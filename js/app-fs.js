@@ -320,6 +320,7 @@ function openIDB() {
 }
 
 async function saveHandleIDB(handle) {
+  if (typeof indexedDB === 'undefined') return;
   try {
     const db = await openIDB();
     return new Promise((resolve, reject) => {
@@ -335,6 +336,7 @@ async function saveHandleIDB(handle) {
 }
 
 async function loadHandleIDB() {
+  if (typeof indexedDB === 'undefined') return null;
   try {
     const db = await openIDB();
     return new Promise((resolve, reject) => {

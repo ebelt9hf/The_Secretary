@@ -305,16 +305,19 @@ button:focus-visible {
 }
 
 /* ── Landing ── */
-#screen-connect{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  height:var(--app-vh);
-  padding:1rem;
+#screen-connect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: var(--app-vh);
+  height: 100vh;
+  padding: 2rem 1rem;
   position: relative;
   background-color: var(--bg);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 #screen-connect::before, #screen-connect::after {
@@ -348,6 +351,7 @@ button:focus-visible {
 #screen-connect-card {
   position: relative;
   z-index: 1;
+  margin: auto 0;
   background: var(--card-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -363,7 +367,12 @@ button:focus-visible {
   gap: 1.1rem;
   text-align: center;
   animation: heroCardEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-  transition: transform var(--transition), box-shadow var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition), max-width 0.3s ease;
+}
+
+#screen-connect-card.has-browser-options {
+  max-width: 880px;
+  width: min(880px, calc(100% - 2rem));
 }
 
 @keyframes heroCardEntrance {
@@ -1919,79 +1928,86 @@ body[data-theme='dark'] .app-version-banner.banner-update {
   width: 100%;
   background: var(--card-bg-alt);
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-md);
-  padding: 1.25rem;
-  margin: 0.5rem 0 0.75rem 0;
+  border-radius: var(--radius-lg);
+  padding: 1.1rem;
+  margin: 0.25rem 0 0.5rem 0;
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.85rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 .browser-compat-header {
   display: flex;
   gap: 0.75rem;
-  align-items: flex-start;
+  align-items: center;
 }
 .browser-compat-icon {
   color: var(--accent);
   flex-shrink: 0;
-  margin-top: 2px;
 }
 .browser-compat-title {
-  margin: 0 0 0.25rem 0;
-  font-size: 1rem;
-  font-weight: 600;
+  margin: 0 0 0.15rem 0;
+  font-size: 0.96rem;
+  font-weight: 700;
   color: var(--text);
 }
 .browser-compat-desc {
   margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.45;
+  font-size: 0.8rem;
+  line-height: 1.4;
   color: var(--text-muted);
 }
 .browser-options-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
   width: 100%;
+}
+@media (max-width: 768px) {
+  .browser-options-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .browser-option-item {
   position: relative;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-sm);
-  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
   transition: all var(--transition);
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  justify-content: space-between;
+  gap: 0.5rem;
   text-align: left;
+  min-height: 155px;
 }
 .browser-option-item:hover {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--card-border));
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 .browser-option-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 .browser-option-heading {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.88rem;
-  font-weight: 600;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+  font-weight: 700;
   color: var(--text);
   margin: 0;
 }
 .browser-option-badge {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 999px;
+  align-self: flex-start;
 }
 .browser-option-badge.badge-paid {
   background: rgba(245, 158, 11, 0.15);
@@ -2005,15 +2021,20 @@ body[data-theme='dark'] .app-version-banner.banner-update {
 }
 .browser-option-text {
   margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.45;
+  font-size: 0.76rem;
+  line-height: 1.4;
   color: var(--text-muted);
+  flex: 1;
 }
 .browser-option-action {
   margin-top: 0.25rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  width: 100%;
+}
+.browser-option-action .btn {
+  width: 100%;
+  justify-content: center;
 }
 
 

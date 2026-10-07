@@ -2958,7 +2958,7 @@ async function checkSavedFolder() {
   if (typeof applyLocalizedUI === 'function') {
     applyLocalizedUI();
   }
-  if (window.AppBridge?.fs) {
+  if (window.AppBridge?.fs && typeof window.AppBridge.fs.getWorkspacePath === 'function') {
     try {
       const ws = await window.AppBridge.fs.getWorkspacePath();
       if (ws) {
@@ -3309,6 +3309,7 @@ function renderBrowserCompatibilityOptions() {
   `;
 
   const card = document.getElementById('screen-connect-card') || screenConnect;
+  if (card && card.classList) card.classList.add('has-browser-options');
   card.insertBefore(container, card.firstChild);
 
   // Hide local folder pick buttons
@@ -3318,6 +3319,8 @@ function renderBrowserCompatibilityOptions() {
   if (btnResume) btnResume.style.display = 'none';
   const divider = document.getElementById('landing-divider');
   if (divider) divider.style.display = 'none';
+  const cloudLink = document.getElementById('landing-cloud-link-wrap');
+  if (cloudLink) cloudLink.style.display = 'none';
 }
 window.renderBrowserCompatibilityOptions = renderBrowserCompatibilityOptions;
 

@@ -371,7 +371,11 @@ async function saveTodosManifest(options = {}) {
     if (typeof renderTeamPanel === 'function' && activeTab === 'team') {
       renderTeamPanel();
     }
-  } catch (e) { console.warn('Could not save todos manifest', e); }
+  } catch (e) {
+    if (e && !e.message?.includes('No root folder handle loaded')) {
+      console.warn('Could not save todos manifest', e);
+    }
+  }
 }
 
 function manifestEntryScore(entry) {

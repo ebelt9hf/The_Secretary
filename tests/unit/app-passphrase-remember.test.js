@@ -25,9 +25,10 @@ describe('Passphrase Autofill & Remember Integration', () => {
   });
 
   beforeEach(() => {
+    const cleanedAppHtml = appHtml.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     document.body.innerHTML = `
       ${modalsHtml}
-      ${appHtml}
+      ${cleanedAppHtml}
     `;
 
     window.settings = {

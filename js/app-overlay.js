@@ -76,8 +76,11 @@ async function deleteCurrentNote() {
   const deletedPath = currentNote.path;
   try {
     await StorageAPI.moveToTrash(currentNote.path, { title: currentNote.title });
-    const idx = manifest.findIndex(m => m.path === currentNote.path);
-    if (idx >= 0) manifest.splice(idx, 1);
+    const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : null);
+    if (curManifest) {
+      const idx = curManifest.findIndex(m => m.path === currentNote.path);
+      if (idx >= 0) curManifest.splice(idx, 1);
+    }
     await saveManifest({ force: true });
     toast(t('trash.noteMovedToTrash') || t('common.noteDeleted'));
     broadcastSync({ type: 'NOTE_DELETED', noteId: deletedId, path: deletedPath });
@@ -524,11 +527,12 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
       if (isFinal) {
         await _doFullNoteSave(changes, activeNote);
       } else {
-        const knownGroups = new Set(manifest.flatMap(n => n.group_tags || []));
-        const knownMajors = new Set(manifest.flatMap(n => n.major_topic_tags || []));
+        const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : []);
+        const knownGroups = new Set(curManifest.flatMap(n => n.group_tags || []));
+        const knownMajors = new Set(curManifest.flatMap(n => n.major_topic_tags || []));
         const hasNewLane  = [...changes.group_tags, ...changes.major_topic_tags]
                               .some(t => !knownGroups.has(t) && !knownMajors.has(t));
-        const updatedHTML = applyNoteEdits(activeNote.originalHTML, changes);
+        const updatedHTML = (typeof applyNoteEdits === 'function') ? applyNoteEdits(activeNote.originalHTML, changes) : (activeNote.originalHTML || '');
         await StorageAPI.writeNoteContent(activeNote.path, updatedHTML);
         Object.assign(activeNote, changes, { originalHTML: updatedHTML });
         upsertManifest(activeNote);
@@ -601,7 +605,9 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
     return true;
   } catch(e) {
     setSaveIndicator('error');
-    console.error('Auto-save failed:', e);
+    if (e && !e.message?.includes('No root folder handle loaded')) {
+      console.error('Auto-save failed:', e);
+    }
     return false;
   }
 }
@@ -2880,7 +2886,8 @@ async function closeNoteOverlay(forceCloseAll = false) {
 
     // Only run final save if user was in edit mode (not just viewing) AND has unsaved changes AND note still exists
     const wasEditing = !document.querySelector('.overlay-panel')?.classList.contains('overlay-view-mode');
-    const noteStillExists = currentNote?.path ? manifest.some(m => m.path === currentNote.path) : true;
+    const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : []);
+    const noteStillExists = currentNote?.path ? curManifest.some(m => m.path === currentNote.path) : true;
     const hasUnsavedChanges = hasUnsavedNoteOverlayChanges();
     const closingNoteRef = currentNote;
 
@@ -10811,11 +10818,12 @@ async function renderInspectorPanel() {
     while ((match = wikiLinkRegex.exec(textVal)) !== null) {
       outgoingMatches.push(match[1].trim());
     }
+    const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : []);
     if (ta && ta.querySelectorAll) {
       ta.querySelectorAll('.note-link, .wiki-link, a[data-note-path], a[data-note-id]').forEach(a => {
         const id = a.getAttribute('data-note-id');
         const path = a.getAttribute('data-note-path');
-        const resolved = (id ? manifest.find(n => n.id === id) : null) || (path ? manifest.find(n => n.path === path) : null);
+        const resolved = (id ? curManifest.find(n => n.id === id) : null) || (path ? curManifest.find(n => n.path === path) : null);
         const title = resolved?.title || a.textContent.replace(/^📝\s*/, '').trim();
         if (title) outgoingMatches.push(title);
       });
@@ -10834,7 +10842,7 @@ async function renderInspectorPanel() {
       list.style.flexDirection = 'column';
       list.style.gap = '0.4rem';
       uniqueOutgoing.forEach(title => {
-        const found = manifest.find(n => (n.title || '').toLowerCase() === title.toLowerCase());
+        const found = curManifest.find(n => (n.title || '').toLowerCase() === title.toLowerCase());
         const btn = document.createElement('button');
         btn.className = 'backlink-chip';
         if (found) {
@@ -12358,9 +12366,10 @@ function getNotesSharingTags(note) {
   const noteGroup = new Set(note.group_tags || []);
   const noteMajor = new Set(note.major_topic_tags || []);
   const noteTopic = new Set(note.topic_tags || []);
+  const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : []);
 
   const results = [];
-  for (const n of manifest) {
+  for (const n of curManifest) {
     if (n.id === note.id) continue;
     const hasSharedGroup = (n.group_tags || []).some(t => noteGroup.has(t));
     const hasSharedMajor = (n.major_topic_tags || []).some(t => noteMajor.has(t));
@@ -12450,7 +12459,8 @@ function openLinkNotePicker(anchorBtn, options = {}) {
   function render(filter) {
     list.innerHTML = '';
     const fl = (filter || '').toLowerCase();
-    const notes = manifest
+    const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : []);
+    const notes = curManifest
       .filter(n => !excluded.has(String(n.id || '').trim()))
       .filter(n => !fl || (n.title || '').toLowerCase().includes(fl))
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));

@@ -37,7 +37,7 @@ const StorageAPI = {
       }
       return JSON.parse(raw);
     } catch (e) {
-      if (e && e.name !== 'NotFoundError') {
+      if (e && e.name !== 'NotFoundError' && !e.message?.includes('No root folder handle loaded')) {
         console.warn(`StorageAPI._readJSON(${filePath}) failed, returning fallback`, e);
       }
       return fallback;

@@ -15,7 +15,7 @@ describe('Perfect Note Informal Notes, Image Injection & Verification Fixes', ()
     globalThis.t = (key) => key;
     globalThis.toast = () => {};
     globalThis.plannerEvents = [];
-    loadScriptsIntoGlobal(['js/app-fs.js', 'js/app-utils.js', 'js/app-overlay.js', 'js/app-dailyreview.js', 'js/app-llm.js']);
+    loadScriptsIntoGlobal(['js/app-state.js', 'js/app-fs.js', 'js/app-utils.js', 'js/app-storage.js', 'js/app-notes.js', 'js/app-overlay.js', 'js/app-dailyreview.js', 'js/app-llm.js']);
   });
 
   describe('restoreOriginalImagesToProposal (inline image restoration)', () => {
@@ -216,6 +216,7 @@ describe('Perfect Note Informal Notes, Image Injection & Verification Fixes', ()
         'notes/2026-09-04-client-call.html': { status: 'ready', proposalA: '<p>Proposal</p>' }
       };
 
+      const errorSpy = vi.spyOn(console, 'error');
       DailyReviewController.renderStep3ListBadges = vi.fn();
       RefactorModalController.activeNote = globalThis.currentNote;
       const origClose = RefactorModalController.closeProposalsModal;
@@ -223,10 +224,13 @@ describe('Perfect Note Informal Notes, Image Injection & Verification Fixes', ()
 
       await RefactorModalController.applyCurrentProposal();
 
+      expect(errorSpy).not.toHaveBeenCalled();
       expect(DailyReviewController.noteProposals['notes/2026-09-04-client-call.html']).toBeUndefined();
       expect(DailyReviewController.renderStep3ListBadges).toHaveBeenCalled();
 
       RefactorModalController.closeProposalsModal = origClose;
+      RefactorModalController.closeProposalsModal();
+      errorSpy.mockRestore();
       editor.remove();
       htmlContainer.remove();
     });
