@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Secretary</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+<script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+<script>
+  (function() {
+    try {
+      var isEl = !!(window.electronAPI?.isElectron || /Electron/i.test(navigator.userAgent));
+      if (isEl) {
+        var p = window.electronAPI?.platform || ((/Mac/i.test(navigator.userAgent) && !/iPhone|iPad/i.test(navigator.userAgent)) ? 'darwin' : (/Win/i.test(navigator.userAgent) || /Win/i.test(navigator.platform) ? 'win32' : 'linux'));
+        document.documentElement.classList.add('is-electron', p === 'darwin' ? 'is-electron-mac' : (p === 'win32' ? 'is-electron-win' : 'is-electron-linux'));
+      }
+    } catch (e) {}
+  })();
+</script>
+<script>
+  // Ensure marked preserves raw HTML (so inline <span class="note-todo"> survives preview/save)
+  try {
+    if (typeof marked !== 'undefined' && typeof marked.setOptions === 'function') {
+      marked.setOptions({
+        gfm: true,
+        breaks: false,
+        headerIds: false,
+        mangle: false,
+        smartLists: true,
+        sanitize: false
+      });
+    }
+  } catch (e) { console.warn('Could not set marked options', e); }
+
+  // Turndown service instance for HTML -> Markdown conversion
+  const turndownService = new TurndownService({
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-'
+  });
+  try {
+    if (typeof turndownPluginGfm !== 'undefined') {
+      turndownService.use(turndownPluginGfm.gfm);
+    }
+  } catch (e) { console.warn('Could not load turndown GFM plugin', e); }
+  try { turndownService.keep(['mark']); } catch (e) { console.warn('Could not keep mark tags', e); }
+  try {
+    turndownService.addRule('mathInline', {
+      filter: function (node) {
+        return node.nodeName === 'SPAN' && (node.classList.contains('note-math') || node.hasAttribute('data-latex'));
+      },
+      replacement: function (content, node) {
+        const latex = node.getAttribute('data-latex') || content || '';
+        return `$${latex}$`;
+      }
+    });
+    turndownService.addRule('mathBlock', {
+      filter: function (node) {
+        return (node.nodeName === 'DIV' || node.nodeName === 'P' || node.nodeName === 'SPAN') && (node.classList.contains('note-math-block') || (node.classList.contains('note-math') && node.getAttribute('data-math-mode') === 'block'));
+      },
+      replacement: function (content, node) {
+        const latex = node.getAttribute('data-latex') || content || '';
+        return `\n\n$$\n${latex}\n$$\n\n`;
+      }
+    });
+  } catch (e) { console.warn('Could not add turndown math rules', e); }
+
+  // Stubs for functions called from HTML inline event handlers before full scripts load
+  function toggleFloatingChat() {
+    if (typeof window._realToggleFloatingChat === 'function') {
+      window._realToggleFloatingChat.apply(this, arguments);
+    } else {
+      const chat = document.getElementById('floating-secretary-chat');
+      const btn = document.getElementById('btn-topbar-ai');
+      if (chat) {
+        const isOpen = chat.classList.contains('is-open');
+        if (isOpen) {
+          chat.classList.remove('is-open');
+          chat.style.removeProperty('display');
+          if (btn) btn.classList.remove('active');
+        } else {
+          chat.classList.add('is-open');
+          chat.style.removeProperty('display');
+          if (btn) btn.classList.add('active');
+        }
+      }
+    }
+  }
+  function minimizeFloatingChat() {
+    if (typeof window._realMinimizeFloatingChat === 'function') {
+      window._realMinimizeFloatingChat.apply(this, arguments);
+    } else {
+      const el = document.getElementById('floating-secretary-chat');
+      if (el) {
+        const isMinimized = el.classList.toggle('minimized');
+        const body = document.getElementById('floating-chat-body');
+        if (isMinimized) {
+          el.dataset.prevHeight = el.style.height || '680px';
+          el.style.height = '40px';
+          el.style.minHeight = '40px';
+          if (body) body.style.display = 'none';
+        } else {
+          el.style.height = el.dataset.prevHeight || '680px';
+          el.style.minHeight = '440px';
+          if (body) body.style.display = 'flex';
+        }
+      }
+    }
+  }
+  function openFloatingChatFromOmnibar() {
+    if (typeof window._realOpenFloatingChatFromOmnibar === 'function') {
+      window._realOpenFloatingChatFromOmnibar.apply(this, arguments);
+    } else {
+      const omnibarOverlay = document.getElementById('omnibar-overlay');
+      if (omnibarOverlay) {
+        omnibarOverlay.style.display = 'none';
+      }
+      const el = document.getElementById('floating-secretary-chat');
+      if (el && el.style.display === 'none') {
+        toggleFloatingChat();
+      }
+    }
+  }
+  function analyzeCurrentNoteWithLLM() {
+    if (typeof window._realAnalyzeCurrentNoteWithLLM === 'function') {
+      window._realAnalyzeCurrentNoteWithLLM.apply(this, arguments);
+    }
+  }
+  function refactorCurrentNoteWithLLM() {
+    if (typeof window._realRefactorCurrentNoteWithLLM === 'function') {
+      window._realRefactorCurrentNoteWithLLM.apply(this, arguments);
+    } else if (typeof window.refactorCurrentNoteWithLLM === 'function') {
+      window.refactorCurrentNoteWithLLM.apply(this, arguments);
+    }
+  }
+  function generateNoteSummaryWithAI() {
+    if (typeof window._realGenerateNoteSummaryWithAI === 'function') {
+      window._realGenerateNoteSummaryWithAI.apply(this, arguments);
+    }
+  }
+  function openNote() {
+    if (typeof window.openNoteOverlay === 'function') {
+      return window.openNoteOverlay.apply(this, arguments);
+    }
+  }
+  function closeNoteOverlay() {
+    if (typeof window._realCloseNoteOverlay === 'function') {
+      return window._realCloseNoteOverlay.apply(this, arguments);
+    }
+  }
+</script>
+</head>
+<body>
+
+<!-- ── Custom window controls (Windows/Linux only; macOS uses native traffic lights) ── -->
+<div id="win-controls" class="win-controls">
+  <button class="win-ctrl-btn" id="win-min" title="Minimize window" data-i18n-title="window.minimize" aria-label="Minimize">
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="0" y="4.5" width="10" height="1" fill="currentColor"/></svg>
+  </button>
+  <button class="win-ctrl-btn" id="win-max" title="Maximize window" data-i18n-title="window.maximize" aria-label="Maximize">
+    <svg class="icon-max" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+    <svg class="icon-restore" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="0.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M2.5 2.5 V0.5 H9.5 V7.5 H7.5" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+  </button>
+  <button class="win-ctrl-btn win-ctrl-close" id="win-close" title="Close window" data-i18n-title="window.close" aria-label="Close">
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M0.5 0.5 L9.5 9.5 M9.5 0.5 L0.5 9.5" stroke="currentColor" stroke-width="1.1"/></svg>
+  </button>
+</div>
+
+<!-- ── Landing ── -->
+<div id="screen-connect" class="loading">
+  <!-- Draggable strip: the landing screen has no titlebar header, so this
+       replaces the drag region the native overlay used to provide. -->
+  <div class="landing-drag-strip"></div>
+  <div id="screen-connect-card">
+    <div class="landing-logo-wrap">
+      <img class="landing-logo" src="icon.svg" alt="Secretary Logo">
+    </div>
+    <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
+    <h1>Secretary</h1>
+    <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
+    <p id="connect-version-hint" data-version="4.0.0" style="font-size:.75rem;color:var(--text-muted);margin-top:-.4rem">Version 4.0.0</p>
+    <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
+    
+    <div class="landing-features">
+      <span class="landing-feature-pill" id="landing-pill-local"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> <span class="landing-pill-text" data-i18n="landing.pillLocalFirst">Local-first</span></span>
+      <span class="landing-feature-pill" id="landing-pill-rich-text"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> <span class="landing-pill-text" data-i18n="landing.pillRichText">Rich Text</span></span>
+      <span class="landing-feature-pill" id="landing-pill-private"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span class="landing-pill-text" data-i18n="landing.pillPrivate">100% Private</span></span>
+    </div>
+
+    <p class="connect-note-hint"></p>
+    <p class="connect-status-hint" id="connect-status-hint" aria-live="polite"></p>
+    
+    <!-- Startup progress bar container -->
+    <div id="startup-progress-wrap" class="startup-progress-container" style="display:none;" aria-live="polite">
+      <div class="startup-progress-track">
+        <div id="startup-progress-fill" class="startup-progress-fill"></div>
+      </div>
+      <div class="startup-progress-info">
+        <div class="startup-progress-status">
+          <span id="startup-progress-icon" class="startup-progress-icon">
+            <svg class="icon-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+          </span>
+          <span id="startup-progress-step" class="startup-progress-step">Initializing workspace…</span>
+        </div>
+        <span id="startup-progress-pct" class="startup-progress-pct">0%</span>
+      </div>
+    </div>
+    
+    <!-- Action buttons container -->
+    <div class="landing-actions-container">
+      <!-- Resume card button: shown when a previously used folder is remembered -->
+      <div id="landing-resume-wrap" class="landing-resume-wrap" style="display:none">
+        <button class="landing-btn-resume" id="btn-resume-folder" title="Reopen the last folder that was used">
+          <div class="landing-btn-resume-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="10 14 14 10 18 14"/><path d="M14 10v7"/></svg>
+          </div>
+          <div class="landing-btn-resume-content">
+            <span class="landing-btn-resume-label" id="btn-resume-folder-label">Resume workspace</span>
+            <span class="landing-btn-resume-folder" id="btn-resume-folder-name"></span>
+          </div>
+          <div class="landing-btn-resume-arrow">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </div>
+        </button>
+      </div>
+
+      <div class="landing-divider" id="landing-divider" style="display:none"><span>or</span></div>
+
+      <!-- Select folder button -->
+      <button class="landing-btn-open" id="btn-open-folder" title="Pick a folder to open in Secretary (starts from the last used folder when available)">
+        <span class="landing-btn-open-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+        </span>
+        <span id="btn-open-folder-text">Open Secretary Folder</span>
+      </button>
+    </div>
+
+    <div class="landing-kbd-hint">
+      <span>Chrome / Edge API</span> · <span class="landing-kbd">Ctrl</span>+<span class="landing-kbd">Shift</span>+<span class="landing-kbd">Space</span> Omnibar
+    </div>
+  </div>
+</div>
+
+<!-- ── Main App ── -->
+<div id="screen-main">
+
+  <!-- Top bar (two rows) -->
+  <div class="topbar">
+    <!-- Row 1: main tabs + prefs icon -->
+    <div class="topbar-row topbar-main-row" id="topbar-main-row" ondblclick="if(window.AppBridge?.isElectron && !event.target.closest('button, input, select, textarea, a, .tab-item, [role=\'button\']')) { window.AppBridge.windowControls.toggleMaximize(); }">
+      <div class="topbar-title-wrap" style="display:flex; align-items:center; gap:6px">
+        <span class="topbar-title" onclick="OmnibarController.open()" style="cursor: pointer;" title="Open Omnibar (Ctrl+Shift+Space)"><img class="topbar-logo" src="icon.svg" alt="">Secretary</span>
+        <button id="btn-topbar-ai" class="topbar-ai-btn" onclick="toggleFloatingChat()" title="Ouvrir l'assistant local Secretary en mode flottant" data-i18n-title="editor.aiFloatingBtnTooltip">AI</button>
+      </div>
+      <button class="tab-btn" id="tab-planner" onclick="switchTab('planner')" title="Plan your week, calls, and tasks"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span class="tab-btn-label">Planneur</span></button>
+      <button class="tab-btn" id="tab-todos-mode" onclick="switchTab('todos')" title="Switch to the todos board"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><span class="tab-btn-label">Tâches</span></button>
+      <div class="retro-tab-wrapper" id="tab-retro-wrapper">
+        <button class="tab-btn" id="tab-retro" onclick="switchTab('retro')" title="Retrospective and data analysis"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="tab-btn-label">Rétrospective</span></button>
+        <div class="retro-hover-card" id="retro-hover-card" style="display:none;" role="tooltip" aria-live="polite"></div>
+      </div>
+      <button class="tab-btn active" id="tab-notes" onclick="switchTab('notes')" title="Switch to the notes board"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="tab-btn-label">Notes</span></button>
+      <button class="tab-btn" id="tab-decisions" onclick="switchTab('decisions')" title="Consulter et gérer les axes de travail, sujets et décisions stratégiques" data-i18n="topbar.workstreams" data-i18n-title="topbar.workstreamsTooltip"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg></span><span class="tab-btn-label">Axes de travail</span></button>
+      <button class="tab-btn" id="tab-team" onclick="switchTab('team')" title="Manage your team and view collaborators"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="tab-btn-label">Équipe</span></button>
+      <button class="tab-btn" id="tab-daily-review-btn" onclick="startDailyReview()" title="Lancer la Daily Review (Nettoyage de fin de journée)" style="display: none;"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span class="tab-btn-label">Daily Review</span></button>
+      <span class="spacer"></span>
+      <button class="topbar-icon-btn" id="btn-tutorial-icon" onclick="startTutorial()" title="Tutorial"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+      <button class="topbar-icon-btn" id="btn-cloud-sync-status" onclick="openCloudSyncModalOrPrefs()" title="Cloud Sync & Storage Status" data-i18n-title="sync.statusTooltip"><span id="cloud-sync-icon-wrap" style="display:inline-flex; align-items:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span></button>
+      <button class="topbar-icon-btn" id="btn-prefs-icon" onclick="switchTab('prefs')" title="Preferences"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="3" r="1"/><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </div>
+    <!-- Row 2: context controls (notes view mode switcher / timeline zoom / search) -->
+    <div class="topbar-row topbar-sub-row" id="topbar-sub-row">
+      <!-- Notes Tab View Mode Switcher (Segmented Tab Bar) -->
+      <div class="notes-view-tabs" id="notes-view-switcher">
+        <button class="notes-view-tab active" id="btn-notes-view-map" onclick="setNotesViewMode('map')" title="Switch to chronological map view" data-i18n-title="notes.mapViewTooltip"><svg class="app-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg> <span data-i18n="notes.mapView">Map</span></button>
+        <button class="notes-view-tab" id="btn-notes-view-reader" onclick="setNotesViewMode('reader')" title="Switch to integrated reader & review mode" data-i18n-title="notes.readerViewTooltip"><svg class="app-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> <span data-i18n="notes.readerView">Reader</span></button>
+      </div>
+
+      <!-- Notes Tab Today Jump Button -->
+      <button class="topbar-btn notes-today-btn" id="btn-notes-today" onclick="scrollToTodayNotes()" title="Jump to today in notes timeline" data-i18n-title="notes.todayBtnTooltip">
+        <svg class="app-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>
+        <span data-i18n="planner.today">Today</span>
+      </button>
+
+      <!-- Hidden legacy axis pills for backward compatibility -->
+      <div class="axis-pills" id="axis-pills" style="display:none">
+        <button class="axis-pill active" id="axis-pill-group" onclick="setLaneAxis('group')" title="Show lanes by group">Groups</button>
+        <button class="axis-pill" id="axis-pill-major" onclick="setLaneAxis('major')" title="Show lanes by major topic">Topics</button>
+        <button class="axis-pill" id="axis-pill-week"  onclick="setLaneAxis('week')" title="Show lanes by week">Weeks</button>
+      </div>
+      <div class="week-subgroup-ctrl" id="week-subgroup-ctrl" style="display:none">
+        <span>by:</span>
+        <select id="week-subgroup-select" onchange="setWeekSubGrouping(this.value)" title="Choose how notes are grouped inside each week lane">
+          <option value="day">Day</option>
+          <option value="group">Group</option>
+          <option value="major">Major Topic</option>
+          <option value="topic">Topic</option>
+        </select>
+      </div>
+      
+      <span class="spacer"></span>
+      
+      <!-- Relocated Search Group -->
+      <div class="topbar-search-group" id="notes-search-group">
+        <span id="search-match-count" class="search-match-count" style="display:none"></span>
+        <input type="search" id="note-search" placeholder="Search…" oninput="filterNotes()" class="topbar-search" title="Search notes by title, tags, or content" data-i18n-placeholder="board.searchPlaceholder">
+        <button class="topbar-srch-btn on" id="search-content-toggle" title="Search in content" onclick="toggleSearchOption('content')">C</button>
+        <button class="topbar-srch-btn" id="search-case-toggle" title="Case sensitive" onclick="toggleSearchOption('case')">aa</button>
+        <button class="topbar-srch-btn" id="search-regex-toggle" title="Regex" onclick="toggleSearchOption('regex')">.*</button>
+      </div>
+      
+      <button class="topbar-btn" id="btn-filter-bar" onclick="toggleFilterBar()" title="Show or hide the filter bar"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> <span data-i18n="board.filter">Filter</span></button>
+      <button class="topbar-btn" id="btn-trash-bin" onclick="openTrashBinModal()" title="View and restore trashed notes" data-i18n-title="trash.openTrashTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> <span data-i18n="trash.title">Trash</span></button>
+      <button class="topbar-btn" id="btn-knowledge-graph" onclick="KnowledgeGraphViewer.openGraphModal()" title="View interactive knowledge graph" data-i18n-title="graph.openGraphTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> <span data-i18n="graph.title">Graph</span></button>
+      <span id="active-filter-chip-container"></span>
+      <!-- hidden label kept for backward compat with JS that may read it -->
+      <span id="lane-axis-label" style="display:none">Groups</span>
+      <span class="topbar-folder" id="folder-name"></span>
+    </div>
+    <!-- Workstream Filter Bar for Notes Tab (Placed in topbar below mode & today controls) -->
+    <div id="notes-workstream-bar" class="notes-workstream-bar" style="display:none">
+      <div id="notes-workstream-bar-inner" class="notes-workstream-bar-inner"></div>
+    </div>
+  </div>
+  <!-- Application Version Status Banner -->
+  <div id="app-version-banner" class="app-version-banner" style="display:none;" role="status"></div>
+  <div id="filter-bar" class="filter-bar" style="display:none">
+    <div id="filter-bar-chips"></div>
+  </div>
+
+  <div class="app-body" id="app-body">
+
+    <!-- Main content -->
+    <div class="app-main" id="app-main" style="width:100%">
+
+    <!-- Breadcrumb Scrubber Bar for Notes Tab -->
+    <div id="notes-breadcrumb-bar" class="notes-breadcrumb-bar" style="display:none;margin:0.5rem 1rem 0.75rem;padding:0.55rem 1rem;background:color-mix(in srgb, var(--card-bg) 96%, transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border-color);border-radius:var(--radius-md, 8px);box-shadow:var(--shadow-sm);font-size:0.82rem;font-weight:600;color:var(--text-muted)"></div>
+
+    <!-- Floating Timeline Scroll HUD & Today Indicator for Notes -->
+    <div id="notes-scroll-hud" class="notes-scroll-hud" style="display:none" onclick="scrollToTodayNotes()" title="Current timeline position. Click to jump to today." data-i18n-title="notes.scrollIndicatorTooltip">
+      <span class="notes-scroll-hud-label" id="notes-scroll-hud-label"></span>
+      <span class="notes-scroll-hud-today" id="notes-scroll-hud-today" style="display:none" data-i18n="planner.today">Today</span>
+    </div>
+
+    <!-- Swimlane board (Notes tab) -->
+    <div id="swimlane-board" style="display:flex;flex-direction:column;gap:.6rem;padding:1rem;width:100%">
+      <!-- lanes rendered by renderBoard() -->
+    </div>
+
+
+    <!-- Planner panel -->
+    <div id="planner-panel" class="planner-panel" style="display:none;padding:1rem;flex:1;overflow:hidden">
+    </div>
+
+
+    <!-- Preferences panel -->
+    <div id="prefs-panel" class="prefs-panel" style="display:none;padding:1rem;flex:1;overflow-y:auto">
+      <h2 style="display:flex; align-items:center; gap:8px;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> <span data-i18n="topbar.prefsTitle">Preferences</span></h2>
+
+      <div class="prefs-tabs" role="tablist">
+        <button class="prefs-tab-btn active" id="prefs-tab-general-btn" data-tab="general" onclick="switchPrefsTab('general')" role="tab" aria-selected="true"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <span data-i18n="prefs.tabGeneral">Général</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-appearance-btn" data-tab="appearance" onclick="switchPrefsTab('appearance')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg> <span data-i18n="prefs.tabAppearance">Apparence</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-schedule-btn" data-tab="schedule" onclick="switchPrefsTab('schedule')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span data-i18n="prefs.tabSchedule">Agenda</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-ai-btn" data-tab="ai" onclick="switchPrefsTab('ai')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> <span data-i18n="prefs.tabAi">Assistant IA</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-sync-btn" data-tab="sync" onclick="switchPrefsTab('sync')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><rect x="8" y="14" width="8" height="6" rx="1"/><path d="M10 14v-2a2 2 0 1 1 4 0v2"/></svg> <span data-i18n="prefs.tabCloudSync">Cloud Sync & E2EE</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-system-btn" data-tab="system" onclick="switchPrefsTab('system')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> <span data-i18n="prefs.tabSystem">Système</span></button>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-appearance">
+        <h3>Appearance</h3>
+        <div class="prefs-row">
+          <label class="prefs-label">Theme</label>
+          <select id="prefs-theme" onchange="prefsThemeChanged(this.value)" class="prefs-input" title="Choose the app theme">
+            <option value="system">System (Auto)</option>
+            <option value="light">Studio Light</option>
+            <option value="dark">Onyx Black</option>
+          </select>
+        </div>
+        <div class="prefs-row">
+          <label class="prefs-label">Accent Color</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="color" id="prefs-accent-color" value="#4f46e5" onchange="prefsAccentChanged(this.value)" class="prefs-input" style="width:40px;height:32px;padding:2px;cursor:pointer" title="Pick accent color">
+            <select id="prefs-accent-preset" onchange="prefsAccentChanged(this.value)" class="prefs-input" style="max-width:130px" title="Choose accent preset">
+              <option value="#4f46e5">Indigo</option>
+              <option value="#10b981">Emerald</option>
+              <option value="#f59e0b">Amber</option>
+              <option value="#f43f5e">Rose</option>
+              <option value="#8b5cf6">Violet</option>
+              <option value="#06b6d4">Cyan</option>
+            </select>
+          </div>
+        </div>
+        <div class="prefs-row">
+          <label class="prefs-label">Lane sorting</label>
+          <select id="prefs-lane-sorting" onchange="prefsLaneSortChanged(this.value)" class="prefs-input" title="Choose how lanes are ordered">
+            <option value="recent">Newest first</option>
+            <option value="alpha">Alphabetical</option>
+          </select>
+          <small style="display:block;color:#6b7280;margin-top:.3rem">Controls ordering of lanes in the Notes board</small>
+        </div>
+        <div class="prefs-row">
+          <label class="prefs-label">Older notes threshold</label>
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <input type="number" id="prefs-week-cutoff" min="1" max="104" class="prefs-input" style="max-width:72px" onchange="prefsWeekCutoffChanged(+this.value)" title="Choose how many weeks before notes move to Older Notes">
+            <small style="color:#6b7280">weeks — notes older than this appear in the "Older Notes" lane (Weeks view)</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-schedule">
+        <h3>Work Schedule</h3>
+        <div class="prefs-row">
+          <label class="prefs-label">Work start</label>
+          <input type="time" id="prefs-work-start" class="prefs-input" style="max-width:120px" onchange="prefsWorkTimeChanged()" title="Work day start time" value="09:00">
+        </div>
+        <div class="prefs-row">
+          <label class="prefs-label">Work end</label>
+          <input type="time" id="prefs-work-end" class="prefs-input" style="max-width:120px" onchange="prefsWorkTimeChanged()" title="Work day end time" value="18:30">
+        </div>
+        <div class="prefs-row">
+          <label class="prefs-label" id="prefs-working-days-label">Working days</label>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;color:var(--text);font-size:0.85rem;">
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-1" onchange="prefsWorkingDaysChanged()" checked> Mon</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-2" onchange="prefsWorkingDaysChanged()" checked> Tue</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-3" onchange="prefsWorkingDaysChanged()" checked> Wed</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-4" onchange="prefsWorkingDaysChanged()" checked> Thu</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-5" onchange="prefsWorkingDaysChanged()" checked> Fri</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-6" onchange="prefsWorkingDaysChanged()"> Sat</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-0" onchange="prefsWorkingDaysChanged()"> Sun</label>
+          </div>
+        </div>
+        <div class="prefs-row">
+          <label class="prefs-label" id="prefs-default-duration-label">Default block duration</label>
+          <select id="prefs-default-duration" class="prefs-input" style="max-width:120px" onchange="prefsDefaultDurationChanged()" title="Default planned block duration">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">60 min</option>
+            <option value="90">90 min</option>
+            <option value="120">120 min</option>
+          </select>
+        </div>
+        <small style="display:block;color:#6b7280;margin-top:.3rem">Used by the Planner to show unplanned time during work hours</small>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-profile">
+        <h3>Collaborator Profile</h3>
+        <div class="prefs-row">
+          <label class="prefs-label">My Name (alias for "me")</label>
+          <input type="text" id="prefs-username" class="prefs-input" style="max-width:200px" onchange="prefsUsernameChanged(this.value)" placeholder="e.g. Alex" title="Your name as an alias for 'me'">
+        </div>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-language">
+        <h3 data-i18n="prefs.language">Language</h3>
+        <div class="prefs-row">
+          <label class="prefs-label" data-i18n="prefs.appLanguage">App Language</label>
+          <select id="prefs-language" onchange="prefsLanguageChanged(this.value)" class="prefs-input" title="Choose the app interface language" data-i18n-title="prefs.appLanguageTooltip">
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+            <option value="fr">Français</option>
+            <option value="cs">Čeština</option>
+            <option value="es">Español</option>
+            <option value="hu">Magyar</option>
+            <option value="it">Italiano</option>
+            <option value="nl">Nederlands</option>
+            <option value="pl">Polski</option>
+            <option value="pt">Português</option>
+            <option value="ro">Română</option>
+            <option value="ru">Русский</option>
+            <option value="sv">Svenska</option>
+            <option value="tr">Türkçe</option>
+            <option value="uk">Українська</option>
+          </select>
+        </div>
+        <div class="prefs-row">
+          <label class="prefs-label" data-i18n="prefs.workingLanguage">Working Language</label>
+          <select id="prefs-working-language" onchange="prefsWorkingLanguageChanged(this.value)" class="prefs-input" title="Choose the working language for note templates and 1-on-1 notes" data-i18n-title="prefs.workingLanguageTooltip">
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+            <option value="fr">Français</option>
+            <option value="cs">Čeština</option>
+            <option value="es">Español</option>
+            <option value="hu">Magyar</option>
+            <option value="it">Italiano</option>
+            <option value="nl">Nederlands</option>
+            <option value="pl">Polski</option>
+            <option value="pt">Português</option>
+            <option value="ro">Română</option>
+            <option value="ru">Русский</option>
+            <option value="sv">Svenska</option>
+            <option value="tr">Türkçe</option>
+            <option value="uk">Українська</option>
+          </select>
+          <small class="prefs-desc" style="display:block;color:#6b7280;margin-top:.3rem" data-i18n="prefs.workingLanguageDesc">Language used for note templates, meeting structures, and automatic note generation.</small>
+        </div>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-ai">
+        <h3 data-i18n="prefs.aiTitle">Intelligence Artificielle (Assistant IA)</h3>
+        <p class="setup-wizard-step-intro" style="margin-bottom:1rem;" data-i18n="setupWizard.step3Desc">Connect a local or cloud AI provider for smart summaries, task extraction, and chat.</p>
+
+        <!-- Enable Switch Row -->
+        <div class="setup-wizard-toggle-row" style="margin-bottom:1.25rem;">
+          <label class="setup-wizard-toggle-label" for="prefs-ai-enabled">
+            <input type="checkbox" id="prefs-ai-enabled" class="setup-wizard-checkbox" onchange="prefsAiSettingChanged()" title="Toggle AI Assistant features in workspace">
+            <span class="setup-wizard-toggle-slider"></span>
+            <span class="setup-wizard-toggle-text" data-i18n="setupWizard.enableAiLabel">Enable AI Assistant</span>
+          </label>
+        </div>
+
+        <!-- Providers Container (Dimmable when disabled) -->
+        <div id="prefs-ai-providers-container" class="setup-wizard-providers-container">
+          <label class="setup-wizard-label" data-i18n="setupWizard.providerLabel">AI Provider</label>
+          
+          <!-- Provider Cards Grid -->
+          <div id="prefs-ai-providers-grid" class="setup-wizard-providers-grid"></div>
+
+          <!-- Hidden select synced with active card for backward compatibility -->
+          <select id="prefs-ai-provider" style="display:none" onchange="prefsAiProviderChanged(this.value)" title="Choose a provider preset for your local LLM endpoint">
+            <option value="custom">Custom OpenAI-compatible</option>
+            <option value="lmstudio">LM Studio</option>
+            <option value="ollama">Ollama</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="groq">Groq</option>
+            <option value="google">Google Gemini</option>
+          </select>
+
+          <!-- Form inputs for Endpoint, Model Name, API Key -->
+          <div class="setup-wizard-form-row" style="margin-top:0.75rem;">
+            <div class="setup-wizard-form-group" style="flex:2">
+              <label class="setup-wizard-label" for="prefs-ai-endpoint" data-i18n="setupWizard.endpointLabel">API Endpoint</label>
+              <input type="text" id="prefs-ai-endpoint" class="setup-wizard-input" onchange="prefsAiSettingChanged()" oninput="prefsAiSettingChanged()" placeholder="e.g. http://127.0.0.1:1234/v1" title="Base URL of the OpenAI-compatible API endpoint">
+            </div>
+            <div class="setup-wizard-form-group" style="flex:1">
+              <label class="setup-wizard-label" for="prefs-ai-model" data-i18n="setupWizard.modelLabel">Model Name</label>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input type="text" id="prefs-ai-model" class="setup-wizard-input" style="flex:1" onchange="prefsAiSettingChanged()" oninput="prefsAiSettingChanged()" placeholder="e.g. qwen2.5-coder-7b-instruct" title="Model identifier to send with requests">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-scan-models" onclick="scanLocalModelsFromUI()" title="Auto-discover models from local endpoint" data-i18n-title="setupWizard.scanModelsTooltip" data-i18n="setupWizard.scanModels">Scan</button>
+              </div>
+              <div id="prefs-ai-model-list" style="display:none; margin-top:4px; max-height:100px; overflow-y:auto; border:1px solid var(--card-border); border-radius:4px; padding:4px; background:var(--card-bg-alt);"></div>
+            </div>
+          </div>
+
+          <div class="setup-wizard-form-group">
+            <label class="setup-wizard-label" for="prefs-ai-key" data-i18n="setupWizard.apiKeyLabel">API Key / Token</label>
+            <input type="password" id="prefs-ai-key" class="setup-wizard-input" onchange="prefsAiSettingChanged()" oninput="prefsAiSettingChanged()" placeholder="Enter API key if required..." title="API key for authentication with this provider">
+          </div>
+
+
+
+          <!-- Connection Test Action Row -->
+          <div class="setup-wizard-test-row" style="margin-top:0.5rem;">
+            <button type="button" id="btn-test-ai-connection" class="setup-wizard-btn setup-wizard-btn-test" onclick="testLocalLLMConnection()" title="Send a ping request to check if Secretary can communicate with the AI endpoint">
+              ⚡ <span data-i18n="setupWizard.testConnectionBtn">Test Connection</span>
+            </button>
+            <span id="prefs-ai-test-status" class="setup-wizard-test-badge" style="display:none;"></span>
+          </div>
+          <div id="prefs-ai-test-result" style="display:none;width:100%;margin-top:0.5rem;"></div>
+        </div>
+
+        <!-- Preserved Advanced Settings Section -->
+        <div style="border-top:1px solid var(--card-border);margin-top:1.25rem;padding-top:1rem;">
+          <div class="setup-wizard-form-row">
+            <div class="setup-wizard-form-group" style="flex:1">
+              <label class="setup-wizard-label" for="prefs-ai-language" id="prefs-ai-language-label">Agent Language</label>
+              <select id="prefs-ai-language" class="setup-wizard-select" onchange="prefsAiSettingChanged()" title="Choose the language constraint for the local AI agent">
+                <option value="auto">Auto (Language of the note/prompt)</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+              </select>
+            </div>
+            <div class="setup-wizard-form-group" style="flex:1">
+              <label class="setup-wizard-label" for="prefs-ai-return-preset" id="prefs-ai-return-preset-label">Return Preset</label>
+              <select id="prefs-ai-return-preset" class="setup-wizard-select" onchange="prefsAiSettingChanged()" title="Choose the return preset for the local AI agent">
+                <option value="full">Full Analysis (Summary, Tasks, Decisions, Corrections)</option>
+                <option value="summary_actions">Summary & Actions (Summary, Tasks, Decisions)</option>
+                <option value="summary_only">Summary Only</option>
+                <option value="actions_only">Actions Only (Tasks & Decisions)</option>
+                <option value="corrections_only">Corrections Only (Spelling & Grammar)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setup-wizard-form-group" style="margin-top:0.75rem;">
+            <label class="setup-wizard-toggle-label" for="prefs-ai-suggest-workstreams">
+              <input type="checkbox" id="prefs-ai-suggest-workstreams" class="setup-wizard-checkbox" onchange="prefsAiSettingChanged()" title="Toggle AI suggestions for workstream creation" data-i18n-title="dailyreview.toggleSuggestWorkstreamsTooltip">
+              <span class="setup-wizard-toggle-text" data-i18n="setupWizard.suggestWorkstreamsLabel">Suggest Workstream creation</span>
+            </label>
+          </div>
+
+          <div class="setup-wizard-form-group" style="margin-top:0.75rem;">
+            <label class="setup-wizard-label" id="prefs-ai-schema-label">Structured Output JSON Schema</label>
+            <div style="position:relative; width:100%;">
+              <textarea id="prefs-ai-schema-display" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:110px;width:100%;background:var(--card-bg-alt);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2.2rem;resize:vertical;box-sizing:border-box;"></textarea>
+              <button type="button" class="btn" onclick="copyAiJsonSchema()" id="btn-copy-ai-schema" title="Copy AI structured output JSON schema to clipboard" data-i18n-title="prefs.copySchemaTooltip" style="position:absolute; top:6px; right:6px; padding:.2rem .55rem; font-size:.72rem; z-index:10; background:var(--card-bg); border:1px solid var(--card-border); border-radius:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> <span data-i18n="prefs.copySchema">Copy Schema</span></button>
+            </div>
+          </div>
+
+          <!-- External Agent Mail-to-Planner Instructions -->
+          <div class="setup-wizard-form-group" style="margin-top:0.85rem; border-top:1px dashed var(--card-border); padding-top:0.85rem;">
+            <label class="setup-wizard-label" id="prefs-external-agent-prompt-label" data-i18n="prefs.externalAgentPromptLabel">External Agent Guidelines (Mail & Calendar)</label>
+            <small class="prefs-desc" style="display:block;color:var(--text-muted);font-size:0.78rem;margin-bottom:6px;" data-i18n="prefs.externalAgentPromptDesc">Copy and paste these guidelines into an external AI agent or automation script to extract calendar events from your mail program into planner-proposals.json.</small>
+            <div style="position:relative; width:100%;">
+              <textarea id="prefs-external-agent-prompt" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:120px;width:100%;background:var(--card-bg-alt);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2.2rem;resize:vertical;box-sizing:border-box;"></textarea>
+              <button type="button" class="btn" onclick="copyExternalAgentPrompt()" id="btn-copy-agent-prompt" title="Copy external agent mail-to-planner instructions to clipboard" data-i18n-title="prefs.copyAgentPromptTooltip" style="position:absolute; top:6px; right:6px; padding:.2rem .55rem; font-size:.72rem; z-index:10; background:var(--card-bg); border:1px solid var(--card-border); border-radius:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> <span data-i18n="prefs.copyAgentPromptBtn">Copy Guidelines</span></button>
+            </div>
+          </div>
+
+          <!-- Preserved Bulk Summaries Row -->
+          <div class="setup-wizard-form-group" style="border-top:1px dashed var(--card-border);padding-top:0.85rem;margin-top:0.85rem">
+            <label class="setup-wizard-label" style="font-weight:600">Génération en bloc</label>
+            <div style="display:flex;flex-direction:column;gap:.6rem;flex:1">
+              <div id="bulk-summary-controls" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+                <span style="font-size:.82rem">Générer les résumés IA des meetings des dernières</span>
+                <input type="number" id="bulk-summary-weeks" value="4" min="1" max="52" style="width:60px;padding:.35rem;border:1px solid var(--card-border);border-radius:var(--radius-sm);background:var(--card-bg);color:var(--text);font-size:.85rem;text-align:center" title="Nombre de semaines à analyser pour la génération en bloc">
+                <span style="font-size:.82rem">semaines</span>
+                <button type="button" class="btn" id="btn-run-bulk-summaries" onclick="runBulkAISummaries()" title="Générer automatiquement des résumés pour toutes les notes des dernières semaines">Lancer la génération</button>
+              </div>
+              <div id="bulk-summary-progress-container" style="display:none;flex-direction:column;gap:.4rem;width:100%;max-width:400px">
+                <div style="display:flex;justify-content:space-between;align-items:center;font-size:.78rem">
+                  <span id="bulk-summary-progress-text" style="font-weight:600">Génération en cours...</span>
+                  <button type="button" class="btn btn-danger" id="btn-cancel-bulk-summaries" onclick="cancelBulkAISummaries()" title="Annuler la génération en bloc des résumés IA" style="padding:.2rem .5rem;font-size:.72rem">Annuler</button>
+                </div>
+                <div class="progress-track" style="width:100%">
+                  <div id="bulk-summary-progress-bar" class="progress-fill" style="width:0%;transition:width 0.2s ease"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-maintenance">
+        <h3 data-i18n="prefs.maintenanceTitle">Index & Maintenance</h3>
+        <div class="prefs-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+            <label class="prefs-label" id="prefs-rebuild-index-label" data-i18n="prefs.rebuildIndexLabel">Reconstruct Index</label>
+            <button class="btn" onclick="rebuildAll()" title="Rebuild the notes and todos indexes" data-i18n-title="prefs.rebuildIndexes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> <span data-i18n="prefs.rebuild">Rebuild</span></button>
+          </div>
+          <small id="prefs-rebuild-index-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="prefs.rebuildIndexDesc">Rescans note files in your workspace folder, registers new orphan files, and removes deleted notes from the app index.</small>
+        </div>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-help">
+        <h3 data-i18n="prefs.helpAndTutorial">Help & Tutorial</h3>
+        <div class="prefs-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+            <label class="prefs-label" id="prefs-setup-wizard-label" data-i18n="prefs.setupWizardLabel">First Startup Wizard</label>
+            <button class="btn" id="prefs-setup-wizard-btn" onclick="SetupWizardController.open()" title="Relaunch the initial setup wizard to reconfigure workspace settings" data-i18n-title="prefs.runSetupWizardTooltip" data-i18n="prefs.runSetupWizardBtn">Run Setup Wizard</button>
+          </div>
+          <small id="prefs-setup-wizard-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="prefs.setupWizardDesc">Relaunches the step-by-step setup wizard to configure folder location, AI options, and default workspace parameters.</small>
+        </div>
+        <div class="prefs-row" style="flex-direction:column;align-items:flex-start;gap:6px;margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+            <label class="prefs-label" id="prefs-tutorial-label" data-i18n="prefs.interactiveTutorial">Interactive Tutorial</label>
+            <button class="btn" id="prefs-tutorial-btn" onclick="startTutorial()" title="Launch the interactive application tour" data-i18n-title="prefs.startTourTooltip" data-i18n="prefs.startTour">Start Tour</button>
+          </div>
+          <small id="prefs-tutorial-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="prefs.tutorialDesc">Launches the guided walkthrough introducing key views, keyboard shortcuts, and board features.</small>
+        </div>
+      </div>
+
+      <div class="prefs-section" id="prefs-sec-folder">
+        <h3 data-i18n="prefs.folder">Folder</h3>
+        <div class="prefs-row">
+          <label class="prefs-label" data-i18n="prefs.savedFolder">Saved folder</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="prefs-folder-name" style="color:#6b7280">Not set</span>
+            <button class="btn" onclick="changeFolderFromPrefs()" title="Pick a different folder" data-i18n-title="prefs.pickFolder" data-i18n="prefs.change">Change</button>
+            <button class="btn" onclick="clearSavedFolder()" title="Forget the remembered folder" data-i18n-title="prefs.forgetFolder" data-i18n="prefs.forget">Forget</button>
+          </div>
+        </div>
+      </div>
+      <div class="prefs-section" id="prefs-sec-sync" style="display:none">
+        <h3 data-i18n="prefs.syncSectionTitle">Cloud Sync & Storage Engine</h3>
+        
+        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <label class="prefs-label" data-i18n="sync.activeEngineLabel">Active Storage Engine</label>
+            <select id="prefs-storage-engine-select" onchange="changeStorageEngineUI(this.value)" class="prefs-input" style="max-width:320px;" title="Choose between local filesystem and encrypted Firebase Firestore" data-i18n-title="sync.selectStorageBackendTooltip">
+              <option value="filesystem" data-i18n="sync.engineOptionFs">Local Filesystem (Free & Private Default)</option>
+              <option value="firebase" data-i18n="sync.engineOptionFirebase">Firebase Cloud Vault (Optional E2EE Sync)</option>
+            </select>
+          </div>
+          <small class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem;" data-i18n="sync.engineDesc">
+            Local Filesystem stores plain HTML/JSON files directly on your computer. Firebase Cloud Vault enables optional multi-device sync with zero-knowledge AES-256-GCM encryption using your own Firebase project.
+          </small>
+        </div>
+
+        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
+          <label class="prefs-label" data-i18n="sync.statusCardTitle">Synchronization Status</label>
+          <div style="display:flex; gap:12px; align-items:center; width:100%; flex-wrap:wrap; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px;">
+            <span id="prefs-sync-status-text" style="font-size:0.85rem; font-weight:600; color:var(--text);">Status: Disconnected</span>
+            <span id="prefs-sync-count-text" style="font-size:0.82rem; color:var(--text-muted);">0 notes cached</span>
+            <span style="flex:1;"></span>
+            <button type="button" class="btn" id="btn-prefs-sync-now" onclick="triggerSyncNowUI()" title="Manually trigger background sync with the cloud" data-i18n-title="sync.syncNowTooltip" data-i18n="sync.syncNowBtn">Sync Now</button>
+          </div>
+        </div>
+
+        <div class="prefs-row" id="prefs-sync-code-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px; display:none;">
+          <label class="prefs-label" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
+          <div style="display:flex; gap:8px; align-items:center; width:100%;">
+            <input type="text" id="prefs-sync-code-input" class="prefs-input" readonly style="flex:1; font-family:monospace; font-weight:600; letter-spacing:1px; background:var(--card-bg-alt);" title="Unique pairing code shared across your devices" data-i18n-title="sync.syncCodeTooltip">
+            <button type="button" class="btn" id="btn-copy-sync-code" onclick="copySyncCodeUI()" title="Copy the sync code to your clipboard" data-i18n-title="sync.copyCodeTooltip" data-i18n="sync.copyCodeBtn">Copy Code</button>
+          </div>
+          <small style="color:var(--text-muted); font-size:0.8rem;" data-i18n="sync.syncCodeHelp">Enter this Sync Code and your Master Passphrase on any other computer to synchronize your notes.</small>
+        </div>
+
+        <div class="prefs-row" id="prefs-sync-remember-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px; display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <label class="prefs-label" data-i18n="sync.rememberPassLabel">Remember Passphrase</label>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;" title="Toggle automatic vault unlocking on this device" data-i18n-title="sync.rememberPassTooltip">
+              <input type="checkbox" id="prefs-sync-remember-pass" onchange="toggleRememberPassphraseUI(this.checked)">
+              <span style="font-size:0.85rem; font-weight:500;" data-i18n="sync.rememberPassOption">Remember on this device</span>
+            </label>
+          </div>
+          <small class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem;" data-i18n="sync.rememberPassHelp">
+            Automatically unlock encrypted vault on startup without asking for passphrase. Uncheck to require master passphrase every time.
+          </small>
+        </div>
+
+        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
+          <label class="prefs-label" data-i18n="sync.vaultActionsTitle">Vault & Migration Actions</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn" id="btn-prefs-migrate-firebase" onclick="openModal('modal-cloud-sync-setup')" title="Import all local notes into encrypted Firebase vault" data-i18n-title="sync.migrateToFirebaseTooltip" data-i18n="sync.migrateToFirebaseBtn">Migrate to Firebase</button>
+            <button type="button" class="btn" id="btn-prefs-configure-firebase" onclick="openModal('modal-cloud-sync-setup'); toggleCustomFirebaseSetupUI();" title="Configure your custom Google Firebase project credentials" data-i18n-title="sync.configureFirebaseTooltip" data-i18n="sync.configureFirebaseBtn">Configure Firebase Project</button>
+            <button type="button" class="btn" id="btn-prefs-reconcile-backup" onclick="reconcileMigrationBackupUI()" title="Scan backup folder to repair missing notes and reconcile merged edits" data-i18n-title="sync.reconcileBackupTooltip" data-i18n="sync.reconcileBackupBtn">Reconcile Backup Notes</button>
+            <button type="button" class="btn" id="btn-prefs-revert-fs" onclick="revertToFilesystemUI()" title="Decrypt and export all notes back to local HTML files" data-i18n-title="sync.revertToFilesystemTooltip" data-i18n="sync.revertToFilesystemBtn">Export to Local Files</button>
+            <button type="button" class="btn" id="btn-prefs-rotate-pass" onclick="openModal('modal-cloud-sync-password-rotate')" title="Change your master passphrase and re-encrypt all notes" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn">Change Passphrase</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="prefs-global-actions">
+        <button class="btn" onclick="loadSettingsFromFolderUI()" title="Load settings from the current folder" data-i18n-title="prefs.loadSettings" data-i18n="prefs.load">Load</button>
+        <button class="btn btn-save" onclick="savePrefs()" title="Save the current preferences" data-i18n-title="prefs.saveSettings" data-i18n="prefs.save">Save</button>
+      </div>
+    </div>
+
+    <!-- Team & Decisions panel -->
+    <div id="team-panel" class="team-panel" style="display:none;padding:1rem;flex:1;overflow:hidden">
+    </div>
+
+    <!-- Retrospective panel -->
+    <div id="retro-panel" class="retro-panel" style="display:none;padding:1rem;flex:1;overflow-y:auto">
+    </div>
+
+    <!-- ── Daily Review Wizard ── -->
+    <div class="daily-review-overlay" id="daily-review-overlay">
+      <div class="dr-shell" id="dr-shell">
+        <div class="dr-header">
+          <div class="dr-title-wrap">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span id="dr-step-title" style="font-size: 1.15rem; font-weight: 700; color: var(--text); display:flex; align-items:center; gap:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span data-i18n="topbar.dailyReview">Daily Review</span></span>
+              <div class="dr-step-date" id="dr-date-title"></div>
+            </div>
+            <div class="dr-header-desc" id="dr-header-desc"></div>
+          </div>
+          <div class="dr-header-actions">
+            <button class="btn" id="btn-dr-guide" onclick="DailyReviewController.startGuidedTour()" title="Lancer le guide interactif de la Daily Review"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <span id="btn-dr-guide-text" data-i18n="tutorial.dailyReviewGuide.guideBtn">Guide</span></button>
+            <button class="btn btn-danger" onclick="confirmQuitDailyReview()" title="Quitter la Daily Review sans valider">Quitter</button>
+          </div>
+        </div>
+
+        <div class="dr-body">
+        <div class="dr-step-container active" id="dr-step-date-select">
+          <div class="dr-step-panel" style="justify-content: center; align-items: center; padding: 2rem; flex: 1;">
+            <div class="dr-start-card" style="align-items: center; text-align: center; max-width: 480px; margin: 0 auto;">
+              <h2 id="dr-start-title" style="margin-bottom: 0.5rem;">Prêt pour votre Daily Review ?</h2>
+              <p id="dr-start-desc" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">
+                Faites le point sur vos réunions d'aujourd'hui, validez les actions générées et préparez demain sereinement.
+              </p>
+              <div class="dr-date-picker-row" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                <label for="dr-target-date" id="dr-start-date-label" style="font-weight: 500; font-size: 0.9rem;">Journée à réviser :</label>
+                <input type="date" id="dr-target-date" class="dr-review-date-input" style="padding: 6px 12px; font-size: 0.95rem; font-family: inherit;" title="Sélectionner la date de la revue à effectuer" aria-label="Date de la revue">
+              </div>
+              <button class="btn btn-primary" id="btn-dr-start" onclick="startDailyReviewForSelectedDate()" style="padding: 10px 24px; font-size: 1.05rem; font-weight: 600;" title="Démarrer la Daily Review pour la date sélectionnée">Démarrer la Revue</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Inbox / Stash Routing -->
+        <div class="dr-step-container" id="dr-step-1">
+          <div class="dr-step-panel" style="flex: 1; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; overflow: hidden; min-height: 0;">
+            <h3 id="dr-step1-title" style="margin: 0; font-size: 1.1rem; color: var(--text);">Tri de la Boîte de Réception (Stash)</h3>
+            <p id="dr-step1-desc" style="margin: 0; color: var(--text-muted); font-size: 0.88rem;">
+              Passez en revue les notes rapides du stash. Transformez-les en tâches, notes de réunion, blocs horaires ou supprimez-les.
+            </p>
+            <div id="stash-routing-grid" class="stash-routing-grid" style="flex: 1; overflow-y: auto;">
+              <!-- Cards injected by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Planner QA & Day Summary -->
+        <div class="dr-step-container" id="dr-step-2">
+          <div class="dr-step-panel" style="flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 0.8rem; overflow: hidden; min-height: 0;">
+            <h3 id="dr-step2-title" style="margin: 0; font-size: 1.1rem; color: var(--text);">Revue du Planificateur &amp; Qualité de l'Agenda</h3>
+            <p id="dr-step2-desc" style="margin: 0; color: var(--text-muted); font-size: 0.88rem;">
+              Ajustez l'emploi du temps d'aujourd'hui selon la réalité. Validez les réunions effectuées et planifiez la suite.
+            </p>
+            <div id="dr-planner-qa-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; min-height: 0;">
+              <!-- Planner day stats & checklist injected by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Notes & Decisions Review -->
+        <div class="dr-step-container" id="dr-step-3">
+          <div class="dr-step-panel" style="flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 0.8rem; overflow: hidden; min-height: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;">
+              <div>
+                <h3 id="dr-step3-title" style="margin: 0; font-size: 1.1rem; color: var(--text);" data-i18n="dailyreview.step3Title">Extraction &amp; Revue des Notes</h3>
+                <p id="dr-step3-desc" style="margin: 0; color: var(--text-muted); font-size: 0.88rem;" data-i18n="dailyreview.step3Desc">
+                  Passez en revue les notes de la journée, reliez les blocs du planner si nécessaire et extrayez les décisions.
+                </p>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="btn btn-primary dr-batch-btn" id="btn-dr-batch-perfect" onclick="DailyReviewController.startBatchPerfectNotes()" data-i18n-title="dailyreview.batchConvertTooltip" title="Convert all today's notes to Perfect Notes in background">
+                  <span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span>
+                  <span data-i18n="dailyreview.batchConvertBtn">Convert All to Perfect Notes</span>
+                </button>
+              </div>
+            </div>
+            <div class="dr-split-container" id="dr-step3-split-container" style="flex: 1; min-height: 0;">
+              <button type="button" class="dr-step3-toggle-btn" id="btn-dr-step3-note-toggle" onclick="DailyReviewController.toggleStep3EditorPane()" title="Réduire / Agrandir le panneau de navigation">-</button>
+              <div class="dr-split-left" id="dr-step3-notes-pane" style="flex: 0 0 320px; display: flex; flex-direction: column; overflow: hidden;">
+                <div id="dr-batch-progress-container" class="dr-batch-progress-box" style="display:none; padding: 8px 12px; margin: 0.6rem 0.6rem 0 0.6rem; background: var(--card-bg-alt); border: 1px solid var(--card-border); border-radius: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.82rem;">
+                    <span id="dr-batch-progress-status" style="font-weight: 600; color: var(--text);">Batch Perfecting Notes... (1/4)</span>
+                    <button type="button" class="btn btn-secondary" id="btn-dr-cancel-batch" style="padding: 2px 8px; font-size: 0.75rem;" onclick="DailyReviewController.cancelBatchPerfectNotes()" data-i18n-title="dailyreview.cancelBatchTooltip" title="Cancel batch conversion">
+                      <span data-i18n="dailyreview.cancelBatch">Cancel</span>
+                    </button>
+                  </div>
+                  <div style="width: 100%; height: 6px; background: var(--card-border); border-radius: 3px; overflow: hidden;">
+                    <div id="dr-batch-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease;"></div>
+                  </div>
+                </div>
+                <div id="dr-notes-to-review-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.8rem;">
+                  <!-- Notes list injected by JS -->
+                </div>
+              </div>
+              <div class="dr-step3-resize-handle" id="dr-step3-resize-handle"></div>
+              <div class="dr-split-right" id="dr-step3-note-pane" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative;">
+                <div id="dr-note-review-editor-container" class="dr-note-review-editor-container" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                  <!-- Embedded Note Editor mounted here -->
+                </div>
+                <!-- Integrated Perfect Note Proposal Review Container -->
+                <div id="dr-integrated-proposal-container" class="dr-integrated-proposal-container" style="display: none; flex: 1; flex-direction: column; gap: 0.5rem; height: 100%; min-height: 0; overflow: hidden; padding: 0.25rem 0;">
+                  <!-- Header with tabs and switch-back toggle -->
+                  <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; gap: 8px; flex-wrap: wrap;">
+                    <div class="refactor-tab-bar" style="display: flex; gap: 6px; background: color-mix(in srgb, var(--card-bg-alt) 80%, var(--card-bg)); padding: 4px; border-radius: 10px; border: 1px solid var(--card-border);">
+                      <button type="button" class="refactor-tab-btn active" id="dr-tab-proposal-a" onclick="DailyReviewController.switchIntegratedTab('A')" data-i18n-title="refactor.proposalATooltip" title="Proposal A (Executive)">Proposal A</button>
+                      <button type="button" class="refactor-tab-btn" id="dr-tab-proposal-b" onclick="DailyReviewController.switchIntegratedTab('B')" data-i18n-title="refactor.proposalBTooltip" title="Proposal B (Comprehensive)">Proposal B</button>
+                      <button type="button" class="refactor-tab-btn" id="dr-tab-proposal-c" style="display: none;" onclick="DailyReviewController.switchIntegratedTab('C')" data-i18n-title="refactor.proposalCTooltip" title="Option C (Custom)">Option C</button>
+                      <button type="button" class="refactor-tab-btn" id="dr-tab-original" onclick="DailyReviewController.switchIntegratedTab('original')" data-i18n-title="refactor.tabOriginalTooltip" title="Original Note">Original</button>
+                      <button type="button" class="refactor-tab-btn" id="dr-tab-scratchpad" onclick="DailyReviewController.switchIntegratedTab('scratchpad')" data-i18n-title="refactor.scratchpadTooltip" title="Agent Scratchpad">Scratchpad</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <button type="button" class="btn btn-secondary" id="btn-dr-switch-raw-editor" onclick="DailyReviewController.switchToRawEditor()" data-i18n-title="dailyreview.switchToRawEditorTooltip" title="Switch back to raw note editor">
+                        <span data-i18n="dailyreview.switchToRawEditor">Raw Editor</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Subtitle / Metrics banner -->
+                  <div id="dr-integrated-tab-desc" style="font-size: 0.82rem; color: var(--text-muted); padding: 3px 8px; border-radius: 6px; background: var(--card-bg-alt); flex-shrink: 0;"></div>
+
+                  <!-- Proposed Workstream & Tags Banner -->
+                  <div id="dr-integrated-tags-container" style="display: none; flex-shrink: 0; background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 8px 12px;"></div>
+
+                  <!-- Clarification Questions Banner (if any detected) -->
+                  <div id="dr-integrated-questions-container" style="display: none; flex-shrink: 0; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; padding: 8px 12px;"></div>
+
+                  <!-- Formatting Toolbar for Perfect Notes Proposal -->
+                  <div class="edit-toolbar dr-integrated-toolbar" id="dr-integrated-toolbar" style="margin: 0; padding: 2px 6px; border-radius: 8px; background: var(--card-bg-alt); border: 1px solid var(--card-border); display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex-shrink: 0; min-height: 30px;">
+                    <div class="md-format-toolbar" id="dr-integrated-format-toolbar" style="display: flex; align-items: center; gap: 2px; flex-wrap: nowrap;">
+                      <button type="button" class="fmt-btn fmt-h1" title="Heading 1" data-i18n-title="editor.h1Tooltip" onclick="DailyReviewController.formatProposal('h1set')">H1</button>
+                      <button type="button" class="fmt-btn fmt-h2" title="Heading 2" data-i18n-title="editor.h2Tooltip" onclick="DailyReviewController.formatProposal('h2set')">H2</button>
+                      <button type="button" class="fmt-btn fmt-h3" title="Heading 3" data-i18n-title="editor.h3Tooltip" onclick="DailyReviewController.formatProposal('h3')">H3</button>
+                      <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+                      <button type="button" class="fmt-btn fmt-bold" title="Bold" data-i18n-title="editor.boldTooltip" onclick="DailyReviewController.formatProposal('bold')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-italic" title="Italic" data-i18n-title="editor.italicTooltip" onclick="DailyReviewController.formatProposal('italic')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-underline" title="Underline" data-i18n-title="editor.underlineTooltip" onclick="DailyReviewController.formatProposal('underline')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-strike" title="Strikethrough" data-i18n-title="editor.strikeTooltip" onclick="DailyReviewController.formatProposal('strike')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4H14a3 3 0 0 1 0 6H7"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-highlight fmt-highlight-prominent" title="Highlight" data-i18n-title="editor.highlightTooltip" onclick="DailyReviewController.formatProposal('mark')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l-6 6v3h3l6-6"/><path d="M22 6l-4.6-4.6a1 1 0 0 0-1.4 0L5 12l7 7 10-10a1 1 0 0 0 0-1.4z"/></svg>
+                      </button>
+                      <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+                      <button type="button" class="fmt-btn fmt-code" title="Inline code" data-i18n-title="editor.codeTooltip" onclick="DailyReviewController.formatProposal('code')">`</button>
+                      <button type="button" class="fmt-btn" title="Code block" data-i18n-title="editor.codeblockTooltip" onclick="DailyReviewController.formatProposal('codeblock')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-quote" title="Blockquote" data-i18n-title="editor.blockquoteTooltip" onclick="DailyReviewController.formatProposal('blockquote')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-clear" title="Clear formatting" data-i18n-title="editor.clearFormattingTooltip" onclick="DailyReviewController.formatProposal('clear')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><path d="M4 20h16"/></svg>
+                      </button>
+                      <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+                      <button type="button" class="fmt-btn" title="Bullet list" data-i18n-title="editor.ulTooltip" onclick="DailyReviewController.formatProposal('ul')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn" title="Numbered list" data-i18n-title="editor.olTooltip" onclick="DailyReviewController.formatProposal('ol')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-checklist" title="Checklist" data-i18n-title="editor.checklistTooltip" onclick="DailyReviewController.formatProposal('checklist')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                      </button>
+                      <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+                      <button type="button" class="fmt-btn" title="Horizontal rule" data-i18n-title="editor.hrTooltip" onclick="DailyReviewController.formatProposal('hr')">—</button>
+                      <button type="button" class="fmt-btn" title="Insert link" data-i18n-title="editor.linkTooltip" onclick="DailyReviewController.formatProposal('link')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn" title="Table" data-i18n-title="editor.tableTooltip" onclick="DailyReviewController.formatProposal('table')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                      </button>
+                      <button type="button" class="fmt-btn fmt-math" title="LaTeX formula" data-i18n-title="editor.mathTooltip" onclick="DailyReviewController.formatProposal('math')">
+                        <span style="font-family:'Times New Roman',serif;font-style:italic;font-weight:700;font-size:12px;letter-spacing:-0.5px;">fx</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Main Proposal Preview & Scratchpad Pane -->
+                  <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden;">
+                    <div id="dr-integrated-preview-pane" class="refactor-preview-scroll" style="flex: 1; overflow-y: auto; padding: 1.2rem; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; line-height: 1.6; color: var(--text);" contenteditable="true" data-i18n-title="refactor.previewPaneTooltip" title="You can edit this proposal directly before applying">
+                      <div id="dr-integrated-proposal-html"></div>
+                      <div id="dr-integrated-actions-container" contenteditable="false" style="display: none; margin-top: 16px; border-top: 1px solid var(--card-border); padding-top: 12px;"></div>
+                    </div>
+                    <div id="dr-integrated-scratchpad-pane" class="refactor-preview-scroll" style="display: none; flex: 1; overflow-y: auto; padding: 1.2rem; background: var(--card-bg-alt); border: 1px solid var(--card-border); border-radius: 8px; line-height: 1.5; color: var(--text); font-size: 0.88rem;">
+                      <div id="dr-integrated-scratchpad-content"></div>
+                    </div>
+                  </div>
+
+                  <!-- Footer Actions: Decline / Option C / Keep Original / Apply & Next -->
+                  <div id="dr-integrated-footer-actions" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-shrink: 0; padding-top: 6px; border-top: 1px solid var(--card-border);">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <button type="button" class="btn btn-secondary" id="btn-dr-integrated-decline" onclick="DailyReviewController.toggleIntegratedFeedbackDrawer()" data-i18n-title="refactor.declineBothTooltip" title="Request custom Option C">
+                        <span data-i18n="refactor.declineBoth">Request Option C</span>
+                      </button>
+                      <button type="button" class="btn btn-secondary" id="btn-dr-integrated-copy" onclick="DailyReviewController.copyIntegratedProposal()" data-i18n-title="refactor.copyProposalTooltip" title="Copy proposal to clipboard">
+                        <span data-i18n="refactor.copyProposal">Copy</span>
+                      </button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <button type="button" class="btn btn-secondary" id="btn-dr-integrated-keep-orig" onclick="DailyReviewController.keepOriginalNote()" data-i18n-title="dailyreview.keepOriginalTooltip" title="Keep original note without changes">
+                        <span data-i18n="dailyreview.keepOriginal">Keep Original</span>
+                      </button>
+                      <button type="button" class="btn btn-primary" id="btn-dr-integrated-apply" onclick="DailyReviewController.applyIntegratedProposal()" data-i18n-title="dailyreview.applyAndNextTooltip" title="Apply this proposal and proceed to next note">
+                        <span data-i18n="dailyreview.applyAndNext">✓ Apply &amp; Next</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Option C Drawer inside integrated view -->
+                  <div id="dr-integrated-feedback-drawer" style="display: none; margin-top: 6px; padding: 10px 12px; border: 1px solid var(--card-border); background: var(--card-bg-alt); border-radius: 8px; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                      <span style="font-size: 0.83rem; font-weight: 600; color: var(--text);" data-i18n="refactor.feedbackTitle">Option C Instructions:</span>
+                      <button type="button" class="btn" style="padding: 2px 6px; font-size: 0.75rem;" onclick="DailyReviewController.toggleIntegratedFeedbackDrawer(false)" data-i18n-title="refactor.closeFeedbackTooltip" title="Close">✕</button>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <input type="text" id="dr-integrated-feedback-input" class="field-input" style="flex: 1; padding: 6px 10px; font-size: 0.84rem; border: 1px solid var(--card-border); border-radius: 6px; background: var(--card-bg); color: var(--text);" placeholder="e.g., Make it more concise, emphasize deadlines..." title="Type custom instructions for Option C" />
+                      <button type="button" class="btn btn-primary" id="btn-dr-integrated-gen-c" onclick="DailyReviewController.generateIntegratedOptionC()" data-i18n-title="refactor.generateOptionCTooltip" title="Generate custom Option C">
+                        <span data-i18n="refactor.generateOptionC">Generate Option C</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5: AI Daily Synthesis & Routing -->
+        <div class="dr-step-container" id="dr-step-ai">
+          <!-- Left panel (65%): Daily Summary Note Editor -->
+          <div class="dr-step-panel" id="dr-ai-left-panel" style="flex: 1.8; padding: 1.2rem; display: flex; flex-direction: column; gap: 0.8rem; overflow:hidden; min-height:0;">
+            <div id="dr-ai-summary-header" style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+              <div>
+                <h3 id="dr-step5-title" style="margin: 0; font-size: 1.1rem; color: var(--text);">Synthèse Quotidienne par l'IA</h3>
+                <p id="dr-step5-desc" style="margin: 2px 0 0 0; color: var(--text-muted); font-size: 0.82rem;">
+                  L'IA a agrégé les notes de toutes vos réunions du jour dans une note journalière structurée.
+                </p>
+              </div>
+            </div>
+            
+            <div id="dr-ai-loading" style="display:none; flex-direction:column; align-items:center; justify-content:center; padding: 2.5rem 1.5rem; flex:1;">
+              <div class="spinner" style="width: 32px; height: 32px; border-width: 3px; margin-bottom: 1rem;"></div>
+              <!-- Prominent step status text -->
+              <span id="dr-ai-loading-title" style="font-size: 1.05rem; font-weight: 600; color: var(--text); margin-bottom: 0.5rem; text-align: center;">Génération de la synthèse...</span>
+              
+              <!-- Clean progress bar track -->
+              <div style="width: 100%; max-width: 380px; height: 8px; background: var(--card-border); border-radius: 4px; overflow: hidden; margin-bottom: 0.6rem;">
+                <div id="dr-ai-loading-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s ease;"></div>
+              </div>
+              
+              <!-- Smaller text showing specific detail below progress bar -->
+              <div style="font-size:0.8rem; color:var(--text-muted); min-height: 1.2rem; text-align: center;" id="dr-ai-loading-details"></div>
+              
+              <!-- Cancel Button -->
+              <button class="btn btn-secondary" id="btn-dr-ai-cancel" onclick="DailyReviewController.cancelAISummaryGeneration()" style="margin-top: 0.5rem; padding: 6px 16px; font-size: 0.85rem;" title="Annuler la génération du résumé quotidien" data-i18n-title="dailyreview.cancelAISummaryTooltip"><span data-i18n="dailyreview.cancelAISummaryBtn">Annuler</span></button>
+            </div>
+            
+            <div id="dr-ai-editor" style="display:flex; flex-direction:column; gap:0.4rem; flex:1; min-height:0;">
+              <!-- Legacy hidden fields for programmatic fallback compatibility -->
+              <input type="text" id="dr-ai-summary-title" style="display:none;" />
+              <div id="dr-ai-summary-content" style="display:none;"></div>
+
+              <!-- Workstream / Themenfelder Background Sync Progress Banner -->
+              <div id="dr-workstream-sync-banner" class="dr-ws-sync-banner" style="display:none;" role="status" aria-live="polite">
+                <div class="dr-ws-sync-header">
+                  <div class="dr-ws-sync-info">
+                    <span class="dr-ws-sync-spinner" id="dr-ws-sync-spinner"></span>
+                    <span id="dr-ws-sync-status-text" class="dr-ws-sync-text">Mise à jour des dossiers thématiques en arrière-plan...</span>
+                  </div>
+                  <button type="button" class="btn btn-secondary dr-ws-sync-action-btn" id="dr-ws-sync-view-btn" onclick="switchStep5Tab('workstreams')" title="Voir les détails des dossiers thématiques" data-i18n-title="dailyreview.workstreamSyncViewDetails">
+                    <span data-i18n="dailyreview.workstreamSyncViewDetails">Voir les détails</span>
+                  </button>
+                </div>
+                <div class="dr-ws-sync-track">
+                  <div id="dr-ws-sync-progress-bar" class="dr-ws-sync-progress" style="width: 0%;"></div>
+                </div>
+              </div>
+
+              <!-- Three-Tab Header Navigation -->
+              <div class="dr-step5-tab-bar" style="display:flex; gap:6px; background:color-mix(in srgb, var(--card-bg-alt) 80%, var(--card-bg)); padding:3px 6px; border-radius:8px; border:1px solid var(--card-border); flex-shrink:0;">
+                <button type="button" class="dr-step5-tab-btn active" id="dr-tab-summary-note" onclick="switchStep5Tab('note')" title="Éditer le résumé quotidien" data-i18n-title="dailyreview.summaryNoteTooltip">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> <span id="dr-tab-summary-note-label" data-i18n="dailyreview.summaryNoteTab">Résumé quotidien</span>
+                </button>
+                <button type="button" class="dr-step5-tab-btn" id="dr-tab-summaries-list" onclick="switchStep5Tab('list')" title="Afficher la liste des synthèses de notes" data-i18n-title="dailyreview.summariesListTooltip">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M16 2v4h4"/><path d="M21 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h9z"/><path d="M3 6v14a2 2 0 0 0 2 2h14"/></svg> <span id="dr-tab-summaries-list-label" data-i18n="dailyreview.summariesListTab">Résumés des notes</span> (<span id="dr-step5-notes-count">0</span>)
+                </button>
+                <button type="button" class="dr-step5-tab-btn" id="dr-tab-workstream-updates" onclick="switchStep5Tab('workstreams')" title="Mises à jour des Workstreams extraites des notes" data-i18n-title="dailyreview.workstreamUpdatesTabTooltip">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12"/><path d="M18 9a9 9 0 0 0-9 9"/></svg> <span id="dr-tab-workstream-updates-label" data-i18n="dailyreview.workstreamUpdatesTab">Workstreams</span> (<span id="dr-step5-ws-count">0</span>)
+                </button>
+              </div>
+
+              <!-- Tab 1: Daily Summary Note Editor Container -->
+              <div class="dr-step5-tab-content active" id="dr-step5-tab-note" style="display:flex; flex-direction:column; flex:1; min-height:0; width:100%;">
+                <div id="dr-step5-editor-container" class="dr-note-review-editor-container" style="flex:1; min-height:0; width:100%;">
+                  <!-- Embedded Note Editor mounted here -->
+                </div>
+              </div>
+
+              <!-- Tab 2: Meeting & Notes Summaries List -->
+              <div class="dr-step5-tab-content" id="dr-step5-tab-list" style="display:none; flex-direction:column; flex:1; min-height:0; width:100%;">
+                <label id="dr-ai-meeting-summaries-label" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.5rem;" data-i18n="dailyreview.meetingSummariesLabel">Activités et réunions de la journée :</label>
+                <div id="dr-ai-meeting-summaries-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.8rem; padding-right:4px; min-height:0;">
+                  <!-- Dynamic list of today's meeting notes and summaries -->
+                </div>
+              </div>
+
+              <!-- Tab 3: Workstream Updates & Agent Sync List -->
+              <div class="dr-step5-tab-content" id="dr-step5-tab-workstreams" style="display:none; flex-direction:column; flex:1; min-height:0; width:100%;">
+                <label id="dr-ai-workstream-updates-label" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.5rem;" data-i18n="dailyreview.workstreamUpdatesDesc">Mises à jour extraites par l'IA des notes du jour pour les workstreams actifs :</label>
+                <div id="dr-ai-workstream-updates-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.8rem; padding-right:4px; min-height:0;">
+                  <!-- Dynamic list of extracted workstream updates -->
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Right panel (35%): AI Suggested Actions -->
+          <div class="dr-step-panel" id="dr-ai-suggestions-panel" style="display:flex; flex-direction:column; gap:0.6rem; flex: 1.1; overflow:hidden; min-height:0; border-left: 1px solid var(--card-border); padding-left: 1rem; padding-right:0.2rem;">
+            <h4 style="margin:0; font-size:0.95rem; font-weight:600; color:var(--text); display:flex; align-items:center; justify-content:space-between; gap:0.4rem; flex-shrink:0;">
+              <span id="dr-ai-suggestions-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px; color:var(--accent);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Actions suggérées par l'IA</span>
+              <label class="dr-toggle-ws-label" style="display:inline-flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:normal; cursor:pointer; color:var(--text-muted);" title="Toggle AI suggestions for new workstreams" data-i18n-title="dailyreview.toggleSuggestWorkstreamsTooltip">
+                <input type="checkbox" id="dr-toggle-suggest-ws" checked onchange="DailyReviewController.toggleSuggestWorkstreams(this.checked)" style="cursor:pointer;" title="Toggle AI suggestions for new workstreams" data-i18n-title="dailyreview.toggleSuggestWorkstreamsTooltip">
+                <span data-i18n="dailyreview.suggestWorkstreamsLabel">Workstreams</span>
+              </label>
+            </h4>
+            <p id="dr-ai-suggestions-desc" style="font-size:0.75rem; color:var(--text-muted); margin:0; flex-shrink:0;">
+              L'IA a extrait ces actions des notes du jour. Vous pouvez les ajouter au board ou planifier un bloc de travail.
+            </p>
+            <div id="dr-ai-suggestions-list" style="display:flex; flex-direction:column; gap:0.6rem; flex:1; overflow-y:auto; padding-right:0.2rem; min-height:0; margin-top:0.2rem;">
+              <!-- Suggested action cards -->
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <div class="dr-footer">
+          <div class="dr-footer-left">
+            <button class="btn btn-secondary" id="btn-dr-prev" onclick="navigateDailyReviewStep(-1)" disabled style="display:none;" title="Revenir à l'étape précédente">Précédent</button>
+          </div>
+          
+          <div class="dr-footer-center">
+            <span id="dr-step-indicator-text" class="dr-step-indicator-text">Étape 1 sur 5</span>
+            <div class="dr-steps-tracker">
+              <div class="dr-step-dot active" id="dr-dot-1">1</div>
+              <div class="dr-step-separator"></div>
+              <div class="dr-step-dot" id="dr-dot-2">2</div>
+              <div class="dr-step-separator"></div>
+              <div class="dr-step-dot" id="dr-dot-3">3</div>
+              <div class="dr-step-separator"></div>
+              <div class="dr-step-dot" id="dr-dot-4">4</div>
+              <div class="dr-step-separator" id="dr-separator-5"></div>
+              <div class="dr-step-dot" id="dr-dot-5">5</div>
+            </div>
+          </div>
+          
+          <div class="dr-footer-right">
+            <!-- Regenerate button: shown on step 5 only after generation, near the Close Day button -->
+            <div id="dr-ai-regenerate-wrap" style="position:relative; display:none;">
+              <button class="btn btn-secondary" id="btn-dr-ai-regenerate" onclick="DailyReviewController.handleRegenerateClick()" title="Régénérer le résumé avec de nouvelles instructions">↻ Régénérer</button>
+              <div id="dr-ai-regenerate-popover" style="display:none; position:absolute; bottom:115%; right:0; width:280px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); padding:10px; z-index:100; flex-direction:column; gap:8px;">
+                <label id="dr-ai-regenerate-label" for="dr-ai-regenerate-context" style="font-size:0.75rem; font-weight:600; color:var(--text); margin-bottom:2px; display:block; text-align:left;">Ajouter des instructions :</label>
+                <textarea id="dr-ai-regenerate-context" name="dr-ai-regenerate-context" style="width:100%; height:60px; font-size:0.8rem; padding:6px; resize:none; border:1px solid var(--card-border); border-radius:4px; outline:none; background:var(--card-bg); color:var(--text);" placeholder="Ex: Rendre plus formel, insister sur le budget..."></textarea>
+                <label style="display:flex; align-items:center; gap:6px; font-size:0.75rem; color:var(--text); cursor:pointer;" title="Toggle AI suggestions for new workstreams" data-i18n-title="dailyreview.toggleSuggestWorkstreamsTooltip">
+                  <input type="checkbox" id="dr-ai-regen-suggest-workstreams" checked style="cursor:pointer;" title="Toggle AI suggestions for new workstreams" data-i18n-title="dailyreview.toggleSuggestWorkstreamsTooltip">
+                  <span data-i18n="dailyreview.suggestWorkstreamsToggle">Suggest new workstreams</span>
+                </label>
+                <div style="display:flex; gap:6px; justify-content:flex-end;">
+                  <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="DailyReviewController.hideRegeneratePopover()" title="Annuler la régénération">Annuler</button>
+                  <button class="btn btn-primary" style="padding:4px 8px; font-size:0.75rem;" onclick="DailyReviewController.submitRegenerateWithContext()" title="Lancer la régénération">Régénérer</button>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="btn-dr-next" onclick="navigateDailyReviewStep(1)" style="display:none;" title="Passer à l'étape suivante">Suivant</button>
+          </div>
+        </div>
+      </div>
+    </div><!-- /app-main -->
+  </div><!-- /app-body -->
+
+  <!-- Note edit overlay -->
+  <include src="templates/note-editor-overlay.html" />
+
+  <!-- Todo view/edit overlay -->
+  <include src="templates/todo-edit-overlay.html" />
+</div><!-- /screen-main -->
+
+<!-- Focus Mode Mini HUD (PiP Window) -->
+<div id="focus-pip-hud">
+  <div class="focus-pip-hud-top">
+    <span class="focus-pip-hud-title" id="focus-pip-hud-title" data-i18n="focus.session"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Focus Session</span>
+    <div class="focus-pip-hud-controls">
+      <button class="focus-pip-btn" id="btn-pip-toggle-timer" onclick="toggleFocusPipTimer()" title="Pause or resume timer" data-i18n-title="focus.pauseResume"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+      <button class="focus-pip-btn" id="btn-pip-close" onclick="closeFocusPipWindow()" title="Close Mini HUD" data-i18n-title="focus.closeHud"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div class="focus-pip-timer-display">
+    <div class="focus-pip-digits" id="focus-pip-digits">25:00</div>
+    <div class="focus-pip-task-label" id="focus-pip-task-label" data-i18n="focus.deepWork">Deep Work Focus</div>
+  </div>
+</div>
+
+<include src="templates/floating-chat.html" />
+<include src="templates/modals.html" />
+<include src="templates/omnibar.html" />
+
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<script src="js/app-state.js?v=4.0.0"></script>
+<script src="js/app-utils.js?v=4.0.0"></script>
+<script src="js/app-icons.js?v=4.0.0"></script>
+<script src="js/app-popover-manager.js?v=4.0.0"></script>
+<script src="js/translations.js?v=4.0.0"></script>
+<script src="js/app-i18n.js?v=4.0.0"></script>
+<script src="js/app-bridge.js?v=4.0.0"></script>
+<script src="js/app-fs.js?v=4.0.0"></script>
+<script src="js/firebase-bundle.js?v=4.0.0"></script>
+<script src="js/firebase-config.js?v=4.0.0"></script>
+<script src="js/app-crypto.js?v=4.0.0"></script>
+<script src="js/app-image-optimizer.js?v=4.0.0"></script>
+<script src="js/app-firebase-sync.js?v=4.0.0"></script>
+<script src="js/app-storage.js?v=4.0.0"></script>
+<script src="js/app-stash-service.js?v=4.0.0"></script>
+<script src="js/app-omnibar.js?v=4.0.0"></script>
+<script src="js/app-topic-memory.js?v=4.0.0"></script>
+<script src="js/app-prompts.js?v=4.0.0"></script>
+<script src="js/app-llm.js?v=4.0.0"></script>
+<script src="js/app-dailyreview.js?v=4.0.0"></script>
+<script src="js/app-notes.js?v=4.0.0"></script>
+<script src="js/app-todos-board.js?v=4.0.0"></script>
+<script src="js/app-board.js?v=4.0.0"></script>
+<script src="js/app-focus.js?v=4.0.0"></script>
+<script src="js/app-overlay.js?v=4.0.0"></script>
+<script src="js/app-planner.js?v=4.0.0"></script>
+<script src="js/app-collab.js?v=4.0.0"></script>
+<script src="js/app-retro.js?v=4.0.0"></script>
+<script src="js/app-tutorial.js?v=4.0.0"></script>
+<script src="js/app-graph-view.js?v=4.0.0"></script>
+<script src="js/app-chat.js?v=4.0.0"></script>
+<script src="js/app-init.js?v=4.0.0"></script>
+</body>
+</html>

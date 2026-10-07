@@ -1,0 +1,1600 @@
+/* ── Secretary: Notes Board ── */
+/* ── Tags ── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 140px;
+  height: 20px;
+  box-sizing: border-box;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-size: .68rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all var(--transition);
+  border: 1px solid transparent;
+}
+.group-tag {
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.major-tag {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border: 1px solid var(--color-medium-border);
+}
+.topic-tag {
+  background: var(--color-low-bg);
+  color: var(--color-low-text);
+  border: 1px solid var(--color-low-border);
+}
+.extra-tag {
+  background: var(--card-bg-alt);
+  color: var(--text-muted);
+  border: 1px solid var(--card-border);
+}
+
+/* ── Map View Timeline: Vertical Time Bar Stems ("Hanging Notes") ── */
+.map-timeline-card-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 280px;
+  flex: 0 0 280px;
+  box-sizing: border-box;
+  margin-bottom: 0.85rem;
+}
+.map-time-stem-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  padding-top: 2px;
+}
+.map-time-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+  opacity: 0.9;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 6px;
+  line-height: 1.3;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.map-time-bar-stem {
+  width: 2px;
+  height: 22px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 25%, transparent) 0%, color-mix(in srgb, var(--accent) 65%, transparent) 100%);
+  margin: 2px 0 0 0;
+  border-radius: 1px;
+}
+.map-timeline-card-col .sl-card {
+  width: 280px !important;
+  min-width: 280px !important;
+  height: 300px !important;
+  min-height: 300px !important;
+  box-sizing: border-box;
+  flex: 0 0 280px;
+}
+.tag.todo-high {
+  background: var(--color-high-bg);
+  color: var(--color-high-text);
+  border: 1px solid var(--color-high-border);
+}
+.tag.todo-med {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border: 1px solid var(--color-medium-border);
+}
+.tag.todo-wip {
+  background: var(--color-wip-bg);
+  color: var(--color-wip-text);
+  border: 1px solid var(--color-wip-border);
+}
+.tag.todo-low {
+  background: var(--color-low-bg);
+  color: var(--color-low-text);
+  border: 1px solid var(--color-low-border);
+}
+.todo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  line-height: 1.2;
+  padding: .25rem .75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: .78rem;
+  cursor: pointer;
+  background: var(--card-bg-alt);
+  transition: all var(--transition);
+}
+.todo-btn.todo-high {
+  background: var(--color-high-bg);
+  color: var(--color-high-text);
+  border-color: var(--color-high-border);
+}
+.todo-btn.todo-med {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border-color: var(--color-medium-border);
+}
+.todo-btn.todo-wip {
+  background: var(--color-wip-bg);
+  color: var(--color-wip-text);
+  border-color: var(--color-wip-border);
+}
+.todo-btn.todo-low {
+  background: var(--color-low-bg);
+  color: var(--color-low-text);
+  border-color: var(--color-low-border);
+}
+.todo-btn:hover {
+  transform: translateY(-1px);
+}
+.todo-btn.active {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+  outline: none;
+}
+
+/* Filter bar */
+.filter-bar-chip {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  line-height: 1.2;
+  padding: .32rem .75rem;
+  font-size: .80rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition);
+  background: var(--card-bg-alt);
+  color: var(--text);
+}
+.filter-bar-chip:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.filter-bar-chip.fb-major {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border-color: var(--color-medium-border);
+}
+.filter-bar-chip.fb-major:hover, .filter-bar-chip.fb-major.active {
+  background: color-mix(in srgb, var(--color-medium) 16%, var(--card-bg));
+  border-color: var(--color-medium);
+  color: var(--color-medium-text);
+}
+.filter-bar-chip.fb-group {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.filter-bar-chip.fb-group:hover, .filter-bar-chip.fb-group.active {
+  background: color-mix(in srgb, var(--accent) 16%, var(--card-bg));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.filter-bar-chip.fb-topic {
+  background: var(--color-low-bg);
+  color: var(--color-low-text);
+  border-color: var(--color-low-border);
+}
+.filter-bar-chip.fb-topic:hover, .filter-bar-chip.fb-topic.active {
+  background: color-mix(in srgb, var(--color-low) 16%, var(--card-bg));
+  border-color: var(--color-low);
+  color: var(--color-low-text);
+}
+.filter-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+  margin-bottom: .4rem;
+  padding: .25rem 0;
+}
+.filter-bar-section {
+  font-size: .76rem;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  margin-right: .2rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.05em;
+}
+.active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  line-height: 1.2;
+  padding: .3rem .8rem;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-left: .3rem;
+  transition: all var(--transition);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.active-filter-chip:hover {
+  background: color-mix(in srgb, var(--accent) 85%, black);
+  transform: translateY(-1px);
+}
+
+/* Swimlane board */
+.sl-lane {
+  background: var(--lane-surface, var(--card-bg));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+  border-left: 5px solid var(--lane-color, var(--accent));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  transition: box-shadow var(--transition), border-color var(--transition), background-color var(--transition);
+}
+.sl-lane-header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .65rem .9rem;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--lane-color, var(--accent)) 12%, transparent);
+  background: var(--lane-surface, var(--card-bg-alt));
+  color: var(--lane-color, var(--text));
+  font-family: var(--font-sans);
+  transition: all var(--transition);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22), 0 10px 24px color-mix(in srgb, var(--lane-color, var(--accent)) 28%, transparent);
+}
+.sl-lane:hover, .sl-lane.lane-hovered {
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--lane-color, var(--accent)) 10%, transparent), var(--shadow);
+  border-color: color-mix(in srgb, var(--lane-color, var(--accent)) 30%, var(--card-border));
+}
+.sl-lane:hover .sl-lane-header, .sl-lane.lane-hovered .sl-lane-header {
+  background: var(--lane-surface-hover, var(--card-bg-alt));
+}
+.sl-lane.selected-lane {
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--lane-color, var(--accent)) 15%, transparent), var(--shadow-lg);
+  border-color: var(--lane-color, var(--accent));
+}
+.sl-lane.selected-lane .sl-lane-header {
+  background: var(--lane-surface-hover, var(--card-bg-alt));
+}
+.sl-lane-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: var(--lane-color, var(--accent));
+}
+.sl-lane-name {
+  font-weight: 600;
+  font-size: .88rem;
+  color: var(--text);
+}
+.sl-lane-count {
+  font-size: .72rem;
+  color: var(--text-muted);
+  margin-left: 2px;
+  font-weight: 500;
+}
+.sl-lane-add {
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--text) 24%, transparent);
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  border-radius: var(--radius-sm);
+  padding: .2rem .7rem;
+  font-size: .8rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition);
+}
+.sl-lane-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--card-bg);
+}
+.sl-lane-toggle {
+  font-size: .72rem;
+  color: var(--text-muted);
+  margin-left: .3rem;
+}
+
+.sl-subtabs {
+  display: flex;
+  gap: .3rem;
+  padding: .5rem .9rem;
+  border-bottom: 1px solid var(--card-border);
+  flex-wrap: wrap;
+  background: var(--card-bg-alt);
+}
+.sl-subtab {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: .7rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-muted);
+  transition: all var(--transition);
+}
+.sl-subtab:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.sl-subtab.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Lane cards — horizontal scroll row */
+.sl-cards {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: .5rem;
+  padding: .6rem .8rem .7rem;
+  overflow-x: auto;
+  overflow-y: visible;
+  flex-shrink: 0;
+  flex-wrap: nowrap !important;
+  scrollbar-width: thin;
+}
+.sl-cards::-webkit-scrollbar {
+  height: 6px;
+}
+.sl-cards::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sl-cards::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 999px;
+}
+
+/* Note card: Redesigned with title focus, wider aspect ratio (235px), reduced size */
+.sl-card {
+  --card-current-bg: var(--card-bg);
+  background: var(--card-current-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 10px);
+  padding: .5rem .7rem .5rem .2rem;
+  cursor: pointer;
+  width: 280px;
+  flex: 0 0 280px;
+  min-width: 280px;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: .08rem;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background-color var(--transition), height var(--transition);
+  user-select: none;
+  height: 300px;
+  min-height: 300px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 6px color-mix(in srgb, var(--lane-color, var(--accent)) 10%, transparent);
+}
+.sl-card.note-card {
+  flex-direction: row;
+  gap: 2px;
+  padding: .55rem .65rem .5rem .2rem;
+}
+.sl-card-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.sl-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15), 0 8px 20px color-mix(in srgb, var(--lane-color, var(--accent)) 20%, transparent);
+  border-color: color-mix(in srgb, var(--lane-color, var(--accent)) 45%, var(--card-border));
+}
+.sl-card.selected {
+  border-color: var(--lane-color, var(--accent));
+  box-shadow: inset 4px 0 0 var(--lane-color, var(--accent)), 0 6px 18px rgba(0, 0, 0, 0.12), 0 4px 12px color-mix(in srgb, var(--lane-color, var(--accent)) 15%, transparent);
+  --card-current-bg: color-mix(in srgb, var(--lane-color, var(--accent)) 4%, var(--card-bg));
+  background: var(--card-current-bg);
+}
+
+/* Planned / Uncreated Note Card (from planner blocs) */
+.sl-card.planned-note-card {
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--card-bg));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 6px color-mix(in srgb, var(--accent) 10%, transparent);
+  width: 280px !important;
+  min-width: 280px !important;
+  height: 300px !important;
+  min-height: 300px !important;
+}
+.sl-card.planned-note-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15), 0 8px 20px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Unwritten / Past Bloc without Note: neutral soft muted styling */
+.sl-card.unwritten-note-card {
+  border: 1px dashed var(--card-border);
+  background: var(--card-bg-alt);
+  opacity: 0.85;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  width: 280px !important;
+  min-width: 280px !important;
+  height: 300px !important;
+  min-height: 300px !important;
+}
+.sl-card.unwritten-note-card:hover {
+  opacity: 1;
+  border-color: var(--card-border);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15), 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+.unwritten-note-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--card-border);
+}
+.planned-note-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Drag handle: fixed width and centered vertically for easier grabbing */
+.sl-card-drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  opacity: 0.4;
+  font-size: .95rem;
+  width: 16px;
+  margin-left: -.05rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  user-select: none;
+  transition: opacity var(--transition), color var(--transition);
+  height: 100%;
+}
+.sl-card-drag-handle:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+.sl-card-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Week group — label above a row of cards */
+.sl-week-group {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  flex-shrink: 0;
+  padding-right: .5rem;
+}
+.sl-week-lbl {
+  font-size: .68rem;
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: .25rem .55rem;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22), 0 10px 24px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.sl-week-cards {
+  display: flex;
+  flex-direction: row;
+  gap: .85rem;
+  align-items: flex-start;
+  flex-shrink: 0;
+  flex-wrap: wrap !important;
+}
+.notes-map-view .sl-week-cards {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap !important;
+  gap: 0.85rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* Vertical divider between week groups */
+.sl-week-sep {
+  width: 1px;
+  background: var(--card-border);
+  align-self: stretch;
+  flex-shrink: 0;
+  margin: 0 .4rem;
+}
+/* Maximized lane: pure CSS Flexbox layout */
+.app-main:has(#swimlane-board.has-maximized) {
+  overflow-y: hidden;
+  min-height: 0;
+  height: 100%;
+}
+#swimlane-board.has-maximized {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+.sl-lane.maximized {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sl-lane.maximized .sl-cards {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.sl-lane.maximized .sl-week-group {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+  padding-right: 1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.sl-lane.maximized .sl-week-cards {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap; /* Stack cards vertically */
+  gap: .75rem;
+  width: auto;
+  overflow-y: auto; /* Vertically scrollable column content */
+  padding-right: .4rem; /* Spacer for scrollbar */
+}
+/* Custom premium scrollbars for columns */
+.sl-lane.maximized .sl-week-cards::-webkit-scrollbar {
+  width: 5px;
+}
+.sl-lane.maximized .sl-week-cards::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sl-lane.maximized .sl-week-cards::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--lane-color, var(--accent)) 25%, transparent);
+  border-radius: 999px;
+}
+.sl-lane.maximized .sl-week-cards::-webkit-scrollbar-thumb:hover {
+  background: var(--lane-color, var(--accent));
+}
+/* Increase note card width and height when lane is maximized */
+.sl-lane.maximized .sl-card {
+  width: 440px;
+  height: 300px;
+  padding: .75rem .8rem .75rem .3rem;
+  gap: .2rem;
+}
+.sl-lane.maximized .sl-card-title {
+  font-size: .88rem;
+  min-height: 2.5em;
+  max-height: 2.5em;
+  line-height: 1.25;
+}
+.sl-lane.maximized .sl-card-preview-text {
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+/* Hide other lanes when one is maximized */
+#swimlane-board.has-maximized .sl-lane:not(.maximized) {
+  display: none !important;
+}
+
+/* Lane action buttons */
+.sl-lane-actions {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  margin-left: auto;
+}
+.sl-lane-action-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--text) 24%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: .8rem;
+  line-height: 1;
+  padding: 0;
+  transition: all var(--transition);
+}
+.sl-lane-action-btn:hover {
+  border-color: var(--lane-color, var(--accent));
+  color: var(--lane-color, var(--accent));
+  background: var(--card-bg-alt);
+}
+.sl-lane-action-btn.active {
+  border-color: var(--lane-color, var(--accent));
+  color: var(--text-on-accent);
+  background: var(--lane-color, var(--accent));
+}
+.sl-lane-action-btn:active {
+  transform: translateY(1px);
+}
+
+.sl-lane-focus-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--text) 24%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: .8rem;
+  line-height: 1;
+  padding: 0;
+  transition: all var(--transition);
+}
+.sl-lane-focus-btn:hover {
+  border-color: var(--lane-color, var(--accent));
+  color: var(--lane-color, var(--accent));
+  background: var(--card-bg-alt);
+}
+.sl-lane-focus-btn:active {
+  transform: translateY(1px);
+}
+
+.sl-card-tags-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+.sl-card-workstream-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin-bottom: 2px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-card-title {
+  font-weight: 700;
+  font-size: .95rem;
+  color: var(--text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 2px 0 3px 0;
+  letter-spacing: -0.01em;
+}
+.sl-card-date {
+  font-size: .68rem;
+  color: var(--text-muted);
+}
+.sl-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 2px;
+}
+.fb-workstream {
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.fb-workstream.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+.sl-card-badges {
+  display: flex;
+  gap: .25rem;
+  margin-top: auto;
+  padding-top: .25rem;
+}
+.sl-badge {
+  font-size: .64rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+.sl-badge-high, .sl-badge-q1 {
+  background: var(--color-high-bg);
+  color: var(--color-high-text);
+  border-color: var(--color-high-border);
+}
+.sl-badge-med, .sl-badge-q2 {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border-color: var(--color-medium-border);
+}
+.sl-badge-q3 {
+  background: var(--color-wip-bg);
+  color: var(--color-wip-text);
+  border-color: var(--color-wip-border);
+}
+.sl-badge-wip {
+  background: var(--color-wip-bg);
+  color: var(--color-wip-text);
+  border-color: var(--color-wip-border);
+}
+.sl-badge-low, .sl-badge-q4 {
+  background: var(--color-low-bg);
+  color: var(--color-low-text);
+  border-color: var(--color-low-border);
+}
+.sl-badge-done {
+  background: var(--card-bg-alt);
+  color: var(--text-muted);
+  border-color: var(--card-border);
+  text-decoration: line-through;
+}
+
+/* ═══ Dark Theme Badge Overrides ═══ */
+body[data-theme='dark'] .sl-badge-high,
+body[data-theme='dark'] .sl-badge-q1 {
+  background: rgba(248, 113, 113, 0.22) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(248, 113, 113, 0.45) !important;
+}
+body[data-theme='dark'] .sl-badge-med,
+body[data-theme='dark'] .sl-badge-q2 {
+  background: rgba(251, 191, 36, 0.22) !important;
+  color: #fde047 !important;
+  border-color: rgba(251, 191, 36, 0.45) !important;
+}
+body[data-theme='dark'] .sl-badge-q3 {
+  background: rgba(96, 165, 250, 0.22) !important;
+  color: #93c5fd !important;
+  border-color: rgba(96, 165, 250, 0.45) !important;
+}
+body[data-theme='dark'] .sl-badge-low,
+body[data-theme='dark'] .sl-badge-q4 {
+  background: rgba(52, 211, 153, 0.22) !important;
+  color: #6ee7b7 !important;
+  border-color: rgba(52, 211, 153, 0.45) !important;
+}
+
+.sl-lane.todo-lane {
+  border-color: color-mix(in srgb, var(--color-medium) 30%, var(--card-border));
+}
+.sl-lane.todo-lane .sl-lane-header {
+  background: var(--color-medium-bg);
+}
+.sl-todo-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--color-medium);
+  border-radius: var(--radius-sm);
+  padding: .5rem .7rem;
+  cursor: pointer;
+  width: 190px;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  flex-shrink: 0;
+  transition: all var(--transition);
+
+  /* Derived priority color for urgent due status */
+  --color-urgent: color-mix(in srgb, var(--color-high) 50%, var(--color-medium));
+  --color-urgent-text: color-mix(in srgb, var(--color-high-text) 50%, var(--color-medium-text));
+}
+.sl-todo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--color-medium);
+}
+.sl-todo-card.sl-todo-card-wip {
+  background: var(--color-wip-bg);
+  border-color: var(--card-border);
+  border-left: 4px solid var(--color-wip);
+  box-shadow: var(--shadow);
+}
+.sl-todo-card.sl-todo-card-wip:hover {
+  border-color: var(--color-wip);
+}
+.sl-todo-card-text {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sl-todo-card-due {
+  font-size: .66rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.sl-todo-card.due-soon {
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--color-medium) 20%, transparent);
+}
+
+.sl-todo-card.due-urgent {
+  box-shadow: 0 5px 12px color-mix(in srgb, var(--color-urgent) 30%, transparent);
+}
+
+.sl-todo-card.due-overdue {
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--color-high) 35%, transparent);
+}
+
+.sl-todo-card-due.due-soon { color: var(--color-medium-text); }
+.sl-todo-card-due.due-urgent { color: var(--color-urgent-text); }
+.sl-todo-card-due.due-overdue { color: var(--color-high-text); }
+.sl-todo-card-from {
+  font-size: .67rem;
+  color: var(--text-muted);
+}
+.todo-board-lane {
+  --todo-lane-bg: var(--card-bg-alt);
+  --todo-lane-border: var(--card-border);
+  --todo-lane-accent: var(--text-muted);
+  border-color: var(--todo-lane-border);
+}
+.todo-board-lane .sl-lane-header {
+  background: var(--todo-lane-bg);
+  border-color: var(--todo-lane-border);
+  color: var(--todo-lane-accent);
+}
+.todo-board-lane .sl-lane-swatch {
+  background: var(--todo-lane-accent);
+}
+.todo-board-lane .sl-lane-name {
+  color: var(--text);
+}
+.todo-board-lane .sl-lane-count, .todo-board-lane .sl-lane-toggle-icon {
+  color: var(--todo-lane-accent);
+}
+.todo-board-lane .sl-cards {
+  padding: .45rem .55rem .55rem;
+  gap: .45rem;
+}
+
+/* ════════════════════════════════
+   Note-card redesign (main board)
+   ════════════════════════════════ */
+.sl-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  padding: 0;
+  margin-bottom: .25rem;
+  min-height: 0;
+}
+/* Card body grows to fill card; preview takes remaining space so badges sit at bottom consistently */
+.sl-card-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: .25rem;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* New Unified Card Preview Area */
+.sl-card-preview-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+  margin-bottom: 0.2rem;
+}
+
+.sl-card-highlights-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.sl-card-highlights-container .note-highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border-left: none;
+}
+
+.sl-card-highlights-container .note-highlights-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.1rem;
+}
+
+.sl-card-highlights-container .note-highlights-items {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  overflow: hidden;
+  max-height: 3.5rem; /* Cap heights in compact mode so text can show */
+  transition: max-height var(--transition);
+}
+
+.sl-lane.maximized .sl-card-highlights-container .note-highlights-items,
+.sl-lane.maximized .sl-card:hover .sl-card-highlights-container .note-highlights-items {
+  max-height: 10rem;
+}
+
+.sl-card:hover .sl-card-highlights-container .note-highlights-items {
+  max-height: 7rem; /* Expand on hover to show more chips */
+}
+
+/* Styled highlight chips inside the card */
+.sl-card-highlights-container .note-highlight-chip {
+  display: inline-block;
+  background: var(--highlight-chip-bg);
+  color: var(--highlight-chip-text);
+  border: 1px solid var(--highlight-border);
+  font-weight: 600;
+  font-size: .65rem;
+  padding: .1rem .35rem;
+  line-height: 1.2;
+  border-radius: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sl-card-highlights-container .note-highlight-chip-more {
+  background: var(--highlight-chip-bg);
+  color: var(--highlight-chip-text);
+  border: 1px solid var(--highlight-border);
+  padding: .1rem .35rem;
+  font-size: .65rem;
+  border-radius: 4px;
+}
+
+.sl-card-preview-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  overflow: hidden;
+  word-break: break-word;
+  flex: 1;
+  min-height: 0;
+}
+
+.sl-card-preview-fade {
+  display: none !important;
+}
+
+/* Per-type tag rows: cap to single row and cleanly format tag chips */
+.sl-card-tag-row {
+  display: flex;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  max-height: 22px;
+  padding: 0;
+  overflow: hidden;
+  width: 100%;
+}
+.sl-card-tag-row .tag {
+  line-height: 1.2;
+  padding: 1px 7px;
+  font-size: .68rem;
+  width: fit-content;
+  max-width: 140px;
+  height: 20px;
+  border-radius: 9999px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sl-card-tags-top {
+  margin-bottom: .25rem;
+}
+.sl-card-tag-add {
+  background: none;
+  border: 1px dashed var(--card-border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  font-size: .6rem;
+  padding: 0 6px;
+  line-height: 1.6;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all var(--transition);
+}
+.sl-card-tag-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--card-bg-alt);
+}
+.sl-card-tag-input {
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  font-size: .65rem;
+  padding: 2px 6px;
+  width: 80px;
+  font-family: inherit;
+  outline: none;
+  background: var(--card-bg-alt);
+  color: var(--text);
+}
+/* Clickable tag chips */
+/* Title/date blocks reserve fixed space so card height is consistent */
+.sl-card-title {
+  font-weight: 600;
+  font-size: .82rem;
+  color: var(--text);
+  line-height: 1.22;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.45em;
+  max-height: 2.45em;
+}
+.sl-card-date {
+  font-size: .68rem;
+  color: var(--text-muted);
+  line-height: 1.15;
+  min-height: 1.15em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Badges area: reserve height so presence/absence doesn't change card footer */
+.sl-card-badges {
+  display: flex;
+  gap: .25rem;
+  margin-top: auto;
+  padding-top: .2rem;
+  min-height: 1.6em;
+}
+.sl-card-badges.empty {
+  visibility: hidden;
+}
+
+/* Context menu for note cards (right-click) */
+.note-card-context-menu {
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: .25rem;
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+}
+.note-card-context-menu .ctx-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  line-height: 1.2;
+  padding: .25rem .75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+.note-card-context-menu .ctx-btn:hover {
+  background: var(--card-bg-alt);
+  color: var(--accent);
+}
+.note-card-context-menu .ctx-btn:active {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg-alt));
+}
+.note-card-context-menu .ctx-btn .planner-ctx-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Filter bar styles */
+.filter-bar {
+  background: var(--card-bg-alt);
+  border-bottom: 1px solid var(--card-border);
+  padding: .4rem .9rem;
+}
+
+/* Card planner blocks list */
+.sl-card-planner-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+  min-height: 1.45em;
+  overflow: hidden;
+}
+.sl-card-planner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
+  color: var(--accent);
+  transition: all var(--transition);
+}
+.sl-card-planner-chip:hover {
+  background: color-mix(in srgb, var(--accent) 20%, var(--card-bg));
+  border-color: var(--accent);
+}
+.sl-card-planner-chip-call {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.sl-card-planner-chip-prep {
+  background: color-mix(in srgb, #10b981 14%, var(--card-bg));
+  color: #10b981;
+  border-color: color-mix(in srgb, #10b981 35%, transparent);
+}
+.sl-card-planner-chip-todo {
+  background: color-mix(in srgb, #f59e0b 14%, var(--card-bg));
+  color: #d97706;
+  border-color: color-mix(in srgb, #f59e0b 35%, transparent);
+}
+.sl-card-planner-chip-custom,
+.sl-card-planner-chip-personal {
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ═══ Dark Theme Overrides for Swimlane Cards ═══ */
+body[data-theme='dark'] .sl-card-planner-chip-call {
+  background: rgba(59, 130, 246, 0.22);
+  color: #93c5fd;
+  border-color: rgba(96, 165, 250, 0.45);
+}
+body[data-theme='dark'] .sl-card-planner-chip-prep {
+  background: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+body[data-theme='dark'] .sl-card-planner-chip-todo {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fde047;
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.fl-note-planner-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+/* Load More / Infinite Scroll Sentinel card styling */
+.sl-card.load-more-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 2px dashed var(--card-border);
+  background: color-mix(in srgb, var(--lane-color, var(--accent)) 3%, var(--card-bg));
+  color: var(--lane-color, var(--accent));
+  font-weight: 600;
+  transition: all var(--transition);
+  cursor: pointer;
+}
+.sl-card.load-more-card.sl-lane-loading-sentinel {
+  animation: sentinelPulse 2.8s infinite ease-in-out;
+}
+@keyframes sentinelPulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.01); }
+}
+.sl-card.load-more-card:hover {
+  border-style: solid;
+  border-color: var(--lane-color, var(--accent));
+  background: color-mix(in srgb, var(--lane-color, var(--accent)) 8%, var(--card-bg));
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg), 0 4px 12px color-mix(in srgb, var(--lane-color, var(--accent)) 12%, transparent);
+}
+.load-more-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+.load-more-icon {
+  font-size: 1.5rem;
+}
+.load-more-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.load-more-remaining {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+/* ── Responsive Swimlane Board & Cards Scaling ── */
+@media (max-width: 640px) {
+  #swimlane-board {
+    padding: 0.5rem !important;
+    gap: 0.5rem !important;
+  }
+  .sl-cards {
+    padding: 0.4rem 0.5rem;
+    gap: 0.4rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sl-card, .sl-todo-card {
+    width: 220px;
+    max-width: 82vw;
+    scroll-snap-align: start;
+  }
+}
+
+@media (min-width: 1600px) {
+  #swimlane-board {
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+}
+
+/* ── Notes Scrollbar Timeline HUD & Today Indicator ── */
+.notes-scroll-hud {
+  position: fixed;
+  right: 18px;
+  top: 70px;
+  z-index: 95;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(6px) scale(0.96);
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), top 0.08s ease-out;
+  user-select: none;
+  cursor: pointer;
+}
+
+.notes-scroll-hud.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0) scale(1);
+}
+
+.notes-scroll-hud:hover {
+  background: color-mix(in srgb, var(--card-bg) 95%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-color));
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18), 0 2px 6px color-mix(in srgb, var(--accent) 20%, transparent);
+  transform: translateX(-2px) scale(1.02);
+}
+
+.notes-scroll-hud:active {
+  transform: translateX(0) scale(0.98);
+}
+
+.notes-scroll-hud-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.notes-scroll-hud-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.25;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.notes-scroll-hud-today::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+
+/* ── Notes Tab Today Jump Button ── */
+.notes-today-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.notes-today-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Permanent Workstream Filter Bar for Notes ── */
+.notes-workstream-bar {
+  padding: 0.35rem 0.9rem 0.45rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.notes-workstream-bar-inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.notes-ws-bar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+
+.notes-ws-bar-label svg {
+  color: var(--accent);
+}
+
+.notes-ws-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.notes-ws-chip svg {
+  color: rgba(255, 255, 255, 0.85);
+  flex-shrink: 0;
+}
+
+.notes-ws-chip:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.notes-ws-chip.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.notes-ws-chip.active svg {
+  color: currentColor;
+}
+
+/* ── Day Indicator Daily Summary Badge ── */
+.map-day-daily-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.map-day-daily-summary-badge:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: translateY(-1px);
+}
+
+.map-day-daily-summary-badge svg {
+  flex-shrink: 0;
+}
+
+/* ── Review / Reader Mode Daily Summary Highlights ── */
+.reader-toc-daily-summary {
+  background: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+  border-left: 3px solid var(--accent) !important;
+  font-weight: 700 !important;
+}
+
+.reader-toc-daily-summary .reader-toc-num {
+  background: var(--accent) !important;
+  color: var(--text-on-accent) !important;
+}
+
+.reader-note-daily-summary {
+  border: 2px solid var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 4%, var(--card-bg)) !important;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 15%, transparent), var(--shadow-sm) !important;
+}
+
+.reader-note-daily-summary .reader-note-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent) !important;
+}
+
+.reader-daily-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── Infinite Scroll Sentinel Loader ── */
+.map-scroll-sentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.85rem 1.5rem;
+  margin: 1.25rem auto 0.5rem;
+  max-width: 340px;
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  border: 1px dashed var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.map-scroll-sentinel:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+
+

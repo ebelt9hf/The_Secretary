@@ -1,0 +1,236 @@
+<!-- Todo view/edit overlay -->
+<div id="todo-edit-overlay" style="display:none;position:fixed;inset:0;z-index:1001;background:rgba(0,0,0,.48);backdrop-filter:blur(8px);align-items:center;justify-content:center" onclick="todoOverlayBackdropClick(event)">
+  <div class="overlay-panel todo-overlay-panel" onclick="event.stopPropagation()">
+    <div class="overlay-header todo-modal-header todo-dark-header">
+      <div class="todo-modal-title-group" style="flex:1; margin-right:12px;">
+        <input id="todo-edit-title" type="text" class="todo-modal-title-input" placeholder="Task title..." title="Type the task title">
+        <span id="todo-overlay-indicator" class="save-indicator"></span>
+      </div>
+      <button class="overlay-close-btn" onclick="requestCloseTodoOverlay()" title="Close overlay"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    
+    <div id="todo-edit-body" class="todo-edit-body" style="display:flex; flex-direction:column;">
+      <div class="todo-edit-grid">
+        
+        <!-- Eisenhower Quadrant & Matrix Picker Button -->
+        <div class="todo-edit-field todo-edit-span-2">
+          <label class="todo-edit-label">Eisenhower Quadrant</label>
+          <div class="todo-quadrant-input-group">
+            <select id="todo-edit-quadrant" class="todo-edit-input" title="Choose Eisenhower Quadrant" onchange="onTodoModalQuadrantChanged(this.value)">
+              <option value="Q1">Q1 - Do First (Urgent & Important)</option>
+              <option value="Q2" selected>Q2 - Schedule (Important, Not Urgent)</option>
+              <option value="Q3">Q3 - Delegate (Urgent, Not Important)</option>
+              <option value="Q4">Q4 - Eliminate (Not Urgent & Not Important)</option>
+              <option value="Done">Done (Completed)</option>
+            </select>
+            <button type="button" class="btn btn-secondary btn-matrix-picker" id="todo-matrix-picker-btn" onclick="openSingleTodoMatrixPicker()" data-i18n-title="todo.applyPositionTooltip" title="Position this task directly in the 2D Eisenhower matrix"><span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span> <span data-i18n="todo.interactiveMatrixPicker">Interactive Matrix</span></button>
+          </div>
+        </div>
+
+        <!-- Workstream Association -->
+        <div class="todo-edit-field todo-edit-span-2">
+          <label class="todo-edit-label" id="todo-edit-workstream-label" for="todo-edit-workstream">Workstream <span class="todo-field-hint">(optional)</span></label>
+          <select id="todo-edit-workstream" class="todo-edit-input" title="Associate this task with a workstream">
+            <option value="">-- None / Unassigned --</option>
+          </select>
+        </div>
+
+        <!-- Owner & Requested by (One line) -->
+        <div class="todo-edit-field">
+          <label class="todo-edit-label">Owner <span class="todo-field-hint">(optional)</span></label>
+          <div id="todo-edit-owner-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select colleague owner"></div>
+        </div>
+        <div class="todo-edit-field">
+          <label class="todo-edit-label">Requested by <span class="todo-field-hint">(optional)</span></label>
+          <div id="todo-edit-asked-by-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select colleague who requested this task"></div>
+        </div>
+
+        <!-- Due Date & Execution Status (One line) -->
+        <div class="todo-edit-field">
+          <label class="todo-edit-label">Due Date</label>
+          <div class="todo-due-picker-widget" id="todo-due-picker-container" onclick="triggerTodoDatePicker()" title="Click to choose a due date">
+            <span class="todo-due-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+            <span id="todo-due-display-text" class="todo-due-text">Not set</span>
+            <input id="todo-edit-due-date" type="date" class="todo-hidden-date-input" onchange="onTodoDueDateChanged(this.value)">
+            <button type="button" id="todo-due-clear-btn" class="todo-due-clear-btn" style="display:none" onclick="event.stopPropagation(); clearTodoDueDate();" data-i18n-title="todo.clearDueDateTooltip" title="Clear due date"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+        <div class="todo-edit-field">
+          <label class="todo-edit-label">Execution Status</label>
+          <div class="todo-status-segmented-group" id="todo-status-segmented-group">
+            <button type="button" class="todo-status-seg-btn active" data-status="pending" onclick="setTodoModalStatus('pending')" data-i18n-title="todo.statusPendingTooltip" title="Mark task status as pending"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span> <span data-i18n="todo.statusPending">Pending</span></button>
+            <button type="button" class="todo-status-seg-btn" data-status="wip" onclick="setTodoModalStatus('wip')" data-i18n-title="todo.statusWipTooltip" title="Mark task status as in progress"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> <span data-i18n="todo.statusInProgress">In Progress</span></button>
+            <button type="button" class="todo-status-seg-btn" data-status="done" onclick="setTodoModalStatus('done')" data-i18n-title="todo.statusDoneTooltip" title="Mark task status as completed"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span> <span data-i18n="todo.statusDone">Done</span></button>
+          </div>
+        </div>
+
+        <!-- Description / Context -->
+        <div class="todo-edit-field todo-edit-span-2">
+          <label class="todo-edit-label">Description / Context</label>
+          <textarea id="todo-edit-context" rows="4" class="todo-edit-textarea" placeholder="Add optional details, context, or notes..." title="Click and type description or context"></textarea>
+        </div>
+
+        <!-- Checklist / Subtasks -->
+        <div class="todo-edit-field todo-edit-span-2">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label class="todo-edit-label" style="margin:0;"><span data-i18n="todo.checklistTitle">Checklist / Subtasks</span> <span id="todo-edit-checklist-badge" class="todo-field-hint"></span></label>
+          </div>
+          <div id="todo-edit-checklist-items" style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;"></div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="todo-edit-new-checklist-input" class="todo-edit-input" placeholder="Add a subtask step..." onkeydown="if(event.key==='Enter'){event.preventDefault();addTodoChecklistItemFromUI();}" title="Type a subtask step and press Enter" data-i18n-placeholder="todo.addChecklistPlaceholder">
+            <button type="button" class="btn btn-secondary" onclick="addTodoChecklistItemFromUI()" title="Add subtask" data-i18n-title="todo.addChecklistTooltip" data-i18n="todo.addChecklistBtn">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Recurrence Settings -->
+        <div class="todo-edit-field todo-edit-span-2" style="background:var(--card-bg-alt); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <label style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:0.85rem; cursor:pointer;">
+              <input type="checkbox" id="todo-edit-recurrence-enabled" onchange="onTodoRecurrenceToggle(this.checked)" title="Enable recurrence for this task">
+              <span data-i18n="todo.recurrenceEnabled">Recurring Task</span>
+            </label>
+            <div id="todo-edit-recurrence-controls" style="display:none; align-items:center; gap:8px;">
+              <span style="font-size:0.8rem; color:var(--text-muted);" data-i18n="todo.recurrenceRepeatEvery">Repeat:</span>
+              <select id="todo-edit-recurrence-freq" class="todo-edit-input" style="width:auto; padding:2px 8px; font-size:0.82rem;" title="Choose recurrence frequency">
+                <option value="daily" data-i18n="todo.recDaily">Daily</option>
+                <option value="weekly" selected data-i18n="todo.recWeekly">Weekly</option>
+                <option value="biweekly" data-i18n="todo.recBiweekly">Every 2 Weeks</option>
+                <option value="monthly" data-i18n="todo.recMonthly">Monthly</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Delegation Tracking & Dated Updates (for delegated or tracked tasks) -->
+        <div class="todo-edit-field todo-edit-span-2" id="todo-edit-delegation-updates-section" style="background:var(--card-bg-alt); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <label class="todo-edit-label" style="margin:0; display:flex; align-items:center; gap:6px;">
+              <span class="ui-icon-wrap" style="color:var(--accent);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+              <span data-i18n="todo.delegatedUpdatesSectionTitle">Delegation Tracking & Dated Updates</span>
+            </label>
+            <div style="display:flex; align-items:center; gap:8px; font-size:0.8rem;">
+              <label for="todo-edit-delegated-date" style="color:var(--text-muted); font-size:0.75rem;" data-i18n="todo.delegatedDateLabel">Delegated:</label>
+              <input type="date" id="todo-edit-delegated-date" class="todo-edit-input" style="width:auto; padding:2px 6px; font-size:0.78rem;" title="Date when this task was delegated" onchange="onTodoDelegatedDateChanged(this.value)">
+            </div>
+          </div>
+          <div id="todo-edit-updates-container" style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px; max-height:160px; overflow-y:auto;"></div>
+          <div class="todo-edit-new-update-form" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+            <input type="date" id="todo-edit-update-date" class="todo-edit-input" style="width:130px; font-size:0.8rem; padding:3px 6px;" title="Update date">
+            <select id="todo-edit-update-type" class="todo-edit-input" style="width:150px; font-size:0.8rem; padding:3px 6px;" title="Update type">
+              <option value="general_update" data-i18n="todo.updateTypeGeneral">Progress update</option>
+              <option value="feedback_received" data-i18n="todo.updateTypeFeedbackReceived">Feedback received</option>
+              <option value="awaiting_feedback" data-i18n="todo.updateTypeAwaitingFeedback">Awaiting feedback</option>
+              <option value="sync_meeting" data-i18n="todo.updateTypeSyncMeeting">1-on-1 Sync meeting</option>
+            </select>
+            <input type="text" id="todo-edit-update-text" class="todo-edit-input" style="flex:1; min-width:160px; font-size:0.8rem; padding:3px 8px;" placeholder="Add status details, feedback notes..." title="Type update details" onkeydown="if(event.key==='Enter'){event.preventDefault();addTodoDatedUpdateFromUI();}">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addTodoDatedUpdateFromUI()" data-i18n-title="todo.updateAddTooltip" title="Add dated progress update" data-i18n="todo.updateAddBtn">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Associated Notes -->
+        <div class="todo-edit-field todo-edit-span-2">
+          <label class="todo-edit-label">Associated Notes <span class="todo-field-hint">(optional)</span></label>
+          <div id="todo-edit-assoc-notes-container" class="todo-assoc-notes-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
+          <div style="position:relative;">
+            <input id="todo-edit-assoc-notes-search" type="text" class="todo-edit-input" placeholder="Search a note to associate..." autocomplete="off"
+              onfocus="showTodoAssocNotesDropdown()" oninput="filterTodoAssocNotes()" title="Search a note to associate with this task">
+            <div id="todo-edit-assoc-notes-list" class="planner-dropdown-list" style="display:none; position:absolute; z-index:10; left:0; right:0; max-height:200px; overflow-y:auto;"></div>
+          </div>
+        </div>
+
+        <!-- Task Prerequisites & Dependencies -->
+        <div class="todo-edit-field todo-edit-span-2">
+          <label class="todo-edit-label">Prerequisites / Dependencies <span class="todo-field-hint">(this task is blocked until selected tasks are done)</span></label>
+          <div id="todo-edit-depends-container" class="todo-assoc-notes-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
+          <div style="position:relative;">
+            <input id="todo-edit-depends-search" type="text" class="todo-edit-input" placeholder="Search prerequisite tasks..." autocomplete="off"
+              onfocus="showTodoDependsDropdown()" oninput="filterTodoDepends()" onkeydown="handleTodoDependsSearchKeydown(event)" title="Select prerequisite tasks that must be completed before this task">
+            <div id="todo-edit-depends-list" class="planner-dropdown-list secretary-scrollbar" style="display:none; position:absolute; z-index:10; left:0; right:0; max-height:200px; overflow-y:auto;"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Inline Merge / Fusion Panel (Hidden by default) -->
+      <div id="todo-edit-merge-panel" class="todo-merge-panel" style="display:none; margin-top:10px; padding:12px; background:var(--card-bg-alt); border:1px solid var(--accent); border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:6px; font-weight:700; color:var(--accent); font-size:0.92rem;">
+            <span class="ui-icon-wrap"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 21v-8"/><path d="m9 16 3 3 3-3"/><path d="M4 8l5 5"/><path d="M20 8l-5 5"/></svg></span>
+            <span data-i18n="todo.mergeModalTitle">Merge Tasks</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeTodoMergePanel()" data-i18n-title="common.cancelTooltip" title="Cancel merge" data-i18n="todo.mergeCancelBtn">Cancel</button>
+        </div>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 8px 0;" data-i18n="todo.mergeModalDesc">Select a task to merge into this one. Checklists, descriptions, linked notes, and dependencies will be combined.</p>
+        <div style="position:relative; margin-bottom:8px;">
+          <input type="text" id="todo-edit-merge-search" class="todo-edit-input" placeholder="Search a task to merge..." oninput="filterTodoMergeCandidates(this.value)" autocomplete="off" title="Type to search tasks for fusion" data-i18n-placeholder="todo.mergeSearchPlaceholder">
+          <div id="todo-edit-merge-candidates-list" class="planner-dropdown-list secretary-scrollbar" style="max-height:160px; overflow-y:auto; margin-top:4px;"></div>
+        </div>
+        <div id="todo-edit-merge-preview" style="display:none; background:var(--card-bg); padding:8px 10px; border-radius:6px; border:1px solid var(--card-border); font-size:0.82rem; margin-bottom:8px;">
+          <div style="font-weight:600; margin-bottom:4px; color:var(--text);" data-i18n="todo.mergePreviewTitle">Merged Task Preview:</div>
+          <div id="todo-edit-merge-preview-content" style="color:var(--text-muted); font-size:0.78rem;"></div>
+          <div style="margin-top:8px; display:flex; justify-content:flex-end; gap:6px;">
+            <button type="button" id="todo-edit-merge-confirm-btn" class="btn btn-save btn-sm" onclick="confirmExecuteTodoMerge()" data-i18n-title="todo.mergeConfirmBtn" title="Execute task merge and propagate across notes" data-i18n="todo.mergeConfirmBtn">Confirm Merge</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Row -->
+      <div class="todo-edit-actions">
+        <div class="todo-edit-actions-left" style="display:flex; align-items:center; gap:6px;">
+          <button id="todo-edit-delete-btn" class="btn btn-danger-soft todo-btn-danger" onclick="deleteTodoFromOverlay()" title="Delete this todo" style="display:none"><span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span> Delete</button>
+          <button id="todo-edit-merge-btn" type="button" class="btn btn-secondary" onclick="openTodoMergePanel()" title="Merge this task with another task" data-i18n-title="todo.mergeButtonTooltip"><span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 21v-8"/><path d="m9 16 3 3 3-3"/><path d="M4 8l5 5"/><path d="M20 8l-5 5"/></svg></span> <span data-i18n="todo.mergeButton">Merge</span></button>
+        </div>
+        <div class="todo-edit-actions-right">
+          <button class="btn btn-secondary" onclick="requestCloseTodoOverlay()" data-i18n="todo.cancel" data-i18n-title="todo.cancelChangesTooltip" title="Cancel changes and close modal">Cancel</button>
+          <button class="btn btn-save" onclick="saveTodoFromOverlay()" data-i18n="todo.save" data-i18n-title="todo.saveTodoTooltip" title="Save changes and close modal">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /todo-edit-overlay -->
+
+<!-- Single-Todo Interactive Matrix Picker Overlay -->
+<div id="todo-matrix-picker-overlay" class="eisenhower-quadrant-overlay-backdrop" style="display:none; z-index:2000;" onclick="todoMatrixPickerBackdropClick(event)">
+  <div class="overlay-panel todo-matrix-picker-panel" onclick="event.stopPropagation()">
+    <div class="overlay-header">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="ui-icon-wrap" style="color:var(--accent);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+        <h3 style="margin:0; font-size:1.05rem; font-weight:700;" id="todo-matrix-picker-title">Position in Eisenhower Matrix</h3>
+      </div>
+      <button class="overlay-close-btn" onclick="closeSingleTodoMatrixPicker()" data-i18n-title="common.closeTooltip" title="Close matrix picker"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="overlay-body todo-matrix-picker-body">
+      <div class="todo-matrix-picker-canvas" id="todo-matrix-picker-canvas">
+        <svg width="100%" height="100%" style="position:absolute;top:0;left:0;pointer-events:none;">
+          <defs>
+            <radialGradient id="mp-q1" cx="25%" cy="25%" r="65%"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0.04"/></radialGradient>
+            <radialGradient id="mp-q2" cx="75%" cy="25%" r="65%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.2"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0.04"/></radialGradient>
+            <radialGradient id="mp-q3" cx="25%" cy="75%" r="65%"><stop offset="0%" stop-color="#6366f1" stop-opacity="0.2"/><stop offset="100%" stop-color="#6366f1" stop-opacity="0.04"/></radialGradient>
+            <radialGradient id="mp-q4" cx="75%" cy="75%" r="65%"><stop offset="0%" stop-color="#14b8a6" stop-opacity="0.2"/><stop offset="100%" stop-color="#14b8a6" stop-opacity="0.04"/></radialGradient>
+          </defs>
+          <rect x="0" y="0" width="50%" height="50%" fill="url(#mp-q1)" />
+          <rect x="50%" y="0" width="50%" height="50%" fill="url(#mp-q2)" />
+          <rect x="0" y="50%" width="50%" height="50%" fill="url(#mp-q3)" />
+          <rect x="50%" y="50%" width="50%" height="50%" fill="url(#mp-q4)" />
+          <line x1="50%" y1="0" x2="50%" y2="100%" stroke="var(--card-border)" stroke-width="1.5" opacity="0.6"/>
+          <line x1="0" y1="50%" x2="100%" y2="50%" stroke="var(--card-border)" stroke-width="1.5" opacity="0.6"/>
+        </svg>
+        <div id="mp-q1-label" style="position:absolute;top:10px;left:12px;color:#ef4444;font-weight:700;font-size:0.75rem;pointer-events:none;">Q1 - Do First</div>
+        <div id="mp-q2-label" style="position:absolute;top:10px;right:12px;color:#f59e0b;font-weight:700;font-size:0.75rem;pointer-events:none;">Q2 - Schedule</div>
+        <div id="mp-q3-label" style="position:absolute;bottom:10px;left:12px;color:#6366f1;font-weight:700;font-size:0.75rem;pointer-events:none;">Q3 - Delegate</div>
+        <div id="mp-q4-label" style="position:absolute;bottom:10px;right:12px;color:#14b8a6;font-weight:700;font-size:0.75rem;pointer-events:none;">Q4 - Eliminate</div>
+        <div id="todo-matrix-picker-dot" class="matrix-picker-dot" style="position:absolute; transform:translate(-50%, -50%); display:flex; align-items:center; gap:6px; background:var(--card-bg, #1e293b); border:1.5px solid currentColor; border-radius:20px; padding:4px 10px 4px 6px; box-shadow:0 4px 12px rgba(0,0,0,0.25); cursor:grab; pointer-events:none; z-index:5;">
+          <span id="todo-matrix-picker-bullet" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:currentColor;"></span>
+          <span id="todo-matrix-picker-label" style="font-size:0.8rem; font-weight:600; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; color:var(--text, #f8fafc);">Task</span>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px;">
+        <div id="todo-matrix-picker-coords-text" style="font-size:0.85rem; color:var(--text-muted, #94a3b8); font-weight:500;"></div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn btn-secondary" id="todo-matrix-picker-cancel-btn" onclick="closeSingleTodoMatrixPicker()" data-i18n="todo.cancel" data-i18n-title="todo.cancelMatrixPickerTooltip" title="Cancel position changes and close matrix picker">Cancel</button>
+          <button type="button" class="btn btn-save" id="todo-matrix-picker-confirm-btn" onclick="confirmSingleTodoMatrixPicker()" data-i18n="todo.applyPosition" data-i18n-title="todo.applyPositionTooltip" title="Apply position and Eisenhower quadrant">Apply Position</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

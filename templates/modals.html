@@ -1,0 +1,940 @@
+<!-- ── New Note Modal ── -->
+<div class="modal-overlay" id="modal-new-note">
+  <div class="modal">
+    <h2 style="display:flex; align-items:center; gap:8px;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> <span data-i18n="editor.newNoteTitle">New Note</span></h2>
+    <div class="form-field">
+      <label>Title</label>
+      <input type="text" id="nn-title" placeholder="Meeting / topic title…" title="Click and type the note title">
+    </div>
+    <div class="form-field">
+      <label>Date</label>
+      <input type="date" id="nn-date" title="Click to choose the note date">
+    </div>
+    <div class="form-field">
+      <label>Group tag</label>
+      <input type="text" id="nn-group" list="list-groups" placeholder="e.g. Calls" title="Click and type a group tag">
+      <datalist id="list-groups"></datalist>
+      <p class="form-hint">First-level folder (e.g. Calls, Projects)</p>
+    </div>
+    <div class="form-field">
+      <label>Major Topic tag</label>
+      <input type="text" id="nn-major" list="list-majors" placeholder="e.g. Strategy" title="Click and type a major topic tag">
+      <datalist id="list-majors"></datalist>
+    </div>
+    <div class="form-field">
+      <label>Topic tag</label>
+      <input type="text" id="nn-topic" list="list-topics" placeholder="e.g. Leadership-Meeting" title="Click and type a topic tag">
+      <datalist id="list-topics"></datalist>
+      <p class="form-hint">Second-level folder</p>
+    </div>
+      <div class="form-field">
+        <label>Content</label>
+        <span class="md-tab-hint" style="margin-bottom:6px;display:block">**bold** &nbsp;*italic* &nbsp;- bullet &nbsp;# heading</span>
+        <textarea id="nn-content" placeholder="# Summary&#10;&#10;**Key decisions:**&#10;- Decision 1&#10;- Decision 2&#10;&#10;**Action items:**&#10;- [ ] Task for someone" title="Click and type the note content"></textarea>
+      </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-new-note')" data-i18n="common.cancel" data-i18n-title="editor.cancelNoteModalTooltip" title="Close this dialog without creating a note">Cancel</button>
+      <button class="btn btn-save" onclick="createNewNote()" data-i18n="editor.createNote" data-i18n-title="editor.createNoteTooltip" title="Create the note">Create Note</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Label Manager Modal ── -->
+<div class="modal-overlay" id="modal-label-manager">
+  <div class="modal label-manager-modal">
+    <h2 id="label-manager-title">Label Manager</h2>
+    <div id="label-manager-body"></div>
+  </div>
+</div>
+
+<!-- ── New Todo Modal ── -->
+<div class="modal-overlay" id="modal-new-todo">
+  <div class="modal">
+
+    <h2 style="display:flex; align-items:center; gap:8px;"><span id="nt-priority-pin" style="color:var(--color-medium, #f59e0b); display:inline-flex; align-items:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg></span> <span id="nt-dialog-title">New Todo</span></h2>
+    <div class="form-field">
+      <label>Title <span style="color:#bbb;font-weight:normal">(used as file name)</span></label>
+      <input type="text" id="nt-title" placeholder="Short title…" title="Click and type the todo title">
+    </div>
+    <div class="form-field">
+      <label>Description</label>
+      <input type="text" id="nt-text" placeholder="What needs to be done?" title="Click and type the todo description">
+    </div>
+    <div class="form-field">
+      <label>Eisenhower Quadrant</label>
+      <select id="nt-priority" title="Click to choose Eisenhower Quadrant" onchange="updateNewTodoPinColor(this.value)">
+        <option value="Q1">Q1 - Do First (Urgent & Important)</option>
+        <option value="Q2" selected>Q2 - Schedule (Important, Not Urgent)</option>
+        <option value="Q3">Q3 - Delegate (Urgent, Not Important)</option>
+        <option value="Q4">Q4 - Eliminate (Not Urgent & Not Important)</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label>Due date <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <input type="date" id="nt-due-date" title="Click to choose a due date">
+    </div>
+    <div class="form-field">
+      <label>Owner <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <div id="nt-owner-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select collaborator"></div>
+    </div>
+    <div class="form-field">
+      <label>Requested by <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <div id="nt-asked-by-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select collaborator who requested this task"></div>
+    </div>
+    <div class="form-field">
+      <label>Context <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <input type="text" id="nt-context" placeholder="Additional context…" title="Click and type extra context">
+    </div>
+    <div class="form-field" id="nt-schedule-field">
+      <label id="nt-schedule-label">Planifier la tâche</label>
+      <select id="nt-schedule" title="Planifier cette tâche dans l'agenda">
+        <option value="next-slot" selected>Prochain créneau disponible (30 min)</option>
+        <option value="open-modal">Ouvrir l'éditeur de bloc</option>
+        <option value="none">Ne pas planifier</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="if (window.DailyReviewController && typeof DailyReviewController.cancelRoutedTodoCreation === 'function') DailyReviewController.cancelRoutedTodoCreation(); closeModal('modal-new-todo')" data-i18n="common.cancel" data-i18n-title="todo.cancelTodoModalTooltip" title="Close this dialog without creating a todo">Cancel</button>
+      <button class="btn btn-save" onclick="createNewTodo()" data-i18n="common.save" data-i18n-title="todo.saveTodoModalTooltip" title="Create the todo">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Attach Context Modal ── -->
+<div class="modal-overlay" id="modal-attach-context">
+  <div class="modal" id="attach-modal-content" style="width: min(580px, 98vw); max-width: 98vw; max-height: 94vh; padding: 1.5rem; display: flex; flex-direction: column; gap: var(--space-3);">
+  </div>
+</div>
+
+<!-- ── Collaborator Details Modal ── -->
+<div class="modal-overlay" id="modal-collab-details">
+  <div class="modal" style="width: min(980px, 98vw); max-width: 98vw; max-height: 94vh;">
+    <div id="collab-details-modal-content"></div>
+    <div class="modal-actions" style="margin-top: 1.2rem; display: flex; justify-content: flex-end;">
+      <button class="btn" onclick="closeModal('modal-collab-details')" data-i18n="common.close" data-i18n-title="team.closeCollabDetailsTooltip" title="Close collaborator details">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Decision Edit Modal ── -->
+<div class="modal-overlay" id="modal-edit-decision">
+
+  <div class="modal" style="width: min(640px, 98vw); max-width: 98vw; max-height: 94vh;">
+    <h2 style="display:flex; align-items:center; gap:8px;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></svg> <span id="ed-dialog-title" data-i18n="team.editDecisionModalTitle">Modifier la décision</span></h2>
+    <input type="hidden" id="ed-decision-id">
+    
+    <div class="form-field">
+      <label data-i18n="decision.titleLabel">Décision</label>
+      <input type="text" id="ed-text" placeholder="Description de la décision…" title="Saisir l'intitulé de la décision" data-i18n-placeholder="decision.titlePlaceholder" data-i18n-title="decision.titleInputTooltip">
+    </div>
+    
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+      <div class="form-field">
+        <label data-i18n="decision.statusLabel">Statut</label>
+        <select id="ed-status" title="Sélectionner le statut de la décision" data-i18n-title="decision.statusSelectTooltip">
+          <option value="active" data-i18n="team.statusActive">Active</option>
+          <option value="proposed" data-i18n="team.statusProposed">Proposée / À prendre</option>
+          <option value="superseded" data-i18n="team.statusSuperseded">Remplacée</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label data-i18n="decision.authorityLabel">Autorité</label>
+        <select id="ed-authority" title="Sélectionner le niveau d'autorité" data-i18n-title="decision.authoritySelectTooltip">
+          <option value="team" data-i18n="team.teamRole">Équipe</option>
+          <option value="manager" data-i18n="team.managerBadge">Manager / Direction</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+      <div class="form-field">
+        <label data-i18n="decision.impactLabel">Impact</label>
+        <select id="ed-impact" title="Sélectionner le niveau d'impact" data-i18n-title="decision.impactSelectTooltip">
+          <option value="high" data-i18n="team.impactHigh">Impact Élevé</option>
+          <option value="medium" data-i18n="team.impactMedium">Impact Moyen</option>
+          <option value="low" data-i18n="team.impactLow">Impact Faible</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label data-i18n="decision.majorTopicLabel">Projet / Axe de travail</label>
+        <div class="tags-editor" id="ed-major-topic" data-type="major" title="Cliquer pour choisir un ou plusieurs projets ou axes de travail" data-i18n-title="decision.majorTopicTooltip"></div>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label data-i18n="decision.rationaleLabel">Contexte & Rationale</label>
+      <textarea id="ed-rationale" rows="3" style="width:100%; box-sizing:border-box; padding:0.5rem; border-radius:var(--radius-md); border:1px solid var(--card-border); background:var(--bg); color:var(--text);" placeholder="Notes explicatives, contexte, arbitrage..." title="Saisir le contexte ou les justifications de la décision" data-i18n-placeholder="decision.rationalePlaceholder" data-i18n-title="decision.rationaleTooltip"></textarea>
+    </div>
+
+    <div class="form-field" id="ed-assoc-notes-field">
+      <label id="ed-assoc-notes-label" data-i18n="decision.assocNotesLabel">Notes associées</label>
+      <div id="ed-linked-notes-search-wrap" style="width:100%; position:relative; margin-bottom:0.4rem;">
+        <input type="text" id="ed-linked-notes-search" class="field-input" autocomplete="off" placeholder="Associer une note..." style="width:100%; box-sizing:border-box; padding:0.45rem 0.6rem; border-radius:var(--radius-md); border:1px solid var(--card-border); background:var(--bg); color:var(--text); font-size:0.85rem;" title="Rechercher une note pour associer cette décision" data-i18n-placeholder="decision.assocNotesSearchPlaceholder" data-i18n-title="decision.assocNotesSearchTooltip">
+        <div id="ed-linked-notes-list" class="planner-dropdown-list" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:180px; overflow-y:auto; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; z-index:10000; box-shadow:var(--shadow-lg);"></div>
+      </div>
+      <div id="ed-assoc-notes-container" style="display:flex; flex-direction:column; gap:4px; max-height:150px; overflow-y:auto;"></div>
+    </div>
+
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center;">
+      <button type="button" class="btn btn-danger" id="ed-delete-btn" onclick="deleteDecisionFromModal()" title="Supprimer cette décision" data-i18n="common.delete" data-i18n-title="decision.deleteTooltip">Supprimer</button>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn" onclick="closeModal('modal-edit-decision')" title="Fermer sans enregistrer la décision" data-i18n="common.cancel" data-i18n-title="decision.cancelTooltip">Annuler</button>
+        <button type="button" class="btn btn-save btn-primary" onclick="saveDecisionFromModal()" title="Enregistrer la décision" data-i18n="common.save" data-i18n-title="decision.saveTooltip">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-export-decisions" role="dialog" aria-labelledby="export-dialog-title">
+  <div class="modal" style="width: min(520px, 98vw); max-width: 98vw; max-height: 94vh; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+    <h2 style="display:flex; align-items:center; gap:8px;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> <span id="export-dialog-title" data-i18n="export.decisionsTitle">Exporter le Registre des Décisions</span></h2>
+    <p style="font-size:0.88rem; color:var(--text-muted); margin:0;" data-i18n="export.decisionsDesc">Choisissez le format d'exportation pour enregistrer l'ensemble des décisions répertoriées.</p>
+    
+    <div style="display:flex; flex-direction:column; gap:0.6rem; margin:0.5rem 0;">
+      <label class="decision-export-card" style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem; border:1px solid var(--card-border); border-radius:8px; cursor:pointer; background:var(--card-bg); transition:all 0.15s ease;">
+        <input type="radio" name="export-format" value="md" checked style="accent-color:var(--accent);">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <strong style="font-size:0.92rem; color:var(--text); display:flex; align-items:center; gap:6px;"><svg class="app-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> <span data-i18n="export.markdownTitle">Markdown (.md)</span></strong>
+          <span style="font-size:0.78rem; color:var(--text-muted);" data-i18n="export.markdownDesc">Format structuré textuel idéal pour la documentation et GitHub</span>
+        </div>
+      </label>
+
+      <label class="decision-export-card" style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem; border:1px solid var(--card-border); border-radius:8px; cursor:pointer; background:var(--card-bg); transition:all 0.15s ease;">
+        <input type="radio" name="export-format" value="json" style="accent-color:var(--accent);">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <strong style="font-size:0.92rem; color:var(--text); display:flex; align-items:center; gap:6px;"><svg class="app-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg> <span data-i18n="export.jsonTitle">JSON (.json)</span></strong>
+          <span style="font-size:0.78rem; color:var(--text-muted);" data-i18n="export.jsonDesc">Données brutes structurées avec métadonnées complètes</span>
+        </div>
+      </label>
+
+      <label class="decision-export-card" style="display:flex; align-items:center; gap:0.8rem; padding:0.75rem 1rem; border:1px solid var(--card-border); border-radius:8px; cursor:pointer; background:var(--card-bg); transition:all 0.15s ease;">
+        <input type="radio" name="export-format" value="csv" style="accent-color:var(--accent);">
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <strong style="font-size:0.92rem; color:var(--text); display:flex; align-items:center; gap:6px;"><svg class="app-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> <span data-i18n="export.csvTitle">CSV (.csv)</span></strong>
+          <span style="font-size:0.78rem; color:var(--text-muted);" data-i18n="export.csvDesc">Tableau de données compatible avec Excel et Google Sheets</span>
+        </div>
+      </label>
+    </div>
+
+    <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:0.6rem;">
+      <button class="btn" onclick="closeModal('modal-export-decisions')" title="Annuler l'exportation" data-i18n="common.cancel" data-i18n-title="export.cancelTooltip">Annuler</button>
+      <button class="btn btn-save btn-primary" onclick="confirmExportDecisions()" title="Télécharger le fichier d'export" data-i18n="team.exportBtn" data-i18n-title="export.confirmTooltip">Exporter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Clarification Questions Modal ── -->
+<div class="modal-overlay" id="modal-refactor-clarifications" style="display:none; z-index:10005;" role="dialog" aria-modal="true" aria-labelledby="refactor-clarification-title">
+  <div class="modal refactor-clarification-modal" style="width: min(680px, 96vw); max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <h3 id="refactor-clarification-title" style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <span id="refactor-clarification-title-text" data-i18n="refactor.clarificationTitle">Clarifications & Additional Details</span>
+        </h3>
+        <p id="refactor-clarification-desc" data-i18n="refactor.clarificationSubtitle" style="margin:4px 0 0 0; font-size:0.85rem; color:var(--text-muted);">
+          The assistant detected some points that need clarification to build the perfect note:
+        </p>
+      </div>
+      <button class="btn" style="padding:4px 8px; font-size:0.85rem; line-height:1;" onclick="RefactorModalController.closeClarificationsModal()" data-i18n-title="common.closeTooltip" title="Close dialog"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <div id="refactor-questions-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:1rem; max-height:55vh; padding-right:4px;">
+      <!-- Dynamic list of questions -->
+    </div>
+
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; margin-top:0.5rem; gap:0.5rem;">
+      <button class="btn btn-secondary" id="btn-refactor-skip" onclick="RefactorModalController.skipClarifications()" data-i18n="refactor.skipClarifications" data-i18n-title="refactor.skipClarificationsTooltip" title="Proceed directly to structured proposals without providing additional details">Skip & Refactor directly</button>
+      <div style="display:flex; gap:0.5rem;">
+        <button class="btn" onclick="RefactorModalController.closeClarificationsModal()" data-i18n="common.cancel" data-i18n-title="refactor.cancelTooltip" title="Cancel and keep current note">Cancel</button>
+        <button class="btn btn-primary" id="btn-refactor-submit" onclick="RefactorModalController.submitClarifications()" data-i18n="refactor.submitAnswers" data-i18n-title="refactor.submitAnswersTooltip" title="Submit your answers to refine and generate structured proposals">Submit Answers & Refactor</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Perfect Note Proposals Modal ── -->
+<div class="modal-overlay" id="modal-refactor-proposals" style="display:none; z-index:10005;" role="dialog" aria-modal="true" aria-labelledby="refactor-proposals-title">
+  <div class="modal refactor-proposals-modal" style="width: min(1080px, 94vw); max-width: 94vw; height: min(880px, 90vh); max-height: 90vh; display: flex; flex-direction: column; gap: 0.5rem; padding: 1.2rem 1.5rem; box-sizing: border-box;">
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h3 id="refactor-proposals-title" style="margin:0; font-size:1.2rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg> <span id="refactor-proposals-title-text" data-i18n="refactor.proposalsTitle">Perfect Note Proposals</span>
+        </h3>
+        <span id="refactor-topic-memory-badge" class="badge" style="display:none; font-size:0.75rem; background:rgba(99,102,241,0.12); color:#6366f1; border:1px solid rgba(99,102,241,0.3); border-radius:12px; padding:2px 8px;" data-i18n-title="refactor.topicMemoryTooltip" title="Loaded persistent topic memory from prior notes in this topic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"/></svg> Topic Memory</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="refactor-shortcuts-hint" style="font-size:0.75rem; color:var(--text-muted); opacity:0.8; user-select:none;">[1] [2] [3] [O] [S] Tabs • [Ctrl+Enter] Apply • [Esc] Close</span>
+        <button class="btn" style="padding:4px 8px; font-size:0.85rem; line-height:1; display:inline-flex; align-items:center; justify-content:center;" id="btn-refactor-popout" onclick="RefactorModalController.popoutAuxiliaryWindow()" data-i18n-title="refactor.popoutTooltip" title="Open note in dedicated auxiliary window"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+        <button class="btn" style="padding:4px 8px; font-size:0.85rem; line-height:1;" onclick="RefactorModalController.closeProposalsModal()" data-i18n-title="refactor.closeProposalsTooltip" title="Close proposals dialog"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="refactor-tab-bar" style="display:flex; gap:6px; background:color-mix(in srgb, var(--card-bg-alt) 80%, var(--card-bg)); padding:4px; border-radius:10px; border:1px solid var(--card-border); flex-shrink:0;">
+      <button type="button" class="refactor-tab-btn active" id="tab-proposal-a" onclick="RefactorModalController.switchTab('A')" data-i18n-title="refactor.proposalATooltip" title="View Executive / Action-Oriented proposal with clear headings and bulleted decisions">
+        <span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 17l4-10 4 10"/><line x1="9.5" y1="13" x2="14.5" y2="13"/></svg></span> <span data-i18n="refactor.proposalA">Proposal A (Executive)</span>
+      </button>
+      <button type="button" class="refactor-tab-btn" id="tab-proposal-b" onclick="RefactorModalController.switchTab('B')" data-i18n-title="refactor.proposalBTooltip" title="View Comprehensive / Contextual proposal preserving all nuances and discussion detail">
+        <span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 7h4a2.5 2.5 0 0 1 0 5H8z"/><path d="M8 12h4.5a2.5 2.5 0 0 1 0 5H8z"/></svg></span> <span data-i18n="refactor.proposalB">Proposal B (Comprehensive)</span>
+      </button>
+      <button type="button" class="refactor-tab-btn" id="tab-proposal-c" style="display:none;" onclick="RefactorModalController.switchTab('C')" data-i18n-title="refactor.proposalCTooltip" title="View Custom synthesized version incorporating your specific feedback">
+        <span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M16 9.5a4 4 0 0 0-4-2.5 4 4 0 0 0-4 4v2a4 4 0 0 0 4 4 4 4 0 0 0 4-2.5"/></svg></span> <span data-i18n="refactor.proposalC">Option C (Custom)</span>
+      </button>
+      <button type="button" class="refactor-tab-btn" id="tab-original" onclick="RefactorModalController.switchTab('original')" data-i18n-title="refactor.tabOriginalTooltip" title="View and edit original note before AI refactoring">
+        <span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></span> <span data-i18n="refactor.tabOriginal">Original Note</span>
+      </button>
+      <button type="button" class="refactor-tab-btn" id="tab-scratchpad" onclick="RefactorModalController.switchTab('scratchpad')" data-i18n-title="refactor.scratchpadTooltip" title="View internal agent research log, retrieved topic context, and structuring rationale">
+        <span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"/></svg></span> <span data-i18n="refactor.scratchpadTab">Agent Scratchpad</span>
+      </button>
+    </div>
+
+    <!-- Subtitle / Focus description banner -->
+    <div id="refactor-tab-desc" style="font-size:0.82rem; color:var(--text-muted); padding:3px 8px; border-radius:6px; background:var(--card-bg-alt); flex-shrink:0;">
+      Action-oriented structure with clear headings, bold takeaways, and bulleted decisions.
+    </div>
+
+    <!-- In-Modal Refactoring / Re-optimizing Progress Banner -->
+    <div id="refactor-modal-progress-banner" style="display:none; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); font-size:0.84rem; font-weight:600; color:var(--text); flex-shrink:0;">
+      <span class="spinner" style="display:inline-block; width:14px; height:14px; border:2px solid var(--accent); border-right-color:transparent; border-radius:50%; animation:spin 0.8s linear infinite; flex-shrink:0;"></span>
+      <span id="refactor-modal-progress-text" style="flex:1;">Generating Option C...</span>
+      <div style="width:120px; height:6px; background:var(--card-border); border-radius:3px; overflow:hidden; flex-shrink:0;">
+        <div id="refactor-modal-progress-bar" style="width:0%; height:100%; background:var(--accent); transition:width 0.2s ease;"></div>
+      </div>
+    </div>
+
+    <!-- Proposed Topic Split Callout Banner -->
+    <div id="refactor-topic-split-container" style="display:none; flex-shrink:0;"></div>
+
+    <!-- Proposed Workstream & Tags Recommendations Banner -->
+    <div id="refactor-tags-container" style="display:none; flex-shrink:0; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.3); border-radius:8px; padding:8px 12px; margin-bottom:8px;"></div>
+
+    <!-- Formatting Toolbar for Perfect Notes Proposal Modal -->
+    <div class="edit-toolbar refactor-modal-toolbar" id="refactor-modal-toolbar" style="margin: 0; padding: 2px 6px; border-radius: 8px; background: var(--card-bg-alt); border: 1px solid var(--card-border); display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex-shrink: 0; min-height: 30px;">
+      <div class="md-format-toolbar" id="refactor-modal-format-toolbar" style="display: flex; align-items: center; gap: 2px; flex-wrap: nowrap;">
+        <button type="button" class="fmt-btn fmt-h1" title="Heading 1" data-i18n-title="editor.h1Tooltip" onclick="RefactorModalController.formatProposal('h1set')">H1</button>
+        <button type="button" class="fmt-btn fmt-h2" title="Heading 2" data-i18n-title="editor.h2Tooltip" onclick="RefactorModalController.formatProposal('h2set')">H2</button>
+        <button type="button" class="fmt-btn fmt-h3" title="Heading 3" data-i18n-title="editor.h3Tooltip" onclick="RefactorModalController.formatProposal('h3')">H3</button>
+        <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+        <button type="button" class="fmt-btn fmt-bold" title="Bold" data-i18n-title="editor.boldTooltip" onclick="RefactorModalController.formatProposal('bold')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-italic" title="Italic" data-i18n-title="editor.italicTooltip" onclick="RefactorModalController.formatProposal('italic')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-underline" title="Underline" data-i18n-title="editor.underlineTooltip" onclick="RefactorModalController.formatProposal('underline')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-strike" title="Strikethrough" data-i18n-title="editor.strikeTooltip" onclick="RefactorModalController.formatProposal('strike')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4H14a3 3 0 0 1 0 6H7"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-highlight fmt-highlight-prominent" title="Highlight" data-i18n-title="editor.highlightTooltip" onclick="RefactorModalController.formatProposal('mark')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l-6 6v3h3l6-6"/><path d="M22 6l-4.6-4.6a1 1 0 0 0-1.4 0L5 12l7 7 10-10a1 1 0 0 0 0-1.4z"/></svg>
+        </button>
+        <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+        <button type="button" class="fmt-btn fmt-code" title="Inline code" data-i18n-title="editor.codeTooltip" onclick="RefactorModalController.formatProposal('code')">`</button>
+        <button type="button" class="fmt-btn" title="Code block" data-i18n-title="editor.codeblockTooltip" onclick="RefactorModalController.formatProposal('codeblock')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-quote" title="Blockquote" data-i18n-title="editor.blockquoteTooltip" onclick="RefactorModalController.formatProposal('blockquote')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-clear" title="Clear formatting" data-i18n-title="editor.clearFormattingTooltip" onclick="RefactorModalController.formatProposal('clear')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><path d="M4 20h16"/></svg>
+        </button>
+        <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+        <button type="button" class="fmt-btn" title="Bullet list" data-i18n-title="editor.ulTooltip" onclick="RefactorModalController.formatProposal('ul')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+        <button type="button" class="fmt-btn" title="Numbered list" data-i18n-title="editor.olTooltip" onclick="RefactorModalController.formatProposal('ol')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-checklist" title="Checklist" data-i18n-title="editor.checklistTooltip" onclick="RefactorModalController.formatProposal('checklist')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </button>
+        <div class="toolbar-divider" aria-hidden="true" style="height: 14px; margin: 0 2px;"></div>
+        <button type="button" class="fmt-btn" title="Horizontal rule" data-i18n-title="editor.hrTooltip" onclick="RefactorModalController.formatProposal('hr')">—</button>
+        <button type="button" class="fmt-btn" title="Insert link" data-i18n-title="editor.linkTooltip" onclick="RefactorModalController.formatProposal('link')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </button>
+        <button type="button" class="fmt-btn" title="Table" data-i18n-title="editor.tableTooltip" onclick="RefactorModalController.formatProposal('table')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+        </button>
+        <button type="button" class="fmt-btn fmt-math" title="LaTeX formula" data-i18n-title="editor.mathTooltip" onclick="RefactorModalController.formatProposal('math')">
+          <span style="font-family:'Times New Roman',serif;font-style:italic;font-weight:700;font-size:12px;letter-spacing:-0.5px;">fx</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Container -->
+    <div style="flex:1; min-height:0; display:flex; flex-direction:column; position:relative; overflow:hidden;">
+      <!-- Live Note Preview -->
+      <div id="refactor-proposal-preview-pane" class="refactor-preview-scroll" style="flex:1; overflow-y:auto; padding:1.2rem; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; line-height:1.6; color:var(--text);" contenteditable="true" data-i18n-title="refactor.previewPaneTooltip" title="You can edit this proposal directly before applying or re-perfecting">
+        <div id="refactor-proposal-html"></div>
+        <div id="refactor-actions-review-container" contenteditable="false" style="display:none; margin-top:16px; border-top:1px solid var(--card-border); padding-top:12px;"></div>
+      </div>
+
+      <!-- Scratchpad & Insights Viewer -->
+      <div id="refactor-scratchpad-pane" class="refactor-preview-scroll" style="display:none; flex:1; overflow-y:auto; padding:1.2rem; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px; line-height:1.5; color:var(--text); font-size:0.88rem;">
+        <div id="refactor-scratchpad-content"></div>
+      </div>
+
+      <!-- Inline Feedback Drawer for Option C (Compact Combo Box + Input) -->
+      <div id="refactor-feedback-drawer" style="display:none; margin-top:8px; padding:10px 12px; border:1px solid var(--card-border); background:var(--card-bg-alt); border-radius:8px; flex-direction:column; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; flex:1;">
+            <label for="refactor-feedback-preset" id="refactor-feedback-label" data-i18n="refactor.feedbackTitle" style="font-size:0.83rem; font-weight:600; color:var(--text); white-space:nowrap;">Option C Instructions:</label>
+            <select id="refactor-feedback-preset" class="field-select" onchange="RefactorModalController.onFeedbackPresetSelected(this.value)" data-i18n-title="refactor.presetTooltip" title="Choose a quick refinement preset or customize below" style="flex:1; max-width:360px; padding:4px 8px; font-size:0.82rem; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text);">
+              <option value="" data-i18n="refactor.presetPrompt">Quick refinement preset...</option>
+              <option value="More concise & shorter bullets" data-i18n="refactor.presetConcise">More concise & shorter bullets</option>
+              <option value="Emphasize deadlines, owners & dates" data-i18n="refactor.presetDeadlines">Emphasize deadlines & owners</option>
+              <option value="Organize chronologically by agenda" data-i18n="refactor.presetChronological">Chronological meeting flow</option>
+              <option value="Highlight strategic decisions and blockers" data-i18n="refactor.presetDecisions">Focus on strategic decisions</option>
+              <option value="Bullet points only (no paragraphs)" data-i18n="refactor.presetBulletsOnly">Bullet points only</option>
+              <option value="Executive tone with bold takeaways" data-i18n="refactor.presetExecutive">Executive summary tone</option>
+            </select>
+          </div>
+          <button type="button" class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="RefactorModalController.toggleFeedbackDrawer(false)" data-i18n-title="refactor.closeFeedbackTooltip" title="Close feedback panel"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="text" id="refactor-feedback-input" class="field-input" style="flex:1; padding:6px 10px; font-size:0.84rem; border:1px solid var(--card-border); border-radius:6px; background:var(--card-bg); color:var(--text);" placeholder="e.g., Make it more concise, emphasize deadlines..." title="Type custom instructions or refinements for Option C" />
+          <button type="button" class="btn btn-primary" id="btn-generate-option-c" onclick="RefactorModalController.generateOptionC()" data-i18n="refactor.generateOptionC" data-i18n-title="refactor.generateOptionCTooltip" title="Generate custom Option C according to your instructions" style="white-space:nowrap; padding:6px 14px; font-size:0.84rem;"><span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Generate Option C</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0; margin-top:0.4rem;">
+      <button class="btn btn-secondary" id="btn-refactor-decline" onclick="RefactorModalController.toggleFeedbackDrawer(true)" data-i18n="refactor.declineBoth" data-i18n-title="refactor.declineBothTooltip" title="Decline these proposals and provide custom instructions for Option C">Request Option C</button>
+      <div style="display:flex; gap:0.6rem; align-items:center;">
+        <button class="btn" id="btn-refactor-reperfect" style="display:none;" onclick="RefactorModalController.reperfectWithEdits()" data-i18n="refactor.reperfectProposal" data-i18n-title="refactor.reperfectProposalTooltip" title="Re-perfect this proposal incorporating your manual edits">Re-perfect with Edits</button>
+        <button class="btn" onclick="RefactorModalController.closeProposalsModal()" data-i18n="common.cancel" data-i18n-title="refactor.cancelTooltip" title="Cancel and keep current note">Cancel</button>
+        <button class="btn" id="btn-refactor-copy" onclick="RefactorModalController.copyCurrentProposal()" data-i18n="refactor.copyProposal" data-i18n-title="refactor.copyProposalTooltip" title="Copy selected proposal to clipboard">Copy</button>
+        <button class="btn btn-primary" id="btn-refactor-apply" onclick="RefactorModalController.applyCurrentProposal()" data-i18n="refactor.applyProposal" data-i18n-title="refactor.applyProposalTooltip" title="Apply selected proposal to note editor (creates automatic backup snapshot)"><span class="ui-icon-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span> Apply Proposal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Trash Bin Modal ── -->
+<div class="modal-overlay" id="modal-trash-bin">
+  <div class="modal" style="max-width: 650px; width: 90%; max-height: 80vh; display: flex; flex-direction: column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin:0;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg> <span data-i18n="trash.modalTitle">Trash Bin</span></h2>
+      <button class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-trash-bin')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div id="trash-bin-empty-hint" style="display:none; padding:2rem; text-align:center; color:var(--text-muted);" data-i18n="trash.empty">Your trash bin is empty.</div>
+    <div id="trash-bin-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:12px; min-height: 120px;"></div>
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--card-border); padding-top:10px;">
+      <button class="btn btn-danger" id="btn-empty-trash" onclick="emptyTrashFromUI()" title="Permanently delete all notes in trash" data-i18n-title="trash.emptyTrashTooltip" data-i18n="trash.emptyTrash">Empty Trash</button>
+      <button class="btn" onclick="closeModal('modal-trash-bin')" title="Close dialog" data-i18n-title="common.close" data-i18n="common.close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Note Template Picker Modal ── -->
+<div class="modal-overlay" id="modal-template-picker">
+  <div class="modal" style="max-width: 720px; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin:0;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> <span data-i18n="templates.pickerTitle">Choose Note Template</span></h2>
+      <button class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-template-picker')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <p style="font-size:0.85rem; color:var(--text-muted); margin:0;" data-i18n="templates.pickerSubtitle">Start your note with a structured framework tailored to your meeting or project ritual.</p>
+      
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label for="template-picker-lang-select" style="font-size:0.82rem; font-weight:600; color:var(--text-muted);" data-i18n="templates.languageLabel">Language:</label>
+        <select id="template-picker-lang-select" class="prefs-input" style="padding:4px 8px; font-size:0.82rem; min-width:110px;" onchange="onTemplatePickerLanguageChange(this.value)" title="Choose the language for templates" data-i18n-title="templates.languageSelectTooltip">
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="cs">Čeština</option>
+          <option value="es">Español</option>
+          <option value="hu">Magyar</option>
+          <option value="it">Italiano</option>
+          <option value="nl">Nederlands</option>
+          <option value="pl">Polski</option>
+          <option value="pt">Português</option>
+          <option value="ro">Română</option>
+          <option value="ru">Русский</option>
+          <option value="sv">Svenska</option>
+          <option value="tr">Türkçe</option>
+          <option value="uk">Українська</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="template-picker-grid" style="flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px; margin-bottom:14px; padding-right:2px;"></div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--card-border); padding-top:10px; flex-wrap:wrap; gap:8px;">
+      <label id="template-picker-merge-container" style="display:inline-flex; align-items:center; gap:6px; font-size:0.82rem; cursor:pointer; color:var(--text);" title="Merge template sections into existing note content instead of overwriting" data-i18n-title="templates.mergeWithExistingTooltip">
+        <input type="checkbox" id="template-picker-merge-checkbox" checked>
+        <span data-i18n="templates.mergeWithExisting">Merge with existing note content</span>
+      </label>
+      <div class="modal-actions" style="margin:0;">
+        <button class="btn" onclick="closeModal('modal-template-picker')" title="Cancel and close dialog" data-i18n-title="common.cancel" data-i18n="common.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Note Share / Export Modal ── -->
+<div class="modal-overlay" id="modal-note-share">
+  <div class="modal" style="max-width: 650px; width: 90%; max-height: 85vh; display: flex; flex-direction: column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin:0;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> <span data-i18n="share.modalTitle">Share & Export Note</span></h2>
+      <button class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-note-share')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="prefs-tabs" style="margin-bottom:12px;">
+      <button type="button" class="prefs-tab-btn active" id="share-tab-slack-btn" onclick="switchShareTab('slack')" title="Format for Slack and Microsoft Teams" data-i18n="share.slackTab" data-i18n-title="share.slackTabTooltip">Slack & Teams</button>
+      <button type="button" class="prefs-tab-btn" id="share-tab-email-btn" onclick="switchShareTab('email')" title="Format for Email" data-i18n="share.emailTab" data-i18n-title="share.emailTabTooltip">Email (Rich Text)</button>
+      <button type="button" class="prefs-tab-btn" id="share-tab-md-btn" onclick="switchShareTab('markdown')" title="Format for clean Markdown" data-i18n="share.markdownTab" data-i18n-title="share.markdownTabTooltip">Clean Markdown</button>
+    </div>
+    <div style="flex:1; overflow-y:auto; margin-bottom:14px;">
+      <textarea id="share-export-text" readonly style="width:100%; height:220px; font-family:var(--font-mono, monospace); font-size:0.82rem; padding:10px; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg-alt); color:var(--text); resize:none; box-sizing:border-box;"></textarea>
+      <div id="share-export-email-preview" style="display:none; width:100%; height:220px; overflow-y:auto; padding:12px; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text); box-sizing:border-box;"></div>
+    </div>
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="NoteFileExportEngine.downloadMarkdown(currentNote)" title="Download standalone .md file" data-i18n-title="share.downloadMdTooltip" data-i18n="share.downloadMd">Download .md</button>
+        <button class="btn btn-secondary btn-sm" onclick="NoteFileExportEngine.printToPdf()" title="Print or save as PDF" data-i18n-title="share.printPdfTooltip" data-i18n="share.printPdf">Print / PDF</button>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+        <span id="share-copied-hint" style="font-size:0.8rem; color:var(--accent); display:none;" data-i18n="share.copiedSuccess">Copied to clipboard!</span>
+        <button class="btn" onclick="closeModal('modal-note-share')" title="Close dialog" data-i18n-title="common.close" data-i18n="common.close">Close</button>
+        <button class="btn btn-primary" onclick="copyFormattedShareText()" title="Copy formatted output to clipboard" data-i18n-title="share.copyTooltip" data-i18n="share.copyBtn">Copy to Clipboard</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Note Version History Modal ── -->
+<div class="modal-overlay" id="modal-note-history">
+  <div class="modal" style="max-width: 700px; width: 90%; max-height: 85vh; display: flex; flex-direction: column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin:0;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/><path d="M4 12a8 8 0 0 1 8-8"/></svg> <span data-i18n="history.modalTitle">Revision History</span></h2>
+      <button class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-note-history')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div id="note-history-empty-hint" style="display:none; padding:2rem; text-align:center; color:var(--text-muted);" data-i18n="history.empty">No prior snapshots recorded for this note yet.</div>
+    <div id="note-history-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:12px; min-height: 140px;"></div>
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--card-border); padding-top:10px;">
+      <button class="btn btn-secondary" onclick="createManualSnapshotFromUI()" title="Save snapshot of current note state now" data-i18n-title="history.saveSnapshotTooltip" data-i18n="history.saveSnapshotNow">+ Save Current Snapshot</button>
+      <button class="btn" onclick="closeModal('modal-note-history')" title="Close dialog" data-i18n-title="common.close" data-i18n="common.close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Interactive Knowledge Graph Modal ── -->
+<div class="modal-overlay" id="modal-knowledge-graph">
+  <div class="modal" style="max-width: 960px; width: 94%; height: 85vh; display: flex; flex-direction: column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); padding-bottom:10px; margin-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <h2 style="display:flex; align-items:center; gap:8px; margin:0;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> <span data-i18n="graph.modalTitle">Knowledge Graph</span></h2>
+        <div id="knowledge-graph-ws-pills" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+      </div>
+      <button class="btn btn-secondary modal-close-icon-btn" onclick="KnowledgeGraphViewer.closeGraphModal()" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div style="flex:1; position:relative; overflow:hidden; border-radius:8px; background:var(--card-bg-alt); border:1px solid var(--card-border);">
+      <canvas id="knowledge-graph-canvas" style="width:100%; height:100%; display:block; cursor:pointer;"></canvas>
+      <div style="position:absolute; bottom:12px; left:14px; font-size:0.75rem; color:var(--text-muted); pointer-events:none; background:rgba(0,0,0,0.4); padding:4px 8px; border-radius:4px;" data-i18n="graph.hint">Click any note to open it directly</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Quick Stash Capture Modal ── -->
+<div class="modal-overlay" id="modal-quick-stash">
+  <div class="modal" style="max-width: 520px; width: 90%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin:0;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> <span data-i18n="stash.quickCaptureTitle">Quick Stash Capture</span></h2>
+      <button class="btn btn-secondary modal-close-icon-btn" onclick="QuickStashController.closeModal()" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div style="margin-bottom:12px;">
+      <textarea id="quick-stash-textarea" style="width:100%; height:120px; padding:10px; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg-alt); color:var(--text); resize:none; box-sizing:border-box; font-size:0.9rem;" placeholder="Capture a thought, idea, or reminder... (use #tags to organize)" data-i18n-placeholder="stash.quickCapturePlaceholder" onkeydown="if((event.metaKey || event.ctrlKey) && event.key === 'Enter') { QuickStashController.saveFromUI(); }"></textarea>
+      <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;" data-i18n="stash.quickCaptureShortcutHint">Press Cmd/Ctrl + Enter to stash instantly</div>
+    </div>
+    <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+      <button class="btn" onclick="QuickStashController.closeModal()" title="Cancel dialog" data-i18n-title="common.cancel" data-i18n="common.cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="QuickStashController.saveFromUI()" title="Save to stash" data-i18n-title="stash.saveTooltip" data-i18n="stash.stashBtn">Stash It</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete Workstream Confirmation Modal ── -->
+<div class="modal-overlay" id="modal-delete-workstream">
+  <div class="modal" style="max-width: 480px; width: 90%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin:0; color:var(--color-high, #ef4444);">
+        <svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+        <span data-i18n="workstream.deleteModalTitle">Delete Workstream</span>
+      </h2>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-delete-workstream')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <p style="margin: 0.8rem 0 0.5rem 0; font-size: 0.92rem; color: var(--text); line-height: 1.5;" id="delete-ws-confirm-msg">
+      Are you sure you want to delete this workstream?
+    </p>
+    <p class="form-hint" style="margin: 0 0 1.2rem 0; color: var(--text-muted); font-size: 0.82rem; line-height: 1.4;" data-i18n="workstream.deleteModalWarning">
+      This will permanently delete the workstream memory dossier and remove it from your workspace. Associated notes and decisions will remain in their respective sections.
+    </p>
+    <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('modal-delete-workstream')" data-i18n="common.cancel" title="Cancel deletion" data-i18n-title="common.cancelTooltip">Cancel</button>
+      <button type="button" class="btn btn-danger" id="btn-confirm-delete-ws" data-i18n="common.delete" title="Confirm permanent deletion of this workstream" data-i18n-title="workstream.deleteConfirmBtnTooltip">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cloud Sync / Firebase E2EE Onboarding & Setup Modal ── -->
+<div class="modal-overlay" id="modal-cloud-sync-setup">
+  <div class="modal" style="max-width: 560px; width: 92%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.25rem;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><rect x="8" y="14" width="8" height="6" rx="1"/><path d="M10 14v-2a2 2 0 1 1 4 0v2"/></svg>
+        </span>
+        <span data-i18n="sync.setupTitle">Cloud Sync & E2EE Setup</span>
+      </h2>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-cloud-sync-setup')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    
+    <p style="margin: 0.2rem 0 0.7rem 0; font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;" data-i18n="sync.setupDesc">
+      Synchronize your notes securely across devices with Zero-Knowledge Client-Side Encryption (AES-256-GCM). Your master password never leaves your device.
+    </p>
+
+    <!-- Storage Clarity Card: Free Local vs Optional Cloud -->
+    <div style="background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
+      <div style="display:flex; align-items:center; gap:6px; font-weight:600; color:var(--text); margin-bottom:3px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span data-i18n="sync.storageExplanationTitle">Local Files vs Cloud Sync</span>
+      </div>
+      <div style="color:var(--text-muted);" data-i18n="sync.storageExplanationBody">
+        By default, Secretary operates 100% locally and free on your computer with zero accounts or cloud dependencies. Cloud Sync is an optional feature that allows you to connect your own free Firebase project to sync encrypted notes across multiple devices.
+      </div>
+    </div>
+
+    <!-- Custom Firebase Project Config Accordion -->
+    <div style="margin-bottom:12px; border:1px solid var(--card-border); border-radius:8px; background:var(--card-bg-alt); overflow:hidden;">
+      <button type="button" class="btn" id="btn-toggle-custom-firebase" onclick="toggleCustomFirebaseSetupUI()" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:none; border:none; text-align:left; font-size:0.82rem; font-weight:600; color:var(--text); cursor:pointer;" title="Configure your own Firebase project credentials" data-i18n-title="sync.customFirebaseTooltip">
+        <span style="display:flex; align-items:center; gap:6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <span data-i18n="sync.customFirebaseTitle">Firebase Project Connection</span>
+        </span>
+        <span id="sync-custom-firebase-status-pill" style="font-size:0.72rem; padding:2px 7px; border-radius:10px; background:rgba(59,130,246,0.12); color:#3b82f6; font-weight:500;" data-i18n="sync.customFirebaseStatusDefault">Default Project</span>
+      </button>
+
+      <div id="sync-custom-firebase-body" style="display:none; padding:10px 12px; border-top:1px solid var(--card-border); font-size:0.78rem;">
+        <p style="margin:0 0 8px 0; color:var(--text-muted); line-height:1.4;" data-i18n="sync.customFirebaseHelp">
+          Connect your own Google Firebase project (100% free on Spark tier) by pasting your Web App configuration JSON:
+        </p>
+        <textarea id="sync-custom-firebase-json" class="prefs-input" style="width:100%; height:75px; font-family:monospace; font-size:0.75rem; resize:vertical; margin-bottom:8px;" placeholder='{ "apiKey": "AIza...", "projectId": "my-vault-123", "databaseURL": "https://..." }' title="Paste Firebase Web App config JSON here" data-i18n-title="sync.customFirebaseJsonTooltip" data-i18n-placeholder="sync.customFirebaseJsonPlaceholder"></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
+          <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent); font-size:0.75rem; text-decoration:none;" title="Open Firebase Console in browser to create a free project" data-i18n-title="sync.openFirebaseConsoleTooltip" data-i18n="sync.openFirebaseConsole">Open Firebase Console (Free)</a>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-secondary" onclick="resetCustomFirebaseConfigUI()" style="padding:4px 8px; font-size:0.75rem;" title="Reset to default demonstration Firebase project" data-i18n-title="sync.resetDefaultFirebaseTooltip" data-i18n="sync.resetDefaultFirebaseBtn">Reset to Default</button>
+            <button type="button" class="btn btn-primary" onclick="saveCustomFirebaseConfigUI()" style="padding:4px 8px; font-size:0.75rem;" title="Save and apply custom Firebase project configuration" data-i18n-title="sync.saveCustomFirebaseTooltip" data-i18n="sync.saveCustomFirebaseBtn">Apply Config</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+      <div style="padding:8px 10px; border-radius:6px; background:var(--card-bg-alt); border:1px solid var(--card-border); font-size:0.78rem; display:flex; align-items:center; gap:8px; color:var(--text);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>AES-256-GCM Zero-Knowledge</span>
+      </div>
+      <div style="padding:8px 10px; border-radius:6px; background:var(--card-bg-alt); border:1px solid var(--card-border); font-size:0.78rem; display:flex; align-items:center; gap:8px; color:var(--text);">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <span>Instant Local IndexedDB Cache</span>
+      </div>
+    </div>
+
+    <!-- Tabs: New Vault vs Link Existing -->
+    <form id="form-cloud-sync-setup" onsubmit="event.preventDefault(); submitCloudSyncSetup();" style="margin:0;">
+      <!-- Hidden username input for browser password managers and autofill support -->
+      <input type="text" id="sync-setup-username" name="username" autocomplete="username" value="Secretary Vault" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;" tabindex="-1" aria-hidden="true">
+      <div style="display:flex; border-bottom:1px solid var(--card-border); margin-bottom:14px; gap:8px;">
+        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-new" onclick="switchSyncSetupTab('new')" style="padding:6px 14px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid var(--accent); color:var(--accent);" data-i18n="sync.tabNewVault" title="Set up a new encrypted cloud vault on this device" data-i18n-title="sync.tabNewVaultTooltip">Create New Vault</button>
+        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-link" onclick="switchSyncSetupTab('link')" style="padding:6px 14px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--text-muted);" data-i18n="sync.tabLinkVault" title="Connect to an existing vault using a sync code and passphrase" data-i18n-title="sync.tabLinkVaultTooltip">Link Existing Device</button>
+      </div>
+
+      <!-- Sync Code input row -->
+      <div class="form-field" style="margin-bottom:12px;">
+        <label for="sync-setup-sync-code" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="text" id="sync-setup-sync-code" name="sync-code" placeholder="e.g. SEC-8B4K-9D2F" class="prefs-input" style="flex:1; font-family:monospace; font-weight:600; letter-spacing:1px;" title="Unique pairing code shared across your devices" data-i18n-title="sync.syncCodeTooltip" data-i18n-placeholder="sync.syncCodePlaceholder">
+          <button type="button" class="btn btn-secondary" id="btn-sync-setup-regen" onclick="regenerateSetupSyncCode()" title="Generate a new random sync code" data-i18n-title="sync.regenerateCodeTooltip" style="padding:6px 9px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          </button>
+          <button type="button" class="btn btn-secondary" id="btn-sync-setup-copy" onclick="copySetupSyncCode()" title="Copy the sync code to your clipboard" data-i18n-title="sync.copyCodeTooltip" style="padding:6px 9px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+        <small id="sync-setup-code-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:3px; display:block;" data-i18n="sync.syncCodeHelp">Enter this Sync Code and your Master Passphrase on any other computer to synchronize your notes.</small>
+      </div>
+
+      <div class="form-field" style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <label for="sync-setup-passphrase" data-i18n="sync.masterPasswordLabel" style="margin-bottom:0;">Master Passphrase (E2EE)</label>
+          <span id="sync-setup-pass-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); display:inline-flex; align-items:center; gap:4px;"></span>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <div style="position:relative; flex:1; display:flex; align-items:center;">
+            <input type="text" id="sync-setup-passphrase" name="password" autocomplete="new-password" placeholder="Choose a strong master passphrase..." class="prefs-input" style="width:100%; padding-right:36px; font-family:monospace; font-size:0.83rem; font-weight:500;" minlength="10" required title="Enter a master passphrase for encryption" data-i18n-title="sync.passphrasePlaceholder" data-i18n-placeholder="sync.passphrasePlaceholder" oninput="handleSetupPassphraseInput(this.value)">
+            <button type="button" id="btn-sync-setup-pass-visibility" onclick="togglePassVisibility('sync-setup-passphrase', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle passphrase visibility" data-i18n-title="common.togglePasswordVisibility">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-sync-setup-pass-regen" onclick="regenerateSetupPassphrase()" title="Generate a new strong, high-entropy default passphrase" data-i18n-title="sync.regeneratePassphraseTooltip" style="padding:6px 9px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          </button>
+          <button type="button" class="btn btn-secondary" id="btn-sync-setup-pass-copy" onclick="copySetupPassphrase()" title="Copy master passphrase to clipboard" data-i18n-title="sync.copyPassphraseTooltip" style="padding:6px 9px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+
+        <!-- Security & Encryption Clarity Notice -->
+        <div id="sync-setup-pass-clarity-card" style="margin-top:8px; padding:10px 12px; border-radius:8px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); font-size:0.75rem; line-height:1.45; color:var(--text);">
+          <div style="display:flex; align-items:center; gap:6px; font-weight:600; color:#10b981; margin-bottom:4px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span data-i18n="sync.passphraseClarityTitle">All Data Encrypted With This Key</span>
+          </div>
+          <div id="sync-setup-pass-clarity-text" data-i18n="sync.passphraseClarityNotice" style="color:var(--text-muted);">
+            All your notes, titles, tags, and content are encrypted locally on your device with this passphrase using AES-256-GCM before syncing. It is never sent to the cloud. A longer passphrase provides exponentially stronger protection against brute-force attacks — longer means significantly better security.
+          </div>
+        </div>
+        <small id="sync-setup-pass-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;" data-i18n="sync.passphraseHint">Minimum 10 characters. Required to decrypt notes on other devices.</small>
+      </div>
+
+      <div style="margin-bottom:10px;">
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:normal; text-transform:none; color:var(--text); margin:0;" title="Save passphrase locally to automatically unlock vault on startup" data-i18n-title="sync.rememberPassphraseTooltip">
+          <input type="checkbox" id="sync-setup-remember-pass" style="width:16px; height:16px; margin:0; flex-shrink:0; accent-color:var(--accent);">
+          <span data-i18n="sync.rememberPassphraseLabel">Remember passphrase on this device</span>
+        </label>
+      </div>
+
+      <div style="margin-bottom:14px;">
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:normal; text-transform:none; color:var(--text-muted); margin:0;" title="Do not show this onboarding dialog on startup" data-i18n-title="sync.dontShowAgain">
+          <input type="checkbox" id="sync-setup-dont-show-again" style="width:16px; height:16px; margin:0; flex-shrink:0; accent-color:var(--accent);">
+          <span data-i18n="sync.dontShowAgain">Do not show this onboarding dialog on startup</span>
+        </label>
+      </div>
+
+      <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <button type="button" class="btn" onclick="saveCloudSyncPromptDismissal()" data-i18n="sync.keepLocalOnly" data-i18n-title="sync.keepLocalOnlyTooltip" title="Dismiss setup and continue storing notes in local files">Keep Local Only</button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-sync-setup')" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Close this dialog">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-cloud-sync" data-mode="new" data-i18n="sync.enableSyncBtn" data-i18n-title="sync.enableSyncBtnTooltip" title="Initialize zero-knowledge encryption and enable sync">Enable Sync</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Cloud Sync Unlock Modal ── -->
+<div class="modal-overlay" id="modal-cloud-sync-unlock">
+  <div class="modal" style="max-width: 440px; width: 90%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">
+    <form id="form-cloud-sync-unlock" onsubmit="event.preventDefault(); submitCloudSyncUnlock();" style="margin:0;">
+      <!-- Hidden username input for browser password managers and autofill support -->
+      <input type="text" id="sync-unlock-username" name="username" autocomplete="username" value="Secretary Vault" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;" tabindex="-1" aria-hidden="true">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.2rem;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          <span data-i18n="sync.unlockTitle">Unlock Encrypted Vault</span>
+        </h2>
+        <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-cloud-sync-unlock')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <p style="margin: 0.2rem 0 1rem 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;" data-i18n="sync.unlockDesc">
+        Please enter your master passphrase to unlock and synchronize your encrypted notes.
+      </p>
+      <div class="form-field" style="margin-bottom:14px;">
+        <label for="sync-unlock-passphrase" data-i18n="sync.masterPasswordLabel">Master Passphrase</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="sync-unlock-passphrase" name="password" autocomplete="current-password" placeholder="Enter passphrase..." class="prefs-input" style="width:100%; padding-right:36px;" title="Enter your master passphrase to decrypt notes" data-i18n-title="sync.passphrasePlaceholder" data-i18n-placeholder="sync.passphrasePlaceholder" autofocus>
+          <button type="button" onclick="togglePassVisibility('sync-unlock-passphrase', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle passphrase visibility" data-i18n-title="common.togglePasswordVisibility">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <span id="sync-unlock-error" style="color:var(--color-high, #ef4444); font-size:0.8rem; display:none; margin-top:4px;"></span>
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:0.83rem; font-weight:normal; text-transform:none; color:var(--text); margin-top:10px;" title="Save passphrase locally to automatically unlock vault on startup" data-i18n-title="sync.rememberPassphraseTooltip">
+          <input type="checkbox" id="sync-unlock-remember-pass" style="width:16px; height:16px; margin:0; flex-shrink:0; accent-color:var(--accent);">
+          <span data-i18n="sync.rememberPassphraseLabel">Remember passphrase on this device</span>
+        </label>
+      </div>
+      <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-sync-unlock')" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Close this dialog without unlocking">Cancel</button>
+        <button type="button" class="btn btn-secondary" id="btn-sync-unlock-save" onclick="submitCloudSyncUnlock(true)" data-i18n="sync.saveAndUnlockBtn" data-i18n-title="sync.saveAndUnlockTooltip" title="Unlock and remember passphrase on this device">Save & Unlock</button>
+        <button type="submit" class="btn btn-primary" id="btn-sync-unlock-submit" data-i18n="sync.unlockBtn" data-i18n-title="sync.unlockBtnTooltip" title="Unlock your encrypted vault and sync notes">Unlock Vault</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Cloud Sync Password Rotation Modal ── -->
+<div class="modal-overlay" id="modal-cloud-sync-password-rotate">
+  <div class="modal" style="max-width: 480px; width: 90%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">
+    <form id="form-cloud-sync-rotate" onsubmit="event.preventDefault(); submitCloudSyncPasswordRotate();" style="margin:0;">
+      <!-- Hidden username input for browser password managers and autofill support -->
+      <input type="text" id="sync-rotate-username" name="username" autocomplete="username" value="Secretary Vault" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;" tabindex="-1" aria-hidden="true">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.2rem;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          </span>
+          <span data-i18n="sync.rotatePasswordTitle">Change Master Passphrase</span>
+        </h2>
+        <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-cloud-sync-password-rotate')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <p style="margin: 0.2rem 0 1rem 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;" data-i18n="sync.rotatePasswordDesc">
+        This will re-encrypt all notes in your vault with a new cryptographic key.
+      </p>
+      <div class="form-field" style="margin-bottom:10px;">
+        <label for="sync-rotate-current-pass" data-i18n="sync.currentPasswordLabel">Current Passphrase</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="sync-rotate-current-pass" name="current-password" autocomplete="current-password" placeholder="Current passphrase..." class="prefs-input" style="width:100%; padding-right:36px;" title="Enter your current passphrase" data-i18n-title="sync.currentPasswordTooltip">
+          <button type="button" onclick="togglePassVisibility('sync-rotate-current-pass', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle passphrase visibility" data-i18n-title="common.togglePasswordVisibility">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="form-field" style="margin-bottom:10px;">
+        <label for="sync-rotate-new-pass" data-i18n="sync.newPasswordLabel">New Passphrase</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="sync-rotate-new-pass" name="new-password" autocomplete="new-password" placeholder="New strong passphrase..." class="prefs-input" style="width:100%; padding-right:36px;" minlength="10" required title="Enter your new master passphrase" data-i18n-title="sync.newPasswordTooltip">
+          <button type="button" onclick="togglePassVisibility('sync-rotate-new-pass', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle passphrase visibility" data-i18n-title="common.togglePasswordVisibility">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="form-field" style="margin-bottom:12px;">
+        <label for="sync-rotate-confirm-pass" data-i18n="sync.confirmPasswordLabel">Confirm New Passphrase</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="sync-rotate-confirm-pass" name="confirm-password" autocomplete="new-password" placeholder="Repeat new passphrase..." class="prefs-input" style="width:100%; padding-right:36px;" minlength="10" required title="Repeat your new passphrase" data-i18n-title="sync.confirmPasswordTooltip">
+          <button type="button" onclick="togglePassVisibility('sync-rotate-confirm-pass', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle passphrase visibility" data-i18n-title="common.togglePasswordVisibility">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <span id="sync-rotate-error" style="color:var(--color-high, #ef4444); font-size:0.8rem; display:none; margin-top:4px;"></span>
+      </div>
+      <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-sync-password-rotate')" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Close dialog without changing passphrase">Cancel</button>
+        <button type="submit" class="btn btn-primary" onclick="submitCloudSyncPasswordRotate()" data-i18n="sync.changePasswordBtn" data-i18n-title="sync.changePasswordBtnTooltip" title="Re-encrypt entire vault with your new passphrase">Change & Re-encrypt</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Sync Conflict Resolution Modal (A/B) ── -->
+<div class="modal-overlay" id="modal-sync-conflict" style="display:none; z-index:10006;" role="dialog" aria-modal="true" aria-labelledby="sync-conflict-title">
+  <div class="modal sync-conflict-modal" style="width: min(960px, 94vw); max-width: 94vw; max-height: 90vh; display: flex; flex-direction: column; gap: 0.8rem; padding: 1.2rem 1.5rem; box-sizing: border-box; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-shrink:0;">
+      <div>
+        <h2 id="sync-conflict-title" style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--color-medium-text, #f59e0b) 15%, transparent); color:var(--color-medium-text, #f59e0b);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </span>
+          <span data-i18n="sync.conflictModalTitle">Resolve Synchronization Conflict</span>
+        </h2>
+        <p style="margin: 4px 0 0 0; font-size: 0.86rem; color: var(--text-muted); line-height: 1.4;" data-i18n="sync.conflictModalSubtitle">
+          This note was edited on another device. Select which version you want to keep. The unselected version is automatically preserved in Note History (.history).
+        </p>
+      </div>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-sync-conflict')" title="Close dialog" data-i18n-title="common.close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- A/B Comparison Grid -->
+    <div class="sync-conflict-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; flex:1; min-height:0; overflow:hidden;">
+      <!-- Option A: This Device (Local) -->
+      <div class="sync-conflict-card" style="display:flex; flex-direction:column; background:var(--card-bg-alt); border:1px solid var(--accent); border-radius:10px; padding:12px; min-height:0; overflow:hidden;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
+          <span class="badge" style="background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent); font-weight:600; padding:3px 8px; border-radius:6px; font-size:0.8rem; display:inline-flex; align-items:center; gap:5px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span data-i18n="sync.conflictOptionALabel">Option A: This Device (Local)</span>
+          </span>
+          <span id="conflict-local-meta" style="font-size:0.75rem; color:var(--text-muted);"></span>
+        </div>
+        <div id="conflict-local-preview" class="sync-conflict-preview" style="flex:1; overflow-y:auto; padding:10px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text); min-height:180px; max-height:360px;"></div>
+        <div style="margin-top:10px; display:flex; justify-content:stretch; flex-shrink:0;">
+          <button type="button" class="btn btn-primary" id="btn-conflict-pick-a" onclick="ConflictResolverController.resolve('keep_local')" style="width:100%; justify-content:center;" title="Keep local version and archive remote version in Note History" data-i18n-title="sync.keepATooltip" data-i18n="sync.keepA">Keep Option A (This Device)</button>
+        </div>
+      </div>
+
+      <!-- Option B: Other Device (Remote) -->
+      <div class="sync-conflict-card" style="display:flex; flex-direction:column; background:var(--card-bg-alt); border:1px solid color-mix(in srgb, var(--color-medium-text, #f59e0b) 60%, transparent); border-radius:10px; padding:12px; min-height:0; overflow:hidden;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-shrink:0;">
+          <span class="badge" style="background:color-mix(in srgb, var(--color-medium-text, #f59e0b) 15%, transparent); color:var(--color-medium-text, #f59e0b); font-weight:600; padding:3px 8px; border-radius:6px; font-size:0.8rem; display:inline-flex; align-items:center; gap:5px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            <span data-i18n="sync.conflictOptionBLabel">Option B: Other Device (Remote)</span>
+          </span>
+          <span id="conflict-remote-meta" style="font-size:0.75rem; color:var(--text-muted);"></span>
+        </div>
+        <div id="conflict-remote-preview" class="sync-conflict-preview" style="flex:1; overflow-y:auto; padding:10px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; font-size:0.88rem; line-height:1.5; color:var(--text); min-height:180px; max-height:360px;"></div>
+        <div style="margin-top:10px; display:flex; justify-content:stretch; flex-shrink:0;">
+          <button type="button" class="btn btn-primary" id="btn-conflict-pick-b" onclick="ConflictResolverController.resolve('keep_remote')" style="width:100%; justify-content:center;" title="Keep remote version and archive local version in Note History" data-i18n-title="sync.keepBTooltip" data-i18n="sync.keepB">Keep Option B (Other Device)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Safety Information Notice -->
+    <div style="display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:6px; background:color-mix(in srgb, var(--text-muted) 8%, transparent); font-size:0.78rem; color:var(--text-muted); flex-shrink:0;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <span data-i18n="sync.conflictHistoryNotice">The unselected version is automatically preserved as a timestamped snapshot in Note History (.history) and can be restored at any time.</span>
+    </div>
+
+    <!-- Bottom Actions -->
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; flex-shrink:0;">
+      <button type="button" class="btn btn-secondary" id="btn-conflict-keep-both" onclick="ConflictResolverController.resolve('keep_both')" title="Save both versions by creating a separate conflict copy" data-i18n-title="sync.keepBothTooltip" data-i18n="sync.keepBoth">Keep Both (Save Copy)</button>
+      <button type="button" class="btn btn-secondary" onclick="closeModal('modal-sync-conflict')" title="Close dialog and review conflict later" data-i18n-title="common.cancelTooltip" data-i18n="common.cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cloud Mode Exit Confirmation Modal ── -->
+<div class="modal-overlay" id="modal-cloud-exit-confirm" style="display:none; z-index:10007;" role="dialog" aria-modal="true" aria-labelledby="cloud-exit-title">
+  <div class="modal cloud-exit-modal" style="width: min(560px, 92vw); max-width: 92vw; display: flex; flex-direction: column; gap: 1rem; padding: 1.4rem 1.6rem; box-sizing: border-box; border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.4);">
+    <!-- Header -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-shrink:0;">
+      <div>
+        <h2 id="cloud-exit-title" style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent); color:var(--accent, #3b82f6);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          </span>
+          <span data-i18n="confirm.cloudExitTitle">Close Secretary (Cloud Mode)</span>
+        </h2>
+        <p style="margin: 6px 0 0 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.45;" data-i18n="confirm.cloudExitSubtitle">
+          All changes will be securely synchronized to your cloud vault. Choose how to handle local working copies on this device:
+        </p>
+      </div>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="if (typeof resolveCloudExitDialog === 'function') resolveCloudExitDialog('cancel'); else closeModal('modal-cloud-exit-confirm');" title="Cancel and stay in Secretary" data-i18n-title="confirm.closeAppCancelTooltip">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Options Details Cards -->
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <!-- Option 1: Keep local copies -->
+      <div style="padding:10px 12px; border-radius:8px; background:var(--card-bg-alt); border:1px solid var(--card-border);">
+        <div style="font-weight:600; font-size:0.88rem; color:var(--text); margin-bottom:2px;" data-i18n="confirm.cloudExitKeepOptionTitle">Keep Local Working Copies (Fast Startup)</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;" data-i18n="confirm.cloudExitKeepOptionDesc">Leaves local cache in IndexedDB on this private computer for instant offline access and rapid search next time you launch.</div>
+      </div>
+      <!-- Option 2: Delete local copies -->
+      <div style="padding:10px 12px; border-radius:8px; background:var(--card-bg-alt); border:1px solid color-mix(in srgb, var(--color-danger, #ef4444) 30%, transparent);">
+        <div style="font-weight:600; font-size:0.88rem; color:var(--color-danger, #ef4444); margin-bottom:2px;" data-i18n="confirm.cloudExitPurgeOptionTitle">Delete Local Copies (Shared & Work Computers)</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); line-height:1.4;" data-i18n="confirm.cloudExitPurgeOptionDesc">Flushes all writes to Firebase, wipes local IndexedDB and memory cache, and locks vault. Zero traces left on this device.</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px; flex-wrap:wrap;">
+      <button type="button" class="btn btn-secondary" onclick="if (typeof resolveCloudExitDialog === 'function') resolveCloudExitDialog('cancel'); else closeModal('modal-cloud-exit-confirm');" data-i18n="confirm.closeAppCancel" data-i18n-title="confirm.closeAppCancelTooltip" title="Cancel and keep Secretary open">Cancel</button>
+      <button type="button" class="btn btn-danger" onclick="if (typeof resolveCloudExitDialog === 'function') resolveCloudExitDialog('close_and_delete');" data-i18n="confirm.cloudExitPurgeBtn" data-i18n-title="confirm.cloudExitPurgeBtnTooltip" title="Flush all changes to cloud, delete local copies and close application">Close & Delete Local Copies</button>
+      <button type="button" class="btn btn-save" onclick="if (typeof resolveCloudExitDialog === 'function') resolveCloudExitDialog('close');" data-i18n="confirm.cloudExitKeepBtn" data-i18n-title="confirm.cloudExitKeepBtnTooltip" title="Synchronize changes and close while keeping fast local cache">Close</button>
+    </div>
+  </div>
+</div>
+
+
+

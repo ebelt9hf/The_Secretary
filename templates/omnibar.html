@@ -1,0 +1,25 @@
+<!-- ── Omnibar Modal ── -->
+<div class="omnibar-overlay" id="omnibar-overlay">
+  <div class="omnibar-container" id="omnibar-container" role="dialog" aria-modal="true" aria-label="Omnibar Command Palette">
+    <div class="omnibar-input-wrapper">
+      <img class="omnibar-icon" src="icon.svg" alt="" style="width: 20px; height: 20px; margin-right: 10px; object-fit: contain;">
+      <div class="omnibar-input-area" id="omnibar-input-area">
+        <div class="omnibar-ghost-layer" id="omnibar-ghost-layer" aria-hidden="true"></div>
+        <input type="text" class="omnibar-input" id="omnibar-input" placeholder="What do you want to do?" data-i18n-placeholder="omnibar.inputPlaceholder" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="omnibar-results">
+      </div>
+      <button id="omnibar-ai-btn" class="omnibar-ai-btn" onclick="openFloatingChatFromOmnibar()" title="Open Secretary Chat" data-i18n-title="omnibar.aiChatTitle" style="background:transparent; border:none; cursor:pointer; padding: 0 4px; display:inline-flex; align-items:center; justify-content:center; margin-right:6px; color: var(--text);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></button>
+      <span class="omnibar-esc-tip">⎋</span>
+    </div>
+    <div class="omnibar-param-indicator" id="omnibar-param-indicator" aria-hidden="true"></div>
+    <div class="omnibar-results-container" id="omnibar-results" role="listbox" style="display: none;"></div>
+    <div class="omnibar-hints"></div>
+    <div class="omnibar-footer" id="omnibar-footer">
+      <div class="omnibar-footer-shortcuts">
+        <span class="omnibar-footer-item"><kbd>↩</kbd> <span id="omnibar-lbl-select" data-i18n="omnibar.footerSelect">Select</span></span>
+        <span class="omnibar-footer-item"><kbd>↑↓</kbd> <span id="omnibar-lbl-nav" data-i18n="omnibar.footerNavigate">Navigate</span></span>
+        <span class="omnibar-footer-item"><kbd>⇥</kbd> <span id="omnibar-lbl-auto" data-i18n="omnibar.footerAutocomplete">Complete</span></span>
+      </div>
+      <span class="omnibar-footer-item"><kbd>⎋</kbd> <span id="omnibar-lbl-close" data-i18n="omnibar.footerClose">Close</span></span>
+    </div>
+  </div>
+</div>

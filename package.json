@@ -1,0 +1,112 @@
+{
+  "name": "secretary",
+  "version": "4.0.0",
+  "description": "Private local-first personal note manager and task organizer",
+  "main": "electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"npm run electron:start\"",
+    "electron:start": "wait-on http://localhost:5173 && electron .",
+    "bundle:firebase": "esbuild development/firebase-entry.js --bundle --minify --format=iife --outfile=js/firebase-bundle.js",
+    "build": "npm run bundle:firebase && vite build",
+    "check:translations": "python3 development/check_translations.py",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test": "npm run check:translations && npm run test:unit",
+    "preview": "vite preview",
+    "package": "npm run build && electron-builder --dir",
+    "package:mac": "npm run build && electron-builder --mac --dir",
+    "package:win": "npm run build && electron-builder --win --x64 --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win --x64"
+  },
+  "keywords": [
+    "notes",
+    "tasks",
+    "kanban",
+    "local-first",
+    "markdown"
+  ],
+  "author": "Etienne Beltzung <etienne.beltzung@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "happy-dom": "^20.11.12",
+    "vite": "^5.4.21",
+    "vitest": "^4.1.11",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.secretary.app",
+    "productName": "Secretary",
+    "copyright": "Copyright © 2026 Etienne Beltzung",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "icon.icns",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.png",
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "icon.png"
+    },
+    "files": [
+      "dist/**/*",
+      "models/**/*",
+      "electron/**/*",
+      "icon.ico",
+      "icon.png",
+      "icon.icns",
+      "!dist/v*/**",
+      "!dist/apple/**",
+      "!dist/windows/**",
+      "!dist/mac*/**",
+      "!dist/win*/**",
+      "!dist/linux*/**",
+      "!dist/models/**",
+      "!dist/*.{dmg,zip,exe,AppImage,deb,blockmap,yaml,yml}",
+      "!dist/builder-*",
+      "!**/*.{h,hh,hpp,hxx,c,cc,cpp,cxx,o,a,obj,gyp,gypi}",
+      "!**/*.{ts,d.ts,map}",
+      "!**/*.{md,markdown,txt,nycrc,jsdoc}",
+      "!**/node_modules/**/{test,tests,testing,bench,benchmark,benchmarks,docs,documentation,example,examples}/**",
+      "!**/node_modules/sharp/vendor/**/include/**",
+      "!**/node_modules/sharp/src/**",
+      "!**/.DS_Store",
+      "!**/.git*"
+    ]
+  },
+  "dependencies": {
+    "@xenova/transformers": "^2.17.2",
+    "firebase": "^12.19.0"
+  }
+}

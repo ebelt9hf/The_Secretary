@@ -1,0 +1,353 @@
+import json
+import re
+
+new_keys = {
+    "common.save": {
+        "en": "Save",
+        "de": "Speichern",
+        "fr": "Enregistrer",
+        "es": "Guardar",
+        "it": "Salva",
+        "pt": "Salvar",
+        "nl": "Opslaan",
+        "pl": "Zapisz",
+        "ru": "Сохранить",
+        "uk": "Зберегти",
+        "sv": "Spara",
+        "tr": "Kaydet",
+        "cs": "Uložit",
+        "ro": "Salvează",
+        "hu": "Mentés"
+    },
+    "topbar.workstreams": {
+        "en": "Workstreams",
+        "de": "Workstreams",
+        "fr": "Workstreams",
+        "es": "Workstreams",
+        "it": "Workstream",
+        "pt": "Workstreams",
+        "nl": "Workstreams",
+        "pl": "Strumienie prac",
+        "ru": "Рабочие потоки",
+        "uk": "Робочі потоки",
+        "sv": "Arbetsströmmar",
+        "tr": "İş Akışları",
+        "cs": "Pracovní postupy",
+        "ro": "Fluxuri de lucru",
+        "hu": "Munkaterületek"
+    },
+    "topbar.workstreamsTooltip": {
+        "en": "View and manage workstreams, topics, and strategic decisions",
+        "de": "Workstreams, Themen und strategische Entscheidungen anzeigen und verwalten",
+        "fr": "Consulter et gérer les workstreams, sujets et décisions stratégiques",
+        "es": "Ver y gestionar flujos de trabajo, temas y decisiones estratégicas",
+        "it": "Visualizza e gestisci workstream, argomenti e decisioni strategiche",
+        "pt": "Visualizar e gerenciar workstreams, tópicos e decisões estratégicas",
+        "nl": "Bekijk en beheer workstreams, onderwerpen en strategische beslissingen",
+        "pl": "Przeglądaj i zarządzaj strumieniami prac, tematami i decyzjami strategicznymi",
+        "ru": "Просмотр и управление рабочими потоками, темами и стратегическими решениями",
+        "uk": "Перегляд та управление робочими потоками, темами та стратегічними рішеннями",
+        "sv": "Visa och hantera arbetsströmmar, ämnen och strategiska beslut",
+        "tr": "İş akışlarını, konuları ve stratejik kararları görüntüleyin ve yönetin",
+        "cs": "Zobrazit a spravovat pracovní postupy, témata a strategická rozhodnutí",
+        "ro": "Vizualizați și gestionați fluxurile de lucru, subiectele și deciziile strategice",
+        "hu": "Munkaterületek, témák és stratégiai döntések megtekintése és kezelése"
+    },
+    "refactor.confirmTopicSplitTooltip": {
+        "en": "Split this out into a separate Workstream Memory file upon applying",
+        "de": "Beim Anwenden in eine separate Workstream-Speicherdatei aufteilen",
+        "fr": "Séparer dans un fichier mémoire de Workstream dédié lors de l'application",
+        "es": "Dividir esto en un archivo de memoria de Workstream separado al aplicar",
+        "it": "Dividi in un file di memoria Workstream separato dopo l'applicazione",
+        "pt": "Dividir em um arquivo de memória Workstream separado ao aplicar",
+        "nl": "Splits dit bij het toepassen in een afzonderlijk Workstream-geheugenbestand",
+        "pl": "Wydziel to do osobnego pliku pamięci strumienia prac po zastosowaniu",
+        "ru": "Выделить в отдельный файл памяти рабочего потока при применении",
+        "uk": "Виділити в окремий файл пам'яті робочого потоку при застосуванні",
+        "sv": "Dela upp i en separat arbetsströmsminnesfil vid tillämpning",
+        "tr": "Uyguladıktan sonra bunu ayrı bir İş Akışı Bellek dosyasına ayırın",
+        "cs": "Při aplikaci rozdělit do samostatného souboru paměti pracovního postupu",
+        "ro": "Separați într-un fișier de memorie de flux de lucru dedicat la aplicare",
+        "hu": "Külön mentési fájlba választás az alkalmazáskor"
+    },
+    "refactor.createTopicMemory": {
+        "en": "Create Workstream Memory",
+        "de": "Workstream-Speicher erstellen",
+        "fr": "Créer Mémoire Workstream",
+        "es": "Crear Memoria de Workstream",
+        "it": "Crea Memoria Workstream",
+        "pt": "Criar Memória de Workstream",
+        "nl": "Workstream-geheugen maken",
+        "pl": "Utwórz pamięć strumienia",
+        "ru": "Создать память потока",
+        "uk": "Створити пам'ять потоку",
+        "sv": "Skapa arbetsströmsminne",
+        "tr": "İş Akışı Belleği Oluştur",
+        "cs": "Vytvořit paměť postupu",
+        "ro": "Creează Memorie Flux",
+        "hu": "Munkaterület mentés létrehozása"
+    },
+    "refactor.newTopicDetected": {
+        "en": "New Major Workstream Detected",
+        "de": "Neuer Haupt-Workstream erkannt",
+        "fr": "Nouveau Workstream Majeur Détecté",
+        "es": "Nuevo Flujo de Trabajo Principal Detectado",
+        "it": "Rilevato Nuovo Workstream Principale",
+        "pt": "Novo Workstream Principal Detetado",
+        "nl": "Nieuwe Belangrijke Workstream Gedeclereerd",
+        "pl": "Wykryto nowy główny strumień prac",
+        "ru": "Обнаружен новый главный рабочий поток",
+        "uk": "Виявлено новий головний робочий потік",
+        "sv": "Ny huvudarbetsström upptäckt",
+        "tr": "Yeni Ana İş Akışı Tespit Edildi",
+        "cs": "Zjištěn nový hlavní pracovní postup",
+        "ro": "S-a detectat un nou flux de lucru principal",
+        "hu": "Új fő munkaterület észlelve"
+    },
+    "refactor.reperfectProposal": {
+        "en": "Re-perfect with Edits",
+        "de": "Mit Änderungen neu perfektionieren",
+        "fr": "Ré-optimiser avec les Éditions",
+        "es": "Re-perfeccionar con Ediciones",
+        "it": "Riperfeziona con Modifiche",
+        "pt": "Re-aperfeiçoar com Edições",
+        "nl": "Her-perfectioneren met bewerkingen",
+        "pl": "Udoskonal z edycjami",
+        "ru": "Пересоздать с правками",
+        "uk": "Пересоздати з правками",
+        "sv": "Omperfektera med redigeringar",
+        "tr": "Düzenlemelerle Yeniden Mükemmelleştir",
+        "cs": "Vylepšit s úpravami",
+        "ro": "Re-perfecționează cu editările",
+        "hu": "Újra-tökéletesítés a szerkesztésekkel"
+    },
+    "refactor.reperfectProposalTooltip": {
+        "en": "Re-perfect this proposal incorporating your manual edits",
+        "de": "Perfektionieren Sie diesen Vorschlag unter Einbeziehung Ihrer manuellen Änderungen neu",
+        "fr": "Ré-optimiser cette proposition en intégrant vos modifications manuelles",
+        "es": "Vuelva a perfeccionar esta propuesta incorporando sus ediciones manuales",
+        "it": "Riperfeziona questa proposta incorporando le tue modifiche manuali",
+        "pt": "Re-aperfeiçoe esta proposta incorporando suas edições manuais",
+        "nl": "Her-perfectioneer dit voorstel met verwerking van uw handmatige bewerkingen",
+        "pl": "Ponownie udoskonal tę propozycję, uwzględniając Twoje ręczne edycje",
+        "ru": "Пересоздайте это предложение с учетом ваших ручных правок",
+        "uk": "Пересоздайте цэ предложение з урахуванням ваших ручних правок",
+        "sv": "Omperfektera detta förslag genom att inkludera dina manuella redigeringar",
+        "tr": "Manuel düzenlemelerinizi dahil ederek bu teklifi yeniden mükemmelleştirin",
+        "cs": "Znovu vylepšete tento návrh zapracováním vašich ručních úprav",
+        "ro": "Re-perfecționați această propunere integrând editările dvs. manuale",
+        "hu": "Tökéletesítse újra ezt a javaslatot a kézi szerkesztések beépítésével"
+    },
+    "refactor.refiningAmended": {
+        "en": "Re-perfecting proposal with your edits...",
+        "de": "Vorschlag wird mit Ihren Änderungen neu perfektioniert...",
+        "fr": "Ré-optimisation de la proposition avec vos modifications...",
+        "es": "Re-perfeccionando propuesta con sus ediciones...",
+        "it": "Riperfezionamento proposta con le tue modifiche...",
+        "pt": "Re-aperfeiçoando proposta com suas edições...",
+        "nl": "Voorstel wordt her-geperfectioneerd met uw bewerkingen...",
+        "pl": "Ponowne udoskonalanie propozycji z Twoimi edycjami...",
+        "ru": "Пересоздание предложения с вашими правками...",
+        "uk": "Пересоздання пропозиції з вашими правками...",
+        "sv": "Omperfekterar förslag med dina redigeringar...",
+        "tr": "Teklif düzenlemelerinizle yeniden mükemmelleştiriliyor...",
+        "cs": "Znovu se vylepšuje návrh s vašimi úpravami...",
+        "ro": "Se re-perfecționează propunerea cu editările dvs....",
+        "hu": "Javaslat újra-tökéletesítése a szerkesztésekkel..."
+    },
+    "refactor.stepReperfect": {
+        "en": "Proposal Re-perfected",
+        "de": "Vorschlag neu perfektioniert",
+        "fr": "Proposition Ré-optimisée",
+        "es": "Propuesta Re-perfeccionada",
+        "it": "Proposta Riperfezionata",
+        "pt": "Proposta Re-aperfeiçoada",
+        "nl": "Voorstel her-geperfectioneerd",
+        "pl": "Propozycja udoskonalona",
+        "ru": "Предложение пересоздано",
+        "uk": "Пропозиція пересоздана",
+        "sv": "Förslag omperfekterat",
+        "tr": "Teklif Yeniden Mükemmelleştirildi",
+        "cs": "Návrh vylepšen",
+        "ro": "Propunere re-perfecționată",
+        "hu": "Javaslat újra-tökéletesítve"
+    },
+    "refactor.topicMemoryCreated": {
+        "en": "Workstream Memory created",
+        "de": "Workstream-Speicher erstellt",
+        "fr": "Mémoire Workstream créée",
+        "es": "Memoria de Workstream creada",
+        "it": "Memoria Workstream creata",
+        "pt": "Memória de Workstream criada",
+        "nl": "Workstream-geheugen gemaakt",
+        "pl": "Utworzono pamięć strumienia",
+        "ru": "Память рабочего потока создана",
+        "uk": "Пам'ять робочого потоку створена",
+        "sv": "Arbetsströmsminne skapat",
+        "tr": "İş Akışı Belleği oluşturuldu",
+        "cs": "Paměť postupu vytvořena",
+        "ro": "Memorie de flux creată",
+        "hu": "Munkaterület mentés létrehozva"
+    },
+    "workstream.archive": {
+        "en": "Archive",
+        "de": "Archivieren",
+        "fr": "Archiver",
+        "es": "Archivar",
+        "it": "Archivia",
+        "pt": "Arquivar",
+        "nl": "Archiveren",
+        "pl": "Archiwizuj",
+        "ru": "Архивировать",
+        "uk": "Архівувати",
+        "sv": "Arkivera",
+        "tr": "Arşivle",
+        "cs": "Archivovat",
+        "ro": "Arhivează",
+        "hu": "Archiválás"
+    },
+    "workstream.archivedToast": {
+        "en": "Workstream archived!",
+        "de": "Workstream archiviert!",
+        "fr": "Workstream archivé !",
+        "es": "¡Flujo de trabajo archivado!",
+        "it": "Workstream archiviato!",
+        "pt": "Workstream arquivado!",
+        "nl": "Workstream gearchiveerd!",
+        "pl": "Strumień prac zarchiwizowany!",
+        "ru": "Рабочий поток архивирован!",
+        "uk": "Робочий потік заархівовано!",
+        "sv": "Arbetsström arkiverad!",
+        "tr": "İş akışı arşivlendi!",
+        "cs": "Pracovní postup archivován!",
+        "ro": "Flux de lucru arhivat!",
+        "hu": "Munkaterület archiválva!"
+    },
+    "workstream.reactivate": {
+        "en": "Reactivate",
+        "de": "Reaktivieren",
+        "fr": "Réactiver",
+        "es": "Reactivar",
+        "it": "Riattiva",
+        "pt": "Reativar",
+        "nl": "Heractiveren",
+        "pl": "Reaktywuj",
+        "ru": "Возобновить",
+        "uk": "Відновити",
+        "sv": "Reaktivera",
+        "tr": "Yeniden Etkinleştir",
+        "cs": "Reaktivovat",
+        "ro": "Reactivează",
+        "hu": "Újraaktiválás"
+    },
+    "workstream.reactivatedToast": {
+        "en": "Workstream reactivated!",
+        "de": "Workstream reaktiviert!",
+        "fr": "Workstream réactivé !",
+        "es": "¡Flujo de trabajo reactivado!",
+        "it": "Workstream riattivato!",
+        "pt": "Workstream reativado!",
+        "nl": "Workstream geheractiveerd!",
+        "pl": "Strumień prac reaktywowany!",
+        "ru": "Рабочий поток возобновлен!",
+        "uk": "Робочий потік відновлено!",
+        "sv": "Arbetsström reaktiverad!",
+        "tr": "İş akışı yeniden etkinleştirildi!",
+        "cs": "Pracovní postup reaktivován!",
+        "ro": "Flux de lucru reactivat!",
+        "hu": "Munkaterület újraaktiválva!"
+    },
+    "workstream.statusActive": {
+        "en": "Active",
+        "de": "Aktiv",
+        "fr": "Actif",
+        "es": "Activo",
+        "it": "Attivo",
+        "pt": "Ativo",
+        "nl": "Actief",
+        "pl": "Aktywny",
+        "ru": "Активный",
+        "uk": "Активний",
+        "sv": "Aktiv",
+        "tr": "Etkin",
+        "cs": "Aktivní",
+        "ro": "Activ",
+        "hu": "Aktív"
+    },
+    "workstream.statusArchived": {
+        "en": "Archived (>30d)",
+        "de": "Archiviert (>30T)",
+        "fr": "Archivé (>30j)",
+        "es": "Archivado (>30d)",
+        "it": "Archiviato (>30g)",
+        "pt": "Arquivado (>30d)",
+        "nl": "Gearchiveerd (>30d)",
+        "pl": "Zarchiwizowano (>30dni)",
+        "ru": "Архивировано (>30дн)",
+        "uk": "Заархівовано (>30дн)",
+        "sv": "Arkiverad (>30d)",
+        "tr": "Arşivlendi (>30g)",
+        "cs": "Archivováno (>30d)",
+        "ro": "Arhivat (>30z)",
+        "hu": "Archiválva (>30n)"
+    },
+    "workstream.summaryLabel": {
+        "en": "Workstream Executive Summary:",
+        "de": "Workstream-Zusammenfassung:",
+        "fr": "Résumé Exécutif du Workstream :",
+        "es": "Resumen Ejecutivo del Flujo de Trabajo:",
+        "it": "Riepilogo Esecutivo del Workstream:",
+        "pt": "Resumo Executivo do Workstream:",
+        "nl": "Workstream Samenvatting:",
+        "pl": "Podsumowanie wykonawcze strumienia:",
+        "ru": "Краткое описание рабочего потока:",
+        "uk": "Короткий опис робочого потоку:",
+        "sv": "Sammanfattning av arbetsström:",
+        "tr": "İş Akışı Yönetici Özeti:",
+        "cs": "Přehled pracovního postupu:",
+        "ro": "Rezumat executiv al fluxului de lucru:",
+        "hu": "Munkaterület vezetői összefoglaló:"
+    },
+    "workstream.summaryPlaceholder": {
+        "en": "Enter 1-sentence summary of this workstream...",
+        "de": "Geben Sie eine 1-Satz-Zusammenfassung dieses Workstreams ein...",
+        "fr": "Entrez un résumé en 1 phrase de ce workstream...",
+        "es": "Ingrese un resumen de 1 oración de este flujo de trabajo...",
+        "it": "Inserisci un riepilogo in 1 frase di questo workstream...",
+        "pt": "Insira um resumo de 1 frase deste workstream...",
+        "nl": "Voer een samenvatting van 1 zin in van deze workstream...",
+        "pl": "Wprowadź jednozdaniowe podsumowanie tego strumienia prac...",
+        "ru": "Введите резюме из 1 предложения для этого рабочего потока...",
+        "uk": "Введіть короткий опис з 1 речення для цього робочого потоку...",
+        "sv": "Ange en sammanfattning på 1 mening av denna arbetsström...",
+        "tr": "Bu iş akışının 1 cümlelik özetini girin...",
+        "cs": "Zadejte shrnutí tohoto pracovního postupu na 1 větu...",
+        "ro": "Introduceți un rezumat de 1 propoziție al acestui flux de lucru...",
+        "hu": "Adja meg a munkaterület 1 mondatos összefoglalóját..."
+    }
+}
+
+file_path = "/Users/etiennebeltzung/Projects/Project 3/js/translations.js"
+
+with open(file_path, "r", encoding="utf-8") as f:
+    content = f.read()
+
+# Extract JSON string assigned to window.APP_TRANSLATIONS_BUNDLE
+json_start = content.find("{")
+json_end = content.rfind("}") + 1
+
+json_str = content[json_start:json_end]
+data = json.loads(json_str)
+
+for key, langs in new_keys.items():
+    data["translations"][key] = langs
+
+# Update total_keys count
+data["metadata"]["total_keys"] = len(data["translations"])
+
+new_content = "window.APP_TRANSLATIONS_BUNDLE = " + json.dumps(data, ensure_ascii=False, indent=2) + ";\n"
+
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(new_content)
+
+print(f"Successfully added {len(new_keys)} translation keys to translations.js!")

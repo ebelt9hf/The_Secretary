@@ -1,0 +1,41 @@
+/raw
+/Inputs
+/review-backups
+/Inputs
+/stash
+# Local workspace / user data
+/.secretary/
+/Inputs/
+/todos/
+/secretary-settings.json
+/planner.json
+/notes/
+/notes_summary.json
+/colleagues.json
+/secretary-settings.json
+/planner.json
+/topics_map.json
+/deletions_review.md
+/review_notes_review.md
+/topics_review.md
+
+
+# Python caches
+**/__pycache__/
+*.pyc
+.DS_Store
+
+# Node & Build artifacts
+node_modules/
+dist/
+release/
+.vite/
+*.dmg
+*.zip
+models/
+
+# Environment & Secret Tokens
+.env
+*.env
+.github_token
+*.token

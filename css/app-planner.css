@@ -1,0 +1,4232 @@
+/* ── Secretary: Planner Mode Stylesheet ── */
+
+.planner-panel {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 0.5rem !important;
+  box-sizing: border-box;
+  background: var(--bg);
+
+  /* Derived priority colors for planner-specific statuses */
+  --color-urgent: color-mix(in srgb, var(--color-high) 50%, var(--color-medium));
+  --color-urgent-text: color-mix(in srgb, var(--color-high-text) 50%, var(--color-medium-text));
+
+  --color-work: #a855f7;
+  --color-work-bg: color-mix(in srgb, var(--color-work) 10%, var(--card-bg-alt));
+  --color-work-text: color-mix(in srgb, var(--color-work) 85%, var(--text));
+  --color-work-border: color-mix(in srgb, var(--color-work) 20%, transparent);
+
+  --color-sync: #6366f1;
+  --color-sync-bg: color-mix(in srgb, var(--color-sync) 10%, var(--card-bg-alt));
+  --color-sync-text: color-mix(in srgb, var(--color-sync) 85%, var(--text));
+  --color-sync-border: color-mix(in srgb, var(--color-sync) 20%, transparent);
+}
+
+.sl-badge-q1 { background: color-mix(in srgb, #ef4444 14%, var(--card-bg)); color: #ef4444; border: 1px solid color-mix(in srgb, #ef4444 30%, transparent); }
+.sl-badge-q2 { background: color-mix(in srgb, #f59e0b 14%, var(--card-bg)); color: #f59e0b; border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent); }
+.sl-badge-q3 { background: color-mix(in srgb, #6366f1 14%, var(--card-bg)); color: #6366f1; border: 1px solid color-mix(in srgb, #6366f1 30%, transparent); }
+.sl-badge-q4 { background: color-mix(in srgb, #14b8a6 14%, var(--card-bg)); color: #14b8a6; border: 1px solid color-mix(in srgb, #14b8a6 30%, transparent); }
+
+
+/* ── Layout Panels ── */
+.planner-sidebar-left {
+  width: clamp(220px, 22vw, 300px);
+  min-width: 210px;
+  max-width: 34%;
+  flex-shrink: 0;
+  border-right: 1px solid var(--card-border);
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.planner-main,
+.planner-main-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.planner-sidebar-right {
+  width: clamp(180px, 19vw, 280px);
+  min-width: 170px;
+  max-width: min(40%, 480px);
+  flex-shrink: 0;
+  border-left: 1px solid var(--card-border);
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.planner-sidebar-combined {
+  width: clamp(260px, 28vw, 420px);
+  min-width: 240px;
+  max-width: min(45%, 560px);
+}
+
+.planner-pane-resize-handle {
+  width: 7px;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.planner-pane-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--card-border);
+}
+
+.planner-pane-resize-handle:hover::before,
+.planner-pane-resize-handle.dragging::before {
+  background: var(--accent);
+  width: 2px;
+  left: 2px;
+}
+
+.planner-pane-resize-handle.hidden {
+  display: none;
+}
+
+.planner-pane-resize-handle.collapsed-toggle {
+  width: 14px;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--card-bg-alt) 85%, transparent);
+}
+
+.planner-pane-resize-handle.collapsed-toggle::before {
+  left: 6px;
+  width: 2px;
+  background: color-mix(in srgb, var(--accent) 45%, var(--card-border));
+}
+
+body.planner-pane-resizing {
+  cursor: col-resize !important;
+}
+
+body.planner-pane-resizing * {
+  user-select: none !important;
+}
+
+/* ── Sidebar Typography & Elements ── */
+.planner-sidebar-header {
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--card-border);
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.planner-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.planner-sidebar-combined .planner-sidebar-content {
+  padding: 0.65rem;
+  gap: 0.55rem;
+  overflow: hidden;
+}
+
+.planner-pane-tabs {
+  display: flex;
+  align-items: center;
+  background: var(--card-bg-alt, rgba(0, 0, 0, 0.04));
+  padding: 3px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--card-border, rgba(0, 0, 0, 0.08));
+  gap: 3px;
+  margin: 0.4rem 0;
+}
+
+.planner-pane-tab-btn {
+  flex: 1 1 0;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planner-pane-tab-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.planner-pane-tab-btn.active {
+  color: var(--accent-fg, #4338ca);
+  background: var(--card-bg, #ffffff);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.planner-pane-tabs.single .planner-pane-tab-btn {
+  flex: 0 1 auto;
+  min-width: 52%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.planner-pane-tab-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.planner-pane-tab-panel {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+.planner-pane-tab-panel.active {
+  display: block;
+}
+
+.planner-virtual-list {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  contain: strict;
+}
+
+.planner-virtual-spacer {
+  width: 1px;
+  opacity: 0;
+}
+
+.planner-virtual-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-bottom: 0.6rem;
+}
+
+/* Todo items in planner sidebar */
+.planner-todo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.planner-todo-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+  letter-spacing: 0.03em;
+}
+
+.planner-todo-card {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg-alt);
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.planner-todo-card:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.planner-todo-card-title {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.planner-todo-card-due {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.planner-todo-card.due-soon {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-medium) 24%, transparent);
+}
+
+.planner-todo-card.due-urgent {
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--color-urgent) 35%, transparent);
+}
+
+.planner-todo-card.due-overdue {
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-high) 45%, transparent);
+}
+
+.planner-todo-card-due.due-soon { color: var(--color-medium-text); }
+.planner-todo-card-due.due-urgent { color: var(--color-urgent-text); }
+.planner-todo-card-due.due-overdue { color: var(--color-high-text); }
+
+.planner-todo-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.planner-todo-card-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.planner-todo-card-btn {
+  font-size: 0.68rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  line-height: 1.2;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.planner-todo-card-btn.btn-plan-work {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+.planner-todo-card-btn.btn-plan-work:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+body[data-theme='dark'] .planner-todo-card-btn.btn-plan-work {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.4);
+}
+body[data-theme='dark'] .planner-todo-card-btn.btn-plan-work:hover {
+  background: rgba(34, 197, 94, 0.28);
+  border-color: rgba(34, 197, 94, 0.6);
+}
+
+.planner-todo-card-btn.btn-plan-sync {
+  background: #eef2ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+.planner-todo-card-btn.btn-plan-sync:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+body[data-theme='dark'] .planner-todo-card-btn.btn-plan-sync {
+  background: rgba(99, 102, 241, 0.18);
+  color: #818cf8;
+  border-color: rgba(99, 102, 241, 0.4);
+}
+body[data-theme='dark'] .planner-todo-card-btn.btn-plan-sync:hover {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.planner-todo-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  background: var(--card-bg);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.planner-todo-pill.scheduled {
+  color: var(--color-wip-text);
+  border-color: var(--color-wip-border);
+  background: var(--color-wip-bg);
+}
+
+/* ── Calendar Header / Navigator ── */
+.planner-header {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.45rem;
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.planner-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.planner-nav-btn {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.planner-nav-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+}
+
+.planner-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.planner-week-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.35rem 0.85rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.planner-nav-btn.planner-review-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--card-border));
+  font-weight: 600;
+}
+
+.planner-nav-btn.planner-review-btn:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  border-color: var(--accent);
+}
+
+.planner-more-btn {
+  padding: 0.25rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.planner-more-dropdown-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 220px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(var(--glass-blur, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 10px));
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planner-more-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition, 0.15s ease), color var(--transition, 0.15s ease);
+}
+
+.planner-more-menu-item:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg-alt));
+  color: var(--accent);
+}
+
+.planner-more-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.planner-stat-icon,
+.planner-side-pill-icon,
+.planner-star-icon,
+.planner-series-icon,
+.ooo-banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1180px) {
+  .planner-panel {
+    padding: 0 !important;
+  }
+
+  .planner-pane-resize-handle,
+  .planner-sidebar-right.planner-sidebar-combined {
+    display: none !important;
+  }
+
+  .planner-main-content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .planner-header {
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .planner-header-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .planner-nav-group {
+    flex-shrink: 0;
+  }
+
+  .planner-view-switcher {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+}
+
+@media (max-width: 640px) {
+  .planner-header {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.4rem !important;
+  }
+  .planner-header-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .planner-nav-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .planner-calendar-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+  }
+  .planner-calendar-grid {
+    min-width: 680px;
+  }
+}
+
+/* ── Calendar Grid View ── */
+.planner-calendar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+}
+
+.planner-calendar-grid {
+  display: grid;
+  grid-template-columns: 50px repeat(7, 1fr);
+  position: relative;
+  min-width: 750px;
+}
+
+/* Sticky Column Headers */
+.planner-grid-header {
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  z-index: 8;
+  display: contents;
+}
+
+.planner-header-cell-spacer {
+  border-bottom: 1px solid var(--card-border);
+  background: var(--card-bg);
+  position: sticky;
+  top: 0;
+  z-index: 8;
+}
+
+.planner-header-cell {
+  padding: 0.6rem 0.2rem 1.1rem 0.2rem;
+  text-align: center;
+  border-bottom: 1px solid var(--card-border);
+  border-left: 1px solid var(--card-border);
+  font-weight: 600;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  position: sticky;
+  top: 0;
+  background-color: var(--card-bg);
+  z-index: 8;
+}
+
+.planner-header-cell.today {
+  color: var(--accent);
+}
+
+.planner-header-cell.today .planner-header-day {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.planner-header-day {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.planner-header-date {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: none;
+  filter: none;
+  text-shadow: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.planner-header-cell.today .planner-header-date {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.planner-header-cell.reviewed .planner-header-date {
+  background: var(--color-low);
+  color: #ffffff;
+}
+
+.planner-header-cell.reviewable {
+  cursor: pointer;
+}
+
+.planner-header-reviewed {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid transparent;
+  padding: 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-low);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--card-bg);
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.2s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  z-index: 2;
+}
+
+.planner-header-reviewed:hover {
+  transform: scale(1.15);
+}
+
+.planner-header-cell.reviewable:not(.reviewed) .planner-header-reviewed,
+.planner-header-reviewed.unreviewed {
+  opacity: 0.85;
+  background: transparent;
+  border: 1.5px dashed color-mix(in srgb, var(--text) 35%, transparent);
+  color: transparent;
+}
+
+.planner-header-cell.reviewable:not(.reviewed):hover .planner-header-reviewed,
+.planner-header-reviewed.unreviewed:hover {
+  opacity: 1;
+  border: 1.5px solid var(--color-low);
+  background: color-mix(in srgb, var(--color-low) 15%, transparent);
+  color: var(--color-low);
+  transform: scale(1.15);
+}
+
+.planner-header-cell.reviewed .planner-header-reviewed,
+.planner-header-reviewed:not(.unreviewed) {
+  opacity: 1;
+  background: var(--color-low);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+/* Day Capacity Score badge */
+.planner-header-capacity {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.phc-sep {
+  opacity: 0.5;
+  margin: 0 1px;
+}
+
+/* Colors for simple clean text alignment */
+.phc-low  { color: var(--text-muted); }
+.phc-mid  { color: var(--color-medium-text); }
+.phc-high { color: var(--color-urgent-text); }
+.phc-full { color: var(--color-high-text); }
+
+/* Grid lines & timeline cells */
+.planner-time-col {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--card-border);
+  background: var(--card-bg);
+  position: relative;
+  height: 1920px;
+}
+
+.planner-time-cell {
+  height: 80px; /* 1 hour */
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-right: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  position: relative;
+  top: -6px; /* align with slot line */
+}
+
+/* Column representation for each day */
+.planner-day-col {
+  position: relative;
+  height: 1920px; /* 24 hours * 80px */
+  border-left: 1px solid var(--card-border);
+  background-image: 
+    linear-gradient(rgba(0,0,0,0.12) 1px, transparent 1px),
+    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 100% 80px, 100% 40px, 100% 100%; /* hourly and half-hourly horizontal lines */
+}
+
+body[data-theme='dark'] .planner-day-col {
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+}
+
+/* Today column accent */
+.planner-day-col.today {
+  background-color: color-mix(in srgb, var(--accent) 2%, transparent);
+}
+
+/* Time Indicator Line - Apple Human Interface Guidelines */
+.planner-current-time-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ff3b30;
+  box-shadow: 0 0 8px rgba(255, 59, 48, 0.45);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.planner-current-time-indicator::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3.5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff3b30;
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.25);
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+/* Empty interactive time slot */
+.planner-empty-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px; /* 30m */
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.planner-empty-slot:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.planner-empty-slot::before {
+  content: '+ Plan Block';
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: 2px 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* ── Planned Event Card ── */
+.planner-event-card {
+  position: absolute;
+  border-radius: 9px;
+  border: 1px solid currentColor;
+  border-left: 3.5px solid currentColor !important;
+  padding: 4px 7px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  cursor: grab;
+  z-index: 3;
+  transition: box-shadow 0.18s ease;
+  box-sizing: border-box;
+}
+
+.planner-event-card:hover {
+  transform: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
+  z-index: 25 !important;
+}
+
+.planner-event-card.selected {
+  box-shadow: 0 0 0 2.5px var(--accent), 0 8px 24px rgba(0, 0, 0, 0.22);
+  z-index: 30 !important;
+}
+
+/* ── Temporary Drag/Click Creation Preview Block ── */
+.planner-event-card.planner-create-preview {
+  left: 4px;
+  width: calc(100% - 28px);
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 100;
+  border-radius: var(--radius-md, 8px);
+  border: 1.5px dashed var(--accent) !important;
+  border-left: 4px solid var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 22%, var(--card-bg));
+  color: var(--text);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 25%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  opacity: 0.95;
+  cursor: default;
+  transition: top 0.04s ease, height 0.04s ease;
+  animation: plannerPreviewFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes plannerPreviewFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+}
+
+.planner-event-card.planner-create-preview.event-call {
+  border-color: var(--color-wip) !important;
+  border-left: 4px solid var(--color-wip) !important;
+  background: color-mix(in srgb, var(--color-wip) 20%, var(--card-bg));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--color-wip) 25%, transparent);
+}
+
+.planner-event-card.planner-create-preview.event-sync {
+  border-color: var(--accent) !important;
+  border-left: 4px solid var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 20%, var(--card-bg));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.planner-event-card.planner-create-preview.event-work {
+  border-color: var(--color-purple, #a855f7) !important;
+  border-left: 4px solid var(--color-purple, #a855f7) !important;
+  background: color-mix(in srgb, var(--color-purple, #a855f7) 20%, var(--card-bg));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--color-purple, #a855f7) 25%, transparent);
+}
+
+.planner-event-card.planner-create-preview.event-prep {
+  border-color: var(--color-medium) !important;
+  border-left: 4px solid var(--color-medium) !important;
+  background: color-mix(in srgb, var(--color-medium) 20%, var(--card-bg));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--color-medium) 25%, transparent);
+}
+
+.planner-event-card.planner-create-preview.event-todo {
+  border-color: var(--color-low) !important;
+  border-left: 4px solid var(--color-low) !important;
+  background: color-mix(in srgb, var(--color-low) 20%, var(--card-bg));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--color-low) 25%, transparent);
+}
+
+.planner-event-card.planner-create-preview.event-ooo {
+  border-color: var(--color-high) !important;
+  border-left: 4px solid var(--color-high) !important;
+  background: color-mix(in srgb, var(--color-high) 20%, var(--card-bg));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--color-high) 25%, transparent);
+}
+
+.planner-event-card.planner-create-preview.event-custom,
+.planner-event-card.planner-create-preview.event-personal {
+  border-color: var(--text-muted) !important;
+  border-left: 4px solid var(--text-muted) !important;
+  background: color-mix(in srgb, var(--text-muted) 20%, var(--card-bg));
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--text-muted) 25%, transparent);
+}
+
+
+.planner-event-title {
+  font-weight: 700;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-event-main-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.planner-event-time-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  text-align: right;
+  line-height: 1.2;
+}
+
+.planner-event-time-start,
+.planner-event-time-end {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.planner-event-time-end {
+  margin-top: 2px;
+}
+
+.planner-event-action-bar {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.planner-event-btn {
+  background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+  color: inherit;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.planner-event-btn:hover {
+  background: color-mix(in srgb, var(--card-bg) 95%, var(--text));
+  border-color: currentColor;
+}
+
+/* Event Types Colorings */
+.planner-event-card.event-call {
+  background: var(--color-wip-bg);
+  color: var(--color-wip-text);
+  border-color: var(--color-wip-border);
+}
+
+.planner-event-card.event-prep {
+  background: var(--color-low-bg);
+  color: var(--color-low-text);
+  border-color: var(--color-low-border);
+}
+
+/* Auto-placed prep blocks (smart scheduling) — dotted border to distinguish from manually placed */
+.planner-event-card.event-prep.auto-placed {
+  border-style: dashed;
+  border-width: 2px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--color-low-bg),
+    var(--color-low-bg) 6px,
+    color-mix(in srgb, var(--color-low) 4%, var(--card-bg-alt)) 6px,
+    color-mix(in srgb, var(--color-low) 4%, var(--card-bg-alt)) 12px
+  );
+}
+
+.planner-event-card.event-todo {
+  background: color-mix(in srgb, var(--color-medium) 14%, var(--card-bg-alt));
+  color: var(--color-medium-text);
+  border-color: color-mix(in srgb, var(--color-medium) 40%, transparent);
+}
+
+.planner-event-card.event-event {
+  background: var(--color-work-bg);
+  color: var(--color-work-text);
+  border-color: var(--color-work-border);
+}
+
+.planner-event-card.event-ooo {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--card-bg-alt),
+    var(--card-bg-alt) 10px,
+    color-mix(in srgb, var(--text) 10%, var(--bg)) 10px,
+    color-mix(in srgb, var(--text) 10%, var(--bg)) 20px
+  );
+  color: var(--text-muted);
+  border-color: var(--card-border);
+}
+
+.planner-event-card.event-ooo.event-allday-ooo {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Full-day OOO banner — spans the top of a day column */
+.planner-ooo-allday-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: default;
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--text) 6%, var(--bg)),
+    color-mix(in srgb, var(--text) 6%, var(--bg)) 8px,
+    color-mix(in srgb, var(--text) 12%, var(--bg)) 8px,
+    color-mix(in srgb, var(--text) 12%, var(--bg)) 16px
+  );
+  border: 1px solid color-mix(in srgb, var(--text) 20%, var(--bg));
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+  position: relative;
+  z-index: 2;
+  user-select: none;
+}
+.planner-ooo-allday-banner .ooo-banner-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.planner-ooo-allday-banner .ooo-banner-range {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+
+.planner-event-card.event-custom,
+.planner-event-card.event-personal {
+  background: var(--card-bg-alt);
+  color: var(--text-muted);
+  border-color: var(--card-border);
+}
+
+.planner-event-card.event-work {
+  background: var(--color-work-bg);
+  color: var(--color-work-text);
+  border-color: var(--color-work-border);
+}
+
+.planner-event-card.dimmed {
+  opacity: 0.25 !important;
+  filter: grayscale(15%);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.planner-event-card.highlighted {
+  opacity: 1 !important;
+  box-shadow: 0 0 8px var(--accent);
+  z-index: 5;
+  transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.planner-sidebar-left.collapsed {
+  width: var(--sidebar-collapsed-width, 36px) !important;
+  min-width: var(--sidebar-collapsed-width, 36px) !important;
+  max-width: var(--sidebar-collapsed-width, 36px) !important;
+  overflow: hidden;
+  cursor: pointer !important;
+  background: var(--card-bg);
+  transition: width var(--transition), min-width var(--transition), max-width var(--transition), background-color var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+.planner-sidebar-left.collapsed:hover {
+  background: color-mix(in srgb, var(--accent) 7%, var(--card-bg-alt)) !important;
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--card-border)) !important;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.08);
+}
+.planner-sidebar-left.collapsed .planner-sidebar-content {
+  display: none !important;
+}
+.planner-sidebar-left.collapsed .planner-sidebar-header {
+  justify-content: center;
+  padding: 0.75rem 0;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  height: 100%;
+  border-bottom: none;
+  border-left: 1px solid var(--card-border);
+  gap: 0.5rem;
+}
+.planner-sidebar-left.collapsed .sidebar-header-title {
+  display: block !important;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--transition);
+}
+.planner-sidebar-left.collapsed:hover .sidebar-header-title {
+  color: var(--accent);
+}
+.planner-sidebar-left.collapsed .planner-sidebar-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  margin: 0 auto 0.4rem auto;
+  font-size: 0.85rem;
+}
+.planner-sidebar-left.collapsed:hover .planner-sidebar-toggle {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.planner-sidebar-right.collapsed {
+  width: var(--sidebar-collapsed-width, 36px) !important;
+  min-width: var(--sidebar-collapsed-width, 36px) !important;
+  max-width: var(--sidebar-collapsed-width, 36px) !important;
+  flex-basis: var(--sidebar-collapsed-width, 36px) !important;
+  overflow: hidden;
+  cursor: pointer !important;
+  background: var(--card-bg);
+  transition: width var(--transition), min-width var(--transition), max-width var(--transition), flex-basis var(--transition), background-color var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+.planner-sidebar-right.collapsed:hover {
+  background: color-mix(in srgb, var(--accent) 7%, var(--card-bg-alt)) !important;
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--card-border)) !important;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.08);
+}
+.planner-sidebar-right.collapsed .planner-sidebar-content {
+  display: none !important;
+}
+.planner-sidebar-right.collapsed .planner-sidebar-header {
+  justify-content: center;
+  padding: 0.75rem 0;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  height: 100%;
+  border-bottom: none;
+  border-left: 1px solid var(--card-border);
+  gap: 0.5rem;
+}
+.planner-sidebar-right.collapsed .sidebar-header-title {
+  display: block !important;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--transition);
+}
+.planner-sidebar-right.collapsed:hover .sidebar-header-title {
+  color: var(--accent);
+}
+.planner-sidebar-right.collapsed .planner-sidebar-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  margin: 0 auto 0.4rem auto;
+  font-size: 0.85rem;
+}
+.planner-sidebar-right.collapsed:hover .planner-sidebar-toggle {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.planner-sidebar-toggle {
+  background: var(--card-bg-alt, rgba(0,0,0,0.04));
+  border: 1px solid var(--card-border, rgba(0,0,0,0.08));
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.planner-sidebar-toggle:hover {
+  background: var(--accent, #4338ca);
+  color: #ffffff;
+  border-color: var(--accent, #4338ca);
+  transform: scale(1.05);
+}
+.planner-sidebar-header {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  background: var(--card-bg);
+}
+
+.planner-sidebar-contract-btn {
+  background: var(--card-bg-alt, rgba(0,0,0,0.04));
+  border: 1px solid var(--card-border, rgba(0,0,0,0.08));
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm, 6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: all var(--transition, 0.2s ease);
+  min-width: 0;
+  flex: 1;
+}
+
+.planner-sidebar-contract-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg-alt));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--card-border));
+  color: var(--accent);
+}
+
+.planner-sidebar-contract-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.planner-sidebar-contract-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planner-sidebar-balance-btn {
+  background: var(--card-bg-alt, rgba(0,0,0,0.04));
+  border: 1px solid var(--card-border, rgba(0,0,0,0.08));
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm, 6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all var(--transition, 0.2s ease);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.planner-sidebar-balance-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-accent, #ffffff);
+  border-color: var(--accent);
+}
+
+.planner-sidebar-balance-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-header-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* View Switcher - Apple Segmented Control */
+.planner-view-switcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: color-mix(in srgb, var(--card-bg-alt) 80%, transparent);
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.planner-view-btn {
+  background: transparent;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  line-height: 1.2;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 7px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+  user-select: none;
+}
+.planner-view-btn:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.planner-view-btn.active {
+  background: var(--card-bg);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), 0 0 0 0.5px color-mix(in srgb, var(--card-border) 60%, transparent);
+}
+
+.planner-note-indicator {
+  margin-left: 6px;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  vertical-align: middle;
+}
+
+.planner-note-action-chip {
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  line-height: 1.45;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planner-note-action-chip:hover {
+  background: var(--bg);
+  opacity: 1;
+}
+
+.planner-event-note-btn {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-progress-overlay {
+  align-items: center;
+  justify-content: center;
+}
+
+.planner-progress-dialog {
+  min-width: 280px;
+  max-width: min(92vw, 460px);
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.planner-progress-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.planner-progress-message {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+  transition: opacity 0.15s ease;
+}
+
+.planner-progress-detail {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  opacity: 0.85;
+  line-height: 1.3;
+}
+
+.planner-progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background: var(--card-border, #e2e8f0);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.planner-progress-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--accent, #4f46e5);
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+
+.planner-progress-spinner {
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--accent, #4f46e5) 24%, transparent);
+  border-top-color: var(--accent, #4f46e5);
+  -webkit-animation: planner-progress-spin 0.75s linear infinite;
+  animation: planner-progress-spin 0.75s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+@keyframes planner-progress-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@-webkit-keyframes planner-progress-spin {
+  0% {
+    -webkit-transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+
+/* ── Inspector Right Sidebar ── */
+.planner-inspector-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.planner-inspector-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.planner-inspector-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 0.4rem;
+}
+
+.planner-inspector-btn-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.planner-inspector-action-btn.full-width {
+  grid-column: span 2;
+  width: 100%;
+}
+
+
+.planner-inspector-action-btn {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  transition: all var(--transition);
+  font-family: inherit;
+  border: 1px solid var(--card-border);
+}
+
+.planner-inspector-action-btn.primary {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border: none;
+}
+
+.planner-inspector-action-btn.primary:hover {
+  background: color-mix(in srgb, var(--accent) 85%, var(--text));
+}
+
+.planner-inspector-action-btn.secondary {
+  background: var(--card-bg-alt);
+  color: var(--text);
+}
+
+.planner-inspector-action-btn.secondary:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+}
+
+.planner-inspector-tags-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  cursor: pointer;
+}
+
+.planner-tag-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg-alt));
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.planner-tag-badge:hover,
+.planner-inspector-tags-compact:hover .planner-tag-badge {
+  background: color-mix(in srgb, var(--accent) 22%, var(--card-bg-alt));
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.planner-tag-badge-add {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: var(--card-bg-alt);
+  color: var(--text-muted);
+  border: 1px dashed var(--card-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.planner-tag-badge-add:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg-alt));
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.planner-inspector-tags-compact:focus-visible,
+.planner-tag-badge-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Prominent Preparation Sessions Section */
+.planner-inspector-prep-section {
+  background: color-mix(in srgb, #f59e0b 6%, var(--card-bg-alt));
+  border: 1px solid color-mix(in srgb, #f59e0b 28%, var(--card-border));
+  border-radius: var(--radius-md, 8px);
+  padding: 0.65rem 0.75rem;
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.planner-inspector-prep-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.planner-inspector-prep-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.planner-prep-count-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #f59e0b;
+  color: #fff;
+  padding: 0.1rem 0.38rem;
+  border-radius: 10px;
+  line-height: 1;
+}
+
+.planner-inspector-prep-add-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: var(--card-bg);
+  border: 1px solid color-mix(in srgb, #f59e0b 45%, var(--card-border));
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.15s ease;
+}
+
+.planner-inspector-prep-add-btn:hover {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+}
+
+.planner-prep-empty-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card-bg) 80%, transparent);
+  border: 1px dashed color-mix(in srgb, #f59e0b 40%, var(--card-border));
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.planner-prep-empty-cta:hover {
+  background: var(--card-bg);
+  border-color: #f59e0b;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.12);
+  transform: translateY(-1px);
+}
+
+.planner-prep-empty-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.planner-prep-empty-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.planner-prep-empty-sub {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.planner-inspector-notes-section {
+  border-top: 1px solid var(--card-border);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.planner-inspector-notes-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.planner-related-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.planner-related-note-item {
+  padding: 0.45rem 0.55rem;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+  transition: all var(--transition);
+}
+
+.planner-related-note-item:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+}
+
+.planner-assoc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.planner-assoc-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.45rem 0.55rem;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.planner-assoc-row:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+}
+
+.planner-assoc-row.selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.planner-assoc-row.dummy {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+}
+
+.planner-assoc-row-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.planner-assoc-row-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.planner-assoc-row-subtitle {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.planner-assoc-row-remove {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.planner-assoc-row-remove:hover {
+  border-color: var(--color-high);
+  color: var(--color-high);
+}
+
+/* ── Context Menu (Glassmorphism overlay) ── */
+.planner-ctx-menu {
+  position: absolute;
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 170px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 2500;
+
+  /* Modern entrance animation */
+  animation: ctxMenuFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+@keyframes ctxMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.planner-ctx-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  line-height: 1.2;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.planner-ctx-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.planner-ctx-btn.danger {
+  color: var(--color-high);
+}
+
+.planner-ctx-btn.danger:hover {
+  background: var(--color-high);
+  color: #ffffff;
+}
+
+/* ── Unplanned work time indicator ── */
+.planner-unplanned-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none !important;
+  user-select: none;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--accent) 4%, transparent) 6px,
+    color-mix(in srgb, var(--accent) 4%, transparent) 8px
+  );
+  border-left: 2px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  opacity: 0.7;
+}
+
+body[data-theme='dark'] .planner-unplanned-slot {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    rgba(96, 165, 250, 0.06) 6px,
+    rgba(96, 165, 250, 0.06) 8px
+  );
+  border-left-color: rgba(96, 165, 250, 0.12);
+}
+
+/* ── Outside work hours (pre/post-work) dim zone ── */
+.planner-off-hours {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none !important;
+  user-select: none;
+  z-index: 0;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+body[data-theme='dark'] .planner-off-hours {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ── Event top & bottom resize handles ── */
+.planner-event-resize-handle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 10px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 15;
+}
+.planner-event-resize-handle.top {
+  top: -3px;
+}
+.planner-event-resize-handle.bottom {
+  bottom: -3px;
+}
+
+.planner-event-card:hover .planner-event-resize-handle {
+  opacity: 0.85;
+}
+
+.planner-event-resize-handle:hover {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.15);
+}
+
+.planner-event-resize-handle::before {
+  content: '';
+  width: 22px;
+  height: 3.5px;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.75;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Drag-over state on day columns */
+.planner-day-col.drag-over {
+  background-color: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* ── Floating Resize Tooltip ── */
+.planner-resize-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: rtFadeIn 0.1s ease;
+}
+
+@keyframes rtFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Planner: sidebar-empty state */
+.sidebar-empty {
+  color: var(--text-muted);
+  font-size: .8rem;
+  text-align: center;
+  padding: 1.5rem .75rem;
+}
+
+/* ── Clone Ghost (mouse-attached preview) ── */
+.planner-clone-ghost {
+  cursor: none !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25) !important;
+  border-style: dashed !important;
+  user-select: none;
+}
+
+body.planner-cloning,
+body.planner-cloning * {
+  cursor: crosshair !important;
+}
+
+
+
+/* ── Overlay: Planner Blocks Info Bar ── */
+.overlay-planner-blocks-wrap {
+  flex-shrink: 0;
+  margin: 0 1rem 0.4rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--card-bg));
+  overflow: hidden;
+}
+
+.overlay-planner-blocks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .45rem .9rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition);
+  min-height: 36px;
+  gap: .5rem;
+}
+
+.overlay-planner-blocks-header:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg));
+}
+
+.overlay-planner-blocks-title-preview {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.overlay-planner-blocks-header-right {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-shrink: 0;
+}
+
+.overlay-planner-blocks-toggle-hint {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.overlay-planner-blocks-chevron {
+  font-size: .9rem;
+  color: var(--text-muted);
+  transition: transform 0.25s ease;
+  display: inline-block;
+  line-height: 1;
+}
+
+.overlay-planner-blocks-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.overlay-planner-blocks-body {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.overlay-planner-blocks-wrap.collapsed .overlay-planner-blocks-body {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  overflow: hidden;
+  border-top: none;
+}
+
+.overlay-planner-blocks-wrap.collapsed .overlay-planner-blocks {
+  display: none;
+}
+
+.overlay-planner-blocks {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.opb-label {
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.opb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.opb-loading {
+  color: var(--text-muted);
+  font-style: italic;
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.opb-loading-dots {
+  display: inline-block;
+  overflow: hidden;
+  width: 0;
+  margin-left: 0.12rem;
+  vertical-align: bottom;
+  animation: opb-loading-dots 1.1s steps(4, end) infinite;
+}
+
+.opb-loading-dots::before {
+  content: '...';
+}
+
+@keyframes opb-loading-dots {
+  from { width: 0; }
+  to { width: 1.1em; }
+}
+
+.opb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.72rem;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  color: var(--text);
+}
+
+.opb-chip-series {
+  border-style: dashed;
+}
+
+.opb-series-badge {
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.opb-chip-note {
+  opacity: .72;
+  font-style: italic;
+}
+
+.opb-chip-call {
+  background: var(--color-wip-bg);
+  color: var(--color-wip-text);
+  border-color: var(--color-wip-border);
+}
+.opb-chip-prep {
+  background: var(--color-low-bg);
+  color: var(--color-low-text);
+  border-color: var(--color-low-border);
+}
+.opb-chip-todo {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border-color: var(--color-medium-border);
+}
+
+.opb-chip-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.72rem;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity var(--transition);
+}
+.opb-chip-btn:hover { opacity: 1; }
+
+.opb-add-btn {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  margin-left: auto;
+  transition: background var(--transition);
+}
+.opb-add-btn:hover {
+  background: color-mix(in srgb, var(--accent) 85%, var(--text));
+}
+.opb-chip-btn.unlink {
+  color: inherit;
+  margin-left: 2px;
+  font-weight: bold;
+}
+.opb-chip-btn.unlink:hover {
+  color: var(--color-high-text);
+}
+
+/* ── Planner Recurrence & Continuation ── */
+.planner-recurrence-toggle-btn {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all var(--transition);
+  margin-top: 0.5rem;
+}
+.planner-recurrence-toggle-btn:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+}
+.planner-recurrence-panel {
+  margin-top: 0.4rem;
+  padding: 0.75rem;
+  background: var(--card-bg-alt);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.planner-day-toggles {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+.planner-day-toggle {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  user-select: none;
+}
+.planner-day-toggle:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.planner-day-toggle.active {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+}
+.planner-recurrence-date-chip-picker {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.planner-recurrence-date-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+.planner-recurrence-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 2px 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.planner-recurrence-date-chip button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.72rem;
+  font-weight: bold;
+}
+.planner-recurrence-date-chip button:hover {
+  color: var(--color-high-text);
+}
+
+/* continuation chain in inspector */
+.planner-continuation-chain {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.planner-continuation-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.55rem;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.planner-continuation-chip:hover {
+  background: var(--card-bg);
+  border-color: var(--accent);
+}
+.planner-continuation-chip.active {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg));
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.planner-continuation-chip-date {
+  font-weight: 600;
+}
+.planner-continuation-chip-time {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+/* ── Suggestion Buttons ── */
+.planner-suggestion-btn {
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  line-height: 1.2;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: var(--text);
+  transition: all var(--transition);
+}
+.planner-suggestion-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.planner-suggestion-btn:active {
+  transform: translateY(0);
+}
+.planner-suggestion-btn.booked {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--text-muted) !important;
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  text-decoration: line-through !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Sync meeting card styling */
+.planner-event-card.event-sync {
+  background: var(--color-sync-bg);
+  color: var(--color-sync-text);
+  border-color: var(--color-sync-border);
+}
+
+/* Short block layout styling (15 minutes) */
+.planner-event-card.short-event {
+  padding: 2px 6px 2px 4px;
+  overflow: visible;
+}
+.planner-event-card.short-event .planner-event-title {
+  font-size: 0.75rem;
+  line-height: 1.1;
+}
+.planner-event-card.short-event .planner-event-time-end {
+  display: none !important;
+}
+.planner-event-card.short-event:hover {
+  z-index: 10;
+}
+.planner-event-card.short-event:hover .planner-event-time-end {
+  display: inline-block !important;
+}
+.planner-event-card.short-event .planner-event-resize-handle {
+  /* Keep resize handles present but hidden by opacity so they can
+     appear when the user hovers the short event. Removing the
+     `display: none` allows the existing hover rule to reveal them. */
+  display: flex;
+  opacity: 0;
+}
+
+/* Drag-and-drop preview/target styling */
+.planner-drop-preview {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+  z-index: 100;
+  box-sizing: border-box;
+}
+
+.planner-drag-row-highlight {
+  position: absolute;
+  left: 50px;
+  right: 0;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  border-top: 1.5px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+  border-bottom: 1.5px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+  pointer-events: none;
+  z-index: 3;
+  box-sizing: border-box;
+}
+
+.planner-event-card.invalid-time {
+  background: var(--color-high-bg) !important;
+  color: var(--color-high-text) !important;
+  border: 1.5px dashed var(--color-high) !important;
+  box-shadow: 0 0 6px var(--color-high-border) !important;
+}
+
+.planner-event-card.invalid-time .planner-event-title::before {
+  content: '⚠️ ';
+}
+
+/* ── 50 Usability Enhancements CSS ── */
+
+/* 1. Context Menu Submenus & Duration Pill Rows */
+.planner-ctx-group-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 0.35rem 0.5rem 0.15rem;
+}
+
+.planner-ctx-pill-row {
+  display: flex;
+  gap: 0.3rem;
+  padding: 0.25rem 0.4rem;
+  flex-wrap: wrap;
+}
+
+.planner-ctx-pill-btn {
+  flex: 1;
+  min-width: 36px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.planner-ctx-pill-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.planner-ctx-shortcut {
+  margin-left: auto;
+  font-size: 0.68rem;
+  opacity: 0.6;
+  font-family: monospace;
+  padding-left: 0.75rem;
+}
+
+/* 2. Video Call Quick Join Button */
+.planner-ctx-video-btn {
+  background: color-mix(in srgb, #3b82f6 15%, var(--card-bg)) !important;
+  color: #2563eb !important;
+  border: 1px solid color-mix(in srgb, #3b82f6 40%, transparent) !important;
+  font-weight: 700 !important;
+}
+
+.planner-ctx-video-btn:hover {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+
+/* 3. Category Quick Filter Bar */
+.planner-category-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--card-bg-alt);
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--card-border);
+  overflow-x: auto;
+}
+
+.planner-cat-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.planner-cat-chip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* 4. Weekly Focus & Stats Dashboard Bar */
+.planner-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.85rem;
+  background: color-mix(in srgb, var(--accent) 5%, var(--card-bg));
+  border-bottom: 1px solid var(--card-border);
+  font-size: 0.75rem;
+  color: var(--text);
+  overflow-x: auto;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.planner-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.planner-stat-item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--card-border));
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.planner-stat-item.active {
+  background: color-mix(in srgb, var(--accent) 15%, var(--card-bg)) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent) !important;
+}
+
+.planner-stat-val {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--accent);
+}
+
+.planner-stat-item.stat-call .planner-stat-val {
+  color: #3b82f6;
+}
+
+.planner-stat-item.stat-work .planner-stat-val {
+  color: #a855f7;
+}
+
+.planner-stat-item.stat-prep .planner-stat-val {
+  color: #f59e0b;
+}
+
+/* Event Filter Dimming */
+.planner-event-card.event-dimmed-by-filter {
+  opacity: 0.22 !important;
+  filter: grayscale(0.6) !important;
+  transform: scale(0.985);
+}
+
+.planner-stats-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Event Card Quick Hover Actions - Apple Frosted Floating Pill */
+.planner-event-quick-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  opacity: 0;
+  transform: translateY(-2px) scale(0.95);
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 25;
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid color-mix(in srgb, var(--card-border) 80%, transparent);
+  border-radius: 20px;
+  padding: 2px 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+}
+
+.planner-event-card:hover .planner-event-quick-actions {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.planner-event-card:hover .planner-event-time-col {
+  opacity: 0.15;
+  transition: opacity 0.15s ease;
+}
+
+.planner-event-act-btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0;
+  color: var(--text-muted);
+  transition: all 0.14s ease;
+}
+
+.planner-event-act-btn:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+  transform: scale(1.08);
+}
+
+.planner-event-act-btn--danger:hover {
+  background: color-mix(in srgb, #ff3b30 18%, transparent) !important;
+  color: #ff3b30 !important;
+}
+
+/* Empty slot hover ghost preview */
+.planner-empty-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  box-sizing: border-box;
+}
+
+.planner-empty-slot:hover {
+  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 4px;
+  z-index: 1;
+}
+
+/* 5. Live Drag & Resize Duration Tooltip */
+.planner-drag-tooltip {
+  position: fixed;
+  z-index: 10000;
+  padding: 0.35rem 0.65rem;
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  transform: translate(-50%, -120%);
+  transition: opacity 0.1s ease;
+  white-space: nowrap;
+}
+
+/* 6. Event Hover Popover Card */
+.planner-event-hover-card {
+  position: fixed;
+  z-index: 9999;
+  width: 260px;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+  font-size: 0.78rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  pointer-events: auto;
+  animation: fadeIn 0.15s ease;
+}
+
+.planner-hover-header {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.planner-hover-time {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.planner-hover-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.3rem;
+}
+
+.planner-hover-btn {
+  flex: 1;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.planner-hover-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* 7. Mini Calendar Popup Overlay */
+.planner-mini-cal-popup {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.5rem;
+  z-index: 9000;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg, 10px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  padding: 0.75rem;
+  width: 240px;
+}
+
+.planner-mini-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.planner-mini-cal-day {
+  padding: 0.25rem 0;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.planner-mini-cal-day:hover {
+  background: var(--card-bg-alt);
+}
+
+.planner-mini-cal-day.today {
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.planner-mini-cal-day.selected {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* 8. Working Hours Collapse Accordion */
+.planner-quiet-hours-banner {
+  height: 24px;
+  background: color-mix(in srgb, var(--card-bg-alt) 80%, transparent);
+  border-bottom: 1px dashed var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.planner-quiet-hours-banner:hover {
+  background: var(--card-bg-alt);
+  color: var(--text);
+}
+
+/* 9. Inspector Quick Shift Buttons & Summary */
+.planner-inspector-shift-row {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.planner-inspector-shift-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.planner-inspector-shift-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.planner-inspector-summary-box {
+  padding: 0.6rem;
+  background: color-mix(in srgb, var(--accent) 5%, var(--card-bg-alt));
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md, 6px);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin-top: 0.5rem;
+}
+
+/* 10. Keyboard Shortcuts Cheat Sheet Modal */
+.planner-shortcuts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1.25rem;
+  padding: 0.5rem 0;
+  font-size: 0.8rem;
+}
+
+.planner-shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.planner-shortcut-key {
+  font-family: monospace;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+/* 11. Modal Duration Pill Selector & Warning Banner */
+.planner-modal-duration-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.planner-modal-duration-pill {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.73rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  cursor: pointer;
+}
+
+.planner-modal-duration-pill:hover,
+.planner-modal-duration-pill.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.planner-modal-warning-banner {
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--color-medium) 15%, var(--card-bg));
+  border: 1px solid var(--color-medium);
+  border-radius: var(--radius-md, 6px);
+  color: var(--text);
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+/* Multi-select active highlight */
+.planner-event-card.selected-multi {
+  outline: 2px solid var(--accent) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent) !important;
+}
+
+/* ── 150 Points Usability & Smoothness Enhancements ── */
+
+/* 1. 30m Sub-Grid Background Lines & Faint Hatch */
+.planner-day-col {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 39px,
+    color-mix(in srgb, var(--card-border) 40%, transparent) 40px,
+    transparent 41px,
+    transparent 79px,
+    var(--card-border) 80px
+  );
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+/* Non-working hours subtle diagonal hatch pattern */
+.planner-offhours-zone {
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--card-bg-alt) 80%, transparent),
+    color-mix(in srgb, var(--card-bg-alt) 80%, transparent) 10px,
+    color-mix(in srgb, var(--card-bg) 90%, transparent) 10px,
+    color-mix(in srgb, var(--card-bg) 90%, transparent) 20px
+  );
+  opacity: 0.75;
+}
+
+/* 2. Custom Slim Hardware-Accelerated Scrollbar */
+.planner-calendar-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.planner-calendar-scroll::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+.planner-calendar-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--card-border) 80%, var(--accent));
+  border-radius: 4px;
+}
+.planner-calendar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* 3. Event Cards Micro-Gradients, Lift & Ribbon Bar */
+.planner-event-card {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, opacity 0.2s ease;
+  will-change: transform;
+  border-radius: 6px;
+  position: absolute;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.planner-event-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3.5px;
+  border-radius: 6px 0 0 6px;
+  background: var(--accent);
+}
+
+.planner-event-card.event-call::before { background: var(--color-wip); }
+.planner-event-card.event-sync::before { background: var(--accent); }
+.planner-event-card.event-work::before { background: var(--color-work); }
+.planner-event-card.event-prep::before { background: var(--color-low); }
+.planner-event-card.event-todo::before { background: var(--color-medium); }
+.planner-event-card.event-ooo::before { background: var(--color-high); }
+.planner-event-card.event-custom::before,
+.planner-event-card.event-personal::before { background: var(--text-muted); }
+.planner-event-card.event-event::before { background: var(--color-work); }
+
+.planner-event-card:hover {
+  transform: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  z-index: 25 !important;
+}
+
+/* Card Time Pill Design */
+.planner-event-time-pill {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--card-bg) 40%, transparent);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Pulse animation for active selection & time indicator */
+@keyframes plannerPulseGlow {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
+  70% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+.planner-event-card.selected {
+  outline: 2px solid var(--accent) !important;
+  animation: plannerPulseGlow 2s infinite;
+  z-index: 30 !important;
+}
+
+/* Current Time Indicator Line & Badge */
+@keyframes liveTimeDotPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px #ef4444, 0 0 16px rgba(239, 68, 68, 0.6);
+  }
+  50% {
+    transform: scale(1.25);
+    box-shadow: 0 0 12px #ef4444, 0 0 22px rgba(239, 68, 68, 0.9);
+  }
+}
+
+.planner-current-time-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ef4444 0%, #f43f5e 100%);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+  z-index: 45;
+  pointer-events: none;
+}
+
+.planner-current-time-indicator::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid var(--card-bg, #fff);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  contain: strict;
+  will-change: transform;
+  animation: liveTimeDotPulse 2s ease-in-out infinite;
+}
+
+.planner-current-time-badge {
+  position: absolute;
+  right: 8px;
+  top: -10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #ef4444;
+  color: #ffffff;
+  padding: 1px 7px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
+  letter-spacing: 0.02em;
+}
+
+.planner-current-time-gutter-badge {
+  position: absolute;
+  right: 2px;
+  transform: translateY(-50%);
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: #ef4444;
+  color: #ffffff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(239, 68, 68, 0.5);
+  z-index: 50;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+/* 4. Dissolve Animation for Delete */
+@keyframes plannerDissolve {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.85); opacity: 0; }
+}
+
+.planner-event-card.dissolving {
+  animation: plannerDissolve 0.25s forwards cubic-bezier(0.16, 1, 0.3, 1) !important;
+  pointer-events: none;
+}
+
+/* 5. Entrance Animations for Modals & Context Menus */
+@keyframes plannerModalEntrance {
+  from { opacity: 0; transform: scale(0.95) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes plannerHudEntrance {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.planner-dynamic-modal .dialog-box,
+.planner-context-menu {
+  animation: plannerModalEntrance 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 6. Side Pane Search & Priority Filters */
+.planner-side-search-wrap {
+  padding: 0.4rem 0.65rem;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.planner-side-search-input {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.planner-side-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.planner-side-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px 1px;
+}
+
+.planner-side-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.planner-side-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.planner-side-pill:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--card-border));
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.planner-side-pill.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.planner-side-pill.pill-q1.active { background: var(--color-high); border-color: var(--color-high); color: var(--text-on-accent); }
+.planner-side-pill.pill-q2.active { background: var(--color-medium); border-color: var(--color-medium); color: var(--text-on-accent); }
+.planner-side-pill.pill-q3.active { background: var(--accent); border-color: var(--accent); color: var(--text-on-accent); }
+.planner-side-pill.pill-q4.active { background: var(--color-low); border-color: var(--color-low); color: var(--text-on-accent); }
+
+/* 7. Keyboard Shortcut Helper HUD Overlay */
+.planner-hud-overlay {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--card-bg) 92%, var(--accent));
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  border-radius: 20px;
+  padding: 0.4rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  z-index: 10000;
+  font-size: 0.75rem;
+  animation: plannerHudEntrance 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.planner-hud-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text);
+}
+
+.planner-hud-key {
+  font-family: monospace;
+  font-weight: 700;
+  background: var(--card-bg-alt);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--card-border);
+  color: var(--accent);
+}
+
+/* 8. Midnight Crossing Continuation Badge */
+.planner-continuation-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-style: italic;
+  display: inline-block;
+  margin-top: 2px;
+}
+
+/* ═══ Dark Theme Calendar Block & Event Card Overrides ═══ */
+body[data-theme='dark'] .planner-event-card {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+body[data-theme='dark'] .planner-event-card.event-call {
+  background: rgba(59, 130, 246, 0.22);
+  color: #93c5fd;
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+body[data-theme='dark'] .planner-event-card.event-prep {
+  background: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+body[data-theme='dark'] .planner-event-card.event-prep.auto-placed {
+  border-color: rgba(52, 211, 153, 0.6);
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(16, 185, 129, 0.18),
+    rgba(16, 185, 129, 0.18) 6px,
+    rgba(16, 185, 129, 0.08) 6px,
+    rgba(16, 185, 129, 0.08) 12px
+  );
+}
+
+body[data-theme='dark'] .planner-event-card.event-todo {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fde047;
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+body[data-theme='dark'] .planner-event-card.event-ooo {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(239, 68, 68, 0.15),
+    rgba(239, 68, 68, 0.15) 10px,
+    rgba(239, 68, 68, 0.08) 10px,
+    rgba(239, 68, 68, 0.08) 20px
+  );
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+body[data-theme='dark'] .planner-ooo-allday-banner {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(239, 68, 68, 0.2),
+    rgba(239, 68, 68, 0.2) 8px,
+    rgba(239, 68, 68, 0.1) 8px,
+    rgba(239, 68, 68, 0.1) 16px
+  );
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+}
+
+body[data-theme='dark'] .planner-event-btn {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+body[data-theme='dark'] .planner-event-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+body[data-theme='dark'] .planner-empty-slot::before {
+  background: var(--card-bg-alt);
+  color: var(--accent-hover);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Planner Auto-Balance Modal & Live Preview ─── */
+.planner-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: dialogFadeIn 0.15s ease-out;
+}
+
+.planner-autobalance-card {
+  background: var(--card-bg, rgba(255, 255, 255, 0.95));
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg, 16px);
+  width: 580px;
+  max-width: 92vw;
+  max-height: 88vh;
+  box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.2));
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: dialogScaleIn 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.planner-autobalance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+
+.planner-autobalance-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.planner-autobalance-header-icon {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+}
+
+.planner-autobalance-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.planner-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.15rem;
+  cursor: pointer;
+  color: var(--text-muted, #64748b);
+  border-radius: var(--radius-sm, 6px);
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.planner-modal-close:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text);
+}
+
+.planner-autobalance-body {
+  padding: 1.15rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.planner-autobalance-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.planner-autobalance-section-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #64748b);
+}
+
+.planner-autobalance-pill-group {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.planner-autobalance-pill {
+  padding: 0.32rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt, rgba(0, 0, 0, 0.03));
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.planner-autobalance-pill:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.08));
+  color: var(--text);
+}
+
+.planner-autobalance-pill.active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.planner-autobalance-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.planner-autobalance-buffer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+  padding: 0.32rem 0;
+  transition: color 0.15s ease;
+}
+
+.planner-autobalance-buffer-toggle:hover {
+  color: var(--text);
+}
+
+.planner-autobalance-buffer-toggle input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.planner-autobalance-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.planner-autobalance-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.planner-autobalance-preview-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #64748b);
+}
+
+.planner-autobalance-count-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--accent) 15%, var(--card-bg-alt, #eee));
+  color: var(--accent);
+}
+
+.planner-autobalance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.planner-autobalance-empty {
+  padding: 1.5rem;
+  text-align: center;
+  font-size: 0.86rem;
+  color: var(--text-muted, #64748b);
+  border: 1px dashed var(--card-border);
+  border-radius: var(--radius-md, 10px);
+}
+
+.planner-autobalance-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt, rgba(0, 0, 0, 0.02));
+  transition: all 0.15s ease;
+  gap: 0.75rem;
+}
+
+.planner-autobalance-item:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.04));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--card-border));
+}
+
+.planner-autobalance-item.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--card-border));
+}
+
+.planner-autobalance-item.no-slot {
+  opacity: 0.6;
+}
+
+.planner-autobalance-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  min-width: 0;
+  flex: 1;
+}
+
+.planner-autobalance-item-left input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.planner-autobalance-quad-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.planner-autobalance-item-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.planner-autobalance-item-title {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-autobalance-item-dur {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+  flex-shrink: 0;
+}
+
+.planner-autobalance-slot-badge {
+  flex-shrink: 0;
+}
+
+.planner-autobalance-slot-time {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.planner-autobalance-slot-none {
+  font-size: 0.74rem;
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
+  padding: 0.2rem 0.55rem;
+}
+
+.planner-autobalance-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--card-border);
+  background: var(--card-bg-alt, rgba(0, 0, 0, 0.02));
+  flex-shrink: 0;
+}
+
+/* ── Planner Series Edit Modal & Sessions Explorer ── */
+.planner-series-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10005;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.planner-series-modal-box {
+  width: min(1040px, 96vw);
+  max-width: 96vw;
+  max-height: 90vh;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-xl, 0 20px 45px rgba(0, 0, 0, 0.25));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text);
+}
+
+.planner-series-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  flex-shrink: 0;
+}
+
+.planner-series-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.planner-series-modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planner-series-rule-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  white-space: nowrap;
+}
+
+.planner-series-modal-body {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 860px) {
+  .planner-series-modal-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
+.planner-series-settings-pane {
+  padding: 1.2rem;
+  overflow-y: auto;
+  border-right: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.planner-series-explorer-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.planner-series-explorer-header {
+  padding: 0.75rem 1.2rem;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card-bg-alt);
+  flex-shrink: 0;
+}
+
+.planner-series-sessions-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  scroll-behavior: smooth;
+}
+
+.planner-series-session-card {
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.planner-series-session-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.06));
+}
+
+.planner-series-session-card.is-past {
+  opacity: 0.78;
+  background: color-mix(in srgb, var(--card-bg) 85%, var(--card-bg-alt));
+}
+
+.planner-series-session-card.is-past:hover {
+  opacity: 1;
+}
+
+.planner-series-session-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.planner-series-session-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  overflow: hidden;
+}
+
+.planner-series-session-checkbox {
+  cursor: pointer;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+.planner-series-session-date {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.planner-series-session-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.planner-drift-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.planner-drift-badge {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.planner-drift-badge--match {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.planner-drift-badge--override {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.planner-diff-tag-pill {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  font-weight: 500;
+}
+
+.planner-session-note-btn {
+  background: transparent;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.76rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.planner-session-note-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.planner-series-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.planner-series-divider::before,
+.planner-series-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--card-border);
+}
+
+.planner-series-divider--upcoming {
+  color: var(--accent);
+}
+
+.planner-series-divider--upcoming::before,
+.planner-series-divider--upcoming::after {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+/* Series Banner inside Single Event Modal */
+.planner-series-notice-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.planner-series-notice-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.planner-series-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.4rem;
+  border-top: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  flex-shrink: 0;
+}
+
+/* ── External Agent Planner Proposals UI & Animations ── */
+
+@keyframes plannerProposalsPulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent);
+    border-color: var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 90%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+    border-color: var(--accent);
+  }
+}
+
+.planner-proposals-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.planner-proposals-toggle-btn:hover {
+  background: var(--card-bg-alt);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.planner-proposals-toggle-btn.pulsing {
+  animation: plannerProposalsPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  border-color: var(--accent) !important;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.planner-proposals-toggle-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.planner-proposals-toggle-btn.active .planner-proposals-badge-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.planner-proposals-badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 20%, var(--card-bg));
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Dashed Proposed Event Cards ── */
+.planner-event-card.proposed-event {
+  border: 2px dashed var(--accent) !important;
+  border-left: 4px dashed var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg)) !important;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 15%, transparent);
+  cursor: pointer;
+  opacity: 0.94;
+  transition: transform 0.1s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.planner-event-card.proposed-event:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.planner-event-card.proposed-event.event-call {
+  border-color: var(--color-wip) !important;
+  background: color-mix(in srgb, var(--color-wip) 12%, var(--card-bg)) !important;
+}
+
+.planner-event-card.proposed-event.event-sync {
+  border-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg)) !important;
+}
+
+.planner-event-card.proposed-event.event-work {
+  border-color: var(--color-work) !important;
+  background: color-mix(in srgb, var(--color-work) 12%, var(--card-bg)) !important;
+}
+
+.planner-event-card.proposed-event.event-prep {
+  border-color: var(--color-low) !important;
+  background: color-mix(in srgb, var(--color-low) 12%, var(--card-bg)) !important;
+}
+
+.planner-event-card.proposed-event.event-todo {
+  border-color: var(--color-medium) !important;
+  background: color-mix(in srgb, var(--color-medium) 12%, var(--card-bg)) !important;
+}
+
+.planner-event-card.proposed-event.event-ooo {
+  border-color: var(--color-high) !important;
+  background: color-mix(in srgb, var(--color-high) 12%, var(--card-bg)) !important;
+}
+
+.planner-event-card.proposed-event.event-custom,
+.planner-event-card.proposed-event.event-personal {
+  border-color: var(--text-muted) !important;
+  background: color-mix(in srgb, var(--text-muted) 12%, var(--card-bg)) !important;
+}
+
+.planner-proposal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 4px);
+  background: color-mix(in srgb, var(--accent) 15%, var(--card-bg));
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  width: fit-content;
+}
+
+.planner-event-card.event-draft {
+  border-style: dotted !important;
+  opacity: 0.92;
+}
+
+.planner-draft-badge {
+  background: color-mix(in srgb, var(--accent) 20%, var(--card-bg)) !important;
+  color: var(--accent) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.planner-draft-notice-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 0.8rem;
+  background: color-mix(in srgb, var(--accent) 14%, var(--card-bg));
+  border: 1.5px dotted var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+
+

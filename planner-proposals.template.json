@@ -1,0 +1,68 @@
+{
+  "_notice": "IMPORTANT FOR AGENTS: Do NOT delete or overwrite existing proposed events in this file. Only append new proposals. Secretary tracks processed/accepted proposals by their unique 'id' to prevent duplicate entries and calendar overlaps.",
+  "_eventTypes": {
+    "call": "Voice or video call (e.g. client calls, Zoom/Teams conferences, phone calls). Supports linking notes and collaborators.",
+    "sync": "Team synchronization or 1-on-1 meeting (e.g. daily standups, weekly 1:1, sprint planning). Supports linking notes and collaborators.",
+    "prep": "Preparation or follow-up buffer session associated with an upcoming or completed call/meeting.",
+    "work": "Focused deep work block (e.g. development, coding, writing, research, architectural analysis). Supports project tags and notes.",
+    "todo": "Scheduled execution session specifically dedicated to working on and completing a task from the Todo list.",
+    "personal": "Personal block or private appointment (e.g. lunch break, doctor appointment, personal errands, admin). Does not require tags or notes.",
+    "ooo": "Out of office / leave / vacation / travel / holiday. Blocks unavailable time; automatically hides project tags and notes.",
+    "custom": "Generic or flexible custom calendar block."
+  },
+  "version": 1,
+  "proposals": [
+    {
+      "id": "agent-proposal-2026-09-16-001",
+      "title": "Architecture Sync: Agent Proposals Integration",
+      "date": "2026-09-16",
+      "startTime": "14:00",
+      "endTime": "15:00",
+      "duration": 60,
+      "type": "sync",
+      "description": "Proposed by Agent: Review proposals schema, deduplication mechanics, and UI presentation.",
+      "source": "Agent Alpha",
+      "collaborators": [
+        "Etienne"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "agent-proposal-2026-09-16-002",
+      "title": "Client Roadmap Strategy Call",
+      "date": "2026-09-16",
+      "startTime": "16:00",
+      "endTime": "17:00",
+      "duration": 60,
+      "type": "call",
+      "description": "Quarterly roadmap presentation and client feedback session.",
+      "source": "Agent Alpha",
+      "collaborators": [
+        "Alice Smith"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "agent-proposal-2026-09-16-003",
+      "title": "Deep Work: Core Engine Performance Optimization",
+      "date": "2026-09-16",
+      "startTime": "09:00",
+      "endTime": "11:30",
+      "duration": 150,
+      "type": "work",
+      "description": "Dedicated focus block for database indexing and bundle reduction.",
+      "source": "Agent Alpha",
+      "status": "pending"
+    },
+    {
+      "id": "agent-proposal-2026-09-17-004",
+      "title": "Strategy Workshop (All-Day)",
+      "date": "2026-09-17",
+      "duration": 1440,
+      "type": "work",
+      "description": "All-day planning workshop (duration supports 1440, 1439, 'all-day', '1.5h', '45m', etc.)",
+      "source": "Agent Beta",
+      "status": "pending"
+    }
+  ]
+}

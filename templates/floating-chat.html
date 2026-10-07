@@ -1,0 +1,27 @@
+<!-- Floating Secretary Chat Window -->
+<div id="floating-secretary-chat" class="floating-chat-window">
+  <div class="floating-chat-header" id="floating-chat-header" ondblclick="if(!event.target.closest('button, input, select')) toggleMaximizeFloatingChat()">
+    <div style="display:flex; align-items:center; gap:8px">
+      <span class="floating-chat-logo" style="display:inline-flex; align-items:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></span>
+      <span class="floating-chat-title">Secretary</span>
+    </div>
+    <div class="floating-chat-actions" style="display: flex; align-items: center; gap: 6px;">
+      <button class="floating-chat-btn help-btn" id="btn-agent-guide" onclick="AIChatController.showAgentGuide()" title="Guide d'utilisation de l'Assistant IA" data-i18n-title="chat.guideTooltip"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+      <button class="floating-chat-btn popout-btn" id="btn-floating-chat-popout" onclick="AIChatController.popoutToWindow()" title="Ouvrir l'assistant IA dans une fenêtre séparée" data-i18n-title="chat.popoutTooltip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+      <button class="floating-chat-btn min-btn" onclick="minimizeFloatingChat()" title="Minimiser" data-i18n-title="window.minimize"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <button class="floating-chat-btn close-btn" onclick="toggleFloatingChat()" title="Fermer" data-i18n-title="window.close"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div id="floating-chat-body" class="floating-chat-body chat-panel" style="height: calc(100% - 40px); overflow: hidden; padding: 0.5rem; background: transparent;">
+    <!-- Fully functional secretary chat is dynamically rendered here -->
+  </div>
+  <!-- Multi-side scalable resize handles -->
+  <div class="chat-resize-handle resize-n"></div>
+  <div class="chat-resize-handle resize-s"></div>
+  <div class="chat-resize-handle resize-w"></div>
+  <div class="chat-resize-handle resize-e"></div>
+  <div class="chat-resize-handle resize-nw"></div>
+  <div class="chat-resize-handle resize-ne"></div>
+  <div class="chat-resize-handle resize-sw"></div>
+  <div class="chat-resize-handle resize-se"></div>
+</div>

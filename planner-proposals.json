@@ -1,0 +1,5 @@
+{
+  "_notice": "IMPORTANT FOR AGENTS: Do NOT delete or overwrite existing proposed events in this file. Only append new proposals. Secretary tracks processed/accepted proposals by their unique 'id' to prevent duplicate entries and calendar overlaps.",
+  "version": 1,
+  "proposals": []
+}

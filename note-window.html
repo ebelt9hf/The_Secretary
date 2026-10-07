@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Secretary Note</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+<script src="https://unpkg.com/turndown-plugin-gfm/dist/turndown-plugin-gfm.js"></script>
+<script>
+  (function() {
+    try {
+      var isEl = !!(window.electronAPI?.isElectron || /Electron/i.test(navigator.userAgent));
+      if (isEl) {
+        var p = window.electronAPI?.platform || ((/Mac/i.test(navigator.userAgent) && !/iPhone|iPad/i.test(navigator.userAgent)) ? 'darwin' : (/Win/i.test(navigator.userAgent) || /Win/i.test(navigator.platform) ? 'win32' : 'linux'));
+        document.documentElement.classList.add('is-electron', p === 'darwin' ? 'is-electron-mac' : (p === 'win32' ? 'is-electron-win' : 'is-electron-linux'));
+      }
+    } catch (e) {}
+  })();
+</script>
+<script>
+  try {
+    if (typeof marked !== 'undefined' && typeof marked.setOptions === 'function') {
+      marked.setOptions({
+        gfm: true,
+        breaks: false,
+        headerIds: false,
+        mangle: false,
+        smartLists: true,
+        sanitize: false
+      });
+    }
+  } catch (e) { console.warn('Could not set marked options', e); }
+
+  const turndownService = new TurndownService({
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-'
+  });
+  try {
+    if (typeof turndownPluginGfm !== 'undefined') {
+      turndownService.use(turndownPluginGfm.gfm);
+    }
+  } catch (e) { console.warn('Could not load turndown GFM plugin', e); }
+  try { turndownService.keep(['mark']); } catch (e) { console.warn('Could not keep mark tags', e); }
+  try {
+    turndownService.addRule('mathInline', {
+      filter: function (node) {
+        return node.nodeName === 'SPAN' && (node.classList.contains('note-math') || node.hasAttribute('data-latex'));
+      },
+      replacement: function (content, node) {
+        const latex = node.getAttribute('data-latex') || content || '';
+        return `$${latex}$`;
+      }
+    });
+    turndownService.addRule('mathBlock', {
+      filter: function (node) {
+        return (node.nodeName === 'DIV' || node.nodeName === 'P' || node.nodeName === 'SPAN') && (node.classList.contains('note-math-block') || (node.classList.contains('note-math') && node.getAttribute('data-math-mode') === 'block'));
+      },
+      replacement: function (content, node) {
+        const latex = node.getAttribute('data-latex') || content || '';
+        return `\n\n$$\n${latex}\n$$\n\n`;
+      }
+    });
+  } catch (e) { console.warn('Could not add turndown math rules', e); }
+
+  function toggleFloatingChat() {
+    if (typeof window._realToggleFloatingChat === 'function') {
+      return window._realToggleFloatingChat.apply(this, arguments);
+    }
+  }
+  function closeNoteOverlay() {
+    if (typeof window._realCloseNoteOverlay === 'function') {
+      return window._realCloseNoteOverlay.apply(this, arguments);
+    }
+  }
+</script>
+</head>
+<body class="is-electron focused-note-mode note-window-standalone">
+
+<!-- Custom window controls (Windows/Linux only) -->
+<div id="win-controls" class="win-controls">
+  <button class="win-ctrl-btn" id="win-min" title="Minimize window" data-i18n-title="window.minimize" aria-label="Minimize">
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="0" y="4.5" width="10" height="1" fill="currentColor"/></svg>
+  </button>
+  <button class="win-ctrl-btn" id="win-max" title="Maximize window" data-i18n-title="window.maximize" aria-label="Maximize">
+    <svg class="icon-max" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+    <svg class="icon-restore" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="0.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M2.5 2.5 V0.5 H9.5 V7.5 H7.5" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+  </button>
+  <button class="win-ctrl-btn win-ctrl-close" id="win-close" title="Close window" data-i18n-title="window.close" aria-label="Close">
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M0.5 0.5 L9.5 9.5 M9.5 0.5 L0.5 9.5" stroke="currentColor" stroke-width="1.1"/></svg>
+  </button>
+</div>
+
+<!-- Standalone Note Editor Container -->
+<div id="screen-main" class="active" style="display:block; height:100vh; width:100vw; overflow:hidden;">
+  <include src="templates/note-editor-overlay.html" />
+</div>
+
+<include src="templates/todo-edit-overlay.html" />
+<include src="templates/floating-chat.html" />
+<include src="templates/modals.html" />
+<include src="templates/omnibar.html" />
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Scripts -->
+<script src="js/app-state.js?v=4.0.0"></script>
+<script src="js/app-utils.js?v=4.0.0"></script>
+<script src="js/app-icons.js?v=4.0.0"></script>
+<script src="js/app-popover-manager.js?v=4.0.0"></script>
+<script src="js/translations.js?v=4.0.0"></script>
+<script src="js/app-i18n.js?v=4.0.0"></script>
+<script src="js/app-bridge.js?v=4.0.0"></script>
+<script src="js/app-fs.js?v=4.0.0"></script>
+<script src="js/firebase-bundle.js?v=4.0.0"></script>
+<script src="js/firebase-config.js?v=4.0.0"></script>
+<script src="js/app-crypto.js?v=4.0.0"></script>
+<script src="js/app-image-optimizer.js?v=4.0.0"></script>
+<script src="js/app-firebase-sync.js?v=4.0.0"></script>
+<script src="js/app-storage.js?v=4.0.0"></script>
+<script src="js/app-stash-service.js?v=4.0.0"></script>
+<script src="js/app-omnibar.js?v=4.0.0"></script>
+<script src="js/app-topic-memory.js?v=4.0.0"></script>
+<script src="js/app-prompts.js?v=4.0.0"></script>
+<script src="js/app-llm.js?v=4.0.0"></script>
+<script src="js/app-dailyreview.js?v=4.0.0"></script>
+<script src="js/app-notes.js?v=4.0.0"></script>
+<script src="js/app-todos-board.js?v=4.0.0"></script>
+<script src="js/app-board.js?v=4.0.0"></script>
+<script src="js/app-focus.js?v=4.0.0"></script>
+<script src="js/app-overlay.js?v=4.0.0"></script>
+<script src="js/app-planner.js?v=4.0.0"></script>
+<script src="js/app-collab.js?v=4.0.0"></script>
+<script src="js/app-retro.js?v=4.0.0"></script>
+<script src="js/app-tutorial.js?v=4.0.0"></script>
+<script src="js/app-graph-view.js?v=4.0.0"></script>
+<script src="js/app-chat.js?v=4.0.0"></script>
+<script src="js/app-init.js?v=4.0.0"></script>
+
+<script>
+// Standalone Note Window Bootstrap
+_isFocusedMode = true;
+document.body.classList.add('focused-note-mode', 'note-window-standalone');
+</script>
+</body>
+</html>
