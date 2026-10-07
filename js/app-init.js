@@ -457,7 +457,7 @@ function setStartupState(nextState) {
   startupState = nextState;
   const nameEl = document.getElementById('folder-name');
   if (!nameEl) return;
-  const base = rootHandle?.name || settings.folder?.last || '';
+  const base = (typeof rootHandle !== 'undefined' && rootHandle?.name) || settings?.folder?.last || '';
   if (!base) return;
   if (startupState === 'BOOT_HYDRATING') nameEl.textContent = `${base} · Indexing...`;
   else nameEl.textContent = base;
@@ -1167,6 +1167,10 @@ async function submitCloudSyncSetup() {
       await window.FirebaseSyncService.linkExistingVault(syncCode, pass);
       if (rememberPass) await rememberPassphraseAfterSetup(pass);
       if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
+      const sc = document.getElementById('screen-connect');
+      if (sc && sc.style.display !== 'none' && !rootHandle) {
+        await mountFolder({ name: 'Firebase Cloud Vault' });
+      }
       updateCloudSyncUI();
       if (typeof renderBoard === 'function') renderBoard();
       if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.linkSuccess') : 'Device linked successfully! Encrypted notes synchronized.');
@@ -1194,6 +1198,11 @@ async function submitCloudSyncSetup() {
       }
 
       if (rememberPass) await rememberPassphraseAfterSetup(pass);
+
+      const sc = document.getElementById('screen-connect');
+      if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
+        await mountFolder({ name: 'Firebase Cloud Vault' });
+      }
 
       updateCloudSyncUI();
       if (typeof renderBoard === 'function') renderBoard();
@@ -2606,7 +2615,9 @@ async function handleSyncMessage(e) {
 /** Mount a directory handle: load data and switch to the main screen. */
 // ═══ App Init ═══
 async function mountFolder(handle) {
-  perfTelemetry.startup.mountStartedAt = performance.now();
+  if (typeof perfTelemetry !== 'undefined' && perfTelemetry?.startup) {
+    perfTelemetry.startup.mountStartedAt = performance.now();
+  }
   setLandingBusy(true, t('landing.loadingFolder'));
   setStartupState('BOOT_MINIMAL');
 
@@ -2627,30 +2638,40 @@ async function mountFolder(handle) {
 
   rootHandle = handle;
   rememberedFolderHandle = handle;
-  settings.folder.last = handle.name;
+  if (typeof settings !== 'undefined' && settings) {
+    if (!settings.folder) settings.folder = {};
+    settings.folder.last = handle?.name || '';
+  }
   saveLocalSettings();
   if (handle?.path && window.AppBridge?.fs?.setWorkspacePath) {
     try { await window.AppBridge.fs.setWorkspacePath(handle.path); } catch (e) {}
   }
   try {
     // Set up cross-window sync channel
-    if (_syncChannel) { try { _syncChannel.close(); } catch(e) {} }
-    _syncChannel = new BroadcastChannel('secretary-sync');
-    _syncChannel.onmessage = handleSyncMessage;
+    if (typeof _syncChannel !== 'undefined' && _syncChannel) { try { _syncChannel.close(); } catch(e) {} }
+    if (typeof BroadcastChannel !== 'undefined' && typeof _syncChannel !== 'undefined') {
+      _syncChannel = new BroadcastChannel('secretary-sync');
+      if (typeof handleSyncMessage === 'function') {
+        _syncChannel.onmessage = handleSyncMessage;
+      }
+    }
     
-    if (typeof _unsubscribeElectronSync === 'function') {
+    if (typeof _unsubscribeElectronSync !== 'undefined' && typeof _unsubscribeElectronSync === 'function') {
       try { _unsubscribeElectronSync(); } catch(e) {}
       _unsubscribeElectronSync = null;
     }
-    if (window.AppBridge?.sync) {
-      _unsubscribeElectronSync = window.AppBridge.sync.onMessage((msg) => {
+    if (window.AppBridge?.sync && typeof handleSyncMessage === 'function') {
+      const unsub = window.AppBridge.sync.onMessage((msg) => {
         handleSyncMessage({ data: msg });
       });
+      if (typeof _unsubscribeElectronSync !== 'undefined') {
+        _unsubscribeElectronSync = unsub;
+      }
     }
     const folderNameEl = document.getElementById('folder-name');
     if (folderNameEl) folderNameEl.textContent = handle.name;
 
-    if (StorageAPI && typeof StorageAPI.clearNoteCache === 'function') {
+    if (typeof StorageAPI !== 'undefined' && StorageAPI && typeof StorageAPI.clearNoteCache === 'function') {
       StorageAPI.clearNoteCache();
     }
     updateStartupProgress(5, t('landing.loadingWorkspace') || 'Loading workspace…');
@@ -2791,7 +2812,9 @@ async function mountFolder(handle) {
       setupGroupNavResize();
       updateSubRowVisibility();
     }
-    perfTelemetry.startup.plannerVisibleMs = Math.round(performance.now() - perfTelemetry.startup.mountStartedAt);
+    if (typeof perfTelemetry !== 'undefined' && perfTelemetry?.startup) {
+      perfTelemetry.startup.plannerVisibleMs = Math.round(performance.now() - (perfTelemetry.startup.mountStartedAt || performance.now()));
+    }
 
     // Determine whether this is a brand-new empty workspace folder vs an existing folder
     let isNewWorkspaceFolder = false;
@@ -2816,7 +2839,9 @@ async function mountFolder(handle) {
     toast(t('common.folderLoaded', { folder: handle.name, count: manifest.length, noteWord: word('note', manifest.length) }));
 
     setStartupState('BOOT_HYDRATING');
-    perfTelemetry.startup.hydrationStartedAt = performance.now();
+    if (typeof perfTelemetry !== 'undefined' && perfTelemetry?.startup) {
+      perfTelemetry.startup.hydrationStartedAt = performance.now();
+    }
     queueBackgroundHydration(isNewWorkspaceFolder);
   } catch (e) {
     setLandingBusy(false);
@@ -2848,7 +2873,9 @@ function queueBackgroundHydration(isNewWorkspaceFolder = false) {
       if (activeTab === 'chat' && window.AIChatController) {
         try { window.AIChatController.render(); } catch (e) {}
       }
-      perfTelemetry.startup.hydrationDurationMs = Math.round(performance.now() - perfTelemetry.startup.hydrationStartedAt);
+      if (typeof perfTelemetry !== 'undefined' && perfTelemetry?.startup) {
+        perfTelemetry.startup.hydrationDurationMs = Math.round(performance.now() - (perfTelemetry.startup.hydrationStartedAt || performance.now()));
+      }
       setStartupState('BOOT_READY');
 
       // Trigger start-of-day onboarding wizard ONLY if a NEW folder is opened (or if folder is unknown/uninitialized)
@@ -2941,6 +2968,10 @@ async function checkSavedFolder() {
     } catch (e) {
       console.warn('Failed getting workspace path', e);
     }
+  }
+  if (settings && settings.storageEngine === 'firebase') {
+    await mountFolder({ name: 'Firebase Cloud Vault' });
+    return;
   }
   let handle = null;
   try {
@@ -3134,92 +3165,168 @@ loadLocalSettings();
 applySettings();
 bindResponsiveLayoutHooks();
 
-// Browser compatibility check for File System Access API
-if (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS()) {
+function copyWebAppUrl(btn) {
+  const url = window.location.href.split('#')[0];
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      const origText = btn.innerHTML;
+      const tCopied = typeof t === 'function' ? t('landing.urlCopied') : 'Link Copied!';
+      btn.innerHTML = `<span>${escH(tCopied)}</span>`;
+      btn.classList.add('btn-success');
+      setTimeout(() => {
+        btn.innerHTML = origText;
+        btn.classList.remove('btn-success');
+      }, 2500);
+    }).catch(() => {});
+  }
+}
+window.copyWebAppUrl = copyWebAppUrl;
+
+function openCustomFirebaseSetupFromLanding() {
+  if (typeof openModal === 'function') openModal('modal-cloud-sync-setup');
+  const body = document.getElementById('sync-custom-firebase-body');
+  if (body) body.style.display = 'block';
+  if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
+  const textarea = document.getElementById('sync-custom-firebase-json');
+  if (textarea) setTimeout(() => textarea.focus(), 150);
+}
+window.openCustomFirebaseSetupFromLanding = openCustomFirebaseSetupFromLanding;
+
+function openManagedFirebaseSetupFromLanding() {
+  if (typeof resetCustomFirebaseConfigUI === 'function') {
+    resetCustomFirebaseConfigUI();
+  }
+  if (typeof openModal === 'function') openModal('modal-cloud-sync-setup');
+  const body = document.getElementById('sync-custom-firebase-body');
+  if (body) body.style.display = 'none';
+  if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
+  const pass = document.getElementById('sync-setup-passphrase');
+  if (pass) setTimeout(() => pass.focus(), 150);
+}
+window.openManagedFirebaseSetupFromLanding = openManagedFirebaseSetupFromLanding;
+
+function renderBrowserCompatibilityOptions() {
   const screenConnect = document.getElementById('screen-connect');
-  if (screenConnect) {
-    // Stop loading state
-    screenConnect.classList.remove('loading');
-    screenConnect.removeAttribute('aria-busy');
-    const status = document.getElementById('connect-status-hint');
-    if (status) status.textContent = '';
+  if (!screenConnect) return;
 
-    const isFileProtocol = location.protocol === 'file:';
-    const userAgent = navigator.userAgent;
-    const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome') && !userAgent.includes('Chromium');
-    const isFirefox = userAgent.includes('Firefox');
+  // Stop loading state
+  screenConnect.classList.remove('loading');
+  screenConnect.removeAttribute('aria-busy');
+  const status = document.getElementById('connect-status-hint');
+  if (status) status.textContent = '';
 
-    let titleText = 'Browser Restriction Detected';
-    let explanationText = '';
-    let actionSteps = '';
+  const existing = document.getElementById('browser-compatibility-options');
+  if (existing) existing.remove();
 
-    if (isSafari || isFirefox) {
-      titleText = 'Browser Not Supported';
-      explanationText = `Your current browser (${isSafari ? 'Safari' : 'Firefox'}) does not support the File System Access API.`;
-      actionSteps = `
-        <li>Please open Secretary in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> on your MacBook.</li>
-      `;
-    } else if (isFileProtocol) {
-      titleText = 'Local File Restriction';
-      explanationText = `Chromium browsers (Chrome/Edge) disable file picker access when loading pages directly via <code>file://</code>.`;
-      actionSteps = `
-        <li>Please start a local web server (e.g. run <code>python -m http.server</code> in the project directory) and access the app at <a href="http://localhost:8000/app.html" style="color: #b91c1c; text-decoration: underline; font-weight: 500;">http://localhost:8000/app.html</a>.</li>
-        <li>Alternatively, open this file in <strong>Google Chrome</strong> (which permits the API over <code>file://</code>).</li>
-      `;
-    } else {
-      titleText = 'API Access Blocked';
-      explanationText = `The File System Access API is disabled or not available in this browser context.`;
-      actionSteps = `
-        <li>If this is a corporate-managed laptop, group policies may block folder pickers in your browser.</li>
-        <li>Try opening the application in <strong>Google Chrome</strong>.</li>
-      `;
-    }
+  const container = document.createElement('div');
+  container.id = 'browser-compatibility-options';
+  container.className = 'browser-compat-card';
 
-    const banner = document.createElement('div');
-    banner.id = 'browser-compatibility-warning';
-    banner.style.cssText = `
-      background-color: #fee2e2;
-      border: 1px solid #fca5a5;
-      border-radius: 8px;
-      padding: 1.25rem;
-      margin: 1rem auto;
-      max-width: 480px;
-      color: #991b1b;
-      text-align: left;
-      font-family: system-ui, -apple-system, sans-serif;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    `;
-    
-    banner.innerHTML = `
-      <div style="display: flex; gap: 0.75rem; align-items: start;">
-        <svg style="flex-shrink: 0; margin-top: 0.15rem;" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        <div>
-          <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 600;">${titleText}</h3>
-          <p style="margin: 0 0 0.75rem 0; font-size: 0.85rem; line-height: 1.4; color: #7f1d1d;">
-            ${explanationText}
-          </p>
-          <h4 style="margin: 0 0 0.25rem 0; font-size: 0.85rem; font-weight: 600; color: #991b1b;">To resolve this:</h4>
-          <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.85rem; line-height: 1.4; color: #7f1d1d;">
-            ${actionSteps}
-          </ul>
+  const tTitle = typeof t === 'function' ? t('landing.browserCompatTitle') : 'Choose Your Storage Option';
+  const tDesc = typeof t === 'function' ? t('landing.browserCompatDesc') : 'Your browser does not support the File System Access API for local folder access. Choose one of the 3 options below to get started with Secretary:';
+
+  const tA_Title = typeof t === 'function' ? t('landing.optionChromeTitle') : 'Google Chrome / Desktop App';
+  const tA_Desc = typeof t === 'function' ? t('landing.optionChromeDesc') : 'Free local-first disk storage. Run Secretary in Chrome, Edge, Brave, or the Desktop App for direct folder reading & writing with 100% privacy.';
+  const tA_Btn = typeof t === 'function' ? t('landing.optionChromeBtn') : 'Copy Web App Link';
+
+  const tB_Title = typeof t === 'function' ? t('landing.optionOwnFirebaseTitle') : 'Connect Own Firebase';
+  const tB_Desc = typeof t === 'function' ? t('landing.optionOwnFirebaseDesc') : '100% Free on Google\'s Spark tier. Bring your own Firebase project with client-side AES-256-GCM Zero-Knowledge encryption.';
+  const tB_Btn = typeof t === 'function' ? t('landing.optionOwnFirebaseBtn') : 'Connect Own Firebase (Free)';
+
+  const tC_Title = typeof t === 'function' ? t('landing.optionManagedFirebaseTitle') : 'Etienne\'s Managed Cloud Vault';
+  const tC_Desc = typeof t === 'function' ? t('landing.optionManagedFirebaseDesc') : 'Turnkey managed cloud infrastructure with Zero-Knowledge E2EE encryption, automated sync & backups (Paid subscription service).';
+  const tC_Btn = typeof t === 'function' ? t('landing.optionManagedFirebaseBtn') : 'Use Managed Cloud Vault (Paid Plan)';
+
+  const badgeFree = typeof t === 'function' ? t('landing.badgeFree') : 'Free';
+  const badgePaid = typeof t === 'function' ? t('landing.badgePaid') : 'Paid / Subscription';
+
+  container.innerHTML = `
+    <div class="browser-compat-header">
+      <div class="browser-compat-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div>
+        <h3 class="browser-compat-title">${escH(tTitle)}</h3>
+        <p class="browser-compat-desc">${escH(tDesc)}</p>
+      </div>
+    </div>
+
+    <div class="browser-options-grid">
+      <!-- Option A: Chrome / Desktop -->
+      <div class="browser-option-item" id="landing-option-chrome">
+        <div class="browser-option-header">
+          <h4 class="browser-option-heading">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span>A) ${escH(tA_Title)}</span>
+          </h4>
+          <span class="browser-option-badge badge-free">${escH(badgeFree)} · Local Disk</span>
+        </div>
+        <p class="browser-option-text">${escH(tA_Desc)}</p>
+        <div class="browser-option-action">
+          <button type="button" class="btn btn-secondary" id="btn-copy-chrome-url" onclick="window.copyWebAppUrl(this)" title="Copy the web app link to clipboard to open in Chrome" style="font-size: 0.78rem; padding: 5px 11px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span>${escH(tA_Btn)}</span>
+          </button>
         </div>
       </div>
-    `;
-    // Insert at the top of the connect card if present
-    const card = document.getElementById('screen-connect-card') || screenConnect;
-    card.insertBefore(banner, card.firstChild);
-    
-    // Hide buttons
-    const btnOpen = document.getElementById('btn-open-folder');
-    if (btnOpen) btnOpen.style.display = 'none';
-    const btnResume = document.getElementById('btn-resume-folder');
-    if (btnResume) btnResume.style.display = 'none';
-    const divider = document.getElementById('landing-divider');
-    if (divider) divider.style.display = 'none';
+
+      <!-- Option B: Own Firebase (Free BYO) -->
+      <div class="browser-option-item" id="landing-option-own-firebase">
+        <div class="browser-option-header">
+          <h4 class="browser-option-heading">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>B) ${escH(tB_Title)}</span>
+          </h4>
+          <span class="browser-option-badge badge-free">${escH(badgeFree)} · BYO Firebase · E2EE</span>
+        </div>
+        <p class="browser-option-text">${escH(tB_Desc)}</p>
+        <div class="browser-option-action">
+          <button type="button" class="btn btn-primary" id="btn-landing-own-firebase" onclick="window.openCustomFirebaseSetupFromLanding()" title="Connect your own free Google Firebase project" style="font-size: 0.78rem; padding: 5px 12px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <span>${escH(tB_Btn)}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Option C: Etienne's Managed Firebase (Paid) -->
+      <div class="browser-option-item" id="landing-option-managed-firebase">
+        <div class="browser-option-header">
+          <h4 class="browser-option-heading">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            <span>C) ${escH(tC_Title)}</span>
+          </h4>
+          <span class="browser-option-badge badge-paid">${escH(badgePaid)}</span>
+        </div>
+        <p class="browser-option-text">${escH(tC_Desc)}</p>
+        <div class="browser-option-action">
+          <button type="button" class="btn btn-primary" id="btn-landing-managed-firebase" onclick="window.openManagedFirebaseSetupFromLanding()" title="Start using Etienne's managed cloud vault with end-to-end encryption" style="font-size: 0.78rem; padding: 5px 12px; background: #d97706; border-color: #d97706;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span>${escH(tC_Btn)}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const card = document.getElementById('screen-connect-card') || screenConnect;
+  card.insertBefore(container, card.firstChild);
+
+  // Hide local folder pick buttons
+  const btnOpen = document.getElementById('btn-open-folder');
+  if (btnOpen) btnOpen.style.display = 'none';
+  const btnResume = document.getElementById('btn-resume-folder');
+  if (btnResume) btnResume.style.display = 'none';
+  const divider = document.getElementById('landing-divider');
+  if (divider) divider.style.display = 'none';
+}
+window.renderBrowserCompatibilityOptions = renderBrowserCompatibilityOptions;
+
+// Browser compatibility check for File System Access API
+if (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS()) {
+  if (settings && settings.storageEngine === 'firebase') {
+    mountFolder({ name: 'Firebase Cloud Vault' });
+  } else {
+    renderBrowserCompatibilityOptions();
   }
 } else {
   // Hash routing: detect #note=<id> or #path=<path> or #chat-window=true
