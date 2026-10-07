@@ -448,14 +448,14 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
         minVersion: '4.0.0',
         deprecatedVersion: '4.1.0',
         latestVersion: '4.2.0',
-        downloadUrl: 'https://github.com/ebelt9hf/secretary'
+        downloadUrl: 'https://github.com/ebelt9hf/The_Secretary'
       };
 
       const result = window.FirebaseSyncService.checkVersionCompatibility(appInfo, '3.9.0');
       expect(result.status).toBe('declined');
       expect(result.minVersion).toBe('4.0.0');
       expect(result.currentVersion).toBe('3.9.0');
-      expect(result.downloadUrl).toBe('https://github.com/ebelt9hf/secretary');
+      expect(result.downloadUrl).toBe('https://github.com/ebelt9hf/The_Secretary');
     });
 
     it('warns with deprecation when client version is deprecated', () => {
@@ -463,7 +463,7 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
         minVersion: '3.5.0',
         deprecatedVersion: '4.0.0',
         latestVersion: '4.2.0',
-        downloadUrl: 'https://github.com/ebelt9hf/secretary'
+        downloadUrl: 'https://github.com/ebelt9hf/The_Secretary'
       };
 
       const result = window.FirebaseSyncService.checkVersionCompatibility(appInfo, '4.0.0');
@@ -477,7 +477,7 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
         minVersion: '3.5.0',
         deprecatedVersion: '3.8.0',
         latestVersion: '4.5.0',
-        downloadUrl: 'https://github.com/ebelt9hf/secretary'
+        downloadUrl: 'https://github.com/ebelt9hf/The_Secretary'
       };
 
       const result = window.FirebaseSyncService.checkVersionCompatibility(appInfo, '4.0.0');

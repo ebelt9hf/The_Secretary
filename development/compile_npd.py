@@ -515,7 +515,7 @@ def get_github_repo(repo_arg: str = None) -> str:
     except Exception:
         pass
 
-    return "ebelt9hf/secretary"
+    return "ebelt9hf/The_Secretary"
 
 
 def collect_release_artifacts(version_dir: pathlib.Path) -> list:
@@ -969,7 +969,7 @@ def main():
     parser.add_argument(
         "--github-repo",
         default=None,
-        help="GitHub repository slug (e.g. 'ebelt9hf/secretary'). Auto-detected from git remote origin if omitted."
+        help="GitHub repository slug (e.g. 'ebelt9hf/The_Secretary'). Auto-detected from git remote origin if omitted."
     )
     parser.add_argument(
         "--draft",

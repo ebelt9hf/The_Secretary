@@ -43,4 +43,4 @@ When bumping the version, the following places must remain in parity:
 3. **`app.html`**:
    - Landing screen version hint element: `<p id="connect-version-hint" data-version="X.Y.Z">Version X.Y.Z</p>`
    - Cache-busting query params on all local CSS & JS tags: `<link ... href="css/...css?v=X.Y.Z">` and `<script src="js/...js?v=X.Y.Z"></script>`
-4. **`README.md`**: Download links (`https://github.com/ebelt9hf/secretary/releases/download/vX.Y.Z/Secretary-X.Y.Z-...`) and binary filenames.
+4. **`README.md`**: Download links (`https://github.com/ebelt9hf/The_Secretary/releases/download/vX.Y.Z/Secretary-X.Y.Z-...`) and binary filenames.

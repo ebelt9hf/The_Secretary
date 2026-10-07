@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secretary</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.0">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.0">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.1">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -194,7 +194,7 @@
     <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
     <h1>Secretary</h1>
     <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-    <p id="connect-version-hint" data-version="4.0.0" style="font-size:.75rem;color:var(--text-muted);margin-top:-.4rem">Version 4.0.0</p>
+    <p id="connect-version-hint" data-version="4.0.1" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.1</p>
     <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
     
     <div class="landing-features">
@@ -228,14 +228,14 @@
       <div id="landing-resume-wrap" class="landing-resume-wrap" style="display:none">
         <button class="landing-btn-resume" id="btn-resume-folder" title="Reopen the last folder that was used">
           <div class="landing-btn-resume-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="10 14 14 10 18 14"/><path d="M14 10v7"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><polyline points="10 14 14 10 18 14"/><path d="M14 10v7"/></svg>
           </div>
           <div class="landing-btn-resume-content">
             <span class="landing-btn-resume-label" id="btn-resume-folder-label">Resume workspace</span>
             <span class="landing-btn-resume-folder" id="btn-resume-folder-name"></span>
           </div>
           <div class="landing-btn-resume-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
           </div>
         </button>
       </div>
@@ -243,16 +243,27 @@
       <div class="landing-divider" id="landing-divider" style="display:none"><span>or</span></div>
 
       <!-- Select folder button -->
-      <button class="landing-btn-open" id="btn-open-folder" title="Pick a folder to open in Secretary (starts from the last used folder when available)">
+      <button class="landing-btn-open landing-btn-open-hero" id="btn-open-folder" title="Pick a folder to open in Secretary (starts from the last used folder when available)">
         <span class="landing-btn-open-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><path d="M12 11v6"/><path d="M9 14l3-3 3 3"/></svg>
         </span>
         <span id="btn-open-folder-text">Open Secretary Folder</span>
+        <span class="landing-btn-open-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </span>
       </button>
+
+      <!-- Cloud Sync Secondary Link -->
+      <div class="landing-cloud-link-wrap" id="landing-cloud-link-wrap">
+        <button type="button" class="landing-cloud-link" id="btn-landing-cloud-link" onclick="window.openManagedFirebaseSetupFromLanding()" title="Connect encrypted cloud storage using Firebase">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          <span>Use Cloud Storage (Firebase E2EE)</span>
+        </button>
+      </div>
     </div>
 
     <div class="landing-kbd-hint">
-      <span>Chrome / Edge API</span> · <span class="landing-kbd">Ctrl</span>+<span class="landing-kbd">Shift</span>+<span class="landing-kbd">Space</span> Omnibar
+      <span>Local-first disk access</span> · <span class="landing-kbd">Ctrl</span>+<span class="landing-kbd">Shift</span>+<span class="landing-kbd">Space</span> Omnibar
     </div>
   </div>
 </div>
@@ -1178,37 +1189,37 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.0"></script>
-<script src="js/app-utils.js?v=4.0.0"></script>
-<script src="js/app-icons.js?v=4.0.0"></script>
-<script src="js/app-popover-manager.js?v=4.0.0"></script>
-<script src="js/translations.js?v=4.0.0"></script>
-<script src="js/app-i18n.js?v=4.0.0"></script>
-<script src="js/app-bridge.js?v=4.0.0"></script>
-<script src="js/app-fs.js?v=4.0.0"></script>
-<script src="js/firebase-bundle.js?v=4.0.0"></script>
-<script src="js/firebase-config.js?v=4.0.0"></script>
-<script src="js/app-crypto.js?v=4.0.0"></script>
-<script src="js/app-image-optimizer.js?v=4.0.0"></script>
-<script src="js/app-firebase-sync.js?v=4.0.0"></script>
-<script src="js/app-storage.js?v=4.0.0"></script>
-<script src="js/app-stash-service.js?v=4.0.0"></script>
-<script src="js/app-omnibar.js?v=4.0.0"></script>
-<script src="js/app-topic-memory.js?v=4.0.0"></script>
-<script src="js/app-prompts.js?v=4.0.0"></script>
-<script src="js/app-llm.js?v=4.0.0"></script>
-<script src="js/app-dailyreview.js?v=4.0.0"></script>
-<script src="js/app-notes.js?v=4.0.0"></script>
-<script src="js/app-todos-board.js?v=4.0.0"></script>
-<script src="js/app-board.js?v=4.0.0"></script>
-<script src="js/app-focus.js?v=4.0.0"></script>
-<script src="js/app-overlay.js?v=4.0.0"></script>
-<script src="js/app-planner.js?v=4.0.0"></script>
-<script src="js/app-collab.js?v=4.0.0"></script>
-<script src="js/app-retro.js?v=4.0.0"></script>
-<script src="js/app-tutorial.js?v=4.0.0"></script>
-<script src="js/app-graph-view.js?v=4.0.0"></script>
-<script src="js/app-chat.js?v=4.0.0"></script>
-<script src="js/app-init.js?v=4.0.0"></script>
+<script src="js/app-state.js?v=4.0.1"></script>
+<script src="js/app-utils.js?v=4.0.1"></script>
+<script src="js/app-icons.js?v=4.0.1"></script>
+<script src="js/app-popover-manager.js?v=4.0.1"></script>
+<script src="js/translations.js?v=4.0.1"></script>
+<script src="js/app-i18n.js?v=4.0.1"></script>
+<script src="js/app-bridge.js?v=4.0.1"></script>
+<script src="js/app-fs.js?v=4.0.1"></script>
+<script src="js/firebase-bundle.js?v=4.0.1"></script>
+<script src="js/firebase-config.js?v=4.0.1"></script>
+<script src="js/app-crypto.js?v=4.0.1"></script>
+<script src="js/app-image-optimizer.js?v=4.0.1"></script>
+<script src="js/app-firebase-sync.js?v=4.0.1"></script>
+<script src="js/app-storage.js?v=4.0.1"></script>
+<script src="js/app-stash-service.js?v=4.0.1"></script>
+<script src="js/app-omnibar.js?v=4.0.1"></script>
+<script src="js/app-topic-memory.js?v=4.0.1"></script>
+<script src="js/app-prompts.js?v=4.0.1"></script>
+<script src="js/app-llm.js?v=4.0.1"></script>
+<script src="js/app-dailyreview.js?v=4.0.1"></script>
+<script src="js/app-notes.js?v=4.0.1"></script>
+<script src="js/app-todos-board.js?v=4.0.1"></script>
+<script src="js/app-board.js?v=4.0.1"></script>
+<script src="js/app-focus.js?v=4.0.1"></script>
+<script src="js/app-overlay.js?v=4.0.1"></script>
+<script src="js/app-planner.js?v=4.0.1"></script>
+<script src="js/app-collab.js?v=4.0.1"></script>
+<script src="js/app-retro.js?v=4.0.1"></script>
+<script src="js/app-tutorial.js?v=4.0.1"></script>
+<script src="js/app-graph-view.js?v=4.0.1"></script>
+<script src="js/app-chat.js?v=4.0.1"></script>
+<script src="js/app-init.js?v=4.0.1"></script>
 </body>
 </html>

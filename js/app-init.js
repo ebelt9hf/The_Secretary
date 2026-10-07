@@ -813,7 +813,7 @@ function renderAppVersionBanner(vStatus) {
   }
 
   const { status, currentVersion, minVersion, latestVersion, downloadUrl } = vStatus;
-  const targetUrl = downloadUrl || 'https://github.com/ebelt9hf/secretary';
+  const targetUrl = downloadUrl || 'https://github.com/ebelt9hf/The_Secretary';
 
   let bannerClass = '';
   let iconSvg = '';

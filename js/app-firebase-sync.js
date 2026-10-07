@@ -1215,7 +1215,7 @@ const FirebaseSyncService = {
     const minVer = appInfo.minVersion ? String(appInfo.minVersion).trim() : null;
     const depVer = appInfo.deprecatedVersion ? String(appInfo.deprecatedVersion).trim() : null;
     const latVer = appInfo.latestVersion ? String(appInfo.latestVersion).trim() : null;
-    const downloadUrl = appInfo.downloadUrl || 'https://github.com/ebelt9hf/secretary';
+    const downloadUrl = appInfo.downloadUrl || 'https://github.com/ebelt9hf/The_Secretary';
     const releaseNotes = appInfo.releaseNotes || '';
 
     // 1. Check declined / minimum required version
