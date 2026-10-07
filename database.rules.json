@@ -1,0 +1,39 @@
+{
+  "rules": {
+    "pairing_codes": {
+      "$code": {
+        // Pairing codes are short-lived tokens used to connect devices (readable and writable by authenticated devices)
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['vaultMeta', 'createdAt'])"
+      }
+    },
+    "subscribers": {
+      // Admin-managed subscription / whitelist registry
+      // Only readable by the subscriber themselves to check their status
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+    "licenses": {
+      // License key validation registry
+      "$licenseKey": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('ownerUid').val() === auth.uid)"
+      }
+    },
+    "users": {
+      "$uid": {
+        // MODE 1: Free Beta / Open Access Mode (Default):
+        // Each authenticated user has full access to their own zero-knowledge encrypted vault:
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+
+        // MODE 2: Paid / Gated Subscription Mode (Uncomment when you want to enforce paywall):
+        // ".read": "auth != null && auth.uid === $uid && (root.child('subscribers').child($uid).child('status').val() === 'active' || root.child('config').child('isFreeBeta').val() === true)",
+        // ".write": "auth != null && auth.uid === $uid && (root.child('subscribers').child($uid).child('status').val() === 'active' || root.child('config').child('isFreeBeta').val() === true)"
+      }
+    }
+  }
+}
