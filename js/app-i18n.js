@@ -951,6 +951,13 @@ function setAppLanguage(lang, { persist = true } = {}) {
 const setLanguage = setAppLanguage;
 
 if (typeof window !== 'undefined') {
+  window.normalizeLanguageCode = normalizeLanguageCode;
+  window.getBrowserLanguageCode = getBrowserLanguageCode;
+  window.getAppLanguage = getAppLanguage;
+  window.getAppLocale = getAppLocale;
+  window.getLanguagePack = getLanguagePack;
+  window.t = t;
+  window.applyLocalizedUI = applyLocalizedUI;
   window.setAppLanguage = setAppLanguage;
   window.setLanguage = setLanguage;
 }

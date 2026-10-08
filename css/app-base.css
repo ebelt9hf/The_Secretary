@@ -615,6 +615,7 @@ button:focus-visible {
   gap: 1rem;
   width: 100%;
   margin-top: 0.25rem;
+  align-items: stretch;
 }
 @media (max-width: 768px) {
   .landing-storage-grid {
@@ -629,7 +630,7 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  align-items: center;
+  align-items: stretch;
   text-align: center;
   gap: 0.9rem;
   position: relative;
@@ -650,8 +651,10 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.6rem;
   width: 100%;
+  min-height: 84px;
 }
 .landing-card-badge {
   font-size: 0.68rem;
@@ -725,26 +728,44 @@ button:focus-visible {
   flex-direction: column;
   gap: 0.35rem;
   flex: 1;
+  justify-content: flex-start;
+  width: 100%;
 }
 .landing-card-body h3 {
   font-size: 0.96rem;
   font-weight: 700;
   color: var(--text);
   margin: 0;
+  min-height: 2.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .landing-card-body p {
   font-size: 0.78rem;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--text-muted);
   margin: 0;
+  min-height: 4.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .landing-card-footer {
   width: 100%;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  margin-top: 0.25rem;
 }
 .landing-card-btn {
   width: 100%;
-  border-radius: var(--radius-md);
-  padding: 0.55rem 0.8rem;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  padding: 0 0.85rem;
   font-size: 0.82rem;
   font-weight: 600;
   display: inline-flex;
@@ -753,7 +774,13 @@ button:focus-visible {
   gap: 6px;
   cursor: pointer;
   font-family: inherit;
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  line-height: 1;
 }
 .landing-card-btn-primary {
   background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 80%, #1e1b4b) 100%);

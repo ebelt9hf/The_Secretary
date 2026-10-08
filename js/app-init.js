@@ -3625,8 +3625,8 @@ function renderBrowserCompatibilityOptions() {
         </div>
         <p class="browser-option-text">${escH(tA_Desc)}</p>
         <div class="browser-option-action">
-          <button type="button" class="btn btn-secondary" id="btn-copy-chrome-url" onclick="window.copyWebAppUrl(this)" title="Copy the web app link to clipboard to open in Chrome" style="font-size: 0.78rem; padding: 5px 11px;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <button type="button" class="landing-card-btn landing-card-btn-primary" id="btn-copy-chrome-url" onclick="window.copyWebAppUrl(this)" title="Copy the web app link to clipboard to open in Chrome">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             <span>${escH(tA_Btn)}</span>
           </button>
         </div>
@@ -3643,8 +3643,8 @@ function renderBrowserCompatibilityOptions() {
         </div>
         <p class="browser-option-text">${escH(tB_Desc)}</p>
         <div class="browser-option-action">
-          <button type="button" class="btn btn-primary" id="btn-landing-own-firebase" onclick="window.openCustomFirebaseSetupFromLanding()" title="Connect your own free Google Firebase project" style="font-size: 0.78rem; padding: 5px 12px;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <button type="button" class="landing-card-btn landing-card-btn-own-firebase" id="btn-landing-own-firebase" onclick="window.openCustomFirebaseSetupFromLanding()" title="Connect your own free Google Firebase project">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             <span>${escH(tB_Btn)}</span>
           </button>
         </div>
@@ -3661,8 +3661,8 @@ function renderBrowserCompatibilityOptions() {
         </div>
         <p class="browser-option-text">${escH(tC_Desc)}</p>
         <div class="browser-option-action">
-          <button type="button" class="btn btn-primary" id="btn-landing-managed-firebase" onclick="window.openManagedFirebaseSetupFromLanding()" title="Start using Etienne's managed cloud vault with end-to-end encryption" style="font-size: 0.78rem; padding: 5px 12px; background: #d97706; border-color: #d97706;">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <button type="button" class="landing-card-btn landing-card-btn-cloud" id="btn-landing-managed-firebase" onclick="window.openManagedFirebaseSetupFromLanding()" title="Start using Etienne's managed cloud vault with end-to-end encryption">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             <span>${escH(tC_Btn)}</span>
           </button>
         </div>
@@ -3673,9 +3673,9 @@ function renderBrowserCompatibilityOptions() {
   const card = document.getElementById('screen-connect-card') || screenConnect;
   if (card && card.classList) card.classList.add('has-browser-options');
   const actionsContainer = card.querySelector ? card.querySelector('.landing-actions-container') : null;
-  if (actionsContainer) {
-    card.insertBefore(container, actionsContainer);
-  } else {
+  if (actionsContainer && actionsContainer.parentNode) {
+    actionsContainer.parentNode.insertBefore(container, actionsContainer);
+  } else if (card) {
     card.appendChild(container);
   }
 
