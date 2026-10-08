@@ -29,9 +29,11 @@ Secretary supports **15 European languages**: English (`en`), Deutsch (`de`), Fr
 
 ## 3. Versioning Guidelines
 
-- **Version Number Increments**: Version numbers, cache-buster query strings (`?v=X.X.X`), and release links MUST ONLY be increased when explicitly commanded by the user. Do NOT bump versions on regular feature or bugfix tasks unless explicitly asked.
-- **When Commanded to Release / Bump Version**:
-  - Run the automated version synchronizer to bump version across `package.json`, `package-lock.json`, `app.html` (`connect-version-hint` and cache busters), and `README.md`:
+- **Version Number Increments on `main`**: Version numbers, cache-buster query strings (`?v=X.X.X`), and release links MUST be increased with each commit to the `main` branch.
+  - Default increment: Patch version (`--patch`) for bug fixes, tweaks, and regular commits.
+  - Minor version (`--minor`) or Major version (`--major`) when introducing significant features, new architecture, or breaking changes.
+- **Workflow When Committing to `main`**:
+  - Run the automated version synchronizer to bump version across `package.json`, `package-lock.json`, `app.html` (`connect-version-hint` and cache busters), `note-window.html`, `secretary-window.html`, and `README.md`:
     ```bash
     python3 development/bump_version.py <new_version|--patch|--minor|--major>
     ```
@@ -39,6 +41,7 @@ Secretary supports **15 European languages**: English (`en`), Deutsch (`de`), Fr
     ```bash
     python3 development/bump_version.py --check
     ```
+  - A pre-commit Git hook (`.githooks/pre-commit`) is also installed to automatically bump and stage the patch version if committing directly to `main` without an existing version bump.
 
 ---
 

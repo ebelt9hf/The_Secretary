@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Git pre-commit hook for Secretary repository
+# Ensures translations consistency and enforces automatic version increment on each commit to `main`.
+
+set -e
+
+# 1. Run translations parity and syntax audit
+echo "🔍 Checking translations..."
+python3 development/check_translations.py
+
+# 2. Check current branch
+CURRENT_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)
+
+if [ "$CURRENT_BRANCH" = "main" ]; then
+    # Determine if a version bump is already staged in package.json
+    if git diff --cached package.json 2>/dev/null | grep -E '^\+[[:space:]]*"version":' >/dev/null 2>&1; then
+        echo "✓ Staged version bump detected on main. Verifying cross-file parity..."
+        python3 development/bump_version.py --check
+    else
+        echo "🚀 Commit to main detected without staged version bump. Automatically bumping patch version..."
+        python3 development/bump_version.py --patch
+        git add package.json package-lock.json app.html note-window.html secretary-window.html README.md 2>/dev/null || true
+        python3 development/bump_version.py --check
+        echo "✓ Version successfully incremented and staged for commit to main."
+    fi
+else
+    # On non-main branches, verify parity if version files were touched
+    if git diff --cached --name-only | grep -E 'package\.json|app\.html|note-window\.html|secretary-window\.html' >/dev/null 2>&1; then
+        echo "🔍 Verifying version parity across modified files..."
+        python3 development/bump_version.py --check
+    fi
+fi

@@ -83,13 +83,20 @@ When writing or modifying code in Secretary, follow these rules:
    python3 development/check_translations.py
    ```
 
-2. **Unit Tests**:
+2. **Versioning Parity on `main`**:
+   The version number MUST be increased with each commit to the `main` branch (default: `--patch`):
+   ```bash
+   python3 development/bump_version.py --patch
+   python3 development/bump_version.py --check
+   ```
+
+3. **Unit Tests**:
    Run full unit test suite:
    ```bash
    npm test
    ```
 
-3. **Build**:
+4. **Build**:
    Build distribution:
    ```bash
    npm run build

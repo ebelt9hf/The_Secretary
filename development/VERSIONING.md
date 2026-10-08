@@ -6,12 +6,12 @@ This document outlines how versioning is managed across the Secretary codebase.
 
 ## 1. Version Policy & When to Bump
 
-- **Explicit Command Only**: Version numbers, cache-buster query strings (`?v=X.X.X`), and release links **MUST ONLY** be increased when explicitly commanded by the user.
-- **Do NOT bump versions** on regular feature or bugfix tasks unless explicitly requested.
-- **When commanded to bump/release**:
-  - **Major version** (`X.0.0`): Major structural changes or breaking architecture updates.
-  - **Minor version** (`X.Y.0`): Feature additions or enhancements.
-  - **Patch version** (`X.Y.Z`): Small bug fixes and tweaks.
+- **Increase Version with Each Commit to `main`**: Version numbers, cache-buster query strings (`?v=X.X.X`), and release links **MUST** be increased with every commit to the `main` branch.
+- **Increment Levels**:
+  - **Patch version** (`--patch`, `X.Y.Z`): Standard default for bug fixes, tweaks, and incremental commits.
+  - **Minor version** (`--minor`, `X.Y.0`): New features, major UI enhancements, or capability additions.
+  - **Major version** (`--major`, `X.0.0`): Major structural changes or breaking architecture updates.
+- **Git Hook Automation**: A Git pre-commit hook (`.githooks/pre-commit`) automatically verifies that every commit to `main` increments the patch version if not already bumped manually.
 
 ---
 
@@ -40,7 +40,7 @@ When bumping the version, the following places must remain in parity:
 
 1. **`package.json`**: `"version": "X.Y.Z"`
 2. **`package-lock.json`**: Root package `"version": "X.Y.Z"` and `packages[""].version`
-3. **`app.html`**:
+3. **`app.html`, `note-window.html`, `secretary-window.html`**:
    - Landing screen version hint element: `<p id="connect-version-hint" data-version="X.Y.Z">Version X.Y.Z</p>`
    - Cache-busting query params on all local CSS & JS tags: `<link ... href="css/...css?v=X.Y.Z">` and `<script src="js/...js?v=X.Y.Z"></script>`
 4. **`README.md`**: Download links (`https://github.com/ebelt9hf/The_Secretary/releases/download/vX.Y.Z/Secretary-X.Y.Z-...`) and binary filenames.
