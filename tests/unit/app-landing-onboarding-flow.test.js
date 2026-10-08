@@ -28,9 +28,23 @@ describe('Landing Screen Onboarding & Language Flow', () => {
           <div id="landing-step-welcome" class="landing-step-view">
             <h1>Secretary</h1>
             <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes</p>
-            <button id="btn-landing-setup" onclick="showLandingStep('setup')"><span data-i18n="landing.getStarted">Set Up Workspace</span></button>
-            <div id="landing-resume-wrap" style="display:none">
-              <button id="btn-resume-folder"><span id="btn-resume-folder-label">Resume workspace</span><span id="btn-resume-folder-name"></span></button>
+            <div id="startup-progress-wrap" class="startup-progress-container" style="display:none;">
+              <div class="startup-progress-track">
+                <div id="startup-progress-fill" class="startup-progress-fill"></div>
+              </div>
+              <div class="startup-progress-info">
+                <div class="startup-progress-status">
+                  <span id="startup-progress-icon" class="startup-progress-icon"></span>
+                  <span id="startup-progress-step" class="startup-progress-step">Initializing workspace…</span>
+                </div>
+                <span id="startup-progress-pct" class="startup-progress-pct">0%</span>
+              </div>
+            </div>
+            <div class="landing-actions-container">
+              <button id="btn-landing-setup" onclick="showLandingStep('setup')"><span data-i18n="landing.getStarted">Set Up Workspace</span></button>
+              <div id="landing-resume-wrap" style="display:none">
+                <button id="btn-resume-folder"><span id="btn-resume-folder-label">Resume workspace</span><span id="btn-resume-folder-name"></span></button>
+              </div>
             </div>
           </div>
           <div id="landing-step-setup" class="landing-step-view landing-step-setup" style="display:none;">
@@ -56,6 +70,7 @@ describe('Landing Screen Onboarding & Language Flow', () => {
           </div>
         </div>
       </div>
+      <div id="screen-main"></div>
       <select id="prefs-language"></select>
     `;
     localStorage.clear();
@@ -235,15 +250,64 @@ describe('Landing Screen Onboarding & Language Flow', () => {
     });
 
     it('mounts demo workspace via startDemoWorkspaceFromLanding', async () => {
+      const origMount = window.mountFolder;
       let mountedHandle = null;
       window.mountFolder = async (h) => { mountedHandle = h; };
       let toastShown = false;
       window.showToast = () => { toastShown = true; };
 
-      await startDemoWorkspaceFromLanding();
-      expect(mountedHandle).toBeTruthy();
-      expect(mountedHandle.name).toBe('Demo Workspace (Sandbox)');
-      expect(toastShown).toBe(true);
+      try {
+        await startDemoWorkspaceFromLanding();
+        expect(mountedHandle).toBeTruthy();
+        expect(mountedHandle.name).toBe('Demo Workspace (Sandbox)');
+        expect(toastShown).toBe(true);
+      } finally {
+        window.mountFolder = origMount;
+      }
+    });
+  });
+
+  describe('Startup Progress Bar & Workspace Initialization Flow', () => {
+    it('hides startup progress bar when landing screen is not busy and workspace is not yet setup', () => {
+      setLandingBusy(false);
+      const wrap = document.getElementById('startup-progress-wrap');
+      expect(wrap.style.display).toBe('none');
+      const setupBtn = document.getElementById('btn-landing-setup');
+      expect(setupBtn).toBeTruthy();
+    });
+
+    it('shows startup progress bar and updates fill and percent when updateStartupProgress is called', () => {
+      updateStartupProgress(45, 'Preloading notes…');
+      const wrap = document.getElementById('startup-progress-wrap');
+      const fill = document.getElementById('startup-progress-fill');
+      const pct = document.getElementById('startup-progress-pct');
+      const step = document.getElementById('startup-progress-step');
+
+      expect(wrap.style.display).toBe('flex');
+      expect(fill.style.width).toBe('45%');
+      expect(pct.textContent).toBe('45%');
+      expect(step.textContent).toBe('Preloading notes…');
+    });
+
+    it('returns from setup step to welcome screen and displays progress bar during mountFolder', async () => {
+      globalThis.switchTab = async () => {};
+      globalThis.loadManifest = async () => [];
+      globalThis.loadTodosManifest = async () => [];
+      globalThis.loadPlanner = async () => {};
+      globalThis.toast = () => {};
+
+      showLandingStep('setup');
+      expect(document.getElementById('landing-step-setup').style.display).toBe('flex');
+      expect(document.getElementById('landing-step-welcome').style.display).toBe('none');
+
+      // Create dummy virtual handle to mount
+      const demoHandle = createDemoVirtualDirectoryHandle();
+      await mountFolder(demoHandle);
+
+      // Welcome step should be restored, progress bar displayed during load, and main screen activated
+      expect(document.getElementById('landing-step-welcome').style.display).toBe('flex');
+      expect(document.getElementById('screen-main').classList.contains('active')).toBe(true);
+      expect(document.getElementById('screen-connect').style.display).toBe('none');
     });
   });
 });

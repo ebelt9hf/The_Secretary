@@ -902,7 +902,7 @@ button:focus-visible {
 
 #screen-connect.loading { cursor: wait; }
 #screen-connect.loading .landing-actions-container,
-#screen-connect.loading .landing-step-view,
+#screen-connect.loading .landing-kbd-hint,
 #screen-connect.loading .btn-primary,
 #screen-connect.loading .btn-secondary,
 #screen-connect.loading .landing-divider { display: none !important; }

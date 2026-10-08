@@ -448,9 +448,9 @@ function setLandingBusy(isBusy, message = '') {
     if (isBusy) screen.setAttribute('aria-busy', 'true');
     else screen.removeAttribute('aria-busy');
   }
-  if (status) status.textContent = isBusy ? (message || t('common.loading')) : '';
-  if (wrap && isBusy) {
-    wrap.style.display = 'flex';
+  if (status) status.textContent = isBusy ? (message || (typeof t === 'function' ? t('common.loading') : 'Loading…')) : '';
+  if (wrap) {
+    wrap.style.display = isBusy ? 'flex' : 'none';
   }
 }
 
@@ -2967,10 +2967,13 @@ async function handleSyncMessage(e) {
 /** Mount a directory handle: load data and switch to the main screen. */
 // ═══ App Init ═══
 async function mountFolder(handle) {
+  if (typeof showLandingStep === 'function') {
+    showLandingStep('welcome');
+  }
   if (typeof perfTelemetry !== 'undefined' && perfTelemetry?.startup) {
     perfTelemetry.startup.mountStartedAt = performance.now();
   }
-  setLandingBusy(true, t('landing.loadingFolder'));
+  setLandingBusy(true, typeof t === 'function' ? t('landing.loadingFolder') : 'Loading folder…');
   setStartupState('BOOT_MINIMAL');
 
   // Reset folder-scoped runtime caches before loading a new workspace folder.
@@ -3161,8 +3164,8 @@ async function mountFolder(handle) {
     const sm = document.getElementById('screen-main');
     if (sm) sm.classList.add('active');
     if (!_isFocusedMode) {
-      setupGroupNavResize();
-      updateSubRowVisibility();
+      if (typeof setupGroupNavResize === 'function') setupGroupNavResize();
+      if (typeof updateSubRowVisibility === 'function') updateSubRowVisibility();
     }
     if (typeof perfTelemetry !== 'undefined' && perfTelemetry?.startup) {
       perfTelemetry.startup.plannerVisibleMs = Math.round(performance.now() - (perfTelemetry.startup.mountStartedAt || performance.now()));
@@ -4036,9 +4039,6 @@ if (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.
   const isCompanionMode = document.body.classList.contains('secretary-window-standalone') ||
                           document.body.classList.contains('chat-window-mode') ||
                           (location.hash && location.hash.includes('chat-window=true'));
-  if (!isCompanionMode) {
-    setLandingBusy(true, t('landing.checkingSavedFolder'));
-  }
   window.checkSavedFolderPromise = checkSavedFolder();
 }
 
