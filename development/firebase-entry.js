@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { getDatabase, ref, set, get, onValue, remove, child } from 'firebase/database';
 
 export const FirebaseBridge = {
@@ -45,6 +45,31 @@ export const FirebaseBridge = {
         }
       });
     });
+  },
+
+  async signInWithEmail(email, password) {
+    if (!this.auth) return null;
+    const cred = await signInWithEmailAndPassword(this.auth, email, password);
+    this.currentUser = cred.user;
+    return cred.user;
+  },
+
+  async signUpWithEmail(email, password) {
+    if (!this.auth) return null;
+    const cred = await createUserWithEmailAndPassword(this.auth, email, password);
+    this.currentUser = cred.user;
+    return cred.user;
+  },
+
+  async signOut() {
+    if (!this.auth) return;
+    await signOut(this.auth);
+    this.currentUser = null;
+  },
+
+  async sendPasswordReset(email) {
+    if (!this.auth) return;
+    await sendPasswordResetEmail(this.auth, email);
   },
 
   getUserId() {
