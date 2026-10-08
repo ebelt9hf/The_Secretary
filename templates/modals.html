@@ -753,6 +753,125 @@
   </div>
 </div>
 
+<!-- ── Cloud Sync Conflict & Smart Reconciliation Modal ── -->
+<div class="modal-overlay" id="modal-sync-conflict-resolution" style="display:none;">
+  <div class="modal sync-conflict-modal" style="max-width: 600px; width: 94%; border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,0.4);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.2rem;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; background:rgba(245, 158, 11, 0.15); color:#f59e0b;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M6 9v12"/></svg>
+        </span>
+        <span data-i18n="sync.conflictModalTitle">Sync Conflict: Existing Cloud Vault</span>
+      </h2>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="cancelSyncConflictModalUI()" title="Cancel and keep local files" data-i18n-title="sync.cancelConflictTooltip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <p style="margin: 0.2rem 0 0.8rem 0; font-size: 0.86rem; color: var(--text-muted); line-height: 1.45;" data-i18n="sync.conflictModalDesc">
+      An existing Cloud Vault was found for your account, but your computer also contains local notes and data. Choose how you would like to synchronize:
+    </p>
+
+    <!-- Side-by-side stats comparison -->
+    <div class="sync-conflict-stat-grid">
+      <!-- Local Stat Card -->
+      <div class="sync-conflict-stat-card">
+        <div class="sync-conflict-stat-header">
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span data-i18n="sync.conflictLocalHeader">Local Workspace</span>
+          </span>
+          <span id="sync-conflict-local-notes-badge" class="sync-conflict-stat-badge">0 Notes</span>
+        </div>
+        <div class="sync-conflict-stat-badges">
+          <span id="sync-conflict-local-todos-badge" style="font-size:0.72rem; color:var(--text-muted);">0 Todos</span>
+          <span style="font-size:0.72rem; color:var(--text-muted);">•</span>
+          <span id="sync-conflict-local-planner-badge" style="font-size:0.72rem; color:var(--text-muted);">0 Events</span>
+        </div>
+      </div>
+
+      <!-- Remote Stat Card -->
+      <div class="sync-conflict-stat-card">
+        <div class="sync-conflict-stat-header">
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            <span data-i18n="sync.conflictRemoteHeader">Cloud Vault</span>
+          </span>
+          <span id="sync-conflict-remote-notes-badge" class="sync-conflict-stat-badge">0 Notes</span>
+        </div>
+        <div class="sync-conflict-stat-badges">
+          <span id="sync-conflict-remote-todos-badge" style="font-size:0.72rem; color:var(--text-muted);">0 Todos</span>
+          <span style="font-size:0.72rem; color:var(--text-muted);">•</span>
+          <span id="sync-conflict-remote-planner-badge" style="font-size:0.72rem; color:var(--text-muted);">0 Events</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Chip -->
+    <div class="sync-conflict-summary-banner" id="sync-conflict-summary-banner">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <span id="sync-conflict-summary-text">Analyzing differences...</span>
+    </div>
+
+    <!-- Strategy Selection Cards -->
+    <div class="sync-conflict-strategy-list" role="radiogroup" aria-label="Conflict Resolution Strategies">
+      <!-- Option 1: Smart Merge -->
+      <label class="sync-conflict-option-card selected" id="card-strategy-merge" onclick="selectConflictStrategyUI('merge')">
+        <input type="radio" name="sync-conflict-strategy" id="strategy-radio-merge" value="merge" class="sync-conflict-radio" checked title="Select Smart Merge strategy" data-i18n-title="sync.strategyMergeTooltip">
+        <div class="sync-conflict-option-content">
+          <div class="sync-conflict-option-title-row">
+            <span class="sync-conflict-option-title" data-i18n="sync.strategyMergeTitle">Smart Merge (Bi-directional)</span>
+            <span class="sync-conflict-option-badge" data-i18n="sync.recommendedBadge">Recommended</span>
+          </div>
+          <div class="sync-conflict-option-desc" data-i18n="sync.strategyMergeDesc">
+            Combines local notes and cloud vault data into one unified set. Nothing gets lost.
+          </div>
+          <div class="sync-conflict-suboptions">
+            <label class="sync-conflict-sub-pill" title="If the same note was edited in both places, use local version" data-i18n-title="sync.priorityLocalTooltip">
+              <input type="radio" name="sync-conflict-priority" id="priority-local" value="local" checked>
+              <span data-i18n="sync.priorityLocalLabel">Prioritize Local Changes</span>
+            </label>
+            <label class="sync-conflict-sub-pill" title="If the same note was edited in both places, use cloud version" data-i18n-title="sync.priorityRemoteTooltip">
+              <input type="radio" name="sync-conflict-priority" id="priority-remote" value="remote">
+              <span data-i18n="sync.priorityRemoteLabel">Prioritize Cloud Vault</span>
+            </label>
+          </div>
+        </div>
+      </label>
+
+      <!-- Option 2: Overwrite Cloud -->
+      <label class="sync-conflict-option-card" id="card-strategy-overwrite-cloud" onclick="selectConflictStrategyUI('overwrite_cloud')">
+        <input type="radio" name="sync-conflict-strategy" id="strategy-radio-overwrite-cloud" value="overwrite_cloud" class="sync-conflict-radio" title="Select Overwrite Cloud strategy" data-i18n-title="sync.strategyOverwriteCloudTooltip">
+        <div class="sync-conflict-option-content">
+          <div class="sync-conflict-option-title-row">
+            <span class="sync-conflict-option-title" data-i18n="sync.strategyOverwriteCloudTitle">Overwrite Cloud Vault (Push Local)</span>
+          </div>
+          <div class="sync-conflict-option-desc" data-i18n="sync.strategyOverwriteCloudDesc">
+            Replaces all cloud data with this computer's workspace. Use if this device holds your most up-to-date work.
+          </div>
+        </div>
+      </label>
+
+      <!-- Option 3: Overwrite Local -->
+      <label class="sync-conflict-option-card" id="card-strategy-overwrite-local" onclick="selectConflictStrategyUI('overwrite_local')">
+        <input type="radio" name="sync-conflict-strategy" id="strategy-radio-overwrite-local" value="overwrite_local" class="sync-conflict-radio" title="Select Overwrite Local strategy" data-i18n-title="sync.strategyOverwriteLocalTooltip">
+        <div class="sync-conflict-option-content">
+          <div class="sync-conflict-option-title-row">
+            <span class="sync-conflict-option-title" data-i18n="sync.strategyOverwriteLocalTitle">Overwrite Local Workspace (Use Cloud)</span>
+          </div>
+          <div class="sync-conflict-option-desc" data-i18n="sync.strategyOverwriteLocalDesc">
+            Switches to the Cloud Vault. Your local files are safely backed up to '_migrated_to_cloud_backup'.
+          </div>
+        </div>
+      </label>
+    </div>
+
+    <!-- Actions -->
+    <div class="modal-actions" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <button type="button" class="btn btn-secondary" onclick="cancelSyncConflictModalUI()" data-i18n="common.cancel" data-i18n-title="sync.cancelConflictTooltip" title="Cancel and keep local files">Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-submit-sync-conflict" onclick="applySyncConflictResolutionUI()" data-i18n="sync.applyResolutionBtn" data-i18n-title="sync.applyResolutionBtnTooltip" title="Apply the selected synchronization strategy">Apply Strategy & Sync</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Cloud Password Reset Modal ── -->
 <div class="modal-overlay" id="modal-cloud-password-reset" style="display:none;">
   <div class="modal" style="max-width: 440px; width: 90%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">

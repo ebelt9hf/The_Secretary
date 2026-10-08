@@ -2050,6 +2050,14 @@ const FirebaseSyncService = {
     return cleaned;
   },
 
+  async saveNote(id, contentHtml, noteData = {}) {
+    return await this.queueSyncNote({
+      id,
+      contentHtml,
+      ...noteData
+    }, 0);
+  },
+
   async queueSyncNote(noteData, debounceMs = 5000) {
     if (this.state.status === this.STATUS.DECLINED) {
       console.warn('FirebaseSyncService: cannot sync note, app version is declined');

@@ -1298,6 +1298,374 @@ const StorageAPI = {
     };
   },
 
+  // ── Sync Conflict Detection & Smart Reconciliation ──
+  async detectSyncConflict(options = {}) {
+    // 1. Collect local workspace metadata
+    let localNotes = [];
+    try {
+      const manifestFromDisk = await this._readJSON('notes/manifest.json', []);
+      const mbFromDisk = await this._readJSON('notes/metadata-buffer.json', { items: [] });
+      const inMemManifest = (typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : [];
+      const inMemBuffer = (typeof window !== 'undefined' && Array.isArray(window.metadataBuffer)) ? window.metadataBuffer : [];
+      const diskHtmlFiles = (typeof this.listNoteFiles === 'function') ? (await this.listNoteFiles('notes')) : [];
+
+      const localMap = new Map();
+      for (const item of [
+        ...manifestFromDisk,
+        ...(Array.isArray(mbFromDisk?.items) ? mbFromDisk.items : []),
+        ...inMemManifest,
+        ...inMemBuffer
+      ]) {
+        if (!item) continue;
+        const rawId = item.id || (item.path ? item.path.replace(/^notes\//i, '').replace(/\.html$/i, '') : null);
+        if (rawId && !localMap.has(rawId)) {
+          localMap.set(rawId, { ...item, id: rawId, path: item.path || `notes/${rawId}.html` });
+        }
+      }
+      for (const rel of (Array.isArray(diskHtmlFiles) ? diskHtmlFiles : [])) {
+        const id = rel.replace(/^notes\//i, '').replace(/\.html$/i, '');
+        if (id && !localMap.has(id)) {
+          localMap.set(id, { id, path: rel.startsWith('notes/') ? rel : `notes/${rel}` });
+        }
+      }
+      localNotes = Array.from(localMap.values());
+    } catch (e) {}
+
+    let localTodos = await this._readJSON('todos/manifest.json', null);
+    if (!localTodos && typeof window !== 'undefined' && Array.isArray(window.todosManifest) && window.todosManifest.length > 0) {
+      localTodos = window.todosManifest;
+    }
+    const localPlanner = await this._readJSON('planner.json', null);
+    const localColleagues = await this._readJSON('colleagues.json', null);
+
+    const localStats = {
+      noteCount: localNotes.length,
+      todoCount: Array.isArray(localTodos) ? localTodos.length : 0,
+      plannerCount: Array.isArray(localPlanner?.events) ? localPlanner.events.length : 0,
+      colleagueCount: Array.isArray(localColleagues?.colleagues || localColleagues) ? (localColleagues.colleagues || localColleagues).length : 0,
+      lastModified: Math.max(0, ...localNotes.map(n => n.updatedAt || 0))
+    };
+
+    // 2. Collect remote vault metadata
+    const remoteNotes = [];
+    if (typeof window !== 'undefined' && window.FirebaseSyncService) {
+      const syncService = window.FirebaseSyncService;
+      if (syncService.state.manifestCache && syncService.state.manifestCache.size > 0) {
+        for (const m of syncService.state.manifestCache.values()) {
+          if (m && !m.deleted) remoteNotes.push(m);
+        }
+      } else if (syncService.state.localCache && syncService.state.localCache.size > 0) {
+        for (const doc of syncService.state.localCache.values()) {
+          if (doc && !doc.deleted) remoteNotes.push(doc);
+        }
+      }
+    }
+
+    let remoteTodos = null;
+    let remotePlanner = null;
+    let remoteColleagues = null;
+    if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+      try { remoteTodos = await window.FirebaseSyncService.getDoc('todos', 'manifest'); } catch (e) {}
+      try { remotePlanner = await window.FirebaseSyncService.getDoc('planner', 'events'); } catch (e) {}
+      try { remoteColleagues = await window.FirebaseSyncService.getDoc('colleagues', 'database'); } catch (e) {}
+    }
+
+    const remoteStats = {
+      noteCount: remoteNotes.length,
+      todoCount: Array.isArray(remoteTodos) ? remoteTodos.length : 0,
+      plannerCount: Array.isArray(remotePlanner?.events) ? remotePlanner.events.length : 0,
+      colleagueCount: Array.isArray(remoteColleagues?.colleagues || remoteColleagues) ? (remoteColleagues.colleagues || remoteColleagues).length : 0,
+      lastModified: Math.max(0, ...remoteNotes.map(n => n.updatedAt || 0))
+    };
+
+    const localHasData = (localStats.noteCount > 0 || localStats.todoCount > 0 || localStats.plannerCount > 0);
+    const remoteHasData = (remoteStats.noteCount > 0 || remoteStats.todoCount > 0 || remoteStats.plannerCount > 0);
+
+    const localIds = new Set(localNotes.map(n => n.id));
+    const remoteIds = new Set(remoteNotes.map(n => n.id));
+    let sharedCount = 0;
+    let differingCount = 0;
+
+    for (const id of localIds) {
+      if (remoteIds.has(id)) {
+        sharedCount++;
+        const lNote = localNotes.find(n => n.id === id);
+        const rNote = remoteNotes.find(n => n.id === id);
+        if (lNote && rNote && (lNote.bodyHash !== rNote.bodyHash || lNote.updatedAt !== rNote.updatedAt)) {
+          differingCount++;
+        }
+      }
+    }
+
+    return {
+      hasConflict: localHasData && remoteHasData,
+      local: localStats,
+      remote: remoteStats,
+      sharedNotesCount: sharedCount,
+      differingNotesCount: differingCount,
+      onlyLocalNotesCount: Math.max(0, localStats.noteCount - sharedCount),
+      onlyRemoteNotesCount: Math.max(0, remoteStats.noteCount - sharedCount)
+    };
+  },
+
+  async reconcileLocalAndCloudVault(passphrase, strategy = 'merge_local_priority', options = {}, onProgress = null) {
+    if (typeof window === 'undefined' || !window.FirebaseSyncService) {
+      throw new Error('FirebaseSyncService is not available');
+    }
+    const backupDir = options.backupDir || '_migrated_to_cloud_backup';
+
+    // Strategy: overwrite_cloud
+    if (strategy === 'overwrite_cloud') {
+      const res = await this.migrateToFirebase(passphrase, { backupDir, ...options }, onProgress);
+      return { success: true, ...res, strategy: 'overwrite_cloud' };
+    }
+
+    // Strategy: overwrite_local
+    if (strategy === 'overwrite_local') {
+      if (typeof onProgress === 'function') {
+        onProgress({ stage: 'unlocking', percent: 20, message: typeof t === 'function' ? t('sync.reconcileUnlocking') : 'Unlocking remote vault…' });
+      }
+      if (!window.FirebaseSyncService.state.isUnlocked) {
+        const unlocked = await window.FirebaseSyncService.unlockVault(passphrase);
+        if (!unlocked) throw new Error('Incorrect passphrase for remote vault');
+      }
+
+      if (typeof onProgress === 'function') {
+        onProgress({ stage: 'archiving', percent: 60, message: typeof t === 'function' ? t('sync.migrationProgressArchiving') : 'Archiving local files to backup folder…' });
+      }
+
+      // Collect all local items to archive
+      const localFiles = await this.listNoteFiles('notes');
+      const notesToArchive = (Array.isArray(localFiles) ? localFiles : []).map(p => ({
+        id: p.replace(/^notes\//, '').replace(/\.html$/, ''),
+        path: p.startsWith('notes/') ? p : `notes/${p}`
+      }));
+
+      await this._archiveLocalFilesAfterMigration(backupDir, { notes: notesToArchive });
+      this.setStorageEngine('firebase');
+      if (typeof settings !== 'undefined' && settings) {
+        settings.storageEngine = 'firebase';
+        if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
+      }
+
+      if (typeof onProgress === 'function') {
+        onProgress({ stage: 'finalizing', percent: 100, message: typeof t === 'function' ? t('sync.migrationProgressFinalizing') : 'Synchronization complete!' });
+      }
+      return { success: true, strategy: 'overwrite_local' };
+    }
+
+    // Strategies: merge_local_priority & merge_remote_priority
+    const isLocalPriority = strategy === 'merge_local_priority';
+
+    if (typeof onProgress === 'function') {
+      onProgress({ stage: 'unlocking', percent: 15, message: typeof t === 'function' ? t('sync.reconcileUnlocking') : 'Unlocking remote vault…' });
+    }
+
+    if (!window.FirebaseSyncService.state.isUnlocked) {
+      const unlocked = await window.FirebaseSyncService.unlockVault(passphrase);
+      if (!unlocked) {
+        await window.FirebaseSyncService.setupVault(passphrase);
+      }
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress({ stage: 'collecting', percent: 30, message: typeof t === 'function' ? t('sync.migrationProgressCollecting') : 'Collecting local and cloud data…' });
+    }
+
+    // 1. Collect local notes
+    const manifestFromDisk = await this._readJSON('notes/manifest.json', []);
+    const mbFromDisk = await this._readJSON('notes/metadata-buffer.json', { items: [] });
+    const inMemManifest = (typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : [];
+    const inMemBuffer = (typeof window !== 'undefined' && Array.isArray(window.metadataBuffer)) ? window.metadataBuffer : [];
+    const diskHtmlFiles = (typeof this.listNoteFiles === 'function') ? (await this.listNoteFiles('notes')) : [];
+
+    const localNoteMap = new Map();
+    for (const item of [...manifestFromDisk, ...(Array.isArray(mbFromDisk?.items) ? mbFromDisk.items : []), ...inMemManifest, ...inMemBuffer]) {
+      if (!item) continue;
+      const rawId = item.id || (item.path ? item.path.replace(/^notes\//i, '').replace(/\.html$/i, '') : null);
+      if (rawId && !localNoteMap.has(rawId)) {
+        localNoteMap.set(rawId, { ...item, id: rawId, path: item.path || `notes/${rawId}.html` });
+      }
+    }
+    for (const rel of (Array.isArray(diskHtmlFiles) ? diskHtmlFiles : [])) {
+      const id = rel.replace(/^notes\//i, '').replace(/\.html$/i, '');
+      if (id && !localNoteMap.has(id)) {
+        localNoteMap.set(id, { id, path: rel.startsWith('notes/') ? rel : `notes/${rel}` });
+      }
+    }
+
+    // Helper to read local note content
+    const getLocalNoteContent = async (item) => {
+      const p = item.path || `notes/${item.id}.html`;
+      try {
+        const text = await readFile(p);
+        if (text) return text;
+      } catch (e) {}
+      if (item.contentHtml || item.html) return item.contentHtml || item.html;
+      return '';
+    };
+
+    if (typeof onProgress === 'function') {
+      onProgress({ stage: 'merging_notes', percent: 50, message: typeof t === 'function' ? t('sync.reconcileMergingNotes') : 'Reconciling note differences…' });
+    }
+
+    // 2. Reconcile notes
+    const localNotesList = Array.from(localNoteMap.values());
+    for (const lNote of localNotesList) {
+      const id = lNote.id;
+      const remoteNote = await window.FirebaseSyncService.getNote(id);
+      const localHtml = await getLocalNoteContent(lNote);
+      let parsed = {};
+      if (localHtml && typeof parseNoteHTML === 'function') {
+        try { parsed = parseNoteHTML(localHtml); } catch (e) {}
+      }
+      const title = parsed.title || lNote.title || id;
+
+      if (!remoteNote) {
+        // Note only exists locally -> upload to cloud vault
+        await window.FirebaseSyncService.queueSyncNote({
+          id,
+          title,
+          contentHtml: localHtml,
+          date: lNote.date || parsed.date || new Date().toISOString().slice(0, 10),
+          tags: lNote.tags || parsed.tags || [],
+          workstream: lNote.workstream || parsed.workstream || '',
+          updatedAt: lNote.updatedAt || Date.now()
+        }, 0);
+      } else {
+        // Note exists on both sides
+        const remoteHtml = remoteNote.contentHtml || remoteNote.html || '';
+        if (localHtml.trim() !== remoteHtml.trim()) {
+          if (isLocalPriority) {
+            // Local wins: save remote as history snapshot and push local
+            try {
+              await this.saveSnapshot(lNote.path || `notes/${id}.html`, remoteHtml, 'remote_conflict_backup');
+            } catch (e) {}
+            await window.FirebaseSyncService.queueSyncNote({
+              id,
+              title,
+              contentHtml: localHtml,
+              date: lNote.date || parsed.date || remoteNote.date || new Date().toISOString().slice(0, 10),
+              tags: lNote.tags || parsed.tags || remoteNote.tags || [],
+              workstream: lNote.workstream || parsed.workstream || remoteNote.workstream || '',
+              updatedAt: Date.now()
+            }, 0);
+          } else {
+            // Remote wins: save local as history snapshot and keep remote
+            try {
+              await this.saveSnapshot(lNote.path || `notes/${id}.html`, localHtml, 'local_conflict_backup');
+            } catch (e) {}
+          }
+        }
+      }
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress({ stage: 'merging_stores', percent: 75, message: typeof t === 'function' ? t('sync.reconcileMergingStores') : 'Merging planner, todos, and contacts…' });
+    }
+
+    // 3. Reconcile Planner Events
+    try {
+      const localPlanner = await this._readJSON('planner.json', null);
+      const remotePlanner = await window.FirebaseSyncService.getDoc('planner', 'events');
+      const localEvents = Array.isArray(localPlanner?.events) ? localPlanner.events : [];
+      const remoteEvents = Array.isArray(remotePlanner?.events) ? remotePlanner.events : [];
+
+      const eventMap = new Map();
+      if (isLocalPriority) {
+        remoteEvents.forEach(e => { if (e && e.id) eventMap.set(e.id, e); });
+        localEvents.forEach(e => { if (e && e.id) eventMap.set(e.id, e); });
+      } else {
+        localEvents.forEach(e => { if (e && e.id) eventMap.set(e.id, e); });
+        remoteEvents.forEach(e => { if (e && e.id) eventMap.set(e.id, e); });
+      }
+      if (eventMap.size > 0) {
+        await window.FirebaseSyncService.putDoc('planner', 'events', {
+          version: 1,
+          events: Array.from(eventMap.values())
+        });
+      }
+    } catch (e) {
+      console.warn('Planner reconciliation warning:', e);
+    }
+
+    // 4. Reconcile Todos
+    try {
+      let localTodos = await this._readJSON('todos/manifest.json', null);
+      if (!localTodos && typeof window !== 'undefined' && Array.isArray(window.todosManifest) && window.todosManifest.length > 0) {
+        localTodos = window.todosManifest;
+      }
+      const remoteTodos = await window.FirebaseSyncService.getDoc('todos', 'manifest');
+      const lTodos = Array.isArray(localTodos) ? localTodos : [];
+      const rTodos = Array.isArray(remoteTodos) ? remoteTodos : [];
+
+      const todoMap = new Map();
+      if (isLocalPriority) {
+        rTodos.forEach(t => { if (t && (t.id || t.text)) todoMap.set(t.id || t.text, t); });
+        lTodos.forEach(t => { if (t && (t.id || t.text)) todoMap.set(t.id || t.text, t); });
+      } else {
+        lTodos.forEach(t => { if (t && (t.id || t.text)) todoMap.set(t.id || t.text, t); });
+        rTodos.forEach(t => { if (t && (t.id || t.text)) todoMap.set(t.id || t.text, t); });
+      }
+      if (todoMap.size > 0) {
+        await window.FirebaseSyncService.putDoc('todos', 'manifest', Array.from(todoMap.values()));
+      }
+    } catch (e) {
+      console.warn('Todos reconciliation warning:', e);
+    }
+
+    // 5. Reconcile Colleagues
+    try {
+      const localColleagues = await this._readJSON('colleagues.json', null);
+      const remoteColleagues = await window.FirebaseSyncService.getDoc('colleagues', 'database');
+      const lColls = Array.isArray(localColleagues?.colleagues) ? localColleagues.colleagues : (Array.isArray(localColleagues) ? localColleagues : []);
+      const rColls = Array.isArray(remoteColleagues?.colleagues) ? remoteColleagues.colleagues : (Array.isArray(remoteColleagues) ? remoteColleagues : []);
+
+      const collMap = new Map();
+      if (isLocalPriority) {
+        rColls.forEach(c => { if (c && (c.id || c.name)) collMap.set(c.id || c.name, c); });
+        lColls.forEach(c => { if (c && (c.id || c.name)) collMap.set(c.id || c.name, c); });
+      } else {
+        lColls.forEach(c => { if (c && (c.id || c.name)) collMap.set(c.id || c.name, c); });
+        rColls.forEach(c => { if (c && (c.id || c.name)) collMap.set(c.id || c.name, c); });
+      }
+      if (collMap.size > 0) {
+        await window.FirebaseSyncService.putDoc('colleagues', 'database', {
+          colleagues: Array.from(collMap.values())
+        });
+      }
+    } catch (e) {
+      console.warn('Colleagues reconciliation warning:', e);
+    }
+
+    // 6. Flush pending queue to cloud
+    try {
+      await window.FirebaseSyncService.flushQueue();
+    } catch (e) {}
+
+    // 7. Archive local files safely to backup folder
+    if (typeof onProgress === 'function') {
+      onProgress({ stage: 'archiving', percent: 90, message: typeof t === 'function' ? t('sync.migrationProgressArchiving') : 'Archiving local files to backup folder…' });
+    }
+    const archiveInfo = await this._archiveLocalFilesAfterMigration(backupDir, { notes: localNotesList });
+
+    this.setStorageEngine('firebase');
+    if (typeof settings !== 'undefined' && settings) {
+      settings.storageEngine = 'firebase';
+      if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress({ stage: 'finalizing', percent: 100, message: typeof t === 'function' ? t('sync.migrationProgressFinalizing') : 'Smart Merge complete!' });
+    }
+
+    return {
+      success: true,
+      strategy,
+      archive: archiveInfo
+    };
+  },
+
   async reconcileMigrationBackup(config = {}, onProgress = null) {
     if (typeof window === 'undefined' || !window.FirebaseSyncService) {
       return { skipped: true, reason: 'FirebaseSyncService unavailable' };

@@ -1208,6 +1208,79 @@ function showMigrationProgressDialog(title, initialMsg) {
 }
 window.showMigrationProgressDialog = showMigrationProgressDialog;
 
+let _syncConflictResolver = null;
+
+function selectConflictStrategyUI(strategy) {
+  const cards = document.querySelectorAll('.sync-conflict-option-card');
+  cards.forEach(c => c.classList.remove('selected'));
+  const targetCard = document.getElementById(`card-strategy-${strategy === 'merge' ? 'merge' : (strategy === 'overwrite_cloud' ? 'overwrite-cloud' : 'overwrite-local')}`);
+  if (targetCard) targetCard.classList.add('selected');
+  const radio = document.getElementById(`strategy-radio-${strategy === 'merge' ? 'merge' : (strategy === 'overwrite_cloud' ? 'overwrite-cloud' : 'overwrite-local')}`);
+  if (radio) radio.checked = true;
+}
+window.selectConflictStrategyUI = selectConflictStrategyUI;
+
+function showSyncConflictModalUI(conflictInfo) {
+  return new Promise((resolve) => {
+    _syncConflictResolver = resolve;
+
+    // Update Local Badges
+    const lNotes = document.getElementById('sync-conflict-local-notes-badge');
+    const lTodos = document.getElementById('sync-conflict-local-todos-badge');
+    const lPlanner = document.getElementById('sync-conflict-local-planner-badge');
+    if (lNotes) lNotes.textContent = `${conflictInfo.local.noteCount} ${typeof t === 'function' ? t('sync.conflictBadgeNotes') : 'Notes'}`;
+    if (lTodos) lTodos.textContent = `${conflictInfo.local.todoCount} ${typeof t === 'function' ? t('sync.conflictBadgeTodos') : 'Todos'}`;
+    if (lPlanner) lPlanner.textContent = `${conflictInfo.local.plannerCount} ${typeof t === 'function' ? t('sync.conflictBadgeEvents') : 'Events'}`;
+
+    // Update Remote Badges
+    const rNotes = document.getElementById('sync-conflict-remote-notes-badge');
+    const rTodos = document.getElementById('sync-conflict-remote-todos-badge');
+    const rPlanner = document.getElementById('sync-conflict-remote-planner-badge');
+    if (rNotes) rNotes.textContent = `${conflictInfo.remote.noteCount} ${typeof t === 'function' ? t('sync.conflictBadgeNotes') : 'Notes'}`;
+    if (rTodos) rTodos.textContent = `${conflictInfo.remote.todoCount} ${typeof t === 'function' ? t('sync.conflictBadgeTodos') : 'Todos'}`;
+    if (rPlanner) rPlanner.textContent = `${conflictInfo.remote.plannerCount} ${typeof t === 'function' ? t('sync.conflictBadgeEvents') : 'Events'}`;
+
+    // Update Summary text
+    const sumText = document.getElementById('sync-conflict-summary-text');
+    if (sumText) {
+      const shared = conflictInfo.sharedNotesCount || 0;
+      const onlyLoc = conflictInfo.onlyLocalNotesCount || 0;
+      const onlyRem = conflictInfo.onlyRemoteNotesCount || 0;
+      const diff = conflictInfo.differingNotesCount || 0;
+      sumText.textContent = `${shared} ${typeof t === 'function' ? t('sync.conflictSummaryShared') : 'Shared Notes'} (${diff} ${typeof t === 'function' ? t('sync.conflictSummaryDiffering') : 'modified in both'}) • ${onlyLoc} ${typeof t === 'function' ? t('sync.conflictSummaryOnlyLocal') : 'Local only'} • ${onlyRem} ${typeof t === 'function' ? t('sync.conflictSummaryOnlyRemote') : 'Cloud only'}`;
+    }
+
+    selectConflictStrategyUI('merge');
+    if (typeof openModal === 'function') openModal('modal-sync-conflict-resolution');
+  });
+}
+window.showSyncConflictModalUI = showSyncConflictModalUI;
+
+function applySyncConflictResolutionUI() {
+  const selectedRadio = document.querySelector('input[name="sync-conflict-strategy"]:checked');
+  let chosenStrategy = selectedRadio ? selectedRadio.value : 'merge';
+  if (chosenStrategy === 'merge') {
+    const priorityRadio = document.querySelector('input[name="sync-conflict-priority"]:checked');
+    const priority = priorityRadio ? priorityRadio.value : 'local';
+    chosenStrategy = priority === 'remote' ? 'merge_remote_priority' : 'merge_local_priority';
+  }
+  if (typeof closeModal === 'function') closeModal('modal-sync-conflict-resolution');
+  if (_syncConflictResolver) {
+    _syncConflictResolver({ cancelled: false, strategy: chosenStrategy });
+    _syncConflictResolver = null;
+  }
+}
+window.applySyncConflictResolutionUI = applySyncConflictResolutionUI;
+
+function cancelSyncConflictModalUI() {
+  if (typeof closeModal === 'function') closeModal('modal-sync-conflict-resolution');
+  if (_syncConflictResolver) {
+    _syncConflictResolver({ cancelled: true });
+    _syncConflictResolver = null;
+  }
+}
+window.cancelSyncConflictModalUI = cancelSyncConflictModalUI;
+
 async function submitCloudSyncSetup() {
   const mode = document.getElementById('btn-submit-cloud-sync')?.getAttribute('data-mode') || 'signin';
   const emailInput = document.getElementById('sync-setup-email');
@@ -1264,14 +1337,51 @@ async function submitCloudSyncSetup() {
       }
 
       // 2. Unlock or initialize vault with Master Passphrase
-      if (typeof settings !== 'undefined' && settings) {
-        settings.storageEngine = 'firebase';
-        if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
-      }
-
       const unlockSuccess = await window.FirebaseSyncService.unlockVault(pass);
       if (!unlockSuccess) {
         await window.FirebaseSyncService.setupVault(pass);
+      }
+
+      // 3. Detect if there is a conflict between local files and existing cloud vault
+      if (window.StorageAPI?.detectSyncConflict) {
+        const conflict = await window.StorageAPI.detectSyncConflict();
+        if (conflict && conflict.hasConflict) {
+          if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
+          const resolution = await showSyncConflictModalUI(conflict);
+          if (!resolution || resolution.cancelled) {
+            return;
+          }
+
+          const progressDialog = showMigrationProgressDialog(
+            typeof t === 'function' ? t('sync.reconcileProgressTitle') : 'Synchronizing Vault…',
+            typeof t === 'function' ? t('sync.migrationProgressCollecting') : 'Collecting notes and documents…'
+          );
+
+          try {
+            await window.StorageAPI.reconcileLocalAndCloudVault(pass, resolution.strategy, {}, (prog) => {
+              progressDialog.update(prog.message, prog.percent);
+            });
+          } finally {
+            progressDialog.close();
+          }
+
+          if (rememberPass) await rememberPassphraseAfterSetup(pass);
+
+          const sc = document.getElementById('screen-connect');
+          if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
+            await mountFolder({ name: 'Firebase Cloud Vault' });
+          }
+
+          updateCloudSyncUI();
+          if (typeof renderBoard === 'function') renderBoard();
+          if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.reconcileSuccessToast') : 'Reconciliation complete! Encrypted vault synchronized.');
+          return;
+        }
+      }
+
+      if (typeof settings !== 'undefined' && settings) {
+        settings.storageEngine = 'firebase';
+        if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
       }
 
       if (rememberPass) await rememberPassphraseAfterSetup(pass);
