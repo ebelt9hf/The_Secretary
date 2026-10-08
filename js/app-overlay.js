@@ -10212,6 +10212,9 @@ window.openModal = openModal;
 function closeModal(id) {
   const modal = document.getElementById(id);
   if (!modal) return;
+  if (id === 'modal-cloud-exit-confirm' && typeof resolveCloudExitDialog === 'function' && typeof _cloudExitResolver === 'function') {
+    resolveCloudExitDialog('cancel');
+  }
   if (modal.classList.contains('closing')) return;
   if (modal._closeTimer) clearTimeout(modal._closeTimer);
   modal.classList.add('closing');
@@ -10229,6 +10232,9 @@ window.closeModal = closeModal;
 
 function _closeModalOverlayElement(overlay) {
   if (!overlay) return;
+  if (overlay.id === 'modal-cloud-exit-confirm' && typeof resolveCloudExitDialog === 'function' && typeof _cloudExitResolver === 'function') {
+    resolveCloudExitDialog('cancel');
+  }
   if (typeof removePlannerCreatePreview === 'function') removePlannerCreatePreview();
   if (overlay.classList.contains('closing')) return;
   if (overlay._closeTimer) clearTimeout(overlay._closeTimer);

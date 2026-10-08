@@ -72,13 +72,14 @@
         }
       },
       async close() {
-        const isStandaloneChild = (AppBridge.isStandaloneChildWindow && AppBridge.isStandaloneChildWindow()) ||
-                                  document.body.classList.contains('note-window-standalone') ||
-                                  document.body.classList.contains('secretary-window-standalone') ||
-                                  document.body.classList.contains('chat-window-mode') ||
-                                  document.body.classList.contains('focus-pip-mode') ||
-                                  (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window'))) ||
-                                  (typeof location !== 'undefined' && location.hash && (location.hash.includes('chat-window') || location.hash.includes('focus-pip') || location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
+        const isStandaloneChild = !document.getElementById('topbar-main-row') && (
+          (AppBridge.isStandaloneChildWindow && AppBridge.isStandaloneChildWindow()) ||
+          document.body.classList.contains('note-window-standalone') ||
+          document.body.classList.contains('secretary-window-standalone') ||
+          document.body.classList.contains('chat-window-mode') ||
+          document.body.classList.contains('focus-pip-mode') ||
+          (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window')))
+        );
 
         if (!isStandaloneChild && typeof window.handleMainWindowCloseRequest === 'function') {
           return await window.handleMainWindowCloseRequest();
@@ -665,12 +666,15 @@
             document.body.classList.contains('focused-note-mode')) {
           return true;
         }
+        if (document.getElementById('topbar-main-row')) {
+          return false;
+        }
       }
       if (typeof location !== 'undefined') {
         if (location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window'))) {
           return true;
         }
-        if (location.hash && (location.hash.includes('chat-window') || location.hash.includes('focus-pip') || location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true'))) {
+        if (location.hash && (location.hash.includes('chat-window') || location.hash.includes('focus-pip'))) {
           return true;
         }
       }

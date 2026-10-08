@@ -4416,19 +4416,20 @@ let _isClosePromptActive = false;
 
 let _cloudExitResolver = null;
 
-function resolveCloudExitDialog(choice) {
+function resolveCloudExitDialog(choice = 'cancel') {
   const modal = document.getElementById('modal-cloud-exit-confirm');
   if (modal) {
     if (typeof closeModal === 'function') {
       closeModal('modal-cloud-exit-confirm');
     } else {
       modal.style.display = 'none';
+      modal.classList.remove('active');
     }
   }
   if (typeof _cloudExitResolver === 'function') {
     const res = _cloudExitResolver;
     _cloudExitResolver = null;
-    res(choice);
+    res(choice || 'cancel');
   }
 }
 window.resolveCloudExitDialog = resolveCloudExitDialog;
@@ -4437,7 +4438,10 @@ function showCloudExitConfirmDialog() {
   return new Promise(resolve => {
     const modal = document.getElementById('modal-cloud-exit-confirm');
     if (modal && typeof openModal === 'function') {
-      _cloudExitResolver = resolve;
+      _cloudExitResolver = (choice) => {
+        _cloudExitResolver = null;
+        resolve(choice || 'cancel');
+      };
       openModal('modal-cloud-exit-confirm');
     } else {
       const overlay = document.createElement('div');
@@ -4485,6 +4489,9 @@ function showCloudExitConfirmDialog() {
         if (e.key === 'Escape') { cleanup(); resolve('cancel'); }
       };
       document.addEventListener('keydown', keyHandler);
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) { cleanup(); resolve('cancel'); }
+      });
     }
   });
 }
@@ -4492,15 +4499,20 @@ window.showCloudExitConfirmDialog = showCloudExitConfirmDialog;
 
 async function handleMainWindowCloseRequest() {
   if (_isExiting) return true;
-  if (_isClosePromptActive) return false;
+  if (_isClosePromptActive) {
+    const isPromptVisible = document.querySelector('.dialog-overlay, #modal-cloud-exit-confirm.active');
+    if (isPromptVisible) return false;
+    _isClosePromptActive = false;
+  }
 
-  const isStandalone = (window.AppBridge?.isStandaloneChildWindow && window.AppBridge.isStandaloneChildWindow()) ||
-                       document.body.classList.contains('note-window-standalone') ||
-                       document.body.classList.contains('secretary-window-standalone') ||
-                       document.body.classList.contains('chat-window-mode') ||
-                       document.body.classList.contains('focus-pip-mode') ||
-                       (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window'))) ||
-                       (typeof location !== 'undefined' && location.hash && (location.hash.includes('chat-window') || location.hash.includes('focus-pip') || location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
+  const isStandalone = !document.getElementById('topbar-main-row') && (
+    (window.AppBridge?.isStandaloneChildWindow && window.AppBridge.isStandaloneChildWindow()) ||
+    document.body.classList.contains('note-window-standalone') ||
+    document.body.classList.contains('secretary-window-standalone') ||
+    document.body.classList.contains('chat-window-mode') ||
+    document.body.classList.contains('focus-pip-mode') ||
+    (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window')))
+  );
 
   if (isStandalone) {
     if (window.electronAPI?.closeWindow) {
@@ -4549,15 +4561,29 @@ async function handleMainWindowCloseRequest() {
   const purgeLocal = exitAction === 'close_and_delete';
   const hasUnsavedOverlay = typeof hasUnsavedNoteOverlayChanges === 'function' && hasUnsavedNoteOverlayChanges();
   const savingInProgress = typeof isSaveInProgress === 'function' && isSaveInProgress();
+  const isSyncing = !!(
+    window.FirebaseSyncService && (
+      (typeof window.FirebaseSyncService.hasPendingCloudWrites === 'function' && window.FirebaseSyncService.hasPendingCloudWrites()) ||
+      window.FirebaseSyncService.state?.status === 'syncing' ||
+      window.FirebaseSyncService.state?.syncTimer !== null
+    )
+  );
 
-  if (hasUnsavedOverlay || savingInProgress || purgeLocal) {
-    await executeSaveAndExitWithProgressBar({ purgeLocal });
+  if (hasUnsavedOverlay || savingInProgress || purgeLocal || isSyncing) {
+    await executeSaveAndExitWithProgressBar({ purgeLocal, isSyncing });
   } else {
     if (window.electronAPI?.requestSaveAllWindows) {
       try { await window.electronAPI.requestSaveAllWindows(); } catch (e) {}
     }
-    if (typeof isSaveInProgress === 'function' && isSaveInProgress()) {
-      await executeSaveAndExitWithProgressBar({ purgeLocal });
+    const stillSyncing = !!(
+      window.FirebaseSyncService && (
+        (typeof window.FirebaseSyncService.hasPendingCloudWrites === 'function' && window.FirebaseSyncService.hasPendingCloudWrites()) ||
+        window.FirebaseSyncService.state?.status === 'syncing' ||
+        window.FirebaseSyncService.state?.syncTimer !== null
+      )
+    );
+    if ((typeof isSaveInProgress === 'function' && isSaveInProgress()) || stillSyncing) {
+      await executeSaveAndExitWithProgressBar({ purgeLocal, isSyncing: stillSyncing });
     } else {
       _isExiting = true;
       if (window.electronAPI?.closeAppConfirmed) {
@@ -4575,10 +4601,18 @@ window.handleMainWindowCloseRequest = handleMainWindowCloseRequest;
 
 async function executeSaveAndExitWithProgressBar(options = {}) {
   _isExiting = true;
-  const progress = showAppCloseProgressDialog(
-    (typeof t === 'function' ? t('editor.closingAppMessage') : null) || 'Please wait while all changes are saved to disk...'
-  );
-  progress.update((typeof t === 'function' ? t('editor.closingAppMessage') : null) || 'Please wait while all changes are saved to disk...', 15);
+  const isSyncingMode = !!(options.isSyncing || (window.FirebaseSyncService && (
+    (typeof window.FirebaseSyncService.hasPendingCloudWrites === 'function' && window.FirebaseSyncService.hasPendingCloudWrites()) ||
+    window.FirebaseSyncService.state?.status === 'syncing' ||
+    window.FirebaseSyncService.state?.syncTimer !== null
+  )));
+
+  const initialMsg = isSyncingMode
+    ? ((typeof t === 'function' ? t('sync.statusSyncing') : null) || 'Syncing changes with cloud...')
+    : ((typeof t === 'function' ? t('editor.closingAppMessage') : null) || 'Please wait while all changes are saved to disk...');
+
+  const progress = showAppCloseProgressDialog(initialMsg);
+  progress.update(initialMsg, 15);
 
   try {
     if (window.electronAPI?.requestSaveAllWindows) {
@@ -4609,11 +4643,25 @@ async function executeSaveAndExitWithProgressBar(options = {}) {
       await finalizeSaves(progress);
     }
 
-    if (window.FirebaseSyncService && window.FirebaseSyncService.hasPendingCloudWrites()) {
-      const isOnline = typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true;
-      if (isOnline) {
-        progress.update((typeof t === 'function' ? t('sync.statusSyncing') : null) || 'Syncing changes with cloud...', 85);
-        try { await window.FirebaseSyncService.flushQueue(); } catch (e) {}
+    if (window.FirebaseSyncService) {
+      const hasPending = typeof window.FirebaseSyncService.hasPendingCloudWrites === 'function' && window.FirebaseSyncService.hasPendingCloudWrites();
+      const inFlightSync = window.FirebaseSyncService.state?.status === 'syncing' || window.FirebaseSyncService.state?.syncTimer !== null;
+      if (hasPending || inFlightSync) {
+        const isOnline = typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true;
+        if (isOnline) {
+          progress.update((typeof t === 'function' ? t('sync.statusSyncing') : null) || 'Syncing changes with cloud...', 80);
+          try {
+            if (typeof window.FirebaseSyncService.flushQueue === 'function') {
+              await window.FirebaseSyncService.flushQueue();
+            }
+          } catch (e) {
+            console.warn('Failed to flush cloud queue on exit:', e);
+          }
+          const syncStart = Date.now();
+          while (window.FirebaseSyncService.state?.status === 'syncing' && Date.now() - syncStart < 3000) {
+            await new Promise(r => setTimeout(r, 100));
+          }
+        }
       }
     }
 
@@ -4644,13 +4692,14 @@ async function executeSaveAndExitWithProgressBar(options = {}) {
 }
 
 window.addEventListener('beforeunload', (e) => {
-  const isStandalone = (window.AppBridge?.isStandaloneChildWindow && window.AppBridge.isStandaloneChildWindow()) ||
-                       document.body.classList.contains('note-window-standalone') ||
-                       document.body.classList.contains('secretary-window-standalone') ||
-                       document.body.classList.contains('chat-window-mode') ||
-                       document.body.classList.contains('focus-pip-mode') ||
-                       (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window'))) ||
-                       (typeof location !== 'undefined' && location.hash && (location.hash.includes('chat-window') || location.hash.includes('focus-pip') || location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
+  const isStandalone = !document.getElementById('topbar-main-row') && (
+    (window.AppBridge?.isStandaloneChildWindow && window.AppBridge.isStandaloneChildWindow()) ||
+    document.body.classList.contains('note-window-standalone') ||
+    document.body.classList.contains('secretary-window-standalone') ||
+    document.body.classList.contains('chat-window-mode') ||
+    document.body.classList.contains('focus-pip-mode') ||
+    (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window')))
+  );
   if (isStandalone) {
     const hasUnsavedNote = typeof hasUnsavedNoteOverlayChanges === 'function' && hasUnsavedNoteOverlayChanges();
     if (hasUnsavedNote && typeof autoSaveNote === 'function') {
@@ -4661,7 +4710,11 @@ window.addEventListener('beforeunload', (e) => {
 
   const hasUnsavedNote = typeof hasUnsavedNoteOverlayChanges === 'function' && hasUnsavedNoteOverlayChanges();
   const isSaving = typeof isSaveInProgress === 'function' && isSaveInProgress();
-  const hasCloudPending = window.FirebaseSyncService && window.FirebaseSyncService.hasPendingCloudWrites();
+  const hasCloudPending = window.FirebaseSyncService && (
+    (typeof window.FirebaseSyncService.hasPendingCloudWrites === 'function' && window.FirebaseSyncService.hasPendingCloudWrites()) ||
+    window.FirebaseSyncService.state?.status === 'syncing' ||
+    window.FirebaseSyncService.state?.syncTimer !== null
+  );
   if (isSaving || hasUnsavedNote || hasCloudPending) {
     if (_isExiting) return;
     if (hasUnsavedNote && typeof autoSaveNote === 'function') {
@@ -4671,10 +4724,15 @@ window.addEventListener('beforeunload', (e) => {
     e.returnValue = '';
     
     setTimeout(() => {
+      const stillPending = window.FirebaseSyncService && (
+        (typeof window.FirebaseSyncService.hasPendingCloudWrites === 'function' && window.FirebaseSyncService.hasPendingCloudWrites()) ||
+        window.FirebaseSyncService.state?.status === 'syncing' ||
+        window.FirebaseSyncService.state?.syncTimer !== null
+      );
       if ((typeof isSaveInProgress === 'function' && isSaveInProgress()) || 
           (typeof hasUnsavedNoteOverlayChanges === 'function' && hasUnsavedNoteOverlayChanges()) ||
-          (window.FirebaseSyncService && window.FirebaseSyncService.hasPendingCloudWrites())) {
-        executeSaveAndExitWithProgressBar();
+          stillPending) {
+        executeSaveAndExitWithProgressBar({ isSyncing: !!stillPending });
       }
     }, 150);
   }

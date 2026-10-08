@@ -1021,9 +1021,10 @@ async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) 
       let decisionsReady = current?.decisionsReady === true;
       let stats = current?.stats || { todoMarkers: 0, mentions: 0, decisions: 0 };
       let parsedSummary = current?.summary || entry.summary || '';
+      let parsed = null;
       try {
         const html = await getNoteHtmlOnDemand(entry.path);
-        const parsed = parseNoteHTML(html);
+        parsed = parseNoteHTML(html);
         parsedSummary = parsed.summary || parsedSummary;
         const previewData = extractNotePreviewData(parsed.mainHTML || '');
         preview = previewData?.text || '';

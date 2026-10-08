@@ -1080,6 +1080,19 @@ describe('Notes Tab View Modes & Timeline Zoom Engine', () => {
       expect(notesReaderTarget).toEqual({ type: 'month', value: '2026-09' });
     });
   });
+
+  describe('hydrateMetadataFromManifestIncremental', () => {
+    it('successfully hydrates note metadata without ReferenceError on parsed variable', async () => {
+      globalThis.StorageAPI = globalThis.StorageAPI || {};
+      globalThis.StorageAPI.readNotesManifest = vi.fn().mockResolvedValue([
+        { path: 'notes/test-note.html', id: 'test-note-1', title: 'Untitled Note', modified: 100 }
+      ]);
+      globalThis.getNoteHtmlOnDemand = vi.fn().mockResolvedValue('<html><head><title>Actual Title</title></head><body><p>Content</p></body></html>');
+      globalThis.saveMetadataBuffer = vi.fn().mockResolvedValue(true);
+
+      await expect(hydrateMetadataFromManifestIncremental({ chunkSize: 10 })).resolves.not.toThrow();
+    });
+  });
 });
 
 
