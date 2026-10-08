@@ -3590,7 +3590,7 @@ function renderBrowserCompatibilityOptions() {
   const tC_Btn = typeof t === 'function' ? t('landing.optionManagedFirebaseBtn') : 'Use Managed Cloud Vault (Paid Plan)';
 
   const badgeFree = typeof t === 'function' ? t('landing.badgeFree') : 'Free';
-  const badgePaid = typeof t === 'function' ? t('landing.badgePaid') : 'Paid / Subscription';
+  const badgePaid = typeof t === 'function' ? t('landing.badgeFreePreview') : 'Free Preview';
 
   container.innerHTML = `
     <div class="browser-compat-header">
@@ -3640,7 +3640,7 @@ function renderBrowserCompatibilityOptions() {
         </div>
       </div>
 
-      <!-- Option C: Etienne's Managed Firebase (Paid) -->
+      <!-- Option C: Etienne's Managed Firebase (Free Preview) -->
       <div class="browser-option-item" id="landing-option-managed-firebase">
         <div class="browser-option-header">
           <h4 class="browser-option-heading">
@@ -3720,13 +3720,281 @@ function changeLandingLanguage(langCode) {
 }
 window.changeLandingLanguage = changeLandingLanguage;
 
-window.startDemoWorkspaceFromLanding = function() {
-  if (typeof SetupWizardController !== 'undefined') {
-    SetupWizardController.open();
-  } else if (typeof startTutorial === 'function') {
-    startTutorial();
-  } else {
-    toast(t('landing.sandboxOptionTitle') || 'Demo Workspace');
+function createVirtualDirectoryHandle(rootName, initialFiles = {}) {
+  const fileStore = new Map();
+  for (const [filePath, content] of Object.entries(initialFiles)) {
+    fileStore.set(filePath.replace(/^\/+/, ''), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+
+  function makeFileHandle(fullPath, fileName) {
+    return {
+      name: fileName,
+      kind: 'file',
+      async getFile() {
+        const content = fileStore.get(fullPath) || '';
+        return {
+          name: fileName,
+          size: content.length,
+          lastModified: Date.now(),
+          type: fileName.endsWith('.json') ? 'application/json' : 'text/html',
+          async text() {
+            return fileStore.get(fullPath) || '';
+          }
+        };
+      },
+      async createWritable() {
+        let buffer = '';
+        return {
+          async write(chunk) {
+            if (typeof chunk === 'string') {
+              buffer += chunk;
+            } else if (chunk && typeof chunk.text === 'function') {
+              buffer += await chunk.text();
+            } else {
+              buffer += String(chunk || '');
+            }
+          },
+          async close() {
+            fileStore.set(fullPath, buffer);
+          },
+          async abort() {}
+        };
+      }
+    };
+  }
+
+  function makeDirHandle(dirPath, dirName) {
+    const prefix = dirPath ? `${dirPath}/` : '';
+    return {
+      name: dirName,
+      kind: 'directory',
+      async getDirectoryHandle(subName, options = {}) {
+        const subPath = prefix ? `${prefix}${subName}` : subName;
+        return makeDirHandle(subPath, subName);
+      },
+      async getFileHandle(fileName, options = {}) {
+        const fullPath = prefix ? `${prefix}${fileName}` : fileName;
+        if (!options.create && !fileStore.has(fullPath)) {
+          const err = new Error(`File not found: ${fullPath}`);
+          err.name = 'NotFoundError';
+          throw err;
+        }
+        if (options.create && !fileStore.has(fullPath)) {
+          fileStore.set(fullPath, '');
+        }
+        return makeFileHandle(fullPath, fileName);
+      },
+      async removeEntry(entryName) {
+        const targetPath = prefix ? `${prefix}${entryName}` : entryName;
+        fileStore.delete(targetPath);
+        for (const k of Array.from(fileStore.keys())) {
+          if (k.startsWith(`${targetPath}/`)) {
+            fileStore.delete(k);
+          }
+        }
+      },
+      async *entries() {
+        const seen = new Set();
+        for (const k of fileStore.keys()) {
+          if (prefix && !k.startsWith(prefix)) continue;
+          const rest = prefix ? k.slice(prefix.length) : k;
+          const parts = rest.split('/');
+          const childName = parts[0];
+          if (!seen.has(childName)) {
+            seen.add(childName);
+            if (parts.length > 1) {
+              yield [childName, makeDirHandle(prefix ? `${prefix}${childName}` : childName, childName)];
+            } else {
+              yield [childName, makeFileHandle(k, childName)];
+            }
+          }
+        }
+      },
+      async *values() {
+        for await (const [, handle] of this.entries()) {
+          yield handle;
+        }
+      }
+    };
+  }
+
+  return makeDirHandle('', rootName);
+}
+window.createVirtualDirectoryHandle = createVirtualDirectoryHandle;
+
+function createDemoVirtualDirectoryHandle() {
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
+  const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+
+  const getWeekDateStr = (offsetDays) => {
+    const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offsetDays);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getWeekDateTimestamp = (offsetDays, hour = 9, minute = 0) => {
+    const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offsetDays, hour, minute, 0);
+    return d.getTime();
+  };
+
+  const dateMon = getWeekDateStr(0);
+  const dateTue = getWeekDateStr(1);
+  const dateWed = getWeekDateStr(2);
+  const dateThu = getWeekDateStr(3);
+  const dateFri = getWeekDateStr(4);
+
+  const initialFiles = {
+    'settings.json': {
+      version: 1,
+      username: 'Alex Demo',
+      theme: 'system',
+      ui: {
+        workStartTime: '08:30',
+        workEndTime: '18:30',
+        workingDays: [1, 2, 3, 4, 5],
+        defaultPlannerDuration: 30,
+        laneSort: 'date',
+        weekCutoffWeeks: 8
+      },
+      collaborators: [
+        { id: 'collab-1', name: 'Etienne Beltzung', role: 'Lead Architect', color: '#4f46e5' },
+        { id: 'collab-2', name: 'Sarah Connor', role: 'Security Engineer', color: '#059669' },
+        { id: 'collab-3', name: 'Alex Martin', role: 'Product Designer', color: '#d97706' }
+      ],
+      workstreams: [
+        { id: 'ws-1', name: 'Product Launch', color: '#4f46e5', status: 'active' },
+        { id: 'ws-2', name: 'Architecture & Security', color: '#059669', status: 'active' },
+        { id: 'ws-3', name: 'Quality & Bug Fixes', color: '#ef4444', status: 'active' },
+        { id: 'ws-4', name: 'Personal / Strategy', color: '#d97706', status: 'active' }
+      ],
+      firstRunSetupDone: true
+    },
+    'notes/manifest.json': [
+      {
+        id: 'welcome-demo-note',
+        path: 'notes/welcome-demo-note.html',
+        title: typeof t === 'function' ? t('demo.welcomeNoteTitle') : 'Welcome to Secretary',
+        date: dateMon,
+        updatedAt: getWeekDateTimestamp(0, 9, 30),
+        tags: ['welcome', 'onboarding', 'productivity'],
+        workstream: 'Product Launch',
+        pinned: true,
+        favorite: true
+      },
+      {
+        id: 'strategy-roadmap-note',
+        path: 'notes/strategy-roadmap-note.html',
+        title: typeof t === 'function' ? t('demo.strategyNoteTitle') : '2026 Product Strategy & Roadmap',
+        date: dateMon,
+        updatedAt: getWeekDateTimestamp(0, 11, 0),
+        tags: ['strategy', 'roadmap', 'features'],
+        workstream: 'Product Launch',
+        pinned: true,
+        favorite: true
+      },
+      {
+        id: 'bug-tracking-note',
+        path: 'notes/bug-tracking-note.html',
+        title: typeof t === 'function' ? t('demo.bugTrackingNoteTitle') : 'Active Bug Tracker & Resolution Log',
+        date: dateTue,
+        updatedAt: getWeekDateTimestamp(1, 14, 15),
+        tags: ['bugs', 'quality', 'triage'],
+        workstream: 'Quality & Bug Fixes',
+        pinned: false,
+        favorite: true
+      },
+      {
+        id: 'weekly-sync-notes',
+        path: 'notes/weekly-sync-notes.html',
+        title: typeof t === 'function' ? t('demo.syncNoteTitle') : 'Weekly Team Synchronization',
+        date: dateWed,
+        updatedAt: getWeekDateTimestamp(2, 10, 0),
+        tags: ['team', 'meeting', 'sync'],
+        workstream: 'Architecture & Security',
+        pinned: false,
+        favorite: false
+      },
+      {
+        id: 'security-zero-knowledge',
+        path: 'notes/security-zero-knowledge.html',
+        title: typeof t === 'function' ? t('demo.securityNoteTitle') : 'Zero-Knowledge Encryption Architecture',
+        date: dateThu,
+        updatedAt: getWeekDateTimestamp(3, 16, 45),
+        tags: ['security', 'crypto', 'e2ee'],
+        workstream: 'Architecture & Security',
+        pinned: false,
+        favorite: false
+      }
+    ],
+    'notes/welcome-demo-note.html': `<h1>Welcome to Secretary</h1><p>Secretary is your <strong>private, local-first personal productivity workspace</strong>. It seamlessly brings together note taking, task management (Kanban), weekly planning, retrospective summaries, and team collaboration.</p><h2>Key Features</h2><ul><li><strong>100% Private & Local-First:</strong> Direct file reading and writing on your machine with zero tracking.</li><li><strong>Zero-Knowledge E2EE Cloud Sync:</strong> Optional end-to-end encrypted backup and cross-device synchronization with AES-256-GCM.</li><li><strong>Integrated Planner & Daily Review:</strong> Schedule work blocks, track focus, and maintain clean daily momentum.</li></ul>`,
+    'notes/strategy-roadmap-note.html': `<h1>2026 Product Strategy & Roadmap</h1><p>Objectives and key initiatives for Secretary core development and ecosystem expansions.</p><h2>Upcoming Milestones & Roadmap</h2><ul><li>[x] <strong>Client-side AES-256-GCM Zero-Knowledge Sync:</strong> End-to-end encrypted vault with PBKDF2 key derivation.</li><li>[x] <strong>Multi-Platform Compatibility:</strong> Unified experience across Web, Desktop (Electron), and Chrome extension environments.</li><li>[x] <strong>Dynamic Startup Flow:</strong> Dedicated 3-option storage onboarding (Local Folder, Own Firebase Spark Tier, Managed Cloud Vault).</li><li>[ ] <strong>Local LLM & Context Engine:</strong> Private on-device embeddings and context retrieval for interactive note synthesis.</li><li>[ ] <strong>Multi-Device Conflict-Free CRDTs:</strong> Real-time peer-to-peer sync with automated field-level conflict resolution.</li></ul>`,
+    'notes/bug-tracking-note.html': `<h1>Active Bug Tracker & Resolution Log</h1><p>Continuous quality monitoring and resolved bug reports across Secretary releases.</p><h2>Resolved Bugs & Regressions</h2><ul><li>[x] <strong>Fixed: Startup Cloud Vault Button:</strong> Fixed unclickable connection trigger on web environments by binding explicit modal opening handlers.</li><li>[x] <strong>Fixed: Modal Viewport Overflow:</strong> Added dynamic max-height and custom scrollbars to prevent action buttons from clipping on laptop screens.</li><li>[x] <strong>Fixed: Planner Week Parity:</strong> Implemented dynamic current-week date calculations so the planner is always pre-populated for active week dates.</li><li>[x] <strong>Fixed: 15-Language Key Parity:</strong> Validated 100% key completeness and zero missing strings across all European languages.</li></ul><h2>Quality Metrics</h2><p>Target: 0 unhandled exceptions, \u226599% unit test coverage across all storage and planner engines.</p>`,
+    'notes/weekly-sync-notes.html': `<h1>Weekly Team Synchronization</h1><p><strong>Attendees:</strong> Alex Martin, Etienne Beltzung, Sarah Connor</p><h2>Discussion Points</h2><ul><li>Reviewed UX improvements on the startup storage selection screen.</li><li>Verified that modal scrollbars and dialog action buttons remain responsive across all screen dimensions.</li><li>Confirmed full internationalization parity across all 15 supported European languages.</li></ul>`,
+    'notes/security-zero-knowledge.html': `<h1>Zero-Knowledge Encryption Architecture</h1><p>Every note and metadata attribute is encrypted locally on your device with your master passphrase using AES-256-GCM and PBKDF2 before ever touching the cloud.</p><p>Neither Secretary nor any cloud provider has access to your plaintext data or encryption keys.</p>`,
+    'collaborators.json': [
+      { id: 'collab-1', name: 'Etienne Beltzung', role: 'Lead Architect', color: '#4f46e5' },
+      { id: 'collab-2', name: 'Sarah Connor', role: 'Security Engineer', color: '#059669' },
+      { id: 'collab-3', name: 'Alex Martin', role: 'Product Designer', color: '#d97706' }
+    ],
+    'workstreams.json': [
+      { id: 'ws-1', name: 'Product Launch', color: '#4f46e5', status: 'active' },
+      { id: 'ws-2', name: 'Architecture & Security', color: '#059669', status: 'active' },
+      { id: 'ws-3', name: 'Quality & Bug Fixes', color: '#ef4444', status: 'active' },
+      { id: 'ws-4', name: 'Personal / Strategy', color: '#d97706', status: 'active' }
+    ],
+    'decisions.json': [
+      { id: 'dec-1', title: typeof t === 'function' ? t('demo.decEncryptionTitle') : 'Zero-Knowledge Encryption as Core Cloud Sync Engine', date: dateMon, status: 'decided', workstream: 'Architecture & Security' },
+      { id: 'dec-2', title: typeof t === 'function' ? t('demo.decLanguageTitle') : '15 European Language Parity Guarantee', date: dateTue, status: 'decided', workstream: 'Product Launch' },
+      { id: 'dec-3', title: typeof t === 'function' ? t('demo.decBugResolutionTitle') : 'Zero Unhandled Exceptions Policy & Strict Regression Testing', date: dateWed, status: 'decided', workstream: 'Quality & Bug Fixes' }
+    ],
+    'todos.json': [
+      { id: 'todo-1', text: 'Review encryption specification and key rotation test cases', col: 'todo', priority: 'high', workstream: 'Architecture & Security', created: getWeekDateTimestamp(0, 8, 30) },
+      { id: 'todo-2', text: 'Fix modal viewport scrollbar overflow on laptop screens', col: 'done', priority: 'high', workstream: 'Quality & Bug Fixes', created: getWeekDateTimestamp(1, 9, 0) },
+      { id: 'todo-3', text: 'Verify startup cloud vault connection button on web build', col: 'done', priority: 'high', workstream: 'Quality & Bug Fixes', created: getWeekDateTimestamp(1, 10, 30) },
+      { id: 'todo-4', text: 'Finalize Q4 roadmap presentation for team sync', col: 'in-progress', priority: 'medium', workstream: 'Product Launch', created: getWeekDateTimestamp(2, 9, 15) },
+      { id: 'todo-5', text: 'Benchmark local LLM context retrieval latency', col: 'todo', priority: 'medium', workstream: 'Product Launch', created: getWeekDateTimestamp(3, 11, 0) },
+      { id: 'todo-6', text: 'Test interactive demo workspace in multiple browsers', col: 'done', priority: 'low', workstream: 'Personal / Strategy', created: getWeekDateTimestamp(4, 14, 0) }
+    ],
+    'planner.json': {
+      events: [
+        { id: 'plan-1', title: typeof t === 'function' ? t('demo.planSyncTitle') : 'Team Synchronization', date: dateMon, startTime: '09:00', endTime: '10:00', duration: 60, type: 'sync', workstream: 'Architecture & Security', collaborator: 'collab-1' },
+        { id: 'plan-2', title: typeof t === 'function' ? t('demo.planWorkTitle') : 'Deep Work - Architecture', date: dateMon, startTime: '10:30', endTime: '12:00', duration: 90, type: 'work', workstream: 'Architecture & Security' },
+        { id: 'plan-3', title: typeof t === 'function' ? t('demo.planPersonalTitle') : 'Lunch & Walk', date: dateMon, startTime: '12:30', endTime: '13:30', duration: 60, type: 'personal' },
+        { id: 'plan-4', title: typeof t === 'function' ? t('demo.planBugTriageTitle') : 'Bug Triage & Quality Review', date: dateTue, startTime: '09:30', endTime: '10:30', duration: 60, type: 'work', workstream: 'Quality & Bug Fixes', collaborator: 'collab-2' },
+        { id: 'plan-5', title: typeof t === 'function' ? t('demo.planCallTitle') : 'Product Review Call', date: dateTue, startTime: '14:00', endTime: '15:00', duration: 60, type: 'call', workstream: 'Product Launch', collaborator: 'collab-3' },
+        { id: 'plan-6', title: typeof t === 'function' ? t('demo.planRoadmapWorkTitle') : 'Roadmap Planning & Milestones', date: dateWed, startTime: '10:00', endTime: '11:30', duration: 90, type: 'work', workstream: 'Product Launch' },
+        { id: 'plan-7', title: typeof t === 'function' ? t('demo.planTodoSessionTitle') : 'Todo Focus - Bug Fixes Verification', date: dateWed, startTime: '15:00', endTime: '16:00', duration: 60, type: 'todo', workstream: 'Quality & Bug Fixes' },
+        { id: 'plan-8', title: typeof t === 'function' ? t('demo.planSecurityAuditTitle') : 'Security & Zero-Knowledge Audit', date: dateThu, startTime: '09:30', endTime: '11:00', duration: 90, type: 'work', workstream: 'Architecture & Security', collaborator: 'collab-2' },
+        { id: 'plan-9', title: typeof t === 'function' ? t('demo.planCollabCheckinTitle') : 'Collaborator 1-on-1 Check-in', date: dateThu, startTime: '14:30', endTime: '15:15', duration: 45, type: 'sync', collaborator: 'collab-3' },
+        { id: 'plan-10', title: typeof t === 'function' ? t('demo.planPrepTitle') : 'Sprint Retrospective Prep', date: dateFri, startTime: '11:00', endTime: '12:00', duration: 60, type: 'prep', workstream: 'Product Launch' },
+        { id: 'plan-11', title: typeof t === 'function' ? t('demo.planWeeklyRetroTitle') : 'Weekly Retrospective & Review', date: dateFri, startTime: '15:30', endTime: '16:30', duration: 60, type: 'sync', collaborator: 'collab-1' }
+      ]
+    }
+  };
+
+  return createVirtualDirectoryHandle('Demo Workspace (Sandbox)', initialFiles);
+}
+window.createDemoVirtualDirectoryHandle = createDemoVirtualDirectoryHandle;
+
+window.startDemoWorkspaceFromLanding = async function() {
+  try {
+    const demoHandle = createDemoVirtualDirectoryHandle();
+    if (typeof mountFolder === 'function') {
+      await mountFolder(demoHandle);
+    }
+    const msg = typeof t === 'function' ? t('landing.demoWorkspaceToast') : 'Demo workspace loaded! Explore sample notes, tasks, and planner.';
+    if (typeof showToast === 'function') {
+      showToast(msg);
+    } else if (typeof toast === 'function') {
+      toast(msg);
+    }
+  } catch (err) {
+    console.error('Failed to launch demo workspace:', err);
+    if (typeof toast === 'function') toast('Failed to launch demo workspace', true);
   }
 };
 

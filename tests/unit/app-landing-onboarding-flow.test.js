@@ -170,4 +170,81 @@ describe('Landing Screen Onboarding & Language Flow', () => {
       expect(localBtn.textContent).toBe('Ouvrir un dossier local');
     });
   });
+
+  describe('Interactive Demo Workspace Sandbox', () => {
+    it('creates an in-memory virtual directory handle with standard FileSystemDirectoryHandle methods', async () => {
+      expect(typeof createDemoVirtualDirectoryHandle).toBe('function');
+      const demoHandle = createDemoVirtualDirectoryHandle();
+      expect(demoHandle).toBeTruthy();
+      expect(demoHandle.kind).toBe('directory');
+      expect(demoHandle.name).toBe('Demo Workspace (Sandbox)');
+
+      // Verify getFileHandle and file reading
+      const settingsFile = await demoHandle.getFileHandle('settings.json');
+      expect(settingsFile).toBeTruthy();
+      expect(settingsFile.kind).toBe('file');
+      const file = await settingsFile.getFile();
+      const content = await file.text();
+      const parsed = JSON.parse(content);
+      expect(parsed.firstRunSetupDone).toBe(true);
+      expect(parsed.workstreams.some(w => w.name === 'Quality & Bug Fixes')).toBe(true);
+
+      // Verify notes manifest contains current week dates and bug tracking note
+      const notesDir = await demoHandle.getDirectoryHandle('notes');
+      expect(notesDir).toBeTruthy();
+      expect(notesDir.kind).toBe('directory');
+      const manifestFile = await notesDir.getFileHandle('manifest.json');
+      const manifestContent = await (await manifestFile.getFile()).text();
+      const manifest = JSON.parse(manifestContent);
+      expect(Array.isArray(manifest)).toBe(true);
+      expect(manifest.length).toBeGreaterThanOrEqual(5);
+
+      const noteIds = manifest.map(n => n.id);
+      expect(noteIds).toContain('welcome-demo-note');
+      expect(noteIds).toContain('strategy-roadmap-note');
+      expect(noteIds).toContain('bug-tracking-note');
+      expect(noteIds).toContain('weekly-sync-notes');
+      expect(noteIds).toContain('security-zero-knowledge');
+
+      // Verify dates are aligned to current week (YYYY-MM-DD)
+      const now = new Date();
+      const year = now.getFullYear();
+      manifest.forEach(n => {
+        expect(n.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(n.date.startsWith(String(year))).toBe(true);
+      });
+
+      // Verify planner events are pre-populated for current week
+      const plannerFile = await demoHandle.getFileHandle('planner.json');
+      const plannerData = JSON.parse(await (await plannerFile.getFile()).text());
+      expect(Array.isArray(plannerData.events)).toBe(true);
+      expect(plannerData.events.length).toBe(11);
+      plannerData.events.forEach(ev => {
+        expect(ev.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(ev.date.startsWith(String(year))).toBe(true);
+        expect(ev.startTime).toBeTruthy();
+        expect(ev.endTime).toBeTruthy();
+      });
+
+      // Verify writable stream simulation
+      const writable = await settingsFile.createWritable();
+      await writable.write('{"updated":true}');
+      await writable.close();
+      const updatedFile = await settingsFile.getFile();
+      expect(await updatedFile.text()).toBe('{"updated":true}');
+    });
+
+    it('mounts demo workspace via startDemoWorkspaceFromLanding', async () => {
+      let mountedHandle = null;
+      window.mountFolder = async (h) => { mountedHandle = h; };
+      let toastShown = false;
+      window.showToast = () => { toastShown = true; };
+
+      await startDemoWorkspaceFromLanding();
+      expect(mountedHandle).toBeTruthy();
+      expect(mountedHandle.name).toBe('Demo Workspace (Sandbox)');
+      expect(toastShown).toBe(true);
+    });
+  });
 });
+
