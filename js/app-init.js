@@ -840,8 +840,7 @@ function updateCloudSyncUI(statusObj) {
   const userInfoSec = document.getElementById('prefs-sec-user-info');
   if (userInfoSec) {
     const isFirebase = status.engine === 'firebase';
-    const isSyncTab = (typeof activePrefsTab !== 'undefined' ? activePrefsTab === 'sync' : true);
-    userInfoSec.style.display = (isFirebase && isSyncTab) ? 'block' : 'none';
+    userInfoSec.style.display = isFirebase ? 'block' : 'none';
 
     if (isFirebase) {
       const avatarEl = document.getElementById('prefs-user-avatar');
