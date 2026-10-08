@@ -1335,7 +1335,20 @@ async function submitCloudSyncSetup() {
     if (mode === 'signin') {
       // 1. Authenticate with Firebase Email & Password
       if (window.FirebaseSyncService?.signInWithEmail) {
-        await window.FirebaseSyncService.signInWithEmail(email, authPass);
+        try {
+          await window.FirebaseSyncService.signInWithEmail(email, authPass);
+        } catch (authErr) {
+          const errMsg = String(authErr?.message || authErr?.code || authErr || '');
+          if ((errMsg.includes('user-not-found') || errMsg.includes('auth/invalid-credential')) && window.FirebaseSyncService?.signUpWithEmail) {
+            try {
+              await window.FirebaseSyncService.signUpWithEmail(email, authPass);
+            } catch {
+              throw authErr;
+            }
+          } else {
+            throw authErr;
+          }
+        }
       }
 
       // 2. Unlock or initialize vault with Master Passphrase
@@ -1400,7 +1413,16 @@ async function submitCloudSyncSetup() {
     } else if (mode === 'signup') {
       // 1. Create account with Firebase Email & Password
       if (window.FirebaseSyncService?.signUpWithEmail) {
-        await window.FirebaseSyncService.signUpWithEmail(email, authPass);
+        try {
+          await window.FirebaseSyncService.signUpWithEmail(email, authPass);
+        } catch (authErr) {
+          const errMsg = String(authErr?.message || authErr?.code || authErr || '');
+          if (errMsg.includes('email-already-in-use') && window.FirebaseSyncService?.signInWithEmail) {
+            await window.FirebaseSyncService.signInWithEmail(email, authPass);
+          } else {
+            throw authErr;
+          }
+        }
       }
 
       // 2. Initialize vault & migrate local notes
@@ -3543,7 +3565,7 @@ function openCustomFirebaseSetupFromLanding() {
   } else if (typeof window.openModal === 'function') {
     window.openModal('modal-cloud-sync-setup');
   }
-  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signin');
+  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signup');
   const body = document.getElementById('sync-custom-firebase-body');
   if (body) body.style.display = 'block';
   if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
@@ -3558,12 +3580,12 @@ function openManagedFirebaseSetupFromLanding() {
   } else if (typeof window.openModal === 'function') {
     window.openModal('modal-cloud-sync-setup');
   }
-  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signin');
+  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signup');
   const body = document.getElementById('sync-custom-firebase-body');
   if (body) body.style.display = 'none';
   if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
-  const pass = document.getElementById('sync-setup-passphrase');
-  if (pass) setTimeout(() => pass.focus(), 150);
+  const emailInput = document.getElementById('sync-setup-email');
+  if (emailInput) setTimeout(() => emailInput.focus(), 150);
 }
 window.openManagedFirebaseSetupFromLanding = openManagedFirebaseSetupFromLanding;
 
@@ -3593,11 +3615,11 @@ function renderBrowserCompatibilityOptions() {
 
   const tB_Title = typeof t === 'function' ? t('landing.optionOwnFirebaseTitle') : 'Connect Own Firebase';
   const tB_Desc = typeof t === 'function' ? t('landing.optionOwnFirebaseDesc') : '100% Free on Google\'s Spark tier. Bring your own Firebase project with client-side AES-256-GCM Zero-Knowledge encryption.';
-  const tB_Btn = typeof t === 'function' ? t('landing.optionOwnFirebaseBtn') : 'Connect Own Firebase (Free)';
+  const tB_Btn = typeof t === 'function' ? t('landing.optionOwnFirebaseBtn') : 'Connect Own Firebase';
 
   const tC_Title = typeof t === 'function' ? t('landing.optionManagedFirebaseTitle') : 'Etienne\'s Managed Cloud Vault';
   const tC_Desc = typeof t === 'function' ? t('landing.optionManagedFirebaseDesc') : 'Turnkey managed cloud infrastructure with Zero-Knowledge E2EE encryption, automated sync & backups (Paid subscription service).';
-  const tC_Btn = typeof t === 'function' ? t('landing.optionManagedFirebaseBtn') : 'Use Managed Cloud Vault (Paid Plan)';
+  const tC_Btn = typeof t === 'function' ? t('landing.optionManagedFirebaseBtn') : 'Connect Cloud Vault';
 
   const badgeFree = typeof t === 'function' ? t('landing.badgeFree') : 'Free';
   const badgePaid = typeof t === 'function' ? t('landing.badgeFreePreview') : 'Free Preview';
