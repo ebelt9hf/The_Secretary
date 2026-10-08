@@ -1575,7 +1575,17 @@ const FirebaseSyncService = {
     }
   },
 
-  async linkExistingVault(syncCode, passphrase, config = {}) {
+  async linkExistingVault(syncCode, passphrase, config = {}, onProgress = null) {
+    if (typeof config === 'function') {
+      onProgress = config;
+      config = {};
+    }
+    const report = (msg, pct) => {
+      if (typeof onProgress === 'function') {
+        try { onProgress(msg, pct); } catch (e) {}
+      }
+    };
+
     if (this.state.status === this.STATUS.DECLINED) {
       throw new Error(typeof t === 'function' ? t('sync.statusDeclinedTooltip') : 'Cloud sync is disabled because your Secretary version is below the minimum supported version.');
     }
@@ -1589,6 +1599,7 @@ const FirebaseSyncService = {
     const cleanCode = syncCode.trim().toUpperCase();
     this.setSyncCode(cleanCode);
 
+    report(typeof t === 'function' ? t('sync.linkingConnecting') : 'Connecting to cloud vault...', 15);
     await this.ensureBridgeInitialized(config);
     const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
     if (!bridge) {
@@ -1596,7 +1607,14 @@ const FirebaseSyncService = {
     }
 
     // 1. Fetch remote vault metadata
-    const remoteMeta = await bridge.getVaultMeta(cleanCode);
+    report(typeof t === 'function' ? t('sync.linkingVerifying') : 'Verifying sync code and master passphrase...', 35);
+    const timeoutMsg = typeof t === 'function'
+      ? t('sync.networkTimeout')
+      : 'Connection timed out. Please verify your internet connection or Firebase configuration.';
+    const remoteMeta = await Promise.race([
+      bridge.getVaultMeta(cleanCode),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMsg)), 15000))
+    ]);
     if (!remoteMeta || !remoteMeta.salt) {
       throw new Error(typeof t === 'function' ? t('sync.syncCodeNotFound') : 'Sync Code not found in cloud. Please check the code.');
     }
@@ -1609,6 +1627,7 @@ const FirebaseSyncService = {
     }
 
     // 2. Verify master passphrase against remote canary
+    report(typeof t === 'function' ? t('sync.linkingVerifying') : 'Verifying sync code and master passphrase...', 50);
     const check = await CryptoEngine.verifyPassphrase(passphrase, remoteMeta);
     if (!check.valid || !check.key) {
       throw new Error(typeof t === 'function' ? t('sync.incorrectPassphrase') : 'Incorrect master passphrase');
@@ -1632,10 +1651,16 @@ const FirebaseSyncService = {
     }
 
     // 3. Fetch all remote encrypted notes
-    const remoteNotes = await bridge.getAllNotes(cleanCode);
+    report(typeof t === 'function' ? t('sync.linkingDownloading') : 'Downloading and decrypting notes...', 65);
+    const remoteNotes = await Promise.race([
+      bridge.getAllNotes(cleanCode),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMsg)), 25000))
+    ]);
     let linkedCount = 0;
     if (Array.isArray(remoteNotes)) {
-      for (const rDoc of remoteNotes) {
+      const total = remoteNotes.length;
+      for (let i = 0; i < total; i++) {
+        const rDoc = remoteNotes[i];
         if (!rDoc || !rDoc.id) continue;
         const cleanId = this._normalizeId(rDoc.id);
         if (!this.validateSchemaCompatibility(rDoc)) {
@@ -1662,9 +1687,14 @@ const FirebaseSyncService = {
             console.warn(`Failed to decrypt note ${cleanId}:`, e);
           }
         }
+        if (total > 0 && i % 3 === 0) {
+          const pct = Math.min(92, Math.round(65 + (i / total) * 25));
+          report(typeof t === 'function' ? t('sync.linkingDownloading') : 'Downloading and decrypting notes...', pct);
+        }
       }
     }
 
+    report(typeof t === 'function' ? t('sync.linkingFinalizing') : 'Finalizing synchronization...', 95);
     // Persist manifest cache
     try {
       await VaultIDBStorage.saveMeta('manifest_cache', Array.from(this.state.manifestCache.values()));
@@ -1678,6 +1708,7 @@ const FirebaseSyncService = {
     }
 
     this._notifyStatus('Linked to vault');
+    report(typeof t === 'function' ? t('sync.linkSuccess') : 'Device linked successfully! Encrypted notes synchronized.', 100);
     return { linkedCount, syncCode: cleanCode };
   },
 

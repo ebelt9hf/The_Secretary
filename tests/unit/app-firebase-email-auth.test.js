@@ -332,7 +332,12 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
     };
 
     await globalThis.submitCloudSyncSetup();
-    expect(window.FirebaseSyncService.linkExistingVault).toHaveBeenCalledWith('SEC-TEST-9999', 'super-secret-passphrase');
+    expect(window.FirebaseSyncService.linkExistingVault).toHaveBeenCalledWith(
+      'SEC-TEST-9999',
+      'super-secret-passphrase',
+      expect.any(Object),
+      expect.any(Function)
+    );
     expect(toastSpy).toHaveBeenCalledWith('sync.setupFailed: Sync Code not found in cloud', true);
   });
 
@@ -359,7 +364,45 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
 
     expect(window.FirebaseSyncService.parseFirebaseConfigString).toHaveBeenCalledWith('{"apiKey": "AIzaSyCustomKey", "projectId": "custom-vault"}');
     expect(window.FirebaseSyncService.setCustomFirebaseConfig).toHaveBeenCalledWith({ apiKey: 'AIzaSyCustomKey', projectId: 'custom-vault' });
-    expect(window.FirebaseSyncService.linkExistingVault).toHaveBeenCalledWith('SEC-CUSTOM-111', 'valid-passphrase-123');
+    expect(window.FirebaseSyncService.linkExistingVault).toHaveBeenCalledWith(
+      'SEC-CUSTOM-111',
+      'valid-passphrase-123',
+      expect.any(Object),
+      expect.any(Function)
+    );
+  });
+
+  it('submitCloudSyncSetup displays migration progress dialog during link operation', async () => {
+    const dialogUpdateSpy = vi.fn();
+    const dialogCloseSpy = vi.fn();
+    globalThis.showMigrationProgressDialog = vi.fn().mockReturnValue({
+      update: dialogUpdateSpy,
+      close: dialogCloseSpy
+    });
+
+    window.FirebaseSyncService = {
+      linkExistingVault: vi.fn().mockImplementation(async (code, pass, config, onProgress) => {
+        if (typeof onProgress === 'function') {
+          onProgress('Connecting...', 20);
+          onProgress('Downloading...', 70);
+        }
+        return { linkedCount: 5, syncCode: code };
+      })
+    };
+    globalThis.closeModal = vi.fn();
+    globalThis.updateCloudSyncUI = vi.fn();
+    window.showToast = vi.fn();
+
+    document.getElementById('btn-submit-cloud-sync').setAttribute('data-mode', 'link');
+    document.getElementById('sync-setup-sync-code').value = 'SEC-PROG-123';
+    document.getElementById('sync-setup-passphrase').value = 'valid-passphrase-123';
+
+    await globalThis.submitCloudSyncSetup();
+
+    expect(globalThis.showMigrationProgressDialog).toHaveBeenCalled();
+    expect(dialogUpdateSpy).toHaveBeenCalledWith('Connecting...', 20);
+    expect(dialogUpdateSpy).toHaveBeenCalledWith('Downloading...', 70);
+    expect(dialogCloseSpy).toHaveBeenCalled();
   });
 });
 

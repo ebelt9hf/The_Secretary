@@ -200,17 +200,23 @@ export const FirebaseBridge = {
     return true;
   },
 
-  async getVaultMeta(userId) {
+  async getVaultMeta(userId, timeoutMs = 15000) {
     if (!this.db || !userId) return null;
     const metaRef = ref(this.db, `users/${userId}/vault_meta`);
-    const snapshot = await get(metaRef);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Firebase network request timed out while fetching vault metadata. Please check your network connection.')), timeoutMs);
+    });
+    const snapshot = await Promise.race([get(metaRef), timeoutPromise]);
     return snapshot.exists() ? snapshot.val() : null;
   },
 
-  async getAllNotes(userId) {
+  async getAllNotes(userId, timeoutMs = 25000) {
     if (!this.db || !userId) return [];
     const vaultRef = ref(this.db, `users/${userId}/vault`);
-    const snapshot = await get(vaultRef);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Firebase network request timed out while fetching notes. Please check your network connection.')), timeoutMs);
+    });
+    const snapshot = await Promise.race([get(vaultRef), timeoutPromise]);
     if (!snapshot.exists()) return [];
     const data = snapshot.val();
     return Object.entries(data).map(([id, val]) => {
