@@ -3527,7 +3527,7 @@ const FirebaseSyncService = {
     const stashDocs = await this.getAllDocs('stash');
     const topicMemoriesIndex = await this.getDoc('topic_memories', 'index');
     const topicDocs = await this.getAllDocs('topic_memories');
-    const topicMemoriesList = (topicDocs || []).filter(d => d.id !== 'index').map(d => ({ key: d.id, data: d }));
+    const topicMemoriesList = (topicDocs || []).filter(d => d.id !== 'index').map(d => ({ key: d.id, data: d.data !== undefined ? d.data : d }));
     const historyDocs = await this.getAllDocs('history');
     const settings = await this.getDoc('settings', 'config');
 

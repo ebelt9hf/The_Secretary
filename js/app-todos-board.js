@@ -1327,14 +1327,15 @@ async function populateTodoWorkstreamDropdown(selectedWorkstream = '') {
     : [];
 
   const currentWs = String(selectedWorkstream || '').trim();
-  if (currentWs && !wsOptions.some(w => w.toLowerCase() === currentWs.toLowerCase())) {
+  const matchedOpt = currentWs ? wsOptions.find(w => w.toLowerCase() === currentWs.toLowerCase()) : null;
+  if (currentWs && !matchedOpt) {
     wsOptions = [currentWs, ...wsOptions];
   }
 
   const defaultLabel = t('todo.unassignedWorkstream') || '-- None / Unassigned --';
   wsSel.innerHTML = `<option value="">${escH(defaultLabel)}</option>` +
     wsOptions.map(name => `<option value="${escA(name)}">${escH(name)}</option>`).join('');
-  wsSel.value = currentWs;
+  wsSel.value = matchedOpt || currentWs;
 }
 window.populateTodoWorkstreamDropdown = populateTodoWorkstreamDropdown;
 

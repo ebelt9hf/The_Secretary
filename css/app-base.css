@@ -357,7 +357,7 @@ button:focus-visible {
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
   border-radius: 20px;
-  padding: 2.25rem 2.25rem;
+  padding: 2rem 2.25rem;
   max-width: 480px;
   width: calc(100% - 2rem);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent);
@@ -367,7 +367,12 @@ button:focus-visible {
   gap: 1.1rem;
   text-align: center;
   animation: heroCardEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-  transition: transform var(--transition), box-shadow var(--transition), max-width 0.3s ease;
+  transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform var(--transition), box-shadow var(--transition);
+}
+
+#screen-connect-card.is-setup-step {
+  max-width: 860px;
+  width: min(860px, calc(100% - 2rem));
 }
 
 #screen-connect-card.has-browser-options {
@@ -378,6 +383,86 @@ button:focus-visible {
 @keyframes heroCardEntrance {
   0% { opacity: 0; transform: translateY(16px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Landing Topbar & Language Switcher ── */
+.landing-topbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  margin-bottom: -0.25rem;
+}
+.landing-btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--text) 5%, var(--card-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.landing-btn-back:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 10%, var(--card-bg-alt));
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: translateX(-2px);
+}
+.landing-lang-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  background: color-mix(in srgb, var(--text) 5%, var(--card-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 999px;
+  padding: 3px 8px 3px 10px;
+  transition: all 0.2s ease;
+}
+.landing-lang-wrapper:hover,
+.landing-lang-wrapper:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--card-bg-alt));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.landing-lang-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.landing-lang-select {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  padding: 2px 4px;
+}
+.landing-lang-select option {
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+/* ── Step Views ── */
+.landing-step-view {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  animation: stepEntrance 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes stepEntrance {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .landing-logo-wrap {
@@ -470,8 +555,235 @@ button:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
+/* Primary Hero Button on Step 1 */
+.landing-btn-primary-start {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 75%, #1e1b4b) 100%);
+  color: #ffffff;
+  border: 1px solid color-mix(in srgb, #ffffff 28%, transparent);
+  border-radius: var(--radius-md);
+  padding: 0.82rem 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  font-size: 0.94rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent) 38%, transparent);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+.landing-btn-primary-start:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 50%, transparent);
+  filter: brightness(1.05);
+}
+.landing-btn-primary-start:active {
+  transform: translateY(0);
+}
+
+/* ── Step 2: Storage Setup Grid & Cards ── */
+.landing-step-setup {
+  text-align: center;
+  gap: 1.25rem;
+}
+.landing-setup-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.landing-setup-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.landing-setup-subtitle {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  max-width: 480px;
+  line-height: 1.45;
+  margin: 0;
+}
+.landing-storage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+@media (max-width: 768px) {
+  .landing-storage-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.landing-storage-card {
+  background: color-mix(in srgb, var(--text) 3%, var(--card-bg-alt));
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  border-radius: 16px;
+  padding: 1.25rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+  gap: 0.9rem;
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.landing-storage-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  background: color-mix(in srgb, var(--text) 5%, var(--card-bg-alt));
+}
+.landing-storage-card.is-recommended {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg-alt));
+}
+.landing-card-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+}
+.landing-card-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 8%, var(--card-bg));
+  color: var(--text-muted);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+.landing-card-badge.is-primary {
+  background: color-mix(in srgb, var(--accent) 15%, var(--card-bg));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.landing-card-badge.is-cloud {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.landing-card-badge.is-demo {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.landing-card-icon-wrap {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 8%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+.landing-card-icon-wrap.is-primary {
+  background: color-mix(in srgb, var(--accent) 16%, var(--card-bg));
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.landing-card-icon-wrap.is-cloud {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.28);
+}
+.landing-card-icon-wrap.is-demo {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.28);
+}
+.landing-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+.landing-card-body h3 {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.landing-card-body p {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  margin: 0;
+}
+.landing-card-footer {
+  width: 100%;
+}
+.landing-card-btn {
+  width: 100%;
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+.landing-card-btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 80%, #1e1b4b) 100%);
+  color: #fff;
+  border: 1px solid color-mix(in srgb, #fff 24%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.landing-card-btn-primary:hover {
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent);
+  filter: brightness(1.05);
+}
+.landing-card-btn-cloud {
+  background: color-mix(in srgb, #10b981 12%, var(--card-bg));
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.landing-card-btn-cloud:hover {
+  background: #10b981;
+  color: #fff;
+  border-color: #10b981;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+.landing-card-btn-demo {
+  background: color-mix(in srgb, #f59e0b 12%, var(--card-bg));
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.landing-card-btn-demo:hover {
+  background: #d97706;
+  color: #fff;
+  border-color: #d97706;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+.landing-setup-footer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+
 #screen-connect.loading { cursor: wait; }
 #screen-connect.loading .landing-actions-container,
+#screen-connect.loading .landing-step-view,
 #screen-connect.loading .btn-primary,
 #screen-connect.loading .btn-secondary,
 #screen-connect.loading .landing-divider { display: none !important; }

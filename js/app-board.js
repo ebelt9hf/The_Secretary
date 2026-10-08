@@ -1001,14 +1001,61 @@ window.getNoteWorkstreamName = getNoteWorkstreamName;
 if (typeof globalThis !== 'undefined') globalThis.getNoteWorkstreamName = getNoteWorkstreamName;
 
 function getKnownWorkstreamsList(notes = []) {
-  const wsSet = new Set();
+  const canonicalMap = new Map(); // normalizedKey -> { displayName, score, pinned }
   const archivedSet = new Set();
   const ignoredSet = new Set(['other', 'autre', '(untagged)', '*', 'uncategorized', 'non classé', 'non catégorisé']);
+
+  const normalizeKey = (name) => {
+    if (!name || typeof name !== 'string') return '';
+    const clean = name.trim();
+    if (!clean) return '';
+    if (typeof sanitizeTopicMemoryKey === 'function') {
+      const s = sanitizeTopicMemoryKey(clean);
+      if (s) return s;
+    }
+    return clean.toLowerCase().replace(/[\s\-_]+/g, '_');
+  };
+
+  const getScore = (name, sourcePriority = 1) => {
+    let score = sourcePriority * 100;
+    if (!name) return score;
+    // Prefer human-readable formatted names with spaces over underscores/dashes
+    if (name.includes(' ') && !name.includes('_')) score += 25;
+    // Prefer Title Case / Capitalized letters over all-lowercase
+    if (/[A-Z]/.test(name)) score += 15;
+    if (/[a-z]/.test(name) && /[A-Z]/.test(name)) score += 10;
+    if (name.includes('_') || name.includes('-')) score -= 20;
+    if (name === name.toLowerCase()) score -= 10;
+    return score;
+  };
 
   const isValidWs = (name) => {
     if (!name || typeof name !== 'string') return false;
     const clean = name.trim();
-    return clean.length > 0 && !ignoredSet.has(clean.toLowerCase()) && !archivedSet.has(clean.toLowerCase());
+    const norm = normalizeKey(clean);
+    return clean.length > 0 && !ignoredSet.has(clean.toLowerCase()) && !ignoredSet.has(norm) && !archivedSet.has(clean.toLowerCase()) && !archivedSet.has(norm);
+  };
+
+  const addCandidate = (rawName, priority = 1, pinned = false) => {
+    if (!rawName || typeof rawName !== 'string') return;
+    const clean = rawName.trim();
+    if (!clean) return;
+    const norm = normalizeKey(clean);
+    if (!norm || ignoredSet.has(clean.toLowerCase()) || ignoredSet.has(norm) || archivedSet.has(clean.toLowerCase()) || archivedSet.has(norm)) {
+      return;
+    }
+
+    const score = getScore(clean, priority);
+    const existing = canonicalMap.get(norm);
+    if (!existing || score > existing.score) {
+      canonicalMap.set(norm, {
+        displayName: clean,
+        score,
+        pinned: pinned || (existing ? existing.pinned : false)
+      });
+    } else if (pinned && existing) {
+      existing.pinned = true;
+    }
   };
 
   // 1. In-memory topic memories cache or fallback to localStorage (Authoritative source: Workstreams tab)
@@ -1017,13 +1064,16 @@ function getKnownWorkstreamsList(notes = []) {
     hasAuthoritativeIndex = true;
     for (const t of _topicMemoriesIndexCache.topics) {
       if (t) {
-        const name = (t.topicName || t.key || '').trim();
-        if (name) {
-          if (t.status === 'archived') {
-            archivedSet.add(name.toLowerCase());
-          } else if (isValidWs(name)) {
-            wsSet.add(name);
-          }
+        const rawKey = (t.key || '').trim();
+        const rawName = (t.topicName || rawKey).trim();
+        const normKey = normalizeKey(rawKey || rawName);
+        if (t.status === 'archived') {
+          if (normKey) archivedSet.add(normKey);
+          if (rawName) archivedSet.add(rawName.toLowerCase());
+          if (rawKey) archivedSet.add(rawKey.toLowerCase());
+          if (normKey) canonicalMap.delete(normKey);
+        } else if (rawName && isValidWs(rawName)) {
+          addCandidate(rawName, 4, !!t.pinned);
         }
       }
     }
@@ -1039,13 +1089,16 @@ function getKnownWorkstreamsList(notes = []) {
           }
           for (const t of parsed.topics) {
             if (t) {
-              const name = (t.topicName || t.key || '').trim();
-              if (name) {
-                if (t.status === 'archived') {
-                  archivedSet.add(name.toLowerCase());
-                } else if (isValidWs(name)) {
-                  wsSet.add(name);
-                }
+              const rawKey = (t.key || '').trim();
+              const rawName = (t.topicName || rawKey).trim();
+              const normKey = normalizeKey(rawKey || rawName);
+              if (t.status === 'archived') {
+                if (normKey) archivedSet.add(normKey);
+                if (rawName) archivedSet.add(rawName.toLowerCase());
+                if (rawKey) archivedSet.add(rawKey.toLowerCase());
+                if (normKey) canonicalMap.delete(normKey);
+              } else if (rawName && isValidWs(rawName)) {
+                addCandidate(rawName, 4, !!t.pinned);
               }
             }
           }
@@ -1059,20 +1112,23 @@ function getKnownWorkstreamsList(notes = []) {
     hasAuthoritativeIndex = true;
     for (const [k, mem] of _topicMemoryFileCache.entries()) {
       if (mem) {
-        const name = (mem.topicName || k || '').trim();
-        if (name) {
-          if (mem.status === 'archived') {
-            archivedSet.add(name.toLowerCase());
-          } else if (isValidWs(name)) {
-            wsSet.add(name);
-          }
+        const rawKey = (mem.key || k || '').trim();
+        const rawName = (mem.topicName || rawKey).trim();
+        const normKey = normalizeKey(rawKey || rawName);
+        if (mem.status === 'archived') {
+          if (normKey) archivedSet.add(normKey);
+          if (rawName) archivedSet.add(rawName.toLowerCase());
+          if (rawKey) archivedSet.add(rawKey.toLowerCase());
+          if (normKey) canonicalMap.delete(normKey);
+        } else if (rawName && isValidWs(rawName)) {
+          addCandidate(rawName, 3, !!mem.pinned);
         }
       }
     }
   }
 
-  // 3. Fallback candidate notes ONLY if no authoritative topic memories index exists at all
-  if (!hasAuthoritativeIndex && wsSet.size === 0) {
+  // 3. Fallback candidate notes and tasks ONLY if no authoritative topic memories index exists at all
+  if (!hasAuthoritativeIndex && canonicalMap.size === 0) {
     const candidateNotes = (Array.isArray(notes) && notes.length > 0)
       ? notes
       : ((typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : []);
@@ -1082,22 +1138,40 @@ function getKnownWorkstreamsList(notes = []) {
       if (typeof n.workstream === 'string' && n.workstream.trim()) {
         n.workstream.split(',').forEach(w => {
           const trimmed = w.trim();
-          if (isValidWs(trimmed)) wsSet.add(trimmed);
+          if (isValidWs(trimmed)) addCandidate(trimmed, 2);
         });
       }
       if (Array.isArray(n.workstreams)) {
         n.workstreams.forEach(w => {
           const trimmed = String(w || '').trim();
-          if (isValidWs(trimmed)) wsSet.add(trimmed);
+          if (isValidWs(trimmed)) addCandidate(trimmed, 2);
+        });
+      }
+    }
+
+    const candidateTodos = (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest))
+      ? todosManifest
+      : ((typeof window !== 'undefined' && Array.isArray(window.todosManifest)) ? window.todosManifest : []);
+
+    for (const todo of candidateTodos) {
+      if (!todo) continue;
+      if (typeof todo.workstream === 'string' && todo.workstream.trim()) {
+        const trimmed = todo.workstream.trim();
+        if (isValidWs(trimmed)) addCandidate(trimmed, 2);
+      }
+      if (Array.isArray(todo.major_topic_tags)) {
+        todo.major_topic_tags.forEach(tag => {
+          const trimmed = String(tag || '').trim();
+          if (isValidWs(trimmed)) addCandidate(trimmed, 2);
         });
       }
     }
   }
 
   // Ensure all archived or ignored entries are pruned
-  for (const item of wsSet) {
-    if (!isValidWs(item)) {
-      wsSet.delete(item);
+  for (const [normKey, entry] of canonicalMap.entries()) {
+    if (!isValidWs(entry.displayName) || archivedSet.has(normKey) || ignoredSet.has(normKey)) {
+      canonicalMap.delete(normKey);
     }
   }
 
@@ -1125,15 +1199,22 @@ function getKnownWorkstreamsList(notes = []) {
         return new Set();
       })();
 
-  return [...wsSet].filter(Boolean).sort((a, b) => {
-    const idxA = customOrder.indexOf(a);
-    const idxB = customOrder.indexOf(b);
+  const resultList = Array.from(canonicalMap.values()).map(v => v.displayName).filter(Boolean);
+
+  return resultList.sort((a, b) => {
+    const normA = normalizeKey(a);
+    const normB = normalizeKey(b);
+
+    const idxA = customOrder.findIndex(c => normalizeKey(c) === normA || c === a);
+    const idxB = customOrder.findIndex(c => normalizeKey(c) === normB || c === b);
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
     if (idxA !== -1) return -1;
     if (idxB !== -1) return 1;
 
-    const isPinnedA = favs.has(a) || (typeof _topicMemoriesIndexCache !== 'undefined' && _topicMemoriesIndexCache?.topics?.find(t => (t.topicName === a || t.key === a) && t.status !== 'archived')?.pinned);
-    const isPinnedB = favs.has(b) || (typeof _topicMemoriesIndexCache !== 'undefined' && _topicMemoriesIndexCache?.topics?.find(t => (t.topicName === b || t.key === b) && t.status !== 'archived')?.pinned);
+    const entryA = canonicalMap.get(normA);
+    const entryB = canonicalMap.get(normB);
+    const isPinnedA = favs.has(a) || !!entryA?.pinned;
+    const isPinnedB = favs.has(b) || !!entryB?.pinned;
     if (isPinnedA && !isPinnedB) return -1;
     if (!isPinnedA && isPinnedB) return 1;
 

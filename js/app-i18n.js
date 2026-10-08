@@ -281,9 +281,22 @@ function setSelectOptionText(selector, values) {
 }
 
 function syncLanguageSelector() {
+  const currentLang = getAppLanguage();
+
+  const landingSelect = document.getElementById('landing-language-select');
+  if (landingSelect) {
+    landingSelect.innerHTML = '';
+    for (const [code, name] of Object.entries(APP_LANGUAGE_NAMES)) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = name;
+      landingSelect.appendChild(opt);
+    }
+    landingSelect.value = currentLang;
+  }
+
   const select = document.getElementById('prefs-language');
   if (select) {
-    const currentLang = getAppLanguage();
     select.innerHTML = '';
     for (const [code, name] of Object.entries(APP_LANGUAGE_NAMES)) {
       const opt = document.createElement('option');
@@ -371,9 +384,9 @@ function applyLocalizedUI() {
   const resumeWrap = document.getElementById('landing-resume-wrap');
   const isResumeVisible = resumeWrap && resumeWrap.style.display !== 'none';
   if (openText) {
-    openText.textContent = isResumeVisible ? (t('landing.openDifferent') || t('landing.open')) : t('landing.open');
+    openText.textContent = isResumeVisible ? (t('landing.openDifferent') || t('landing.open')) : (t('landing.localOptionBtn') || t('landing.open'));
   }
-  setElementTitle('#btn-open-folder', t('landing.openTitle'));
+  setElementTitle('#btn-open-folder', t('landing.localOptionTooltip') || t('landing.openTitle'));
   setElementText('#screen-connect > p:nth-of-type(3)', t('landing.chromeOnly'));
   const versionHintEl = document.getElementById('connect-version-hint');
   if (versionHintEl) {
@@ -934,3 +947,11 @@ function setAppLanguage(lang, { persist = true } = {}) {
   applyLocalizedUI();
   return normalized;
 }
+
+const setLanguage = setAppLanguage;
+
+if (typeof window !== 'undefined') {
+  window.setAppLanguage = setAppLanguage;
+  window.setLanguage = setLanguage;
+}
+

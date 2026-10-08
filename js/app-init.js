@@ -331,7 +331,7 @@ let settings = {
     colors: {}
   },
   folder: { last: null },
-  language: 'fr',
+  language: (typeof getBrowserLanguageCode === 'function' ? getBrowserLanguageCode() : 'en'),
   workingLanguage: 'en',
   ai: {
     enabled: false,
@@ -396,7 +396,8 @@ function loadLocalSettings() {
       const parsed = JSON.parse(raw);
       deepMerge(settings, parsed);
     }
-    settings.language = normalizeLanguageCode(settings.language || appLanguage || 'fr');
+    const defaultLang = (typeof getBrowserLanguageCode === 'function' ? getBrowserLanguageCode() : 'en');
+    settings.language = normalizeLanguageCode(settings.language || appLanguage || defaultLang);
     appLanguage = settings.language;
     plannerWorkingDays = settings.ui?.workingDays || [1, 2, 3, 4, 5];
     if (!raw) saveLocalSettings();
@@ -640,7 +641,8 @@ function applySettings() {
     plannerWorkingDays = settings.ui.workingDays;
     try { localStorage.setItem('secretaryWorkingDays', JSON.stringify(plannerWorkingDays)); } catch(e) {}
   }
-  appLanguage = normalizeLanguageCode(settings.language || appLanguage || 'fr');
+  const defaultLang = (typeof getBrowserLanguageCode === 'function' ? getBrowserLanguageCode() : 'en');
+  appLanguage = normalizeLanguageCode(settings.language || appLanguage || defaultLang);
   applyLocalizedUI();
 }
 
@@ -2529,7 +2531,7 @@ function renderPrefs() {
   const accentPresetEl = document.getElementById('prefs-accent-preset'); if (accentPresetEl) accentPresetEl.value = accentVal;
 
   const usernameEl = document.getElementById('prefs-username'); if (usernameEl) usernameEl.value = settings.username || '';
-  const langSel = document.getElementById('prefs-language'); if (langSel) langSel.value = settings.language || 'fr';
+  const langSel = document.getElementById('prefs-language'); if (langSel) langSel.value = settings.language || (typeof getBrowserLanguageCode === 'function' ? getBrowserLanguageCode() : 'en');
   const workingLangSel = document.getElementById('prefs-working-language'); if (workingLangSel) workingLangSel.value = settings.workingLanguage || 'en';
   const laneSortSel = document.getElementById('prefs-lane-sorting'); if (laneSortSel) laneSortSel.value = (settings.ui && settings.ui.laneSort) || laneSortMode || 'recent';
   const weekCutoffEl = document.getElementById('prefs-week-cutoff'); if (weekCutoffEl) weekCutoffEl.value = (settings.ui && settings.ui.weekCutoffWeeks) || weekCutoffWeeks || 8;
@@ -3678,6 +3680,55 @@ function renderBrowserCompatibilityOptions() {
   if (cloudLink) cloudLink.style.display = 'none';
 }
 window.renderBrowserCompatibilityOptions = renderBrowserCompatibilityOptions;
+
+function showLandingStep(step) {
+  const welcomeStep = document.getElementById('landing-step-welcome');
+  const setupStep = document.getElementById('landing-step-setup');
+  const btnBack = document.getElementById('btn-landing-back');
+  const card = document.getElementById('screen-connect-card');
+
+  if (step === 'setup') {
+    if (welcomeStep) welcomeStep.style.display = 'none';
+    if (setupStep) setupStep.style.display = 'flex';
+    if (btnBack) btnBack.style.display = 'inline-flex';
+    if (card) {
+      card.classList.add('is-setup-step');
+    }
+  } else {
+    if (welcomeStep) welcomeStep.style.display = 'flex';
+    if (setupStep) setupStep.style.display = 'none';
+    if (btnBack) btnBack.style.display = 'none';
+    if (card) {
+      card.classList.remove('is-setup-step');
+    }
+  }
+}
+window.showLandingStep = showLandingStep;
+
+function changeLandingLanguage(langCode) {
+  const normalized = normalizeLanguageCode(langCode);
+  if (typeof setLanguage === 'function') {
+    setLanguage(normalized);
+  } else {
+    appLanguage = normalized;
+    if (typeof applyLocalizedUI === 'function') applyLocalizedUI();
+  }
+  if (typeof settings !== 'undefined') {
+    settings.language = normalized;
+    if (typeof saveLocalSettings === 'function') saveLocalSettings();
+  }
+}
+window.changeLandingLanguage = changeLandingLanguage;
+
+window.startDemoWorkspaceFromLanding = function() {
+  if (typeof SetupWizardController !== 'undefined') {
+    SetupWizardController.open();
+  } else if (typeof startTutorial === 'function') {
+    startTutorial();
+  } else {
+    toast(t('landing.sandboxOptionTitle') || 'Demo Workspace');
+  }
+};
 
 // Browser compatibility check for File System Access API
 if (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS()) {

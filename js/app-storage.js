@@ -841,6 +841,78 @@ const StorageAPI = {
     }
   },
 
+  /**
+   * Helper to robustly collect all topic memories / workstreams from disk, in-memory cache, and localStorage
+   */
+  async _collectTopicMemories(backupDir = null) {
+    let topicMemoriesIndex = await this._readJSON('raw/topic-memories/index.json', null);
+    if (!topicMemoriesIndex && backupDir) {
+      topicMemoriesIndex = await this._readJSON(`${backupDir}/raw/topic-memories/index.json`, null);
+    }
+    if (!topicMemoriesIndex && typeof _topicMemoriesIndexCache !== 'undefined' && _topicMemoriesIndexCache && Array.isArray(_topicMemoriesIndexCache.topics)) {
+      topicMemoriesIndex = _topicMemoriesIndexCache;
+    }
+    if (!topicMemoriesIndex && typeof localStorage !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('secretary_topic_memories_index_v1') || localStorage.getItem('secretary_topic_memories_index');
+        if (cached) topicMemoriesIndex = JSON.parse(cached);
+      } catch (e) {}
+    }
+    if (!topicMemoriesIndex || !Array.isArray(topicMemoriesIndex.topics)) {
+      topicMemoriesIndex = { topics: [] };
+    }
+
+    const topicMemoriesList = [];
+    const seenKeys = new Set();
+
+    for (const top of topicMemoriesIndex.topics) {
+      if (!top) continue;
+      const k = top.key || top.topicName;
+      if (!k) continue;
+      const sanitized = (typeof sanitizeTopicMemoryKey === 'function' ? sanitizeTopicMemoryKey(k) : k) || k;
+      if (seenKeys.has(sanitized)) continue;
+      seenKeys.add(sanitized);
+
+      let mem = await this._readJSON(`raw/topic-memories/${sanitized}.json`, null)
+        || (k !== sanitized ? await this._readJSON(`raw/topic-memories/${k}.json`, null) : null);
+
+      if (!mem && backupDir) {
+        mem = await this._readJSON(`${backupDir}/raw/topic-memories/${sanitized}.json`, null)
+          || (k !== sanitized ? await this._readJSON(`${backupDir}/raw/topic-memories/${k}.json`, null) : null);
+      }
+
+      if (!mem && typeof _topicMemoryFileCache !== 'undefined' && _topicMemoryFileCache instanceof Map) {
+        mem = _topicMemoryFileCache.get(sanitized) || _topicMemoryFileCache.get(k) || null;
+      }
+
+      if (!mem && typeof localStorage !== 'undefined') {
+        try {
+          const cached = localStorage.getItem(`secretary_topic_memory_${sanitized}`) || localStorage.getItem(`secretary_topic_memory_${k}`);
+          if (cached) mem = JSON.parse(cached);
+        } catch (e) {}
+      }
+
+      if (mem) {
+        topicMemoriesList.push({ key: sanitized, data: mem });
+      }
+    }
+
+    // Also include any topic dossiers in _topicMemoryFileCache not present in index
+    if (typeof _topicMemoryFileCache !== 'undefined' && _topicMemoryFileCache instanceof Map) {
+      for (const [ck, cMem] of _topicMemoryFileCache.entries()) {
+        if (ck && cMem && !seenKeys.has(ck)) {
+          seenKeys.add(ck);
+          topicMemoriesList.push({ key: ck, data: cMem });
+        }
+      }
+    }
+
+    return {
+      index: topicMemoriesIndex,
+      memories: topicMemoriesList
+    };
+  },
+
   // ── Utilities & Directory Helpers ──
   async listNoteFiles(subDir = 'notes') {
     if (window.AppBridge?.fs?.hasNativeFS()) {
@@ -1219,21 +1291,9 @@ const StorageAPI = {
     }
 
     // Collect topic memories
-    let topicMemoriesIndex = await this._readJSON('raw/topic-memories/index.json', null)
-      || await this._readJSON(`${backupDir}/raw/topic-memories/index.json`, null);
-    const topicMemoriesList = [];
-    if (topicMemoriesIndex && Array.isArray(topicMemoriesIndex.topics)) {
-      for (const top of topicMemoriesIndex.topics) {
-        const k = top.key || top.topicName;
-        if (k) {
-          const mem = await this._readJSON(`raw/topic-memories/${k}.json`, null)
-            || await this._readJSON(`${backupDir}/raw/topic-memories/${k}.json`, null);
-          if (mem) {
-            topicMemoriesList.push({ key: k, data: mem });
-          }
-        }
-      }
-    }
+    const topicData = await this._collectTopicMemories(backupDir);
+    const topicMemoriesIndex = topicData.index;
+    const topicMemoriesList = topicData.memories;
 
     const localSettings = (await this._readJSON('secretary-settings.json', null))
       || (await this._readJSON(`${backupDir}/secretary-settings.json`, null))
@@ -1638,16 +1698,108 @@ const StorageAPI = {
       console.warn('Colleagues reconciliation warning:', e);
     }
 
-    // 6. Flush pending queue to cloud
+    // 6. Reconcile Topic Memories / Workstreams
+    let localTopicData = { index: { topics: [] }, memories: [] };
+    try {
+      localTopicData = await this._collectTopicMemories(backupDir);
+      const remoteTopicIdx = await window.FirebaseSyncService.getDoc('topic_memories', 'index');
+
+      const localTopics = Array.isArray(localTopicData?.index?.topics) ? localTopicData.index.topics : [];
+      const remoteTopics = Array.isArray(remoteTopicIdx?.topics) ? remoteTopicIdx.topics : [];
+
+      const topicIndexMap = new Map();
+      const normalizeK = (t) => {
+        if (!t) return '';
+        const k = t.key || t.topicName || '';
+        return (typeof sanitizeTopicMemoryKey === 'function' ? sanitizeTopicMemoryKey(k) : k.toLowerCase().trim());
+      };
+
+      if (isLocalPriority) {
+        remoteTopics.forEach(t => { if (t) { const nk = normalizeK(t); if (nk) topicIndexMap.set(nk, t); } });
+        localTopics.forEach(t => { if (t) { const nk = normalizeK(t); if (nk) topicIndexMap.set(nk, t); } });
+      } else {
+        localTopics.forEach(t => { if (t) { const nk = normalizeK(t); if (nk) topicIndexMap.set(nk, t); } });
+        remoteTopics.forEach(t => { if (t) { const nk = normalizeK(t); if (nk) topicIndexMap.set(nk, t); } });
+      }
+
+      const mergedTopics = Array.from(topicIndexMap.values());
+      const mergedIndex = {
+        version: 1,
+        topics: mergedTopics
+      };
+
+      if (mergedTopics.length > 0) {
+        await window.FirebaseSyncService.putDoc('topic_memories', 'index', mergedIndex);
+
+        if (typeof _topicMemoriesIndexCache !== 'undefined') {
+          _topicMemoriesIndexCache = mergedIndex;
+        }
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('secretary_topic_memories_index', JSON.stringify(mergedIndex));
+            localStorage.setItem('secretary_topic_memories_index_v1', JSON.stringify(mergedIndex));
+          } catch (e) {}
+        }
+
+        // Reconcile individual topic memory dossiers
+        for (const top of mergedTopics) {
+          const k = top.key || top.topicName;
+          const sanitized = (typeof sanitizeTopicMemoryKey === 'function' ? sanitizeTopicMemoryKey(k) : k) || k;
+          if (!sanitized) continue;
+
+          let remoteDoc = null;
+          try {
+            remoteDoc = await window.FirebaseSyncService.getDoc('topic_memories', sanitized);
+          } catch (e) {}
+
+          const localItem = (localTopicData.memories || []).find(m => m.key === sanitized || m.key === k);
+          const localDoc = localItem ? localItem.data : null;
+
+          let finalDoc = null;
+          if (localDoc && remoteDoc) {
+            if (isLocalPriority) {
+              finalDoc = localDoc;
+            } else {
+              const localTs = typeof parseFlexibleTimestamp === 'function' ? parseFlexibleTimestamp(localDoc.lastUpdated) : 0;
+              const remoteTs = typeof parseFlexibleTimestamp === 'function' ? parseFlexibleTimestamp(remoteDoc.lastUpdated) : 0;
+              finalDoc = (remoteTs >= localTs) ? remoteDoc : localDoc;
+            }
+          } else if (localDoc) {
+            finalDoc = localDoc;
+          } else if (remoteDoc) {
+            finalDoc = remoteDoc;
+          }
+
+          if (finalDoc) {
+            await window.FirebaseSyncService.putDoc('topic_memories', sanitized, finalDoc);
+            if (typeof _topicMemoryFileCache !== 'undefined' && _topicMemoryFileCache instanceof Map) {
+              _topicMemoryFileCache.set(sanitized, finalDoc);
+            }
+            if (typeof localStorage !== 'undefined') {
+              try {
+                localStorage.setItem(`secretary_topic_memory_${sanitized}`, JSON.stringify(finalDoc));
+              } catch (e) {}
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Topic memories reconciliation warning:', e);
+    }
+
+    // 7. Flush pending queue to cloud
     try {
       await window.FirebaseSyncService.flushQueue();
     } catch (e) {}
 
-    // 7. Archive local files safely to backup folder
+    // 8. Archive local files safely to backup folder
     if (typeof onProgress === 'function') {
       onProgress({ stage: 'archiving', percent: 90, message: typeof t === 'function' ? t('sync.migrationProgressArchiving') : 'Archiving local files to backup folder…' });
     }
-    const archiveInfo = await this._archiveLocalFilesAfterMigration(backupDir, { notes: localNotesList });
+    const archiveInfo = await this._archiveLocalFilesAfterMigration(backupDir, {
+      notes: localNotesList,
+      topicMemories: localTopicData.memories
+    });
 
     this.setStorageEngine('firebase');
     if (typeof settings !== 'undefined' && settings) {
@@ -1876,21 +2028,42 @@ const StorageAPI = {
 
     try {
       const existingTopicIdx = await window.FirebaseSyncService.getDoc('topic_memories', 'index');
-      if (!existingTopicIdx || (Array.isArray(existingTopicIdx.topics) && existingTopicIdx.topics.length === 0)) {
-        const backupTopicIdx = await this._readJSON(`${backupDir}/raw/topic-memories/index.json`, null) || await this._readJSON('raw/topic-memories/index.json', null);
-        if (backupTopicIdx) {
+      const backupTopicData = await this._collectTopicMemories(backupDir);
+      const backupTopicIdx = backupTopicData?.index;
+
+      if (!existingTopicIdx || !Array.isArray(existingTopicIdx.topics) || existingTopicIdx.topics.length === 0) {
+        if (backupTopicIdx && Array.isArray(backupTopicIdx.topics) && backupTopicIdx.topics.length > 0) {
           await window.FirebaseSyncService.putDoc('topic_memories', 'index', backupTopicIdx);
-          if (Array.isArray(backupTopicIdx.topics)) {
-            for (const top of backupTopicIdx.topics) {
-              const k = top.key || top.topicName;
-              if (k) {
-                const mem = await this._readJSON(`${backupDir}/raw/topic-memories/${k}.json`, null) || await this._readJSON(`raw/topic-memories/${k}.json`, null);
-                if (mem) {
-                  await window.FirebaseSyncService.putDoc('topic_memories', k, mem);
-                }
-              }
+          for (const memItem of (backupTopicData.memories || [])) {
+            if (memItem && memItem.key && memItem.data) {
+              await window.FirebaseSyncService.putDoc('topic_memories', memItem.key, memItem.data);
             }
           }
+        }
+      } else if (backupTopicIdx && Array.isArray(backupTopicIdx.topics)) {
+        // Merge missing topics into existing remote index
+        const topicIndexMap = new Map();
+        existingTopicIdx.topics.forEach(t => {
+          const k = (typeof sanitizeTopicMemoryKey === 'function' ? sanitizeTopicMemoryKey(t.key || t.topicName) : (t.key || t.topicName));
+          if (k) topicIndexMap.set(k, t);
+        });
+        let addedAny = false;
+        for (const bt of backupTopicIdx.topics) {
+          const k = (typeof sanitizeTopicMemoryKey === 'function' ? sanitizeTopicMemoryKey(bt.key || bt.topicName) : (bt.key || bt.topicName));
+          if (k && !topicIndexMap.has(k)) {
+            topicIndexMap.set(k, bt);
+            addedAny = true;
+            const memItem = (backupTopicData.memories || []).find(m => m.key === k);
+            if (memItem?.data) {
+              await window.FirebaseSyncService.putDoc('topic_memories', k, memItem.data);
+            }
+          }
+        }
+        if (addedAny) {
+          await window.FirebaseSyncService.putDoc('topic_memories', 'index', {
+            version: 1,
+            topics: Array.from(topicIndexMap.values())
+          });
         }
       }
     } catch (e) {}
@@ -2122,13 +2295,35 @@ const StorageAPI = {
     // Write topic memories
     if (topicMemories?.index) {
       await this._writeJSON('raw/topic-memories/index.json', topicMemories.index);
+      if (typeof _topicMemoriesIndexCache !== 'undefined') {
+        _topicMemoriesIndexCache = topicMemories.index;
+      }
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('secretary_topic_memories_index', JSON.stringify(topicMemories.index));
+          localStorage.setItem('secretary_topic_memories_index_v1', JSON.stringify(topicMemories.index));
+        } catch (e) {}
+      }
     }
     if (Array.isArray(topicMemories?.memories)) {
       for (const tm of topicMemories.memories) {
         if (tm?.key && tm?.data) {
           await this._writeJSON(`raw/topic-memories/${tm.key}.json`, tm.data);
+          if (typeof _topicMemoryFileCache !== 'undefined' && _topicMemoryFileCache instanceof Map) {
+            _topicMemoryFileCache.set(tm.key, tm.data);
+          }
+          if (typeof localStorage !== 'undefined') {
+            try {
+              localStorage.setItem(`secretary_topic_memory_${tm.key}`, JSON.stringify(tm.data));
+            } catch (e) {}
+          }
         }
       }
+    }
+    if (typeof preloadAllWorkstreamMemories === 'function') {
+      try {
+        await preloadAllWorkstreamMemories();
+      } catch (e) {}
     }
 
     // Write chat history

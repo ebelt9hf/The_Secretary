@@ -87,7 +87,7 @@ async function loadTopicMemoriesIndex() {
   // 2. Fallback / Sync with LocalStorage
   if (!indexData.topics || indexData.topics.length === 0) {
     try {
-      const cached = localStorage.getItem(TOPIC_MEMORY_INDEX_LS_KEY);
+      const cached = localStorage.getItem(TOPIC_MEMORY_INDEX_LS_KEY) || localStorage.getItem('secretary_topic_memories_index_v1');
       if (cached) indexData = JSON.parse(cached);
     } catch (_e) {}
   }
@@ -122,6 +122,7 @@ async function persistTopicMemoriesIndex(indexData) {
 
   try {
     localStorage.setItem(TOPIC_MEMORY_INDEX_LS_KEY, jsonStr);
+    localStorage.setItem('secretary_topic_memories_index_v1', jsonStr);
   } catch (_e) {}
 
   if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
