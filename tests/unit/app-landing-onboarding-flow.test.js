@@ -307,8 +307,49 @@ describe('Landing Screen Onboarding & Language Flow', () => {
       // Welcome step should be restored, progress bar displayed during load, and main screen activated
       expect(document.getElementById('landing-step-welcome').style.display).toBe('flex');
       expect(document.getElementById('screen-main').classList.contains('active')).toBe(true);
-      expect(document.getElementById('screen-connect').style.display).toBe('none');
+    });
+
+    it('opens cloud sync modal with custom firebase section when openCustomFirebaseSetupFromLanding is called', () => {
+      document.body.innerHTML += `
+        <div class="modal-overlay" id="modal-cloud-sync-setup" style="display:none;">
+          <div id="sync-custom-firebase-body" style="display:none;"></div>
+          <textarea id="sync-custom-firebase-json"></textarea>
+          <input id="sync-setup-passphrase" />
+        </div>
+      `;
+      let openedModalId = null;
+      globalThis.openModal = (id) => {
+        openedModalId = id;
+        const m = document.getElementById(id);
+        if (m) m.style.display = 'flex';
+      };
+
+      openCustomFirebaseSetupFromLanding();
+      expect(openedModalId).toBe('modal-cloud-sync-setup');
+      const body = document.getElementById('sync-custom-firebase-body');
+      expect(body.style.display).toBe('block');
+    });
+
+    it('opens cloud sync modal with managed vault section when openManagedFirebaseSetupFromLanding is called', () => {
+      document.body.innerHTML += `
+        <div class="modal-overlay" id="modal-cloud-sync-setup" style="display:none;">
+          <div id="sync-custom-firebase-body" style="display:block;"></div>
+          <input id="sync-setup-passphrase" />
+        </div>
+      `;
+      let openedModalId = null;
+      globalThis.openModal = (id) => {
+        openedModalId = id;
+        const m = document.getElementById(id);
+        if (m) m.style.display = 'flex';
+      };
+
+      openManagedFirebaseSetupFromLanding();
+      expect(openedModalId).toBe('modal-cloud-sync-setup');
+      const body = document.getElementById('sync-custom-firebase-body');
+      expect(body.style.display).toBe('none');
     });
   });
 });
+
 

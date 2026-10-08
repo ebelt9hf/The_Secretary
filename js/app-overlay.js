@@ -10163,6 +10163,7 @@ function openModal(id)  {
     clearTimeout(modal._closeTimer);
     modal._closeTimer = null;
   }
+  modal.style.display = 'flex';
   modal.classList.remove('closing');
   modal.classList.add('active');
   if (id === 'modal-cloud-sync-setup') {
@@ -10206,6 +10207,8 @@ function openModal(id)  {
   }
   if (typeof rememberDialogFormState === 'function') rememberDialogFormState(modal);
 }
+window.openModal = openModal;
+
 function closeModal(id) {
   const modal = document.getElementById(id);
   if (!modal) return;
@@ -10214,6 +10217,7 @@ function closeModal(id) {
   modal.classList.add('closing');
   modal._closeTimer = setTimeout(() => {
     modal.classList.remove('active', 'closing');
+    modal.style.display = '';
     modal._closeTimer = null;
     if (typeof clearDialogFormState === 'function') clearDialogFormState(modal);
     if (window.AIChatController) {
@@ -10221,6 +10225,7 @@ function closeModal(id) {
     }
   }, 160);
 }
+window.closeModal = closeModal;
 
 function _closeModalOverlayElement(overlay) {
   if (!overlay) return;
@@ -10230,6 +10235,7 @@ function _closeModalOverlayElement(overlay) {
   overlay.classList.add('closing');
   overlay._closeTimer = setTimeout(() => {
     overlay.classList.remove('active', 'closing');
+    overlay.style.display = '';
     overlay._closeTimer = null;
     if (typeof clearDialogFormState === 'function') clearDialogFormState(overlay);
   }, 160);

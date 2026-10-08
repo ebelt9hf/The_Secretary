@@ -3538,7 +3538,12 @@ function copyWebAppUrl(btn) {
 window.copyWebAppUrl = copyWebAppUrl;
 
 function openCustomFirebaseSetupFromLanding() {
-  if (typeof openModal === 'function') openModal('modal-cloud-sync-setup');
+  if (typeof openModal === 'function') {
+    openModal('modal-cloud-sync-setup');
+  } else if (typeof window.openModal === 'function') {
+    window.openModal('modal-cloud-sync-setup');
+  }
+  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signin');
   const body = document.getElementById('sync-custom-firebase-body');
   if (body) body.style.display = 'block';
   if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
@@ -3548,10 +3553,12 @@ function openCustomFirebaseSetupFromLanding() {
 window.openCustomFirebaseSetupFromLanding = openCustomFirebaseSetupFromLanding;
 
 function openManagedFirebaseSetupFromLanding() {
-  if (typeof resetCustomFirebaseConfigUI === 'function') {
-    resetCustomFirebaseConfigUI();
+  if (typeof openModal === 'function') {
+    openModal('modal-cloud-sync-setup');
+  } else if (typeof window.openModal === 'function') {
+    window.openModal('modal-cloud-sync-setup');
   }
-  if (typeof openModal === 'function') openModal('modal-cloud-sync-setup');
+  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signin');
   const body = document.getElementById('sync-custom-firebase-body');
   if (body) body.style.display = 'none';
   if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
