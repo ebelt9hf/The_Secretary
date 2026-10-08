@@ -10166,7 +10166,7 @@ function openModal(id)  {
   modal.classList.remove('closing');
   modal.classList.add('active');
   if (id === 'modal-cloud-sync-setup') {
-    if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('new');
+    if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signin');
     const syncInput = document.getElementById('sync-setup-sync-code');
     if (syncInput && (!syncInput.value || syncInput.getAttribute('data-linked') === 'true')) {
       syncInput.value = window.FirebaseSyncService?.getSyncCode() || window.FirebaseSyncService?.generateSyncCode() || '';

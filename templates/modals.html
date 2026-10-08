@@ -647,17 +647,40 @@
       </div>
     </div>
 
-    <!-- Tabs: New Vault vs Link Existing -->
+    <!-- Tabs: Sign In vs Create Account vs Link Existing vs Guest -->
     <form id="form-cloud-sync-setup" onsubmit="event.preventDefault(); submitCloudSyncSetup();" style="margin:0;">
       <!-- Hidden username input for browser password managers and autofill support -->
       <input type="text" id="sync-setup-username" name="username" autocomplete="username" value="Secretary Vault" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;" tabindex="-1" aria-hidden="true">
-      <div style="display:flex; border-bottom:1px solid var(--card-border); margin-bottom:14px; gap:8px;">
-        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-new" onclick="switchSyncSetupTab('new')" style="padding:6px 14px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid var(--accent); color:var(--accent);" data-i18n="sync.tabNewVault" title="Set up a new encrypted cloud vault on this device" data-i18n-title="sync.tabNewVaultTooltip">Create New Vault</button>
-        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-link" onclick="switchSyncSetupTab('link')" style="padding:6px 14px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--text-muted);" data-i18n="sync.tabLinkVault" title="Connect to an existing vault using a sync code and passphrase" data-i18n-title="sync.tabLinkVaultTooltip">Link Existing Device</button>
+      <div style="display:flex; border-bottom:1px solid var(--card-border); margin-bottom:14px; gap:6px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-signin" onclick="switchSyncSetupTab('signin')" style="padding:6px 12px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid var(--accent); color:var(--accent);" data-i18n="sync.tabSignIn" title="Sign in with your email and password" data-i18n-title="sync.tabSignInTooltip">Sign In</button>
+        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-signup" onclick="switchSyncSetupTab('signup')" style="padding:6px 12px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--text-muted);" data-i18n="sync.tabSignUp" title="Create a new cloud sync account with your email" data-i18n-title="sync.tabSignUpTooltip">Create Account</button>
+        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-link" onclick="switchSyncSetupTab('link')" style="padding:6px 12px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--text-muted);" data-i18n="sync.tabLinkVault" title="Connect to an existing vault using a sync code and passphrase" data-i18n-title="sync.tabLinkVaultTooltip">Link Device</button>
+        <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-guest" onclick="switchSyncSetupTab('guest')" style="padding:6px 12px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--text-muted);" data-i18n="sync.tabGuest" title="Use anonymous guest vault session" data-i18n-title="sync.tabGuestTooltip">Guest Vault</button>
       </div>
 
-      <!-- Sync Code input row -->
-      <div class="form-field" style="margin-bottom:12px;">
+      <!-- Email & Account Password Fields (for Sign In & Sign Up) -->
+      <div id="sync-setup-auth-fields" style="margin-bottom:12px;">
+        <div class="form-field" style="margin-bottom:10px;">
+          <label for="sync-setup-email" data-i18n="sync.emailLabel" style="margin-bottom:4px; font-weight:600; font-size:0.85rem;">Email Address</label>
+          <input type="email" id="sync-setup-email" name="email" autocomplete="email" placeholder="you@example.com" class="prefs-input" style="width:100%; font-size:0.85rem;" title="Your cloud account email address" data-i18n-title="sync.emailTooltip" data-i18n-placeholder="sync.emailPlaceholder">
+        </div>
+        <div class="form-field" style="margin-bottom:6px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label for="sync-setup-auth-password" data-i18n="sync.accountPasswordLabel" style="margin-bottom:0; font-weight:600; font-size:0.85rem;">Account Password</label>
+            <a href="javascript:void(0)" id="sync-setup-forgot-pass-link" onclick="openPasswordResetFromSetupUI()" style="font-size:0.75rem; color:var(--accent); text-decoration:none;" data-i18n="sync.forgotPasswordLink" title="Send a password reset link to your email" data-i18n-title="sync.forgotPasswordTooltip">Forgot password?</a>
+          </div>
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" id="sync-setup-auth-password" name="auth-password" autocomplete="current-password" placeholder="Enter account password..." class="prefs-input" style="width:100%; padding-right:36px; font-size:0.85rem;" title="Your cloud account password" data-i18n-title="sync.accountPasswordTooltip" data-i18n-placeholder="sync.accountPasswordPlaceholder">
+            <button type="button" id="btn-sync-setup-auth-pass-visibility" onclick="togglePassVisibility('sync-setup-auth-password', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle password visibility" data-i18n-title="common.togglePasswordVisibility">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <small id="sync-setup-auth-pass-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:3px; display:block;" data-i18n="sync.accountPasswordHelp">Minimum 6 characters for Firebase cloud authentication.</small>
+        </div>
+      </div>
+
+      <!-- Sync Code input row (for Linking existing vault or Guest mode) -->
+      <div id="sync-setup-code-container" class="form-field" style="margin-bottom:12px; display:none;">
         <label for="sync-setup-sync-code" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
         <div style="display:flex; gap:6px; align-items:center;">
           <input type="text" id="sync-setup-sync-code" name="sync-code" placeholder="e.g. SEC-8B4K-9D2F" class="prefs-input" style="flex:1; font-family:monospace; font-weight:600; letter-spacing:1px;" title="Unique pairing code shared across your devices" data-i18n-title="sync.syncCodeTooltip" data-i18n-placeholder="sync.syncCodePlaceholder">
@@ -671,22 +694,23 @@
         <small id="sync-setup-code-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:3px; display:block;" data-i18n="sync.syncCodeHelp">Enter this Sync Code and your Master Passphrase on any other computer to synchronize your notes.</small>
       </div>
 
-      <div class="form-field" style="margin-bottom:12px;">
+      <!-- Master Passphrase (E2EE) -->
+      <div id="sync-setup-passphrase-container" class="form-field" style="margin-bottom:12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <label for="sync-setup-passphrase" data-i18n="sync.masterPasswordLabel" style="margin-bottom:0;">Master Passphrase (E2EE)</label>
+          <label for="sync-setup-passphrase" data-i18n="sync.masterPasswordLabel" style="margin-bottom:0; font-weight:600; font-size:0.85rem;">Master Passphrase (E2EE)</label>
           <span id="sync-setup-pass-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); display:inline-flex; align-items:center; gap:4px;"></span>
         </div>
         <div style="display:flex; gap:6px; align-items:center;">
           <div style="position:relative; flex:1; display:flex; align-items:center;">
-            <input type="text" id="sync-setup-passphrase" name="password" autocomplete="new-password" placeholder="Choose a strong master passphrase..." class="prefs-input" style="width:100%; padding-right:36px; font-family:monospace; font-size:0.83rem; font-weight:500;" minlength="10" required title="Enter a master passphrase for encryption" data-i18n-title="sync.passphrasePlaceholder" data-i18n-placeholder="sync.passphrasePlaceholder" oninput="handleSetupPassphraseInput(this.value)">
+            <input type="password" id="sync-setup-passphrase" name="password" autocomplete="new-password" placeholder="Enter master passphrase..." class="prefs-input" style="width:100%; padding-right:36px; font-family:monospace; font-size:0.83rem; font-weight:500;" minlength="10" required title="Enter a master passphrase for encryption" data-i18n-title="sync.passphrasePlaceholder" data-i18n-placeholder="sync.passphrasePlaceholder" oninput="handleSetupPassphraseInput(this.value)">
             <button type="button" id="btn-sync-setup-pass-visibility" onclick="togglePassVisibility('sync-setup-passphrase', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle passphrase visibility" data-i18n-title="common.togglePasswordVisibility">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
-          <button type="button" class="btn btn-secondary" id="btn-sync-setup-pass-regen" onclick="regenerateSetupPassphrase()" title="Generate a new strong, high-entropy default passphrase" data-i18n-title="sync.regeneratePassphraseTooltip" style="padding:6px 9px;">
+          <button type="button" class="btn btn-secondary" id="btn-sync-setup-pass-regen" onclick="regenerateSetupPassphrase()" title="Generate a new strong, high-entropy default passphrase" data-i18n-title="sync.regeneratePassphraseTooltip" style="padding:6px 9px; display:none;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
           </button>
-          <button type="button" class="btn btn-secondary" id="btn-sync-setup-pass-copy" onclick="copySetupPassphrase()" title="Copy master passphrase to clipboard" data-i18n-title="sync.copyPassphraseTooltip" style="padding:6px 9px;">
+          <button type="button" class="btn btn-secondary" id="btn-sync-setup-pass-copy" onclick="copySetupPassphrase()" title="Copy master passphrase to clipboard" data-i18n-title="sync.copyPassphraseTooltip" style="padding:6px 9px; display:none;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
         </div>
@@ -701,7 +725,7 @@
             All your notes, titles, tags, and content are encrypted locally on your device with this passphrase using AES-256-GCM before syncing. It is never sent to the cloud. A longer passphrase provides exponentially stronger protection against brute-force attacks — longer means significantly better security.
           </div>
         </div>
-        <small id="sync-setup-pass-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;" data-i18n="sync.passphraseHint">Minimum 10 characters. Required to decrypt notes on other devices.</small>
+        <small id="sync-setup-pass-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;" data-i18n="sync.passphraseSignInHelp">Enter the master passphrase configured for your vault to decrypt your notes.</small>
       </div>
 
       <div style="margin-bottom:10px;">
@@ -722,10 +746,43 @@
         <button type="button" class="btn" onclick="saveCloudSyncPromptDismissal()" data-i18n="sync.keepLocalOnly" data-i18n-title="sync.keepLocalOnlyTooltip" title="Dismiss setup and continue storing notes in local files">Keep Local Only</button>
         <div style="display:flex; gap:8px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-sync-setup')" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Close this dialog">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn-submit-cloud-sync" data-mode="new" data-i18n="sync.enableSyncBtn" data-i18n-title="sync.enableSyncBtnTooltip" title="Initialize zero-knowledge encryption and enable sync">Enable Sync</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-cloud-sync" data-mode="signin" data-i18n="sync.signInAndSyncBtn" data-i18n-title="sync.signInAndSyncBtnTooltip" title="Sign in with email and connect your encrypted vault">Sign In & Sync</button>
         </div>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ── Cloud Password Reset Modal ── -->
+<div class="modal-overlay" id="modal-cloud-password-reset" style="display:none;">
+  <div class="modal" style="max-width: 440px; width: 90%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.15rem;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </span>
+        <span data-i18n="sync.resetPasswordModalTitle">Reset Cloud Account Password</span>
+      </h2>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-cloud-password-reset')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <p style="margin: 0.2rem 0 0.8rem 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.45;" data-i18n="sync.resetPasswordModalDesc">
+      Enter your account email address and we will send you a password reset link.
+    </p>
+
+    <form id="form-cloud-password-reset" onsubmit="event.preventDefault(); submitPasswordResetUI();" style="margin:0;">
+      <div class="form-field" style="margin-bottom:12px;">
+        <label for="sync-reset-password-email" data-i18n="sync.emailLabel">Email Address</label>
+        <input type="email" id="sync-reset-password-email" name="reset-email" autocomplete="email" placeholder="you@example.com" class="prefs-input" style="width:100%;" required title="Enter your account email address" data-i18n-title="sync.emailTooltip" data-i18n-placeholder="sync.emailPlaceholder">
+      </div>
+      <div id="sync-reset-password-msg" style="display:none; font-size:0.8rem; padding:8px 10px; border-radius:6px; margin-bottom:12px;"></div>
+      <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-password-reset')" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-password-reset" data-i18n="sync.sendResetLinkBtn" data-i18n-title="sync.sendResetLinkBtnTooltip" title="Send password reset email to the address above">Send Reset Link</button>
+      </div>
+    </form>
+  </div>
+</div>
   </div>
 </div>
 

@@ -72,8 +72,13 @@ export const FirebaseBridge = {
     await sendPasswordResetEmail(this.auth, email);
   },
 
+  getUser() {
+    return this.currentUser || (this.auth ? this.auth.currentUser : null);
+  },
+
   getUserId() {
-    return this.currentUser ? this.currentUser.uid : null;
+    const u = this.getUser();
+    return u ? u.uid : null;
   },
 
   async saveNoteMeta(userId, noteId, record) {

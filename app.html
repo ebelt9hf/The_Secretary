@@ -702,7 +702,24 @@
       <div class="prefs-section" id="prefs-sec-sync" style="display:none">
         <h3 data-i18n="prefs.syncSectionTitle">Cloud Sync & Storage Engine</h3>
         
-        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+        <div class="prefs-row" id="prefs-sync-account-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+          <label class="prefs-label" data-i18n="sync.accountCardTitle">Cloud Account</label>
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; flex-wrap:wrap; gap:10px; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; background:rgba(99,102,241,0.15); color:var(--accent);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              <span id="prefs-sync-account-email" style="font-size:0.85rem; font-weight:600; color:var(--text);">Not Signed In</span>
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;" id="prefs-sync-account-actions">
+              <button type="button" class="btn" id="btn-prefs-sync-signin" onclick="openModal('modal-cloud-sync-setup'); switchSyncSetupTab('signin');" title="Sign in or switch cloud account" data-i18n-title="sync.accountSignInTooltip" data-i18n="sync.accountSignInBtn">Sign In / Switch User</button>
+              <button type="button" class="btn btn-secondary" id="btn-prefs-sync-reset-pass" onclick="openPasswordResetModalUI()" title="Send password reset link" data-i18n-title="sync.accountResetPassTooltip" data-i18n="sync.accountResetPassBtn" style="display:none;">Reset Password</button>
+              <button type="button" class="btn btn-secondary" id="btn-prefs-sync-signout" onclick="signOutCloudAccountUI()" title="Sign out from your cloud account on this device" data-i18n-title="sync.accountSignOutTooltip" data-i18n="sync.accountSignOutBtn" style="display:none;">Sign Out</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
             <label class="prefs-label" data-i18n="sync.activeEngineLabel">Active Storage Engine</label>
             <select id="prefs-storage-engine-select" onchange="changeStorageEngineUI(this.value)" class="prefs-input" style="max-width:320px;" title="Choose between local filesystem and encrypted Firebase Firestore" data-i18n-title="sync.selectStorageBackendTooltip">
