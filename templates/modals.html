@@ -658,7 +658,7 @@
     </div>
 
     <!-- Tabs: Sign In vs Create Account vs Link Existing vs Guest -->
-    <form id="form-cloud-sync-setup" onsubmit="event.preventDefault(); submitCloudSyncSetup();" style="margin:0;">
+    <form id="form-cloud-sync-setup" novalidate onsubmit="event.preventDefault(); submitCloudSyncSetup();" style="margin:0;">
       <!-- Hidden username input for browser password managers and autofill support -->
       <input type="text" id="sync-setup-username" name="username" autocomplete="username" value="Secretary Vault" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;" tabindex="-1" aria-hidden="true">
       <div style="display:flex; border-bottom:1px solid var(--card-border); margin-bottom:14px; gap:6px; flex-wrap:wrap;">
@@ -670,14 +670,30 @@
 
       <!-- Email & Account Password Fields (for Sign In & Sign Up) -->
       <div id="sync-setup-auth-fields" style="margin-bottom:12px;">
+        <!-- Google 1-Click Sign-In (Option C / Managed Cloud Vault) -->
+        <div id="sync-setup-google-container" style="margin-bottom:12px;">
+          <button type="button" class="btn btn-secondary sync-social-btn" id="btn-sync-google" onclick="submitCloudSyncGoogle()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:0.86rem; border:1px solid var(--card-border); background:var(--card-bg-alt); color:var(--text); cursor:pointer;" title="Sign in with your Google account" data-i18n-title="sync.googleSignInTooltip">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.6H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.4l4.03-3.13z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.6l4.03 3.13c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
+            <span data-i18n="sync.googleSignInBtn">Continue with Google</span>
+          </button>
+          <div style="display:flex; align-items:center; margin:10px 0; color:var(--text-muted); font-size:0.75rem;">
+            <span style="flex:1; border-top:1px solid var(--card-border);"></span>
+            <span style="padding:0 8px;" data-i18n="sync.orEmailDivider">or continue with email</span>
+            <span style="flex:1; border-top:1px solid var(--card-border);"></span>
+          </div>
+        </div>
+
         <div class="form-field" style="margin-bottom:10px;">
           <label for="sync-setup-email" data-i18n="sync.emailLabel" style="margin-bottom:4px; font-weight:600; font-size:0.85rem;">Email Address</label>
-          <input type="email" id="sync-setup-email" name="email" autocomplete="email" placeholder="you@example.com" class="prefs-input" style="width:100%; font-size:0.85rem;" title="Your cloud account email address" data-i18n-title="sync.emailTooltip" data-i18n-placeholder="sync.emailPlaceholder">
+          <input type="email" id="sync-setup-email" name="email" autocomplete="username" placeholder="you@example.com" class="prefs-input" style="width:100%; font-size:0.85rem;" title="Your cloud account email address" data-i18n-title="sync.emailTooltip" data-i18n-placeholder="sync.emailPlaceholder">
         </div>
         <div class="form-field" style="margin-bottom:6px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
             <label for="sync-setup-auth-password" data-i18n="sync.accountPasswordLabel" style="margin-bottom:0; font-weight:600; font-size:0.85rem;">Account Password</label>
-            <a href="javascript:void(0)" id="sync-setup-forgot-pass-link" onclick="openPasswordResetFromSetupUI()" style="font-size:0.75rem; color:var(--accent); text-decoration:none;" data-i18n="sync.forgotPasswordLink" title="Send a password reset link to your email" data-i18n-title="sync.forgotPasswordTooltip">Forgot password?</a>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" id="btn-sync-send-magic-link" onclick="submitCloudSyncMagicLink()" style="background:none; border:none; padding:0; font-size:0.75rem; color:var(--accent); cursor:pointer; text-decoration:underline;" data-i18n="sync.sendMagicLinkBtn" title="Send a passwordless sign-in link to your email" data-i18n-title="sync.sendMagicLinkTooltip">Email Magic Link</button>
+              <a href="javascript:void(0)" id="sync-setup-forgot-pass-link" onclick="openPasswordResetFromSetupUI()" style="font-size:0.75rem; color:var(--accent); text-decoration:none;" data-i18n="sync.forgotPasswordLink" title="Send a password reset link to your email" data-i18n-title="sync.forgotPasswordTooltip">Forgot password?</a>
+            </div>
           </div>
           <div style="position:relative; display:flex; align-items:center;">
             <input type="password" id="sync-setup-auth-password" name="auth-password" autocomplete="current-password" placeholder="Enter account password..." class="prefs-input" style="width:100%; padding-right:36px; font-size:0.85rem;" title="Your cloud account password" data-i18n-title="sync.accountPasswordTooltip" data-i18n-placeholder="sync.accountPasswordPlaceholder">
@@ -756,7 +772,7 @@
         <button type="button" class="btn" onclick="saveCloudSyncPromptDismissal()" data-i18n="sync.keepLocalOnly" data-i18n-title="sync.keepLocalOnlyTooltip" title="Dismiss setup and continue storing notes in local files">Keep Local Only</button>
         <div style="display:flex; gap:8px;">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-sync-setup')" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Close this dialog">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="btn-submit-cloud-sync" data-mode="signin" data-i18n="sync.signInAndSyncBtn" data-i18n-title="sync.signInAndSyncBtnTooltip" title="Sign in with email and connect your encrypted vault">Sign In & Sync</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-cloud-sync" onclick="submitCloudSyncSetup()" data-mode="signin" data-i18n="sync.signInAndSyncBtn" data-i18n-title="sync.signInAndSyncBtnTooltip" title="Sign in with email and connect your encrypted vault">Sign In & Sync</button>
         </div>
       </div>
     </form>

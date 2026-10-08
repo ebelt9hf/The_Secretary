@@ -346,6 +346,19 @@ function toast(msg, isError = false) {
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
+if (typeof window !== 'undefined') {
+  if (!window.toast) {
+    window.toast = toast;
+  }
+  window.showToast = function(msg, isError = false) {
+    if (typeof window.toast === 'function') {
+      window.toast(msg, isError);
+    } else {
+      toast(msg, isError);
+    }
+  };
+}
+
 
 // Show a toast with an action button (e.g., Undo). actionFn may be async. duration in ms (default 7000).
 function toastAction(msg, actionLabel, actionFn, duration = 7000) {

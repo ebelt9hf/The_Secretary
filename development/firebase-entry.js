@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { getDatabase, ref, set, get, onValue, remove, child } from 'firebase/database';
 
 export const FirebaseBridge = {
@@ -57,6 +57,37 @@ export const FirebaseBridge = {
   async signUpWithEmail(email, password) {
     if (!this.auth) return null;
     const cred = await createUserWithEmailAndPassword(this.auth, email, password);
+    this.currentUser = cred.user;
+    return cred.user;
+  },
+
+  async signInWithGoogle() {
+    if (!this.auth) return null;
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await signInWithPopup(this.auth, provider);
+    this.currentUser = cred.user;
+    return cred.user;
+  },
+
+  async sendSignInLink(email, returnUrl) {
+    if (!this.auth) return false;
+    const actionCodeSettings = {
+      url: returnUrl || (typeof window !== 'undefined' ? window.location.href : 'http://localhost'),
+      handleCodeInApp: true
+    };
+    await sendSignInLinkToEmail(this.auth, email, actionCodeSettings);
+    return true;
+  },
+
+  isSignInWithEmailLink(url) {
+    if (!this.auth) return false;
+    return isSignInWithEmailLink(this.auth, url || (typeof window !== 'undefined' ? window.location.href : ''));
+  },
+
+  async signInWithEmailLink(email, url) {
+    if (!this.auth) return null;
+    const cred = await signInWithEmailLink(this.auth, email, url || (typeof window !== 'undefined' ? window.location.href : ''));
     this.currentUser = cred.user;
     return cred.user;
   },

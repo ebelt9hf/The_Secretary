@@ -23,6 +23,7 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
     // Set up basic DOM structure
     document.body.innerHTML = `
       <div class="modal-overlay" id="modal-cloud-sync-setup" style="display:none;">
+        <input type="text" id="sync-setup-username" name="username" autocomplete="username" value="Secretary Vault">
         <button id="tab-sync-signin"></button>
         <button id="tab-sync-signup"></button>
         <button id="tab-sync-link"></button>
@@ -166,6 +167,9 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
     expect(document.getElementById('sync-setup-forgot-pass-link').style.display).toBe('inline');
     expect(document.getElementById('sync-setup-code-container').style.display).toBe('none');
     expect(document.getElementById('btn-submit-cloud-sync').getAttribute('data-mode')).toBe('signin');
+    expect(document.getElementById('sync-setup-email').getAttribute('autocomplete')).toBe('username');
+    expect(document.getElementById('sync-setup-auth-password').getAttribute('autocomplete')).toBe('current-password');
+    expect(document.getElementById('sync-setup-username').disabled).toBe(true);
 
     // Test signup mode
     globalThis.switchSyncSetupTab('signup');
@@ -173,18 +177,23 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
     expect(document.getElementById('sync-setup-forgot-pass-link').style.display).toBe('none');
     expect(document.getElementById('sync-setup-code-container').style.display).toBe('none');
     expect(document.getElementById('btn-submit-cloud-sync').getAttribute('data-mode')).toBe('signup');
+    expect(document.getElementById('sync-setup-email').getAttribute('autocomplete')).toBe('username');
+    expect(document.getElementById('sync-setup-auth-password').getAttribute('autocomplete')).toBe('new-password');
+    expect(document.getElementById('sync-setup-username').disabled).toBe(true);
 
     // Test link mode
     globalThis.switchSyncSetupTab('link');
     expect(document.getElementById('sync-setup-auth-fields').style.display).toBe('none');
     expect(document.getElementById('sync-setup-code-container').style.display).toBe('block');
     expect(document.getElementById('btn-submit-cloud-sync').getAttribute('data-mode')).toBe('link');
+    expect(document.getElementById('sync-setup-username').disabled).toBe(false);
 
     // Test guest mode
     globalThis.switchSyncSetupTab('guest');
     expect(document.getElementById('sync-setup-auth-fields').style.display).toBe('none');
     expect(document.getElementById('sync-setup-code-container').style.display).toBe('block');
     expect(document.getElementById('btn-submit-cloud-sync').getAttribute('data-mode')).toBe('guest');
+    expect(document.getElementById('sync-setup-username').disabled).toBe(false);
   });
 
   it('updateCloudSyncUI updates preferences account display and buttons for signed-in, guest, and logged-out states', () => {
@@ -231,4 +240,126 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
     expect(window.FirebaseSyncService.sendPasswordReset).toHaveBeenCalledWith('forgot@example.com');
     expect(globalThis.showToast).toHaveBeenCalled();
   });
+
+  it('submitCloudSyncGoogle authenticates with Google, unlocks vault, and updates UI', async () => {
+    window.FirebaseSyncService = {
+      signInWithGoogle: vi.fn().mockResolvedValue({ uid: 'google-user-123', email: 'etienne@google.com' }),
+      generateDefaultPassphrase: () => 'my-super-strong-passphrase-123',
+      unlockVault: vi.fn().mockResolvedValue(true)
+    };
+    globalThis.closeModal = vi.fn();
+    globalThis.showToast = vi.fn();
+    globalThis.updateCloudSyncUI = vi.fn();
+
+    await globalThis.submitCloudSyncGoogle();
+
+    expect(window.FirebaseSyncService.signInWithGoogle).toHaveBeenCalled();
+    expect(window.FirebaseSyncService.unlockVault).toHaveBeenCalledWith('my-super-strong-passphrase-123', false);
+    expect(globalThis.closeModal).toHaveBeenCalledWith('modal-cloud-sync-setup');
+    expect(globalThis.showToast).toHaveBeenCalled();
+    expect(globalThis.updateCloudSyncUI).toHaveBeenCalled();
+  });
+
+  it('submitCloudSyncMagicLink validates email and triggers sendSignInLink', async () => {
+    window.FirebaseSyncService = {
+      sendSignInLink: vi.fn().mockResolvedValue(true)
+    };
+    globalThis.showToast = vi.fn();
+
+    // Invalid email
+    document.getElementById('sync-setup-email').value = 'invalid';
+    await globalThis.submitCloudSyncMagicLink();
+    expect(window.FirebaseSyncService.sendSignInLink).not.toHaveBeenCalled();
+
+    // Valid email
+    document.getElementById('sync-setup-email').value = 'magic@example.com';
+    await globalThis.submitCloudSyncMagicLink();
+    expect(window.FirebaseSyncService.sendSignInLink).toHaveBeenCalledWith('magic@example.com');
+    expect(globalThis.showToast).toHaveBeenCalled();
+  });
+
+  it('checkPendingEmailLinkAuth detects email link in URL and signs in', async () => {
+    window.FirebaseSyncService = {
+      isSignInWithEmailLink: vi.fn().mockReturnValue(true),
+      signInWithEmailLink: vi.fn().mockResolvedValue({ uid: 'link-user-1', email: 'magic@example.com' }),
+      unlockVault: vi.fn().mockResolvedValue(true)
+    };
+    localStorage.setItem('secretary_email_link_email', 'magic@example.com');
+    localStorage.setItem('secretary_magic_link_pending_pass', 'my-vault-pass-123');
+    globalThis.showToast = vi.fn();
+    globalThis.updateCloudSyncUI = vi.fn();
+
+    await globalThis.checkPendingEmailLinkAuth();
+
+    expect(window.FirebaseSyncService.signInWithEmailLink).toHaveBeenCalledWith('magic@example.com', window.location.href);
+    expect(window.FirebaseSyncService.unlockVault).toHaveBeenCalledWith('my-vault-pass-123', true);
+    expect(globalThis.showToast).toHaveBeenCalled();
+    expect(globalThis.updateCloudSyncUI).toHaveBeenCalled();
+  });
+
+  it('window.showToast is defined globally and forwards to toast helper', () => {
+    expect(typeof window.showToast).toBe('function');
+  });
+
+  it('submitCloudSyncSetup in link mode validates inputs and shows toast error', async () => {
+    const toastSpy = vi.fn();
+    window.showToast = toastSpy;
+    document.getElementById('btn-submit-cloud-sync').setAttribute('data-mode', 'link');
+
+    // Missing sync code
+    document.getElementById('sync-setup-sync-code').value = '';
+    document.getElementById('sync-setup-passphrase').value = 'valid-passphrase-123';
+    await globalThis.submitCloudSyncSetup();
+    expect(toastSpy).toHaveBeenCalledWith('sync.syncCodeRequired', true);
+
+    // Short passphrase
+    toastSpy.mockClear();
+    document.getElementById('sync-setup-sync-code').value = 'SEC-TEST-1234';
+    document.getElementById('sync-setup-passphrase').value = 'short';
+    await globalThis.submitCloudSyncSetup();
+    expect(toastSpy).toHaveBeenCalledWith('sync.passphraseTooShort', true);
+  });
+
+  it('submitCloudSyncSetup in link mode links existing vault and displays error toast on failure', async () => {
+    const toastSpy = vi.fn();
+    window.showToast = toastSpy;
+    document.getElementById('btn-submit-cloud-sync').setAttribute('data-mode', 'link');
+    document.getElementById('sync-setup-sync-code').value = 'SEC-TEST-9999';
+    document.getElementById('sync-setup-passphrase').value = 'super-secret-passphrase';
+
+    window.FirebaseSyncService = {
+      linkExistingVault: vi.fn().mockRejectedValue(new Error('Sync Code not found in cloud'))
+    };
+
+    await globalThis.submitCloudSyncSetup();
+    expect(window.FirebaseSyncService.linkExistingVault).toHaveBeenCalledWith('SEC-TEST-9999', 'super-secret-passphrase');
+    expect(toastSpy).toHaveBeenCalledWith('sync.setupFailed: Sync Code not found in cloud', true);
+  });
+
+  it('submitCloudSyncSetup auto-applies custom Firebase config from textarea', async () => {
+    const customTextarea = document.createElement('textarea');
+    customTextarea.id = 'sync-custom-firebase-json';
+    customTextarea.value = '{"apiKey": "AIzaSyCustomKey", "projectId": "custom-vault"}';
+    document.body.appendChild(customTextarea);
+
+    window.FirebaseSyncService = {
+      parseFirebaseConfigString: vi.fn().mockReturnValue({ apiKey: 'AIzaSyCustomKey', projectId: 'custom-vault' }),
+      setCustomFirebaseConfig: vi.fn().mockReturnValue(true),
+      linkExistingVault: vi.fn().mockResolvedValue(true)
+    };
+    globalThis.closeModal = vi.fn();
+    globalThis.updateCloudSyncUI = vi.fn();
+    window.showToast = vi.fn();
+
+    document.getElementById('btn-submit-cloud-sync').setAttribute('data-mode', 'link');
+    document.getElementById('sync-setup-sync-code').value = 'SEC-CUSTOM-111';
+    document.getElementById('sync-setup-passphrase').value = 'valid-passphrase-123';
+
+    await globalThis.submitCloudSyncSetup();
+
+    expect(window.FirebaseSyncService.parseFirebaseConfigString).toHaveBeenCalledWith('{"apiKey": "AIzaSyCustomKey", "projectId": "custom-vault"}');
+    expect(window.FirebaseSyncService.setCustomFirebaseConfig).toHaveBeenCalledWith({ apiKey: 'AIzaSyCustomKey', projectId: 'custom-vault' });
+    expect(window.FirebaseSyncService.linkExistingVault).toHaveBeenCalledWith('SEC-CUSTOM-111', 'valid-passphrase-123');
+  });
 });
+

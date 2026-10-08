@@ -1025,6 +1025,85 @@ const FirebaseSyncService = {
     return user;
   },
 
+  async signInWithGoogle(config = null) {
+    await this.ensureBridgeInitialized(config);
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    if (!bridge || typeof bridge.signInWithGoogle !== 'function') {
+      throw new Error('Google Authentication is not available');
+    }
+    const user = await bridge.signInWithGoogle();
+    if (user && user.uid) {
+      this.state.userId = user.uid;
+      this.state.userEmail = user.email || null;
+      this.state.isAnonymous = false;
+      if (this.state.isUnlocked) {
+        this.listenRemoteVault();
+        this.listenRemoteDocs();
+      }
+      this._notifyStatus();
+    }
+    return user;
+  },
+
+  async sendSignInLink(email, config = null) {
+    if (!email || !email.includes('@')) {
+      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
+    }
+    await this.ensureBridgeInitialized(config);
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    if (!bridge || typeof bridge.sendSignInLink !== 'function') {
+      throw new Error('Email link authentication is not available');
+    }
+    const targetUrl = typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : 'http://localhost';
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('secretary_email_link_email', email.trim());
+      } catch (e) {}
+    }
+    await bridge.sendSignInLink(email.trim(), targetUrl);
+    return true;
+  },
+
+  isSignInWithEmailLink(url = null) {
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    if (!bridge || typeof bridge.isSignInWithEmailLink !== 'function') return false;
+    const testUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
+    return bridge.isSignInWithEmailLink(testUrl);
+  },
+
+  async signInWithEmailLink(email = null, url = null, config = null) {
+    let targetEmail = email;
+    if (!targetEmail && typeof localStorage !== 'undefined') {
+      try {
+        targetEmail = localStorage.getItem('secretary_email_link_email');
+      } catch (e) {}
+    }
+    if (!targetEmail || !targetEmail.includes('@')) {
+      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
+    }
+    await this.ensureBridgeInitialized(config);
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    if (!bridge || typeof bridge.signInWithEmailLink !== 'function') {
+      throw new Error('Email link authentication is not available');
+    }
+    const targetUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
+    const user = await bridge.signInWithEmailLink(targetEmail.trim(), targetUrl);
+    if (user && user.uid) {
+      this.state.userId = user.uid;
+      this.state.userEmail = user.email || targetEmail.trim();
+      this.state.isAnonymous = false;
+      if (typeof localStorage !== 'undefined') {
+        try { localStorage.removeItem('secretary_email_link_email'); } catch (e) {}
+      }
+      if (this.state.isUnlocked) {
+        this.listenRemoteVault();
+        this.listenRemoteDocs();
+      }
+      this._notifyStatus();
+    }
+    return user;
+  },
+
   async signOut() {
     const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
     if (bridge && typeof bridge.signOut === 'function') {
