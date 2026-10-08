@@ -966,11 +966,69 @@ const FirebaseSyncService = {
   getAuthUser() {
     const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
     const bridgeUser = bridge?.getUser?.();
+    const providers = (bridge?.getLinkedProviders?.()) || [];
     return {
       uid: (bridgeUser && bridgeUser.uid) || (this.state.userId !== 'default_user' ? this.state.userId : null),
       email: (bridgeUser && bridgeUser.email) || this.state.userEmail || null,
-      isAnonymous: bridgeUser ? !!bridgeUser.isAnonymous : !!this.state.isAnonymous
+      isAnonymous: bridgeUser ? !!bridgeUser.isAnonymous : !!this.state.isAnonymous,
+      linkedProviders: providers
     };
+  },
+
+  async linkGoogle(config = null) {
+    await this.ensureBridgeInitialized(config);
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    if (!bridge || typeof bridge.linkGoogle !== 'function') {
+      throw new Error('Google linking is not supported by Firebase bridge');
+    }
+    const user = await bridge.linkGoogle();
+    if (user && user.uid) {
+      this.state.userId = user.uid;
+      this.state.userEmail = user.email || this.state.userEmail;
+      this.state.isAnonymous = false;
+      this._notifyStatus();
+    }
+    return user;
+  },
+
+  async linkEmail(email, password, config = null) {
+    if (!email || !email.includes('@')) {
+      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
+    }
+    if (!password || password.length < 6) {
+      throw new Error(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Account password must be at least 6 characters');
+    }
+    await this.ensureBridgeInitialized(config);
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    if (!bridge || typeof bridge.linkEmail !== 'function') {
+      throw new Error('Email linking is not supported by Firebase bridge');
+    }
+    const user = await bridge.linkEmail(email.trim(), password);
+    if (user && user.uid) {
+      this.state.userId = user.uid;
+      this.state.userEmail = user.email || email.trim();
+      this.state.isAnonymous = false;
+      this._notifyStatus();
+    }
+    return user;
+  },
+
+  async unlinkProvider(providerId) {
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    if (!bridge || typeof bridge.unlinkProvider !== 'function') {
+      throw new Error('Unlinking provider is not supported');
+    }
+    const user = await bridge.unlinkProvider(providerId);
+    if (user) {
+      this.state.userEmail = user.email || null;
+      this._notifyStatus();
+    }
+    return user;
+  },
+
+  getLinkedProviders() {
+    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    return bridge?.getLinkedProviders?.() || [];
   },
 
   async signInWithEmail(email, password, config = null) {

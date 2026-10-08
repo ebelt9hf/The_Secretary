@@ -675,7 +675,7 @@ function switchPrefsTab(tabId) {
     appearance: ['prefs-sec-appearance'],
     schedule: ['prefs-sec-schedule'],
     ai: ['prefs-sec-ai'],
-    sync: ['prefs-sec-sync'],
+    sync: ['prefs-sec-sync', 'prefs-sec-user-info'],
     system: ['prefs-sec-folder', 'prefs-sec-maintenance', 'prefs-sec-help']
   };
   Object.entries(sections).forEach(([tId, secIds]) => {
@@ -683,11 +683,17 @@ function switchPrefsTab(tabId) {
     secIds.forEach(id => {
       const el = document.getElementById(id);
       if (el) {
-        el.style.display = isCurrent ? 'block' : 'none';
+        if (id === 'prefs-sec-user-info') {
+          const isFirebase = window.FirebaseSyncService?.state?.engine === 'firebase';
+          el.style.display = (isCurrent && isFirebase) ? 'block' : 'none';
+        } else {
+          el.style.display = isCurrent ? 'block' : 'none';
+        }
       }
     });
   });
 }
+window.switchPrefsTab = switchPrefsTab;
 
 function togglePassVisibility(inputId, btnEl) {
   const input = document.getElementById(inputId);
@@ -827,6 +833,95 @@ function updateCloudSyncUI(statusObj) {
       }
       if (btnSignOut) btnSignOut.style.display = 'none';
       if (btnResetPass) btnResetPass.style.display = 'none';
+    }
+  }
+
+  // ── Multi-Provider User Information & Authentication Methods (Shown only when not local only) ──
+  const userInfoSec = document.getElementById('prefs-sec-user-info');
+  if (userInfoSec) {
+    const isFirebase = status.engine === 'firebase';
+    const isSyncTab = (typeof activePrefsTab !== 'undefined' ? activePrefsTab === 'sync' : true);
+    userInfoSec.style.display = (isFirebase && isSyncTab) ? 'block' : 'none';
+
+    if (isFirebase) {
+      const avatarEl = document.getElementById('prefs-user-avatar');
+      const nameEl = document.getElementById('prefs-user-display-name');
+      const badgeEl = document.getElementById('prefs-user-session-badge');
+      const emailEl = document.getElementById('prefs-user-email-text');
+      const uidEl = document.getElementById('prefs-user-uid-text');
+
+      if (avatarEl) {
+        avatarEl.textContent = (user && user.email)
+          ? user.email.charAt(0).toUpperCase()
+          : (user && user.isAnonymous ? 'G' : 'P');
+      }
+      if (nameEl) {
+        nameEl.textContent = (user && user.email)
+          ? user.email.split('@')[0]
+          : (user && user.isAnonymous
+              ? (typeof t === 'function' ? t('sync.accountGuestSession') : 'Guest Session')
+              : (typeof t === 'function' ? t('sync.authMethodPassphraseTitle') : 'Passphrase Vault'));
+      }
+      if (badgeEl) {
+        badgeEl.textContent = (user && user.isAnonymous)
+          ? (typeof t === 'function' ? t('sync.accountGuestSession') : 'Guest Session')
+          : (user && user.email
+              ? (typeof t === 'function' ? t('sync.authStatusLinked') : 'Linked')
+              : (typeof t === 'function' ? t('sync.authStatusActive') : 'Active'));
+      }
+      if (emailEl) {
+        emailEl.textContent = (user && user.email)
+          ? user.email
+          : (user && user.isAnonymous
+              ? (typeof t === 'function' ? t('sync.accountGuestSession') : 'Guest / Anonymous')
+              : (typeof t === 'function' ? t('sync.authStatusNotLinked') : 'Not Linked'));
+      }
+      if (uidEl) {
+        uidEl.textContent = (user && user.uid) ? `UID: ${user.uid}` : '';
+      }
+
+      // Provider rows
+      const linkedProviders = (user && user.linkedProviders) ? user.linkedProviders : [];
+      const hasGoogle = linkedProviders.some(p => p.providerId === 'google.com');
+      const hasPassword = linkedProviders.some(p => p.providerId === 'password') || (!!(user && user.email) && !user.isAnonymous && !hasGoogle);
+
+      // Google
+      const badgeGoogle = document.getElementById('badge-auth-google');
+      const btnLinkGoogle = document.getElementById('btn-link-auth-google');
+      if (badgeGoogle) {
+        badgeGoogle.textContent = hasGoogle
+          ? (typeof t === 'function' ? t('sync.authStatusLinked') : 'Linked')
+          : (typeof t === 'function' ? t('sync.authStatusNotLinked') : 'Not Linked');
+        badgeGoogle.style.background = hasGoogle ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.08)';
+        badgeGoogle.style.color = hasGoogle ? '#10b981' : 'var(--text-muted)';
+      }
+      if (btnLinkGoogle) {
+        btnLinkGoogle.style.display = hasGoogle ? 'none' : 'inline-flex';
+      }
+
+      // Email & Password
+      const badgeEmail = document.getElementById('badge-auth-email');
+      const btnLinkEmail = document.getElementById('btn-link-auth-email');
+      const btnUserReset = document.getElementById('btn-user-reset-pass');
+      if (badgeEmail) {
+        badgeEmail.textContent = hasPassword
+          ? (typeof t === 'function' ? t('sync.authStatusLinked') : 'Linked')
+          : (typeof t === 'function' ? t('sync.authStatusNotLinked') : 'Not Linked');
+        badgeEmail.style.background = hasPassword ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.08)';
+        badgeEmail.style.color = hasPassword ? '#10b981' : 'var(--text-muted)';
+      }
+      if (btnLinkEmail) {
+        btnLinkEmail.style.display = hasPassword ? 'none' : 'inline-flex';
+      }
+      if (btnUserReset) {
+        btnUserReset.style.display = (hasPassword && user && user.email) ? 'inline-flex' : 'none';
+      }
+
+      // Magic link
+      const btnSendMagic = document.getElementById('btn-user-send-magic');
+      if (btnSendMagic) {
+        btnSendMagic.style.display = (user && user.email && !user.isAnonymous) ? 'inline-flex' : 'none';
+      }
     }
   }
 
@@ -1785,6 +1880,113 @@ async function signOutCloudAccountUI() {
   }
 }
 window.signOutCloudAccountUI = signOutCloudAccountUI;
+
+async function linkCloudSyncGoogleUI() {
+  try {
+    if (!window.FirebaseSyncService) return;
+    await window.FirebaseSyncService.linkGoogle();
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.googleLinkedSuccess') : 'Google account linked successfully!');
+    }
+    updateCloudSyncUI();
+  } catch (err) {
+    console.error('Failed to link Google account:', err);
+    if (typeof showToast === 'function') {
+      showToast((typeof t === 'function' ? t('sync.linkFailed') : 'Account linking failed') + ': ' + (err.message || ''), true);
+    }
+  }
+}
+window.linkCloudSyncGoogleUI = linkCloudSyncGoogleUI;
+
+function openLinkEmailModalUI() {
+  const emailInput = document.getElementById('link-email-input');
+  const passInput = document.getElementById('link-password-input');
+  const authUser = window.FirebaseSyncService ? window.FirebaseSyncService.getAuthUser() : null;
+  if (emailInput) {
+    emailInput.value = authUser?.email || '';
+  }
+  if (passInput) {
+    passInput.value = '';
+  }
+  if (typeof openModal === 'function') {
+    openModal('modal-cloud-link-email');
+  }
+}
+window.openLinkEmailModalUI = openLinkEmailModalUI;
+
+async function submitLinkEmailUI() {
+  const emailInput = document.getElementById('link-email-input');
+  const passInput = document.getElementById('link-password-input');
+  const email = emailInput?.value?.trim();
+  const password = passInput?.value;
+
+  if (!email || !email.includes('@')) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address', true);
+    }
+    return;
+  }
+  if (!password || password.length < 6) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Password must be at least 6 characters', true);
+    }
+    return;
+  }
+
+  try {
+    if (!window.FirebaseSyncService) return;
+    await window.FirebaseSyncService.linkEmail(email, password);
+    if (typeof closeModal === 'function') {
+      closeModal('modal-cloud-link-email');
+    }
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.emailLinkedSuccess') : 'Email and password linked successfully!');
+    }
+    updateCloudSyncUI();
+  } catch (err) {
+    console.error('Failed to link email/password:', err);
+    if (typeof showToast === 'function') {
+      showToast((typeof t === 'function' ? t('sync.linkFailed') : 'Account linking failed') + ': ' + (err.message || ''), true);
+    }
+  }
+}
+window.submitLinkEmailUI = submitLinkEmailUI;
+
+async function sendMagicLinkForCurrentAccountUI() {
+  const user = window.FirebaseSyncService ? window.FirebaseSyncService.getAuthUser() : null;
+  if (!user || !user.email) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.emailRequired') : 'No email address associated with account', true);
+    }
+    return;
+  }
+  try {
+    await window.FirebaseSyncService.sendSignInLink(user.email);
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.magicLinkSentToast') : 'Sign-in link sent to your email inbox!');
+    }
+  } catch (err) {
+    console.error('Failed to send magic link:', err);
+    if (typeof showToast === 'function') {
+      showToast((typeof t === 'function' ? t('sync.setupFailed') : 'Failed') + ': ' + (err.message || ''), true);
+    }
+  }
+}
+window.sendMagicLinkForCurrentAccountUI = sendMagicLinkForCurrentAccountUI;
+
+async function unlinkAuthProviderUI(providerId) {
+  try {
+    if (!window.FirebaseSyncService) return;
+    await window.FirebaseSyncService.unlinkProvider(providerId);
+    updateCloudSyncUI();
+  } catch (err) {
+    console.error('Failed to unlink provider:', err);
+    if (typeof showToast === 'function') {
+      showToast((typeof t === 'function' ? t('sync.linkFailed') : 'Failed to unlink') + ': ' + (err.message || ''), true);
+    }
+  }
+}
+window.unlinkAuthProviderUI = unlinkAuthProviderUI;
 
 function openPasswordResetModalUI(email = '') {
   const emailInput = document.getElementById('sync-reset-password-email');
@@ -4249,6 +4451,118 @@ function createDemoVirtualDirectoryHandle() {
         { id: 'plan-10', title: typeof t === 'function' ? t('demo.planPrepTitle') : 'Sprint Retrospective Prep', date: dateFri, startTime: '11:00', endTime: '12:00', duration: 60, type: 'prep', workstream: 'Product Launch' },
         { id: 'plan-11', title: typeof t === 'function' ? t('demo.planWeeklyRetroTitle') : 'Weekly Retrospective & Review', date: dateFri, startTime: '15:30', endTime: '16:30', duration: 60, type: 'sync', collaborator: 'collab-1' }
       ]
+    },
+    'raw/topic-memories/index.json': {
+      topics: [
+        {
+          key: 'product_launch',
+          topicName: 'Product Launch',
+          summary: 'Core product milestones, roadmap planning, and go-to-market alignment.',
+          status: 'active',
+          pinned: true,
+          lastUpdated: new Date().toISOString(),
+          mappedTags: { major_topic_tags: ['Product Launch'], group_tags: ['strategy', 'roadmap'], topic_tags: ['features'] },
+          factsCount: 3,
+          decisionsCount: 1,
+          associatedNotesCount: 2
+        },
+        {
+          key: 'architecture_security',
+          topicName: 'Architecture & Security',
+          summary: 'Zero-knowledge end-to-end encryption and modular client architecture.',
+          status: 'active',
+          pinned: true,
+          lastUpdated: new Date().toISOString(),
+          mappedTags: { major_topic_tags: ['Architecture & Security'], group_tags: ['security', 'crypto'], topic_tags: ['e2ee'] },
+          factsCount: 3,
+          decisionsCount: 1,
+          associatedNotesCount: 2
+        },
+        {
+          key: 'quality_bug_fixes',
+          topicName: 'Quality & Bug Fixes',
+          summary: 'Strict automated test suites, cross-platform stability, and regression triage.',
+          status: 'active',
+          pinned: false,
+          lastUpdated: new Date().toISOString(),
+          mappedTags: { major_topic_tags: ['Quality & Bug Fixes'], group_tags: ['bugs', 'quality'], topic_tags: ['triage'] },
+          factsCount: 2,
+          decisionsCount: 1,
+          associatedNotesCount: 1
+        },
+        {
+          key: 'personal_strategy',
+          topicName: 'Personal / Strategy',
+          summary: 'High-level personal productivity strategy, retrospectives, and deep work focus blocks.',
+          status: 'active',
+          pinned: false,
+          lastUpdated: new Date().toISOString(),
+          mappedTags: { major_topic_tags: ['Personal / Strategy'], group_tags: ['productivity'], topic_tags: ['habits'] },
+          factsCount: 1,
+          decisionsCount: 0,
+          associatedNotesCount: 0
+        }
+      ]
+    },
+    'raw/topic-memories/product_launch.json': {
+      key: 'product_launch',
+      topicName: 'Product Launch',
+      summary: 'Core product milestones, roadmap planning, and go-to-market alignment.',
+      status: 'active',
+      pinned: true,
+      lastUpdated: new Date().toISOString(),
+      mappedTags: { major_topic_tags: ['Product Launch'], group_tags: ['strategy', 'roadmap'], topic_tags: ['features'] },
+      keyFacts: ['Private local-first personal productivity workspace', 'Multi-platform support across web, electron desktop, and chrome extension', 'Zero-knowledge end-to-end encryption with AES-256-GCM'],
+      activeMilestones: ['15 European language parity guarantee', 'Seamless demo sandbox for instant browser exploration'],
+      decisions: ['15 European Language Parity Guarantee'],
+      openThreads: ['Evaluate on-device local LLM execution latency'],
+      participants: ['Etienne Beltzung', 'Sarah Connor', 'Alex Martin'],
+      associatedNotes: ['notes/strategy-roadmap-note.html', 'notes/welcome-demo-note.html']
+    },
+    'raw/topic-memories/architecture_security.json': {
+      key: 'architecture_security',
+      topicName: 'Architecture & Security',
+      summary: 'Zero-knowledge end-to-end encryption and modular client architecture.',
+      status: 'active',
+      pinned: true,
+      lastUpdated: new Date().toISOString(),
+      mappedTags: { major_topic_tags: ['Architecture & Security'], group_tags: ['security', 'crypto'], topic_tags: ['e2ee'] },
+      keyFacts: ['Client-side PBKDF2 key derivation from user passphrase', 'Local Write-Ahead Log (WAL) ensures zero data loss on crash', 'Direct File System Access with IndexedDB fallback'],
+      activeMilestones: ['Finalize multi-window broadcast sync channel'],
+      decisions: ['Zero-Knowledge Encryption as Core Cloud Sync Engine'],
+      openThreads: ['Audit WebCrypto subtle key export restrictions'],
+      participants: ['Etienne Beltzung', 'Sarah Connor'],
+      associatedNotes: ['notes/security-zero-knowledge.html', 'notes/weekly-sync-notes.html']
+    },
+    'raw/topic-memories/quality_bug_fixes.json': {
+      key: 'quality_bug_fixes',
+      topicName: 'Quality & Bug Fixes',
+      summary: 'Strict automated test suites, cross-platform stability, and regression triage.',
+      status: 'active',
+      pinned: false,
+      lastUpdated: new Date().toISOString(),
+      mappedTags: { major_topic_tags: ['Quality & Bug Fixes'], group_tags: ['bugs', 'quality'], topic_tags: ['triage'] },
+      keyFacts: ['Automated test suite with over 1200 unit tests', 'Translation validator ensuring 100% key parity across 15 languages'],
+      activeMilestones: ['Zero unhandled exceptions policy'],
+      decisions: ['Zero Unhandled Exceptions Policy & Strict Regression Testing'],
+      openThreads: ['Continuous integration verification across all operating systems'],
+      participants: ['Sarah Connor', 'Etienne Beltzung'],
+      associatedNotes: ['notes/bug-tracking-note.html']
+    },
+    'raw/topic-memories/personal_strategy.json': {
+      key: 'personal_strategy',
+      topicName: 'Personal / Strategy',
+      summary: 'High-level personal productivity strategy, retrospectives, and deep work focus blocks.',
+      status: 'active',
+      pinned: false,
+      lastUpdated: new Date().toISOString(),
+      mappedTags: { major_topic_tags: ['Personal / Strategy'], group_tags: ['productivity'], topic_tags: ['habits'] },
+      keyFacts: ['Daily and weekly retrospectives for continuous improvement'],
+      activeMilestones: ['Maintain structured deep work blocks on Mondays and Wednesdays'],
+      decisions: [],
+      openThreads: ['Review weekly planner balance every Friday afternoon'],
+      participants: ['Etienne Beltzung'],
+      associatedNotes: []
     }
   };
 

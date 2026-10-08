@@ -7885,6 +7885,8 @@ function doesItemMatchWorkstream(item, topicName, memory) {
 }
 window.doesItemMatchWorkstream = doesItemMatchWorkstream;
 
+let _isFetchingCatalogForRegistry = false;
+
 function renderRegisterView(container) {
   let prevScrollTop = 0;
   const existingUnified = container?.querySelector?.('.decision-toolbar-unified') || document.querySelector('.decision-toolbar-unified');
@@ -7924,13 +7926,54 @@ function renderRegisterView(container) {
     } catch (_) {}
   }
 
-  if (typeof WorkstreamMemoryEngine !== 'undefined' && typeof WorkstreamMemoryEngine.getTopicMemoriesCatalog === 'function' && (!registeredWorkstreams.size)) {
-    WorkstreamMemoryEngine.getTopicMemoriesCatalog().then(() => {
-      const containerEl = document.getElementById('team-panel');
-      if (containerEl && containerEl.style.display !== 'none' && activeCollabView === 'registry') {
-        renderRegisterView(containerEl);
+  // Also collect known workstreams from settings, board, notes, and decisions
+  if (typeof getKnownWorkstreamsList === 'function') {
+    try {
+      const allNotesList = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof notesManifest !== 'undefined' && Array.isArray(notesManifest)) ? notesManifest : []);
+      const known = getKnownWorkstreamsList(allNotesList);
+      if (Array.isArray(known)) {
+        known.forEach(name => {
+          if (name && typeof name === 'string' && name.trim()) registeredWorkstreams.add(name.trim());
+        });
       }
-    }).catch(() => {});
+    } catch (_) {}
+  }
+  if (typeof settings !== 'undefined' && Array.isArray(settings?.workstreams)) {
+    settings.workstreams.forEach(ws => {
+      const name = typeof ws === 'string' ? ws : ws?.name;
+      if (name && ws?.status !== 'archived') registeredWorkstreams.add(String(name).trim());
+    });
+  }
+  if (typeof workstreamsList !== 'undefined' && Array.isArray(workstreamsList)) {
+    workstreamsList.forEach(ws => {
+      const name = typeof ws === 'string' ? ws : ws?.name;
+      if (name && ws?.status !== 'archived') registeredWorkstreams.add(String(name).trim());
+    });
+  }
+  for (const dec of decisionSource) {
+    if (dec?.workstream) registeredWorkstreams.add(String(dec.workstream).trim());
+    if (Array.isArray(dec?.major_topic_tags)) {
+      dec.major_topic_tags.forEach(t => { if (t) registeredWorkstreams.add(String(t).trim()); });
+    }
+  }
+
+  if (typeof WorkstreamMemoryEngine !== 'undefined' && typeof WorkstreamMemoryEngine.getTopicMemoriesCatalog === 'function' && (!registeredWorkstreams.size) && !_isFetchingCatalogForRegistry) {
+    _isFetchingCatalogForRegistry = true;
+    WorkstreamMemoryEngine.getTopicMemoriesCatalog().then((catalog) => {
+      _isFetchingCatalogForRegistry = false;
+      if (Array.isArray(catalog) && catalog.length > 0) {
+        const containerEl = document.getElementById('team-panel');
+        if (containerEl && containerEl.style.display !== 'none' && activeCollabView === 'registry') {
+          if (typeof renderTeamPanel === 'function') {
+            renderTeamPanel();
+          } else {
+            renderRegisterView(containerEl);
+          }
+        }
+      }
+    }).catch(() => {
+      _isFetchingCatalogForRegistry = false;
+    });
   }
 
   const decisionsByMajor = new Map();

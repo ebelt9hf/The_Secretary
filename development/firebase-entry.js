@@ -1,5 +1,22 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  linkWithPopup,
+  linkWithCredential,
+  EmailAuthProvider,
+  unlink
+} from 'firebase/auth';
 import { getDatabase, ref, set, get, onValue, remove, child } from 'firebase/database';
 
 export const FirebaseBridge = {
@@ -101,6 +118,46 @@ export const FirebaseBridge = {
   async sendPasswordReset(email) {
     if (!this.auth) return;
     await sendPasswordResetEmail(this.auth, email);
+  },
+
+  async linkGoogle() {
+    if (!this.auth) return null;
+    const user = this.getUser();
+    if (!user) throw new Error('No user is currently signed in');
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const cred = await linkWithPopup(user, provider);
+    this.currentUser = cred.user;
+    return cred.user;
+  },
+
+  async linkEmail(email, password) {
+    if (!this.auth) return null;
+    const user = this.getUser();
+    if (!user) throw new Error('No user is currently signed in');
+    const credential = EmailAuthProvider.credential(email, password);
+    const cred = await linkWithCredential(user, credential);
+    this.currentUser = cred.user;
+    return cred.user;
+  },
+
+  async unlinkProvider(providerId) {
+    if (!this.auth) return null;
+    const user = this.getUser();
+    if (!user) throw new Error('No user is currently signed in');
+    const updatedUser = await unlink(user, providerId);
+    this.currentUser = updatedUser;
+    return updatedUser;
+  },
+
+  getLinkedProviders() {
+    const user = this.getUser();
+    if (!user || !user.providerData) return [];
+    return user.providerData.map(p => ({
+      providerId: p.providerId,
+      email: p.email || null,
+      displayName: p.displayName || null
+    }));
   },
 
   getUser() {

@@ -929,6 +929,45 @@
   </div>
 </div>
 
+<!-- ── Link Email & Password Modal ── -->
+<div class="modal-overlay" id="modal-cloud-link-email" style="display:none;">
+  <div class="modal" style="max-width: 440px; width: 90%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.15rem;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:rgba(168,85,247,0.15); color:#a855f7;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </span>
+        <span data-i18n="sync.linkEmailModalTitle">Link Email & Password</span>
+      </h2>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-cloud-link-email')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <p style="margin: 0.2rem 0 0.8rem 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.45;" data-i18n="sync.linkEmailModalDesc">
+      Add an email address and password to your existing cloud vault. You will be able to authenticate on other devices using these credentials in addition to your passphrase.
+    </p>
+
+    <form id="form-cloud-link-email" novalidate onsubmit="event.preventDefault(); submitLinkEmailUI();" style="margin:0;">
+      <div class="form-field" style="margin-bottom:10px;">
+        <label for="link-email-input" data-i18n="sync.emailLabel" style="font-size:0.85rem; font-weight:600;">Email Address</label>
+        <input type="email" id="link-email-input" autocomplete="username" placeholder="you@example.com" class="prefs-input" style="width:100%;" title="Email address to link to this account" data-i18n-title="sync.emailTooltip" data-i18n-placeholder="sync.emailPlaceholder">
+      </div>
+      <div class="form-field" style="margin-bottom:16px;">
+        <label for="link-password-input" data-i18n="sync.accountPasswordLabel" style="font-size:0.85rem; font-weight:600;">Account Password</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="link-password-input" autocomplete="new-password" placeholder="Minimum 6 characters" class="prefs-input" style="width:100%; padding-right:36px;" title="Account password (minimum 6 characters)" data-i18n-title="sync.accountPasswordTooltip">
+          <button type="button" onclick="togglePassVisibility('link-password-input', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle password visibility" data-i18n-title="common.togglePasswordVisibility">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-link-email')" title="Cancel" data-i18n-title="common.cancelTooltip" data-i18n="common.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-link-email" onclick="submitLinkEmailUI()" title="Link this email and password to your vault" data-i18n-title="sync.linkEmailBtnTooltip" data-i18n="sync.linkEmailBtn">Link Email</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ── Cloud Sync Unlock Modal ── -->
 <div class="modal-overlay" id="modal-cloud-sync-unlock">
   <div class="modal" style="max-width: 440px; width: 90%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">

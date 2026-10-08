@@ -3,6 +3,7 @@ import { loadScriptsIntoGlobal } from '../helpers/load-globals.js';
 
 describe('Firebase Email & Password Authentication and Account UI', () => {
   let mockBridge;
+  let originalSyncService;
 
   beforeAll(() => {
     globalThis.window = globalThis.window || {};
@@ -17,9 +18,11 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
       'js/app-firebase-sync.js',
       'js/app-init.js'
     ]);
+    originalSyncService = window.FirebaseSyncService;
   });
 
   beforeEach(() => {
+    window.FirebaseSyncService = originalSyncService;
     // Set up basic DOM structure
     document.body.innerHTML = `
       <div class="modal-overlay" id="modal-cloud-sync-setup" style="display:none;">
@@ -404,5 +407,109 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
     expect(dialogUpdateSpy).toHaveBeenCalledWith('Downloading...', 70);
     expect(dialogCloseSpy).toHaveBeenCalled();
   });
+
+  describe('Multi-Provider Linking & Account Management', () => {
+    it('FirebaseSyncService.linkGoogle calls bridge.linkWithGooglePopup and records provider', async () => {
+      mockBridge.linkWithGooglePopup = vi.fn().mockResolvedValue({
+        uid: 'user-uid-123',
+        email: 'googleuser@gmail.com',
+        providerData: [{ providerId: 'google.com', email: 'googleuser@gmail.com' }]
+      });
+      window.FirebaseBridge = mockBridge;
+      window.FirebaseSyncService.bridge = mockBridge;
+
+      const user = await window.FirebaseSyncService.linkGoogle();
+      expect(mockBridge.linkWithGooglePopup).toHaveBeenCalled();
+      expect(user.email).toBe('googleuser@gmail.com');
+      expect(user.linkedProviders).toEqual(
+        expect.arrayContaining([expect.objectContaining({ providerId: 'google.com' })])
+      );
+    });
+
+    it('FirebaseSyncService.linkEmail calls bridge.linkWithEmailPassword and records provider', async () => {
+      mockBridge.linkWithEmailPassword = vi.fn().mockResolvedValue({
+        uid: 'user-uid-123',
+        email: 'linked@example.com',
+        providerData: [{ providerId: 'password', email: 'linked@example.com' }]
+      });
+      window.FirebaseBridge = mockBridge;
+      window.FirebaseSyncService.bridge = mockBridge;
+
+      const user = await window.FirebaseSyncService.linkEmail('linked@example.com', 'secret123');
+      expect(mockBridge.linkWithEmailPassword).toHaveBeenCalledWith('linked@example.com', 'secret123');
+      expect(user.email).toBe('linked@example.com');
+    });
+
+    it('FirebaseSyncService.unlinkProvider calls bridge.unlinkAuthProvider', async () => {
+      mockBridge.unlinkAuthProvider = vi.fn().mockResolvedValue({
+        uid: 'user-uid-123',
+        providerData: []
+      });
+      window.FirebaseBridge = mockBridge;
+      window.FirebaseSyncService.bridge = mockBridge;
+
+      await window.FirebaseSyncService.unlinkProvider('google.com');
+      expect(mockBridge.unlinkAuthProvider).toHaveBeenCalledWith('google.com');
+    });
+
+    it('linkCloudSyncGoogleUI triggers linkGoogle and updates UI', async () => {
+      window.FirebaseSyncService.linkGoogle = vi.fn().mockResolvedValue({});
+      globalThis.updateCloudSyncUI = vi.fn();
+      window.showToast = vi.fn();
+
+      await globalThis.linkCloudSyncGoogleUI();
+      expect(window.FirebaseSyncService.linkGoogle).toHaveBeenCalled();
+      expect(globalThis.updateCloudSyncUI).toHaveBeenCalled();
+      expect(window.showToast).toHaveBeenCalled();
+    });
+
+    it('submitLinkEmailUI validates inputs and calls linkEmail', async () => {
+      // Add modal inputs to document
+      const container = document.createElement('div');
+      container.innerHTML = `
+        <input id="link-email-input" value="test@example.com">
+        <input id="link-password-input" value="123456">
+      `;
+      document.body.appendChild(container);
+
+      window.FirebaseSyncService.linkEmail = vi.fn().mockResolvedValue({});
+      globalThis.closeModal = vi.fn();
+      globalThis.updateCloudSyncUI = vi.fn();
+      window.showToast = vi.fn();
+
+      await globalThis.submitLinkEmailUI();
+      expect(window.FirebaseSyncService.linkEmail).toHaveBeenCalledWith('test@example.com', '123456');
+      expect(globalThis.closeModal).toHaveBeenCalledWith('modal-cloud-link-email');
+      expect(globalThis.updateCloudSyncUI).toHaveBeenCalled();
+      expect(window.showToast).toHaveBeenCalled();
+    });
+
+    it('updateCloudSyncUI displays user info section when engine is firebase and hides when filesystem', () => {
+      const userInfoSection = document.createElement('div');
+      userInfoSection.id = 'prefs-sec-user-info';
+      userInfoSection.style.display = 'none';
+      document.body.appendChild(userInfoSection);
+
+      window.FirebaseSyncService.getAuthUser = vi.fn().mockReturnValue({
+        uid: 'user-abc',
+        email: 'user@example.com',
+        isAnonymous: false,
+        linkedProviders: [{ providerId: 'google.com' }]
+      });
+
+      if (typeof globalThis.switchPrefsTab === 'function') {
+        globalThis.switchPrefsTab('sync');
+      }
+
+      // Firebase mode
+      globalThis.updateCloudSyncUI({ engine: 'firebase', status: 'connected' });
+      expect(userInfoSection.style.display).toBe('block');
+
+      // Local filesystem mode
+      globalThis.updateCloudSyncUI({ engine: 'filesystem', status: 'idle' });
+      expect(userInfoSection.style.display).toBe('none');
+    });
+  });
 });
+
 
