@@ -1954,6 +1954,7 @@ body[data-theme='dark'] .app-version-banner.banner-update {
 }
 .browser-compat-desc {
   margin: 0;
+  max-width: none;
   font-size: 0.8rem;
   line-height: 1.4;
   color: var(--text-muted);
@@ -1981,7 +1982,7 @@ body[data-theme='dark'] .app-version-banner.banner-update {
   justify-content: space-between;
   gap: 0.5rem;
   text-align: left;
-  min-height: 155px;
+  min-height: auto;
 }
 .browser-option-item:hover {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--card-border));
@@ -2021,6 +2022,7 @@ body[data-theme='dark'] .app-version-banner.banner-update {
 }
 .browser-option-text {
   margin: 0;
+  max-width: none;
   font-size: 0.76rem;
   line-height: 1.4;
   color: var(--text-muted);

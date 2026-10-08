@@ -3550,7 +3550,12 @@ function renderBrowserCompatibilityOptions() {
 
   const card = document.getElementById('screen-connect-card') || screenConnect;
   if (card && card.classList) card.classList.add('has-browser-options');
-  card.insertBefore(container, card.firstChild);
+  const actionsContainer = card.querySelector ? card.querySelector('.landing-actions-container') : null;
+  if (actionsContainer) {
+    card.insertBefore(container, actionsContainer);
+  } else {
+    card.appendChild(container);
+  }
 
   // Hide local folder pick buttons
   const btnOpen = document.getElementById('btn-open-folder');

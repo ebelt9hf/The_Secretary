@@ -75,6 +75,10 @@ describe('Browser Compatibility & 3 Storage Options (tests/unit/app-browser-comp
     const optionC = document.getElementById('landing-option-managed-firebase');
     expect(optionC).not.toBeNull();
     expect(optionC.textContent).toContain('landing.optionManagedFirebaseTitle');
+
+    // Container should be attached to card
+    const card = document.getElementById('screen-connect-card');
+    expect(card.contains(optionsContainer)).toBe(true);
   });
 
   it('openCustomFirebaseSetupFromLanding opens setup modal and expands custom Firebase JSON body', () => {
