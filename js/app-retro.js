@@ -918,12 +918,27 @@ window.isEndOfDayReviewWindow = function() {
     return false;
   }
 
-  // Check working day vs note presence: on a non-working day without a note, do not show
+  // Collect today's reviewable notes
+  let todayNotes = [];
+  if (typeof window.DailyReviewController !== 'undefined' && typeof window.DailyReviewController.collectTodayNotes === 'function') {
+    todayNotes = window.DailyReviewController.collectTodayNotes(todayStr);
+  } else {
+    todayNotes = (typeof manifest !== 'undefined' && Array.isArray(manifest) ? manifest : [])
+      .filter(n => n && n.date === todayStr && !String(n.id || '').startsWith('retro-') && !String(n.id || '').startsWith('summary-'));
+  }
+
+  // Count unreviewed notes
+  const unreviewedNotes = todayNotes.filter(n => !n.reviewed);
+
+  // If there are no notes to review for today, do not pulse/blink the retrospective tab
+  if (todayNotes.length === 0 || unreviewedNotes.length === 0) {
+    return false;
+  }
+
+  // Check working day: on a non-working day, do not pulse
   const workingDays = (window.settings?.ui?.workingDays || (typeof plannerWorkingDays !== 'undefined' ? plannerWorkingDays : [1, 2, 3, 4, 5]));
   const isWorkingDay = Array.isArray(workingDays) ? workingDays.includes(now.getDay()) : true;
-  const todayNotesCount = (typeof manifest !== 'undefined' ? manifest : []).filter(n => n && n.date === todayStr).length;
-
-  if (!isWorkingDay && todayNotesCount === 0) {
+  if (!isWorkingDay) {
     return false;
   }
 
@@ -972,13 +987,20 @@ window.showRetroHoverCard = function() {
   }
 
   const todayStr = formatLocalDateValue(new Date());
-  const todayNotes = (typeof manifest !== 'undefined' ? manifest : []).filter(n => n && n.date === todayStr);
-  const estimate = window.DailyReviewTimeTracker.getEstimate(todayNotes.length);
+  let todayNotes = [];
+  if (typeof window.DailyReviewController !== 'undefined' && typeof window.DailyReviewController.collectTodayNotes === 'function') {
+    todayNotes = window.DailyReviewController.collectTodayNotes(todayStr);
+  } else {
+    todayNotes = (typeof manifest !== 'undefined' && Array.isArray(manifest) ? manifest : [])
+      .filter(n => n && n.date === todayStr && !String(n.id || '').startsWith('retro-') && !String(n.id || '').startsWith('summary-'));
+  }
+  const unreviewedNotes = todayNotes.filter(n => !n.reviewed);
+  const estimate = window.DailyReviewTimeTracker.getEstimate(unreviewedNotes.length);
 
   const titleText = t('retro.reviewTodayHoverTitle') || 'Review Today';
   const descText = t('retro.reviewTodayHoverDesc') || 'Complete your end-of-day walkthrough & organize thoughts';
-  const notesText = todayNotes.length > 0
-    ? (t('retro.notesToReviewCount', { count: todayNotes.length }) || `${todayNotes.length} note(s) to review today`)
+  const notesText = unreviewedNotes.length > 0
+    ? (t('retro.notesToReviewCount', { count: unreviewedNotes.length }) || `${unreviewedNotes.length} note(s) to review today`)
     : (t('retro.noNotesToReview') || 'No notes to review today');
   const ctaText = t('retro.startDailyReviewBtn') || 'Review Today';
   const ctaTooltip = t('retro.startDailyReviewBtnTooltip') || 'Launch the end-of-day Daily Review wizard for today';
