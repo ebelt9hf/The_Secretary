@@ -11,6 +11,7 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
             <div id="omnibar-input-area" class="omnibar-input-area">
               <div id="omnibar-ghost-layer" class="omnibar-ghost-layer"></div>
               <input id="omnibar-input" class="omnibar-input" type="text" />
+              <div id="omnibar-segmented-bar" class="omnibar-segmented-bar" style="display: none;"></div>
             </div>
           </div>
           <div id="omnibar-param-indicator" class="omnibar-param-indicator"></div>
@@ -51,6 +52,22 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
         'omnibar.sectionNotes': 'Notes',
         'omnibar.sectionTodos': 'Tasks',
         'omnibar.sectionEvents': 'Planner & Calls',
+        'omnibar.sectionAction': 'Action',
+        'omnibar.sectionPriority': 'Priority',
+        'omnibar.sectionWorkstream': 'Workstream',
+        'omnibar.sectionStatus': 'Status',
+        'omnibar.sectionType': 'Type',
+        'omnibar.sectionTitle': 'Title',
+        'omnibar.tokenNow': 'Do Now',
+        'omnibar.tokenPlan': 'Schedule',
+        'omnibar.tokenDelegate': 'Delegate',
+        'omnibar.tokenLater': 'Later',
+        'omnibar.previewTodo': 'New Task',
+        'omnibar.previewDec': 'Record Decision',
+        'omnibar.previewBlock': 'Schedule Block',
+        'omnibar.previewNote': 'Create Note',
+        'omnibar.previewCall': 'Call & Note',
+        'omnibar.enterToCreate': 'Press Enter to create',
         'topbar.planner': 'Planner',
         'topbar.notes': 'Notes',
         'topbar.todos': 'Tasks',
@@ -702,7 +719,7 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
 
       // Subsequent Tab completes priority token for /todo
       OmnibarController.handleTabCompletion(false);
-      expect(input.value).toBe('/todo Q1 ');
+      expect(input.value).toBe('/todo now ');
 
       // Cycling notes groups
       input.value = '/note ';
@@ -782,6 +799,96 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
       hintPills.forEach(pill => {
         expect(pill.getAttribute('title')).toBeTruthy();
       });
+    });
+  });
+
+  describe('Segmented Sectional Architecture & Entity Theming', () => {
+    it('initializes segmented mode for /todo and sets up sections with default priority plan', () => {
+      OmnibarController.open();
+      OmnibarController.initSegmentedMode('todo', 'Review PR #42');
+
+      const segmentedBar = document.getElementById('omnibar-segmented-bar');
+      expect(segmentedBar).not.toBeNull();
+      expect(segmentedBar.style.display).toBe('flex');
+      expect(OmnibarController.segmentedState.active).toBe(true);
+      expect(OmnibarController.segmentedState.action).toBe('todo');
+      expect(OmnibarController.segmentedState.data.title).toBe('Review PR #42');
+      expect(OmnibarController.segmentedState.data.priority).toBe('plan');
+
+      const container = document.getElementById('omnibar-container');
+      expect(container.classList.contains('theme-todo')).toBe(true);
+      expect(container.getAttribute('data-urgency')).toBe('plan');
+    });
+
+    it('morphs entity themes dynamically based on urgency in /todo', () => {
+      OmnibarController.open();
+      OmnibarController.initSegmentedMode('todo');
+
+      const container = document.getElementById('omnibar-container');
+      OmnibarController.selectComboOption(1, 'now');
+      expect(container.getAttribute('data-urgency')).toBe('now');
+
+      OmnibarController.selectComboOption(1, 'delegate');
+      expect(container.getAttribute('data-urgency')).toBe('delegate');
+
+      OmnibarController.selectComboOption(1, 'later');
+      expect(container.getAttribute('data-urgency')).toBe('later');
+    });
+
+    it('applies theme-decision when switching to /decision and preserves typed title as summary', () => {
+      OmnibarController.open();
+      OmnibarController.initSegmentedMode('todo', 'Adopt WebSockets');
+
+      // Shift+Tab back to Section 0 to switch to /decision
+      OmnibarController.translateSectionState('dec');
+
+      const container = document.getElementById('omnibar-container');
+      expect(container.classList.contains('theme-decision')).toBe(true);
+      expect(OmnibarController.segmentedState.action).toBe('dec');
+      // Free text is preserved across the switch!
+      expect(OmnibarController.segmentedState.data.title).toBe('Adopt WebSockets');
+      expect(OmnibarController.segmentedState.data.status).toBe('active');
+    });
+
+    it('renders live preview card in #omnibar-results during segmented mode', () => {
+      OmnibarController.open();
+      OmnibarController.initSegmentedMode('todo', 'Fix crash');
+      OmnibarController.selectComboOption(1, 'now');
+
+      const results = document.getElementById('omnibar-results');
+      expect(results.style.display).toBe('block');
+      expect(results.innerHTML).toContain('NOW');
+      expect(results.innerHTML).toContain('Fix crash');
+    });
+
+    it('correctly aggregates most used tags for a workstream', () => {
+      globalThis.manifest = [
+        { id: 'n1', workstream: 'Architecture', topic_tags: ['Backend', 'DB'], extra_tags: ['v2'] },
+        { id: 'n2', workstream: 'Architecture', topic_tags: ['Backend', 'API'] },
+        { id: 'n3', workstream: 'Product', topic_tags: ['Design'] }
+      ];
+
+      const tags = OmnibarController.getMostUsedTagsForWorkstream('Architecture');
+      expect(tags).toHaveLength(2);
+      expect(tags[0]).toBe('Backend'); // Appears in both n1 and n2
+    });
+
+    it('parses action verbs (now, plan, delegate, later) and purges WIP priority bug', async () => {
+      globalThis.todosManifest = [];
+      globalThis.saveTodosManifest = async () => {};
+
+      // Test now -> Q1 High
+      await OmnibarController.handleTodoCommand('/todo now Fix critical bug');
+      expect(globalThis.todosManifest).toHaveLength(1);
+      expect(globalThis.todosManifest[0].eisenhowerQuadrant).toBe('Q1');
+      expect(globalThis.todosManifest[0].priority).toBe('High');
+      expect(globalThis.todosManifest[0].status).toBeUndefined(); // Not overwritten with WIP
+
+      // Test delegate -> Q3 Low
+      await OmnibarController.handleTodoCommand('/todo delegate Send report');
+      expect(globalThis.todosManifest).toHaveLength(2);
+      expect(globalThis.todosManifest[1].eisenhowerQuadrant).toBe('Q3');
+      expect(globalThis.todosManifest[1].priority).toBe('Low');
     });
   });
 });

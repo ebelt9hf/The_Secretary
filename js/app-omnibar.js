@@ -244,9 +244,16 @@ const OmnibarController = {
 
   setCommandPrefix(prefix) {
     const input = document.getElementById('omnibar-input');
+    const locCmd = this.getLocalizedCommand(prefix);
     if (input) {
-      const locCmd = this.getLocalizedCommand(prefix);
       input.value = locCmd + ' ';
+    }
+    const match = this.matchCommandType(prefix.startsWith('/') ? prefix : '/' + prefix);
+    if (match && ['todo', 'dec', 'block', 'note', 'call'].includes(match.type)) {
+      this.initSegmentedMode(match.type);
+      return;
+    }
+    if (input) {
       input.focus();
       this.tabCycle.active = false;
       this.updateGhostSuggestion();
@@ -334,14 +341,17 @@ const OmnibarController = {
       return;
     }
 
-    // If typing a specific command with arguments (e.g. /todo Buy milk, /appel Point client, /call Sync), do not show search dropdown, let inline command execution handle it
+    // If typing a specific command with arguments (e.g. /todo Buy milk, /appel Point client, /call Sync), render live preview card!
     const cmdMatch = this.matchCommandType(query);
     if (cmdMatch && query.length > cmdMatch.cmdLen && /\s/.test(query.slice(0, cmdMatch.cmdLen + 1))) {
-      resultsContainer.style.display = 'none';
-      input.setAttribute('aria-expanded', 'false');
-      input.removeAttribute('aria-activedescendant');
-      this.results = [];
+      this.renderRawCommandLivePreview(cmdMatch, query);
       return;
+    } else {
+      const container = document.getElementById('omnibar-container');
+      if (container && !this.segmentedState.active) {
+        container.classList.remove('theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call');
+        container.removeAttribute('data-urgency');
+      }
     }
 
     const lower = query.toLowerCase();
@@ -387,7 +397,7 @@ const OmnibarController = {
     const cmdSec = t('omnibar.cmdSecretary') || '/secretary';
 
     const cmds = [
-      { cmd: cmdTodo, alt: '/todo', type: 'todo', syntaxText: `${cmdTodo} [Q1-Q4] ${t('omnibar.paramLabel') || '<title>'}`, meta: t('omnibar.hintTodo') || 'Create a task', icon: '✅' },
+      { cmd: cmdTodo, alt: '/todo', type: 'todo', syntaxText: `${cmdTodo} [now|plan|del|later] ${t('omnibar.paramLabel') || '<title>'}`, meta: t('omnibar.hintTodo') || 'Create a task', icon: '✅' },
       { cmd: cmdBlock, alt: '/block', type: 'block', syntaxText: `${cmdBlock} ${t('omnibar.paramLabel') || '<title>'} [${t('omnibar.paramDate') || 'date'}] [${t('omnibar.paramTime') || 'time'}] [${t('omnibar.paramDuration') || 'duration'}]`, meta: t('omnibar.hintBlock') || 'Create planner block', icon: '📅' },
       { cmd: cmdCall, alt: '/call', type: 'call', syntaxText: `${cmdCall} ${t('omnibar.paramLabel') || '<title>'}`, meta: t('omnibar.hintCall') || 'Create call & note', icon: '📞' },
       { cmd: cmdNote, alt: '/note', type: 'note', syntaxText: `${cmdNote} [${t('omnibar.paramGroup') || 'group'}] ${t('omnibar.paramLabel') || '<title>'}`, meta: t('omnibar.hintNote') || 'New note', icon: '📝' },
@@ -745,7 +755,7 @@ const OmnibarController = {
     const cmdSec = t('omnibar.cmdSecretary') || '/secretary';
 
     const commands = [
-      { name: cmdTodo, alt: '/todo', type: 'todo', hint: `[Q1|Q2|Q3|Q4|WIP] ${pLabel}`, options: ['Q1', 'Q2', 'Q3', 'Q4', 'WIP'] },
+      { name: cmdTodo, alt: '/todo', type: 'todo', hint: `[now|plan|del|later] ${pLabel}`, options: ['now', 'plan', 'delegate', 'later'] },
       { name: cmdBlock, alt: '/block', type: 'block', hint: `${pLabel} [today|tomorrow] [14:00] [30m|1h]`, options: ['today', 'tomorrow', '09:00', '10:00', '14:00', '15:00', '30m', '45m', '1h', '2h'] },
       { name: cmdCall, alt: '/call', type: 'call', hint: `${pLabel}`, options: [] },
       { name: cmdDec, alt: '/dec', type: 'dec', hint: `[Topic] ${pLabel}`, options: this.getExistingTopics() },
@@ -789,18 +799,18 @@ const OmnibarController = {
     const match = this.matchCommandType(val);
     if (match) {
       const content = val.substring(match.cmdLen).replace(/^\s+/, '');
-      const priorities = ['Q1', 'Q2', 'Q3', 'Q4', 'WIP'];
+      const priorities = ['now', 'plan', 'delegate', 'del', 'later', 'q1', 'q2', 'q3', 'q4', 'high', 'medium', 'med', 'low', 'maintenant', 'sofort', 'ahora', 'subito', 'hned', 'teraz', 'most', 'acum', 'сейчас', 'şimdi', 'simdi', 'зараз', 'planifier', 'planen', 'planear', 'pianifica', 'plannen', 'zaplanuj', 'planejar', 'naplanovat', 'tervez', 'programeaza', 'запланировать', 'planera', 'planla', 'запланувати', 'deleguer', 'déléguer', 'delegieren', 'delegare', 'delega', 'delegeren', 'oddeleguj', 'delegovat', 'delegál', 'delegera', 'devret', 'делегировать', 'деврет', 'делегувати', 'tard', 'plustard', 'später', 'spaeter', 'luego', 'despues', 'dopo', 'tardi', 'depois', 'pozdeji', 'później', 'pozniej', 'később', 'kesobb', 'maitârziu', 'tarziu', 'позже', 'senare', 'sonra', 'пізніше'];
 
       if (match.type === 'todo') {
         if (!content || (!hasTrailingSpace && content.length === 0)) {
           return {
-            ghostSuffix: hasTrailingSpace ? `[Q1|Q2|Q3|Q4|WIP] ${pLabel}` : ` [Q1|Q2|Q3|Q4|WIP] ${pLabel}`,
-            tabComplete: val.endsWith(' ') ? val + 'Q1 ' : val + ' Q1 ',
-            options: priorities,
+            ghostSuffix: hasTrailingSpace ? `[now|plan|del|later] ${pLabel}` : ` [now|plan|del|later] ${pLabel}`,
+            tabComplete: val.endsWith(' ') ? val + 'now ' : val + ' now ',
+            options: ['now', 'plan', 'delegate', 'later'],
             tokenType: 'todoPriority'
           };
         }
-        const firstToken = content.split(' ')[0].toUpperCase();
+        const firstToken = content.split(' ')[0].toLowerCase();
         if (priorities.includes(firstToken)) {
           if (!content.includes(' ') || content.endsWith(' ')) {
             return {
@@ -898,6 +908,934 @@ const OmnibarController = {
       : [];
     return topics.length ? topics : ['Architecture', 'Product', 'Process', 'Tech'];
   },
+
+  getKnownWorkstreams() {
+    const list = new Set();
+    if (typeof manifest !== 'undefined' && Array.isArray(manifest)) {
+      manifest.forEach(n => {
+        if (n && n.workstream) list.add(n.workstream);
+        if (n && Array.isArray(n.major_topic_tags)) n.major_topic_tags.forEach(t => t && list.add(t));
+      });
+    }
+    if (typeof settings !== 'undefined' && settings && Array.isArray(settings.workstreams)) {
+      settings.workstreams.forEach(w => w && list.add(w));
+    }
+    const arr = Array.from(list).filter(Boolean);
+    return arr.length ? arr : ['General', 'Architecture', 'Product', 'Tech'];
+  },
+
+  getMostUsedTagsForWorkstream(workstreamName) {
+    if (!workstreamName) return [];
+    const counts = {};
+    if (typeof manifest !== 'undefined' && Array.isArray(manifest)) {
+      manifest.forEach(n => {
+        if (!n) return;
+        const matchWs = n.workstream === workstreamName || (Array.isArray(n.major_topic_tags) && n.major_topic_tags.includes(workstreamName));
+        if (matchWs) {
+          const tags = [...(n.topic_tags || []), ...(n.extra_tags || [])];
+          tags.forEach(t => {
+            if (t) counts[t] = (counts[t] || 0) + 1;
+          });
+        }
+      });
+    }
+    const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    return sorted.slice(0, 2);
+  },
+
+  // ── Segmented Sectional Omnibar Architecture ──
+  segmentedState: {
+    active: false,
+    action: 'todo',
+    activeSectionIndex: 1,
+    comboOpen: false,
+    comboSectionIndex: -1,
+    calOpen: false,
+    calMonth: new Date().getMonth(),
+    calYear: new Date().getFullYear(),
+    comboSelectedIndex: 0,
+    data: {
+      action: 'todo',
+      priority: 'plan',
+      workstream: 'General',
+      status: 'active',
+      type: 'work',
+      date: 'today',
+      time: '14:00',
+      duration: '30m',
+      title: '',
+      colleague: ''
+    }
+  },
+
+  initSegmentedMode(action = 'todo', initialText = '') {
+    const segmentedBar = document.getElementById('omnibar-segmented-bar');
+    const input = document.getElementById('omnibar-input');
+    const ghost = document.getElementById('omnibar-ghost-layer');
+    const container = document.getElementById('omnibar-container');
+    if (!segmentedBar) return;
+
+    this.segmentedState.active = true;
+    this.segmentedState.action = action;
+    this.segmentedState.data.action = action;
+    if (initialText) this.segmentedState.data.title = initialText;
+    if (!this.segmentedState.data.workstream) {
+      const known = this.getKnownWorkstreams();
+      this.segmentedState.data.workstream = known[0] || 'General';
+    }
+    if (!this.segmentedState.data.time) {
+      this.segmentedState.data.time = this.getNextRoundHour();
+    }
+    if (!this.segmentedState.data.duration) {
+      this.segmentedState.data.duration = (typeof settings !== 'undefined' && settings?.plannerDefaultDuration) ? `${settings.plannerDefaultDuration}m` : '30m';
+    }
+
+    if (input) input.style.display = 'none';
+    if (ghost) ghost.style.display = 'none';
+    segmentedBar.style.display = 'flex';
+    if (container) container.classList.add('wide');
+
+    this.applyTheme();
+    this.renderSegmentedBar();
+    this.renderLivePreview();
+
+    setTimeout(() => {
+      this.focusSection(1);
+    }, 40);
+  },
+
+  exitSegmentedMode() {
+    const segmentedBar = document.getElementById('omnibar-segmented-bar');
+    const input = document.getElementById('omnibar-input');
+    const ghost = document.getElementById('omnibar-ghost-layer');
+    const container = document.getElementById('omnibar-container');
+    const results = document.getElementById('omnibar-results');
+
+    this.segmentedState.active = false;
+    this.segmentedState.comboOpen = false;
+    this.segmentedState.calOpen = false;
+
+    if (segmentedBar) segmentedBar.style.display = 'none';
+    if (input) {
+      input.style.display = '';
+      input.value = '';
+      input.focus();
+    }
+    if (ghost) ghost.style.display = '';
+    if (container) {
+      container.classList.remove('theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call', 'wide');
+      container.removeAttribute('data-urgency');
+    }
+    if (results) results.style.display = 'none';
+
+    this.updateGhostSuggestion();
+    this.renderDefaultHints();
+  },
+
+  translateSectionState(newAction) {
+    const oldAction = this.segmentedState.action;
+    if (oldAction === newAction) return;
+
+    const data = this.segmentedState.data;
+    data.action = newAction;
+    this.segmentedState.action = newAction;
+
+    // Preserved across all transitions: data.title and data.workstream
+    if (newAction === 'todo') {
+      if (!data.priority) data.priority = 'plan';
+    } else if (newAction === 'dec') {
+      if (!data.status) data.status = 'active';
+    } else if (newAction === 'block') {
+      if (!data.type) data.type = 'work';
+      if (!data.date) data.date = 'today';
+      if (!data.time) data.time = this.getNextRoundHour();
+      if (!data.duration) data.duration = (typeof settings !== 'undefined' && settings?.plannerDefaultDuration) ? `${settings.plannerDefaultDuration}m` : '30m';
+    } else if (newAction === 'call') {
+      if (!data.date) data.date = 'today';
+      if (!data.time) data.time = this.getNextRoundHour();
+    }
+
+    this.segmentedState.comboOpen = false;
+    this.segmentedState.calOpen = false;
+    this.segmentedState.activeSectionIndex = 1;
+    this.applyTheme();
+    this.renderSegmentedBar();
+    this.renderLivePreview();
+  },
+
+  applyTheme() {
+    const container = document.getElementById('omnibar-container');
+    if (!container) return;
+
+    container.classList.remove('theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call');
+    container.removeAttribute('data-urgency');
+
+    if (!this.segmentedState.active) return;
+
+    const action = this.segmentedState.action;
+    if (action === 'dec') {
+      container.classList.add('theme-decision');
+    } else if (action === 'todo') {
+      container.classList.add('theme-todo');
+      container.setAttribute('data-urgency', this.segmentedState.data.priority || 'plan');
+    } else if (action === 'block') {
+      container.classList.add('theme-block');
+    } else if (action === 'note') {
+      container.classList.add('theme-note');
+    } else if (action === 'call') {
+      container.classList.add('theme-call');
+    }
+  },
+
+  getSectionDefinitions() {
+    const action = this.segmentedState.action;
+    const data = this.segmentedState.data;
+
+    // Section 0 is always Action
+    const actionSec = {
+      type: 'action',
+      label: t('omnibar.sectionAction') || 'Action',
+      value: '/' + action,
+      icon: { todo: '✅', dec: '⚖️', block: '📅', note: '📝', call: '📞' }[action] || '⚡',
+      isSelective: true,
+      options: [
+        { id: 'todo', label: t('omnibar.cmdTodo') || '/todo', meta: t('omnibar.previewTodo') || 'Task', icon: '✅' },
+        { id: 'dec', label: t('omnibar.cmdDec') || '/dec', meta: t('omnibar.previewDec') || 'Decision', icon: '⚖️' },
+        { id: 'block', label: t('omnibar.cmdBlock') || '/block', meta: t('omnibar.previewBlock') || 'Block', icon: '📅' },
+        { id: 'note', label: t('omnibar.cmdNote') || '/note', meta: t('omnibar.previewNote') || 'Note', icon: '📝' },
+        { id: 'call', label: t('omnibar.cmdCall') || '/call', meta: t('omnibar.previewCall') || 'Call', icon: '📞' }
+      ]
+    };
+
+    if (action === 'todo') {
+      return [
+        actionSec,
+        {
+          type: 'priority',
+          label: t('omnibar.sectionPriority') || 'Priority',
+          value: data.priority,
+          displayValue: { now: 'NOW', plan: 'PLAN', delegate: 'DEL', later: 'LATER' }[data.priority] || data.priority,
+          badgeClass: `badge-urgency badge-${data.priority}`,
+          isSelective: true,
+          options: [
+            { id: 'now', label: 'now', meta: t('omnibar.tokenNow') || 'Do Now (Urgent & Important)', icon: '🔴' },
+            { id: 'plan', label: 'plan', meta: t('omnibar.tokenPlan') || 'Schedule (Important)', icon: '🟡' },
+            { id: 'delegate', label: 'delegate', meta: t('omnibar.tokenDelegate') || 'Delegate (Urgent)', icon: '🟣' },
+            { id: 'later', label: 'later', meta: t('omnibar.tokenLater') || 'Later (Low priority)', icon: '🟢' }
+          ]
+        },
+        {
+          type: 'workstream',
+          label: t('omnibar.sectionWorkstream') || 'Workstream',
+          value: data.workstream,
+          isSelective: true,
+          options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
+        },
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Title',
+          value: data.title,
+          placeholder: t('omnibar.placeholderTask') || 'What needs to be done?',
+          isSelective: false
+        }
+      ];
+    } else if (action === 'dec') {
+      return [
+        actionSec,
+        {
+          type: 'workstream',
+          label: t('omnibar.sectionWorkstream') || 'Workstream',
+          value: data.workstream,
+          isSelective: true,
+          options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
+        },
+        {
+          type: 'status',
+          label: t('omnibar.sectionStatus') || 'Status',
+          value: data.status,
+          displayValue: { active: t('omnibar.statusActive') || 'Active', draft: t('omnibar.statusDraft') || 'Draft', blocked: t('omnibar.statusBlocked') || 'Blocked' }[data.status] || data.status,
+          isSelective: true,
+          options: [
+            { id: 'active', label: t('omnibar.statusActive') || 'Active', icon: '🟢' },
+            { id: 'draft', label: t('omnibar.statusDraft') || 'Draft', icon: '🟡' },
+            { id: 'blocked', label: t('omnibar.statusBlocked') || 'Blocked', icon: '🔴' }
+          ]
+        },
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Summary',
+          value: data.title,
+          placeholder: t('omnibar.placeholderDecision') || 'Decision summary...',
+          isSelective: false
+        }
+      ];
+    } else if (action === 'block') {
+      return [
+        actionSec,
+        {
+          type: 'type',
+          label: t('omnibar.sectionType') || 'Type',
+          value: data.type,
+          displayValue: { work: t('omnibar.typeWork') || 'Deep Work', sync: t('omnibar.typeSync') || 'Team Sync', call: t('omnibar.typeCall') || 'Call', prep: t('omnibar.typePrep') || 'Preparation', personal: t('omnibar.typePersonal') || 'Personal' }[data.type] || data.type,
+          isSelective: true,
+          options: [
+            { id: 'work', label: t('omnibar.typeWork') || 'Deep Work', icon: '🔷' },
+            { id: 'sync', label: t('omnibar.typeSync') || 'Team Sync', icon: '🟣' },
+            { id: 'call', label: t('omnibar.typeCall') || 'Call', icon: '🟢' },
+            { id: 'prep', label: t('omnibar.typePrep') || 'Preparation', icon: '🟠' },
+            { id: 'personal', label: t('omnibar.typePersonal') || 'Personal', icon: '🟡' }
+          ]
+        },
+        {
+          type: 'workstream',
+          label: t('omnibar.sectionWorkstream') || 'Workstream',
+          value: data.workstream,
+          isSelective: true,
+          options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
+        },
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Title',
+          value: data.title,
+          placeholder: t('omnibar.placeholderBlock') || 'Event title...',
+          isSelective: false
+        },
+        {
+          type: 'date',
+          label: t('omnibar.sectionDate') || 'Date',
+          value: data.date,
+          displayValue: data.date === 'today' ? (t('omnibar.calToday') || 'Today') : data.date === 'tomorrow' ? (t('omnibar.calTomorrow') || 'Tomorrow') : data.date,
+          isSelective: true,
+          options: [
+            { id: 'today', label: t('omnibar.calToday') || 'Today', icon: '📅' },
+            { id: 'tomorrow', label: t('omnibar.calTomorrow') || 'Tomorrow', icon: '📅' },
+            { id: 'calendar', label: t('omnibar.calPickDate') || 'Pick date...', icon: '🗓️' }
+          ]
+        },
+        {
+          type: 'time',
+          label: t('omnibar.sectionTime') || 'Time & Dur',
+          value: `${data.time} (${data.duration})`,
+          isSelective: true,
+          options: [
+            { id: '15m', label: t('omnibar.dur15m') || '15 min', icon: '⏱️' },
+            { id: '30m', label: t('omnibar.token30m') || '30 min', icon: '⏱️' },
+            { id: '45m', label: t('omnibar.dur45m') || '45 min', icon: '⏱️' },
+            { id: '1h', label: t('omnibar.token1h') || '1 hour', icon: '⏱️' },
+            { id: '2h', label: t('omnibar.token2h') || '2 hours', icon: '⏱️' }
+          ]
+        }
+      ];
+    } else if (action === 'note') {
+      return [
+        actionSec,
+        {
+          type: 'workstream',
+          label: t('omnibar.sectionWorkstream') || 'Workstream',
+          value: data.workstream,
+          isSelective: true,
+          options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
+        },
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Title',
+          value: data.title,
+          placeholder: t('omnibar.placeholderNote') || 'Note title...',
+          isSelective: false
+        }
+      ];
+    } else if (action === 'call') {
+      return [
+        actionSec,
+        {
+          type: 'colleague',
+          label: t('omnibar.sectionContact') || 'Contact',
+          value: data.colleague || 'Team',
+          isSelective: true,
+          options: ['Team', 'Alice', 'Bob', 'Client'].map(c => ({ id: c, label: c, icon: '👤' }))
+        },
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Subject',
+          value: data.title,
+          placeholder: t('omnibar.placeholderCall') || 'Subject or participant...',
+          isSelective: false
+        }
+      ];
+    }
+
+    return [actionSec];
+  },
+
+  renderSegmentedBar() {
+    const segmentedBar = document.getElementById('omnibar-segmented-bar');
+    if (!segmentedBar) return;
+
+    const defs = this.getSectionDefinitions();
+    const activeIdx = this.segmentedState.activeSectionIndex;
+
+    let html = '';
+    defs.forEach((sec, idx) => {
+      const isActive = idx === activeIdx;
+      const isComboOpen = this.segmentedState.comboOpen && this.segmentedState.comboSectionIndex === idx;
+      const isCalOpen = this.segmentedState.calOpen && this.segmentedState.comboSectionIndex === idx;
+
+      if (!sec.isSelective) {
+        // Free-text section
+        html += `
+          <div class="omnibar-section omnibar-section-freetext${isActive ? ' active' : ''}" data-section-index="${idx}" onclick="OmnibarController.onSectionClick(${idx})" role="textbox">
+            <input type="text" class="omnibar-section-input" id="omnibar-section-input-text" value="${escH(sec.value || '')}" placeholder="${escH(sec.placeholder || '')}" autocomplete="off" spellcheck="false" oninput="OmnibarController.onFreeTextInput(this.value)" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})">
+          </div>
+        `;
+      } else {
+        // Selective combo section
+        let valDisplay = escH(sec.displayValue || sec.value || '');
+        if (sec.badgeClass) {
+          valDisplay = `<span class="${sec.badgeClass}">${valDisplay}</span>`;
+        }
+        if (sec.icon) {
+          valDisplay = `<span style="margin-right:2px;">${sec.icon}</span> ${valDisplay}`;
+        }
+
+        // Dropdown HTML if active
+        let dropdownHtml = '';
+        if (isComboOpen) {
+          const items = sec.options || [];
+          dropdownHtml = `
+            <div class="omnibar-section-combo" id="omnibar-combo-${idx}">
+              ${items.map((opt, oIdx) => `
+                <div class="omnibar-combo-item${oIdx === this.segmentedState.comboSelectedIndex ? ' selected' : ''}" onclick="event.stopPropagation(); OmnibarController.selectComboOption(${idx}, '${escH(opt.id)}')">
+                  <span>${opt.icon || '•'}</span>
+                  <span>${escH(opt.label)}</span>
+                  ${opt.meta ? `<span class="omnibar-combo-item-meta">${escH(opt.meta)}</span>` : ''}
+                </div>
+              `).join('')}
+              ${idx === 0 ? `
+                <div class="omnibar-combo-item" style="border-top: 1px solid var(--card-border); margin-top: 4px;" onclick="event.stopPropagation(); OmnibarController.exitSegmentedMode()">
+                  <span>🔍</span>
+                  <span>${escH(t('omnibar.backToSearch') || 'Back to search')}</span>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        } else if (isCalOpen) {
+          dropdownHtml = this.renderCalendarPopoverHtml(idx);
+        }
+
+        html += `
+          <div class="omnibar-section${isActive ? ' active' : ''}" data-section-index="${idx}" data-section-type="${sec.type}" onclick="OmnibarController.onSectionClick(${idx})" tabindex="0" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})">
+            ${sec.type !== 'action' ? `<span class="omnibar-section-label">${escH(sec.label)}:</span>` : ''}
+            <span class="omnibar-section-value">${valDisplay}</span>
+            <span class="omnibar-section-arrow">▾</span>
+            ${dropdownHtml}
+          </div>
+        `;
+      }
+    });
+
+    segmentedBar.innerHTML = html;
+  },
+
+  renderCalendarPopoverHtml(secIndex) {
+    const year = this.segmentedState.calYear;
+    const month = this.segmentedState.calMonth;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay(); // 0 is Sunday
+    const startOffset = (firstDay + 6) % 7; // Convert to Mon=0
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let cellsHtml = '';
+    for (let i = 0; i < startOffset; i++) {
+      cellsHtml += `<div class="omnibar-cal-day" style="opacity:0.2;"></div>`;
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isToday = dStr === todayStr;
+      const isSelected = this.segmentedState.data.date === dStr;
+      cellsHtml += `
+        <div class="omnibar-cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}" onclick="event.stopPropagation(); OmnibarController.selectCalDate('${dStr}')">
+          ${d}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="omnibar-calendar-popover" id="omnibar-cal-${secIndex}">
+        <div class="omnibar-cal-header">
+          <button class="omnibar-cal-btn" onclick="event.stopPropagation(); OmnibarController.changeCalMonth(-1)">‹</button>
+          <span>${monthNames[month]} ${year}</span>
+          <button class="omnibar-cal-btn" onclick="event.stopPropagation(); OmnibarController.changeCalMonth(1)">›</button>
+        </div>
+        <div class="omnibar-cal-grid">
+          <div class="omnibar-cal-day-label">Mo</div>
+          <div class="omnibar-cal-day-label">Tu</div>
+          <div class="omnibar-cal-day-label">We</div>
+          <div class="omnibar-cal-day-label">Th</div>
+          <div class="omnibar-cal-day-label">Fr</div>
+          <div class="omnibar-cal-day-label">Sa</div>
+          <div class="omnibar-cal-day-label">Su</div>
+          ${cellsHtml}
+        </div>
+      </div>
+    `;
+  },
+
+  changeCalMonth(delta) {
+    let m = this.segmentedState.calMonth + delta;
+    let y = this.segmentedState.calYear;
+    if (m < 0) { m = 11; y--; }
+    else if (m > 11) { m = 0; y++; }
+    this.segmentedState.calMonth = m;
+    this.segmentedState.calYear = y;
+    this.renderSegmentedBar();
+  },
+
+  selectCalDate(dateStr) {
+    this.segmentedState.data.date = dateStr;
+    this.segmentedState.calOpen = false;
+    this.segmentedState.comboOpen = false;
+    this.renderSegmentedBar();
+    this.renderLivePreview();
+    this.focusSection(this.segmentedState.activeSectionIndex + 1);
+  },
+
+  onSectionClick(index) {
+    const defs = this.getSectionDefinitions();
+    const sec = defs[index];
+    if (!sec) return;
+
+    this.segmentedState.activeSectionIndex = index;
+    if (sec.isSelective) {
+      if (sec.type === 'date' && this.segmentedState.calOpen) {
+        this.segmentedState.calOpen = false;
+      } else if (this.segmentedState.comboOpen && this.segmentedState.comboSectionIndex === index) {
+        this.closeCombo();
+      } else {
+        this.openCombo(index);
+      }
+    } else {
+      this.closeCombo();
+      this.renderSegmentedBar();
+      const inputEl = document.getElementById('omnibar-section-input-text');
+      if (inputEl) inputEl.focus();
+    }
+  },
+
+  openCombo(index) {
+    const defs = this.getSectionDefinitions();
+    const sec = defs[index];
+    if (!sec || !sec.isSelective) return;
+
+    this.segmentedState.comboOpen = true;
+    this.segmentedState.calOpen = false;
+    this.segmentedState.comboSectionIndex = index;
+    this.segmentedState.comboSelectedIndex = 0;
+    this.renderSegmentedBar();
+  },
+
+  closeCombo() {
+    this.segmentedState.comboOpen = false;
+    this.segmentedState.calOpen = false;
+    this.segmentedState.comboSectionIndex = -1;
+    this.renderSegmentedBar();
+  },
+
+  navigateCombo(delta) {
+    const defs = this.getSectionDefinitions();
+    const sec = defs[this.segmentedState.comboSectionIndex];
+    if (!sec || !sec.options) return;
+
+    const len = sec.options.length;
+    this.segmentedState.comboSelectedIndex = (this.segmentedState.comboSelectedIndex + delta + len) % len;
+    this.renderSegmentedBar();
+  },
+
+  confirmComboSelection() {
+    const defs = this.getSectionDefinitions();
+    const sec = defs[this.segmentedState.comboSectionIndex];
+    if (!sec || !sec.options) return;
+
+    const opt = sec.options[this.segmentedState.comboSelectedIndex];
+    if (opt) {
+      this.selectComboOption(this.segmentedState.comboSectionIndex, opt.id);
+    }
+  },
+
+  selectComboOption(sectionIndex, value) {
+    const defs = this.getSectionDefinitions();
+    const sec = defs[sectionIndex];
+    if (!sec) return;
+
+    if (sec.type === 'action') {
+      this.translateSectionState(value);
+      return;
+    }
+
+    if (sec.type === 'priority') {
+      this.segmentedState.data.priority = value;
+      this.applyTheme();
+    } else if (sec.type === 'workstream') {
+      this.segmentedState.data.workstream = value;
+    } else if (sec.type === 'status') {
+      this.segmentedState.data.status = value;
+    } else if (sec.type === 'type') {
+      this.segmentedState.data.type = value;
+    } else if (sec.type === 'date') {
+      if (value === 'calendar') {
+        this.segmentedState.calOpen = true;
+        this.segmentedState.comboOpen = false;
+        this.renderSegmentedBar();
+        return;
+      } else {
+        this.segmentedState.data.date = value;
+      }
+    } else if (sec.type === 'time') {
+      this.segmentedState.data.duration = value;
+    } else if (sec.type === 'colleague') {
+      this.segmentedState.data.colleague = value;
+    }
+
+    this.segmentedState.comboOpen = false;
+    this.segmentedState.calOpen = false;
+    this.renderSegmentedBar();
+    this.renderLivePreview();
+
+    // Advance to next section automatically
+    const nextIdx = (sectionIndex + 1) % defs.length;
+    this.focusSection(nextIdx);
+  },
+
+  onFreeTextInput(value) {
+    this.segmentedState.data.title = value;
+    this.renderLivePreview();
+  },
+
+  onSectionKeyDown(e, sectionIndex) {
+    const defs = this.getSectionDefinitions();
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        const nextIdx = (sectionIndex - 1 + defs.length) % defs.length;
+        this.focusSection(nextIdx);
+      } else {
+        const nextIdx = (sectionIndex + 1) % defs.length;
+        this.focusSection(nextIdx);
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this.segmentedState.comboOpen) {
+        this.confirmComboSelection();
+      } else {
+        this.submitSegmented();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (this.segmentedState.comboOpen || this.segmentedState.calOpen) {
+        this.closeCombo();
+      } else {
+        this.exitSegmentedMode();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!this.segmentedState.comboOpen) {
+        this.openCombo(sectionIndex);
+      } else {
+        this.navigateCombo(1);
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (this.segmentedState.comboOpen) {
+        this.navigateCombo(-1);
+      }
+    }
+  },
+
+  focusSection(index) {
+    const defs = this.getSectionDefinitions();
+    if (index < 0 || index >= defs.length) return;
+
+    this.segmentedState.activeSectionIndex = index;
+    const sec = defs[index];
+
+    if (!sec.isSelective) {
+      this.closeCombo();
+      this.renderSegmentedBar();
+      const inputEl = document.getElementById('omnibar-section-input-text');
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+      }
+    } else {
+      this.openCombo(index);
+    }
+  },
+
+  renderLivePreview() {
+    const resultsContainer = document.getElementById('omnibar-results');
+    const input = document.getElementById('omnibar-input');
+    if (!resultsContainer) return;
+
+    if (!this.segmentedState.active) return;
+
+    const action = this.segmentedState.action;
+    const data = this.segmentedState.data;
+    const title = (data.title || '').trim();
+
+    resultsContainer.style.display = 'block';
+    if (input) input.setAttribute('aria-expanded', 'true');
+
+    let previewHtml = '';
+
+    if (action === 'todo') {
+      const fallbackPlan = { label: t('omnibar.tokenPlan'), badge: 'badge-plan', text: 'PLAN' };
+      const qMeta = {
+        now: { label: t('omnibar.tokenNow') || 'Do Now (Urgent & Important)', badge: 'badge-now', text: 'NOW' },
+        plan: { label: t('omnibar.tokenPlan') || 'Schedule (Important)', badge: 'badge-plan', text: 'PLAN' },
+        delegate: { label: t('omnibar.tokenDelegate') || 'Delegate (Urgent)', badge: 'badge-delegate', text: 'DELEGATE' },
+        later: { label: t('omnibar.tokenLater') || 'Later (Low priority)', badge: 'badge-later', text: 'LATER' }
+      }[data.priority] || fallbackPlan;
+
+      const displayTitle = title || t('omnibar.placeholderTask') || 'What needs to be done?';
+      const ws = data.workstream || 'General';
+
+      previewHtml = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">✅ ${escH(t('omnibar.previewTodo') || 'New Task')}</span>
+            <span class="badge-urgency ${qMeta.badge}">${qMeta.text}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(displayTitle)}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-tag">📁 ${escH(ws)}</span>
+            <span class="omnibar-preview-tag">👤 ${escH(data.assignee || 'Me')}</span>
+            <span>${escH(qMeta.label)}</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (action === 'dec') {
+      const fallbackActive = { icon: '🟢', label: t('omnibar.statusActive') };
+      const statusMeta = {
+        active: { icon: '🟢', label: t('omnibar.statusActive') || 'Active' },
+        draft: { icon: '🟡', label: t('omnibar.statusDraft') || 'Draft' },
+        blocked: { icon: '🔴', label: t('omnibar.statusBlocked') || 'Blocked' }
+      }[data.status] || fallbackActive;
+
+      const displayTitle = title || t('omnibar.placeholderDecision') || 'Decision summary...';
+      const ws = data.workstream || 'General';
+      const inheritedTags = this.getMostUsedTagsForWorkstream(ws);
+      const tagsStr = inheritedTags.length > 0 ? inheritedTags.map(tg => `<span class="omnibar-preview-tag">#${escH(tg)}</span>`).join(' ') : '';
+
+      previewHtml = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">⚖️ ${escH(t('omnibar.previewDec') || 'Record Decision')}</span>
+            <span class="omnibar-preview-tag">${statusMeta.icon} ${escH(statusMeta.label)}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(displayTitle)}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-tag">📁 ${escH(ws)}</span>
+            ${tagsStr}
+            <span>→ ${escH(t('omnibar.calToday') || 'Today')}</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (action === 'block') {
+      const typeIcons = { work: '🔷', sync: '🟣', call: '🟢', prep: '🟠', personal: '🟡' };
+      const displayTitle = title || t('omnibar.placeholderBlock') || 'Event title...';
+      const dur = data.duration || '30m';
+      const time = data.time || this.getNextRoundHour();
+
+      previewHtml = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">📅 ${escH(t('omnibar.previewBlock') || 'Schedule Block')}</span>
+            <span class="omnibar-preview-tag">${typeIcons[data.type] || '🔷'} ${escH(data.type)}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(displayTitle)}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-tag">📁 ${escH(data.workstream || 'General')}</span>
+            <span>🕒 ${escH(data.date)} · ${escH(time)} (${escH(dur)})</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (action === 'note') {
+      const displayTitle = title || t('omnibar.placeholderNote') || 'Note title...';
+      previewHtml = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">📝 ${escH(t('omnibar.previewNote') || 'Create Note')}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(displayTitle)}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-tag">📁 ${escH(data.workstream || 'General')}</span>
+            <span>${escH(t('omnibar.calToday') || 'Today')}</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (action === 'call') {
+      const displayTitle = title || t('omnibar.placeholderCall') || 'Subject or participant...';
+      previewHtml = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">📞 ${escH(t('omnibar.previewCall') || 'Call & Note')}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(displayTitle)}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-tag">👤 ${escH(data.colleague || 'Team')}</span>
+            <span>${escH(data.date || 'today')} · ${escH(data.time || this.getNextRoundHour())}</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    resultsContainer.innerHTML = previewHtml;
+  },
+
+  renderRawCommandLivePreview(cmdMatch, query) {
+    const resultsContainer = document.getElementById('omnibar-results');
+    const input = document.getElementById('omnibar-input');
+    const container = document.getElementById('omnibar-container');
+    if (!resultsContainer || !cmdMatch) return;
+
+    const rest = query.substring(cmdMatch.cmdLen).trim();
+    const type = cmdMatch.type;
+
+    if (container) {
+      container.classList.remove('theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call');
+      container.removeAttribute('data-urgency');
+    }
+
+    resultsContainer.style.display = 'block';
+    if (input) input.setAttribute('aria-expanded', 'true');
+
+    if (type === 'todo') {
+      const match = rest.match(/^(now|plan|delegate|del|later|q1|q2|q3|q4|high|medium|med|low)\s+(.+)$/i);
+      let pKey = 'plan';
+      let taskTitle = rest;
+      if (match) {
+        const rawTag = match[1].toLowerCase();
+        if (['now', 'q1', 'high'].includes(rawTag)) pKey = 'now';
+        else if (['plan', 'q2', 'medium', 'med'].includes(rawTag)) pKey = 'plan';
+        else if (['delegate', 'del', 'q3', 'low'].includes(rawTag)) pKey = 'delegate';
+        else if (['later', 'q4'].includes(rawTag)) pKey = 'later';
+        taskTitle = match[2].trim();
+      }
+      if (container) {
+        container.classList.add('theme-todo');
+        container.setAttribute('data-urgency', pKey);
+      }
+      const fallbackPlanRaw = { label: t('omnibar.tokenPlan'), badge: 'badge-plan', text: 'PLAN' };
+      const qMeta = {
+        now: { label: t('omnibar.tokenNow') || 'Do Now (Urgent & Important)', badge: 'badge-now', text: 'NOW' },
+        plan: { label: t('omnibar.tokenPlan') || 'Schedule (Important)', badge: 'badge-plan', text: 'PLAN' },
+        delegate: { label: t('omnibar.tokenDelegate') || 'Delegate (Urgent)', badge: 'badge-delegate', text: 'DELEGATE' },
+        later: { label: t('omnibar.tokenLater') || 'Later (Low priority)', badge: 'badge-later', text: 'LATER' }
+      }[pKey] || fallbackPlanRaw;
+
+      resultsContainer.innerHTML = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">✅ ${escH(t('omnibar.previewTodo') || 'New Task')}</span>
+            <span class="badge-urgency ${qMeta.badge}">${qMeta.text}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(taskTitle || t('omnibar.placeholderTask') || 'What needs to be done?')}</div>
+          <div class="omnibar-preview-meta">
+            <span>${escH(qMeta.label)}</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (type === 'dec') {
+      if (container) container.classList.add('theme-decision');
+      resultsContainer.innerHTML = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">⚖️ ${escH(t('omnibar.previewDec') || 'Record Decision')}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(rest || t('omnibar.placeholderDecision') || 'Decision summary...')}</div>
+          <div class="omnibar-preview-meta">
+            <span>→ ${escH(t('omnibar.calToday') || 'Today')}</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (type === 'block') {
+      if (container) container.classList.add('theme-block');
+      resultsContainer.innerHTML = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">📅 ${escH(t('omnibar.previewBlock') || 'Schedule Block')}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(rest || t('omnibar.placeholderBlock') || 'Event title...')}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (type === 'note') {
+      if (container) container.classList.add('theme-note');
+      resultsContainer.innerHTML = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">📝 ${escH(t('omnibar.previewNote') || 'Create Note')}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(rest || t('omnibar.placeholderNote') || 'Note title...')}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else if (type === 'call') {
+      if (container) container.classList.add('theme-call');
+      resultsContainer.innerHTML = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">📞 ${escH(t('omnibar.previewCall') || 'Call & Note')}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(rest || t('omnibar.placeholderCall') || 'Subject or participant...')}</div>
+          <div class="omnibar-preview-meta">
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    }
+  },
+
+  async submitSegmented() {
+    const data = this.segmentedState.data;
+    const action = this.segmentedState.action;
+    this.close();
+
+    try {
+      if (action === 'todo') {
+        await this.handleTodoCommand(`/todo ${data.priority} ${data.title}`);
+      } else if (action === 'dec') {
+        await this.handleDecisionCommand(`/dec [${data.workstream}] ${data.title}`);
+      } else if (action === 'block') {
+        const dur = data.duration || '30m';
+        const date = data.date || 'today';
+        const time = data.time || this.getNextRoundHour();
+        await this.handleBlockCommand(`/block ${data.title} ${date} ${time} ${dur}`);
+      } else if (action === 'note') {
+        await this.handleNoteCommand(`/note [${data.workstream}] ${data.title}`);
+      } else if (action === 'call') {
+        await this.handleCallCommand(data.title);
+      }
+    } catch (err) {
+      console.error('Segmented submit failed', err);
+      toast(t('omnibar.captureError', { message: err.message }), true);
+    }
+  },
+
 
   getNextRoundHour() {
     const now = new Date();
@@ -1038,7 +1976,7 @@ const OmnibarController = {
     // 2. /todo [priority] <title>
     if (type === 'todo') {
       const content = val.substring(cmdLen);
-      const priorities = ['Q1', 'Q2', 'Q3', 'Q4', 'WIP'];
+      const priorities = ['NOW', 'PLAN', 'DELEGATE', 'DEL', 'LATER', 'Q1', 'Q2', 'Q3', 'Q4', 'HIGH', 'MEDIUM', 'MED', 'LOW', 'MAINTENANT', 'SOFORT', 'AHORA', 'SUBITO', 'HNED', 'TERAZ', 'MOST', 'ACUM', 'СЕЙЧАС', 'ŞİMDİ', 'SIMDI', 'ЗАРАЗ', 'PLANIFIER', 'PLANEN', 'PLANEAR', 'PIANIFICA', 'PLANNEN', 'ZAPLANUJ', 'PLANEJAR', 'NAPLANOVAT', 'TERVEZ', 'PROGRAMEAZA', 'ЗАПЛАНИРОВАТЬ', 'PLANERA', 'PLANLA', 'ЗАПЛАНУВАТИ', 'DELEGUER', 'DÉLÉGUER', 'DELEGIEREN', 'DELEGAR', 'DELEGARE', 'DELEGA', 'DELEGEREN', 'ODDELEGUJ', 'DELEGOVAT', 'DELEGÁL', 'DELEGERA', 'DEVRET', 'ДЕЛЕГИРОВАТЬ', 'ДЕВРЕТ', 'ДЕЛЕГУВАТИ', 'TARD', 'PLUSTARD', 'SPÄTER', 'SPAETER', 'LUEGO', 'DESPUES', 'DOPO', 'TARDI', 'DEPOIS', 'POZDEJI', 'PÓŹNIEJ', 'POZNIEJ', 'KÉSŐBB', 'KESOBB', 'MAITÂRZIU', 'TARZIU', 'ПОЗЖЕ', 'SENARE', 'SONRA', 'ПІЗНІШЕ'];
 
       const matchSpaces = content.match(/^(\s*)/);
       const leadingSpaceLen = matchSpaces ? matchSpaces[1].length : 0;
@@ -1455,17 +2393,15 @@ const OmnibarController = {
     }
 
     if (match.type === 'todo') {
-      const q1 = t('omnibar.tokenQ1') || 'Urgent & Important';
-      const q2 = t('omnibar.tokenQ2') || 'Strategic';
-      const q3 = t('omnibar.tokenQ3') || 'Urgent';
-      const q4 = t('omnibar.tokenQ4') || 'Low priority';
-      const wip = t('omnibar.tokenWip') || 'In progress';
+      const tNow = t('omnibar.tokenNow') || 'Do Now (Urgent & Important)';
+      const tPlan = t('omnibar.tokenPlan') || 'Schedule (Important)';
+      const tDel = t('omnibar.tokenDelegate') || 'Delegate (Urgent)';
+      const tLater = t('omnibar.tokenLater') || 'Later (Low priority)';
       hintsContainer.innerHTML = `
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('Q1')" title="${escH(q1)}"><code>Q1</code> ${q1}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('Q2')" title="${escH(q2)}"><code>Q2</code> ${q2}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('Q3')" title="${escH(q3)}"><code>Q3</code> ${q3}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('Q4')" title="${escH(q4)}"><code>Q4</code> ${q4}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('WIP')" title="${escH(wip)}"><code>WIP</code> ${wip}</span>
+        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('now')" title="${escH(tNow)}"><span class="badge-urgency badge-now">now</span> ${tNow}</span>
+        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('plan')" title="${escH(tPlan)}"><span class="badge-urgency badge-plan">plan</span> ${tPlan}</span>
+        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('delegate')" title="${escH(tDel)}"><span class="badge-urgency badge-delegate">del</span> ${tDel}</span>
+        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('later')" title="${escH(tLater)}"><span class="badge-urgency badge-later">later</span> ${tLater}</span>
       `;
     } else if (match.type === 'block') {
       const nextHour = this.getNextRoundHour();
@@ -1554,25 +2490,22 @@ const OmnibarController = {
       return;
     }
 
-    const match = content.match(/^(q1|q2|q3|q4|high|medium|med|low|wip)\s+(.+)$/i);
+    const match = content.match(/^(now|plan|delegate|del|later|q1|q2|q3|q4|high|medium|med|low|maintenant|sofort|ahora|subito|hned|teraz|most|acum|сейчас|şimdi|simdi|зараз|planifier|planen|planear|pianifica|plannen|zaplanuj|planejar|naplanovat|tervez|programeaza|запланировать|planera|planla|запланувати|deleguer|déléguer|delegieren|delegare|delega|delegeren|oddeleguj|delegovat|delegál|delegera|devret|делегировать|деврет|делегувати|tard|plustard|später|spaeter|luego|despues|dopo|tardi|depois|pozdeji|później|pozniej|később|kesobb|maitârziu|tarziu|позже|senare|sonra|пізніше)\s+(.+)$/i);
     let quadrant = 'Q2';
     let priority = 'Medium';
     let text = content;
 
     if (match) {
       const tag = match[1].toUpperCase();
-      if (tag === 'WIP') {
-        priority = 'WIP';
-        quadrant = 'Q2';
-      } else if (typeof EisenhowerUtils !== 'undefined' && EisenhowerUtils.parseQuadrantTag) {
+      if (typeof EisenhowerUtils !== 'undefined' && EisenhowerUtils.parseQuadrantTag) {
         const parsed = EisenhowerUtils.parseQuadrantTag(tag);
         quadrant = parsed.quadrant;
         priority = parsed.priority;
       } else {
-        if (tag === 'Q1' || tag === 'HIGH') { quadrant = 'Q1'; priority = 'High'; }
-        else if (tag === 'Q2' || tag === 'MEDIUM' || tag === 'MED') { quadrant = 'Q2'; priority = 'Medium'; }
-        else if (tag === 'Q3' || tag === 'LOW') { quadrant = 'Q3'; priority = 'Low'; }
-        else if (tag === 'Q4') { quadrant = 'Q4'; priority = 'Low'; }
+        if (tag === 'NOW' || tag === 'Q1' || tag === 'HIGH') { quadrant = 'Q1'; priority = 'High'; }
+        else if (tag === 'PLAN' || tag === 'Q2' || tag === 'MEDIUM' || tag === 'MED') { quadrant = 'Q2'; priority = 'Medium'; }
+        else if (tag === 'DELEGATE' || tag === 'DEL' || tag === 'Q3' || tag === 'LOW') { quadrant = 'Q3'; priority = 'Low'; }
+        else if (tag === 'LATER' || tag === 'Q4') { quadrant = 'Q4'; priority = 'Low'; }
       }
       text = match[2].trim();
     }
@@ -1593,11 +2526,7 @@ const OmnibarController = {
       modified: date
     };
 
-    if (priority === 'WIP') {
-      todo.status = 'WIP';
-      todo.priority = 'Medium';
-      todo.originalPriority = 'Medium';
-    }
+
 
     if (typeof todosManifest === 'undefined' || !Array.isArray(todosManifest)) {
       window.todosManifest = [];
@@ -1621,7 +2550,7 @@ const OmnibarController = {
     const now = new Date();
     let dateStr = typeof formatLocalDateValue === 'function' ? formatLocalDateValue(now) : now.toISOString().slice(0, 10);
     let startTimeStr = '';
-    let durationMins = 30;
+    let durationMins = (typeof settings !== 'undefined' && settings?.plannerDefaultDuration) ? parseInt(settings.plannerDefaultDuration, 10) : 30;
 
     // 1. Extract Duration (e.g. 30m, 45min, 1h, 1h30, 2h)
     const durMatch = content.match(/\b(\d+)\s*(h|hr|hrs|heures?|m|min|mins|minutes?)\s*(\d+)?\b/i);
@@ -1775,8 +2704,9 @@ const OmnibarController = {
         date: todayStr,
         group_tags: ['Daily'],
         major_topic_tags: [majorTopic],
-        topic_tags: [],
+        topic_tags: (typeof OmnibarController !== 'undefined') ? OmnibarController.getMostUsedTagsForWorkstream(majorTopic) : [],
         extra_tags: [],
+        workstream: majorTopic,
         mainHTML: `<ul>${decisionItemHtml}</ul>`
       };
       
@@ -1803,8 +2733,9 @@ const OmnibarController = {
         date: todayNote.date || parsed.date,
         group_tags: todayNote.group_tags || parsed.group_tags || [],
         major_topic_tags: todayNote.major_topic_tags ? Array.from(new Set([...todayNote.major_topic_tags, majorTopic])) : [majorTopic],
-        topic_tags: todayNote.topic_tags || [],
+        topic_tags: Array.from(new Set([...(todayNote.topic_tags || parsed.topic_tags || []), ...(typeof OmnibarController !== 'undefined' ? OmnibarController.getMostUsedTagsForWorkstream(majorTopic) : [])])),
         extra_tags: todayNote.extra_tags || [],
+        workstream: todayNote.workstream || majorTopic,
         mainHTML: mainHTML
       };
       

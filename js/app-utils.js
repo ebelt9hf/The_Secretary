@@ -186,10 +186,10 @@ const EisenhowerUtils = {
 
   parseQuadrantTag(tag) {
     const q = String(tag || '').trim().toUpperCase();
-    if (q === 'Q1' || q === 'HIGH') return { quadrant: 'Q1', priority: 'High' };
-    if (q === 'Q2' || q === 'MEDIUM' || q === 'MED') return { quadrant: 'Q2', priority: 'Medium' };
-    if (q === 'Q3' || q === 'LOW') return { quadrant: 'Q3', priority: 'Low' };
-    if (q === 'Q4') return { quadrant: 'Q4', priority: 'Low' };
+    if (q === 'NOW' || q === 'Q1' || q === 'HIGH' || q === 'MAINTENANT' || q === 'SOFORT' || q === 'AHORA' || q === 'SUBITO' || q === 'HNED' || q === 'TERAZ' || q === 'MOST' || q === 'ACUM' || q === 'СЕЙЧАС' || q === 'ŞİMDİ' || q === 'SIMDI' || q === 'ЗАРАЗ') return { quadrant: 'Q1', priority: 'High' };
+    if (q === 'PLAN' || q === 'PLANIFIER' || q === 'PLANEN' || q === 'PLANEAR' || q === 'PIANIFICA' || q === 'PLANNEN' || q === 'ZAPLANUJ' || q === 'PLANEJAR' || q === 'NAPLANOVAT' || q === 'TERVEZ' || q === 'PROGRAMEAZA' || q === 'ЗАПЛАНИРОВАТЬ' || q === 'PLANERA' || q === 'PLANLA' || q === 'ЗАПЛАНУВАТИ' || q === 'Q2' || q === 'MEDIUM' || q === 'MED') return { quadrant: 'Q2', priority: 'Medium' };
+    if (q === 'DELEGATE' || q === 'DEL' || q === 'DELEGUER' || q === 'DÉLÉGUER' || q === 'DELEGIEREN' || q === 'DELEGAR' || q === 'DELEGARE' || q === 'DELEGA' || q === 'DELEGEREN' || q === 'ODDELEGUJ' || q === 'DELEGOVAT' || q === 'DELEGÁL' || q === 'DELEGERA' || q === 'DEVRET' || q === 'ДЕЛЕГИРОВАТЬ' || q === 'ДЕВРЕТ' || q === 'ДЕЛЕГУВАТИ' || q === 'Q3' || q === 'LOW') return { quadrant: 'Q3', priority: 'Low' };
+    if (q === 'LATER' || q === 'TARD' || q === 'PLUSTARD' || q === 'SPÄTER' || q === 'SPAETER' || q === 'LUEGO' || q === 'DESPUES' || q === 'DOPO' || q === 'TARDI' || q === 'DEPOIS' || q === 'POZDEJI' || q === 'PÓŹNIEJ' || q === 'POZNIEJ' || q === 'KÉSŐBB' || q === 'KESOBB' || q === 'MAITÂRZIU' || q === 'TARZIU' || q === 'ПОЗЖЕ' || q === 'SENARE' || q === 'SONRA' || q === 'ПІЗНІШЕ' || q === 'Q4') return { quadrant: 'Q4', priority: 'Low' };
     return { quadrant: 'Q2', priority: 'Medium' };
   },
 
