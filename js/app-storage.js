@@ -22,6 +22,7 @@ const StorageAPI = {
   setStorageEngine(engine) {
     this._storageEngine = engine === 'firebase' ? 'firebase' : 'filesystem';
     if (typeof window !== 'undefined' && window.FirebaseSyncService) {
+      if (!window.FirebaseSyncService.state) window.FirebaseSyncService.state = {};
       window.FirebaseSyncService.state.engine = this._storageEngine;
     }
   },
@@ -125,55 +126,57 @@ const StorageAPI = {
     }
   },
 
+  // ── Generic Document Entity Helpers ──
+  async readDocEntity(docKind, docId, localFile, fallback = null) {
+    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+      const doc = await window.FirebaseSyncService.getDoc(docKind, docId);
+      return doc !== null && doc !== undefined ? doc : fallback;
+    }
+    return await this._readJSON(localFile, fallback);
+  },
+
+  async writeDocEntity(docKind, docId, localFile, payload) {
+    if (this.getStorageEngine() !== 'firebase') {
+      await this._writeJSON(localFile, payload);
+    }
+    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+      await window.FirebaseSyncService.putDoc(docKind, docId, payload);
+    }
+  },
+
+  async hasDocEntity(docKind, docId, localFile) {
+    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+      const doc = await window.FirebaseSyncService.getDoc(docKind, docId);
+      return doc !== null && doc !== undefined;
+    }
+    return await fileExists(localFile);
+  },
+
   // ── Todos Manifest ──
   async readTodosManifest() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const todos = await window.FirebaseSyncService.getDoc('todos', 'manifest');
-      return Array.isArray(todos) ? todos : [];
-    }
-    return await this._readJSON('todos/manifest.json', []);
+    const todos = await this.readDocEntity('todos', 'manifest', 'todos/manifest.json', []);
+    return Array.isArray(todos) ? todos : [];
   },
 
   async writeTodosManifest(todosManifest) {
-    if (this.getStorageEngine() !== 'firebase') {
-      await this._writeJSON('todos/manifest.json', todosManifest);
-    }
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc('todos', 'manifest', todosManifest);
-    }
+    await this.writeDocEntity('todos', 'manifest', 'todos/manifest.json', todosManifest);
   },
 
   async hasTodosManifest() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const doc = await window.FirebaseSyncService.getDoc('todos', 'manifest');
-      return doc !== null && doc !== undefined;
-    }
-    return await fileExists('todos/manifest.json');
+    return await this.hasDocEntity('todos', 'manifest', 'todos/manifest.json');
   },
 
   // ── Planner Events ──
   async readPlanner() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      return await window.FirebaseSyncService.getDoc('planner', 'events');
-    }
-    return await this._readJSON('planner.json', null);
+    return await this.readDocEntity('planner', 'events', 'planner.json', null);
   },
 
   async writePlanner(plannerData) {
-    if (this.getStorageEngine() !== 'firebase') {
-      await this._writeJSON('planner.json', plannerData);
-    }
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc('planner', 'events', plannerData);
-    }
+    await this.writeDocEntity('planner', 'events', 'planner.json', plannerData);
   },
 
   async hasPlanner() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const doc = await window.FirebaseSyncService.getDoc('planner', 'events');
-      return doc !== null && doc !== undefined;
-    }
-    return await fileExists('planner.json');
+    return await this.hasDocEntity('planner', 'events', 'planner.json');
   },
 
   // ── Planner Proposals (External Agent Proposed Events - ALWAYS LOCAL FILE) ──
@@ -203,51 +206,27 @@ const StorageAPI = {
 
   // ── Colleagues ──
   async readColleagues() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      return await window.FirebaseSyncService.getDoc('colleagues', 'database');
-    }
-    return await this._readJSON('colleagues.json', null);
+    return await this.readDocEntity('colleagues', 'database', 'colleagues.json', null);
   },
 
   async writeColleagues(colleaguesDb) {
-    if (this.getStorageEngine() !== 'firebase') {
-      await this._writeJSON('colleagues.json', colleaguesDb);
-    }
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc('colleagues', 'database', colleaguesDb);
-    }
+    await this.writeDocEntity('colleagues', 'database', 'colleagues.json', colleaguesDb);
   },
 
   async hasColleagues() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const doc = await window.FirebaseSyncService.getDoc('colleagues', 'database');
-      return doc !== null && doc !== undefined;
-    }
-    return await fileExists('colleagues.json');
+    return await this.hasDocEntity('colleagues', 'database', 'colleagues.json');
   },
 
   async readColleaguesMigration() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      return await window.FirebaseSyncService.getDoc('colleagues', 'migration_v1_done');
-    }
-    return await this._readJSON('.secretary/colleagues-migration-v1.done', null);
+    return await this.readDocEntity('colleagues', 'migration_v1_done', '.secretary/colleagues-migration-v1.done', null);
   },
 
   async writeColleaguesMigration(data) {
-    if (this.getStorageEngine() !== 'firebase') {
-      await this._writeJSON('.secretary/colleagues-migration-v1.done', data);
-    }
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc('colleagues', 'migration_v1_done', data);
-    }
+    await this.writeDocEntity('colleagues', 'migration_v1_done', '.secretary/colleagues-migration-v1.done', data);
   },
 
   async hasColleaguesMigration() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const doc = await window.FirebaseSyncService.getDoc('colleagues', 'migration_v1_done');
-      return doc !== null && doc !== undefined;
-    }
-    return await fileExists('.secretary/colleagues-migration-v1.done');
+    return await this.hasDocEntity('colleagues', 'migration_v1_done', '.secretary/colleagues-migration-v1.done');
   },
 
   // ── Settings ──
@@ -826,19 +805,11 @@ const StorageAPI = {
 
   // ── Chat History ──
   async readChatHistory() {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      return await window.FirebaseSyncService.getDoc('chat', 'history');
-    }
-    return await this._readJSON('.secretary/chat-history.json', null);
+    return await this.readDocEntity('chat', 'history', '.secretary/chat-history.json', null);
   },
 
   async writeChatHistory(chatHistory) {
-    if (this.getStorageEngine() !== 'firebase') {
-      await this._writeJSON('.secretary/chat-history.json', chatHistory);
-    }
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc('chat', 'history', chatHistory);
-    }
+    await this.writeDocEntity('chat', 'history', '.secretary/chat-history.json', chatHistory);
   },
 
   /**
@@ -1092,66 +1063,8 @@ const StorageAPI = {
 
     const backupDir = config.backupDir || '_migrated_to_cloud_backup';
 
-    // 1. Collect notes comprehensively (from manifest.json, metadata-buffer.json, metadata shards, in-memory manifest/buffer, and filesystem)
-    const manifestFromDisk = await this._readJSON('notes/manifest.json', []);
-    const mbFromDisk = await this._readJSON('notes/metadata-buffer.json', { items: [] });
-    const inMemoryManifest = (typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : [];
-    const inMemoryMetadata = (typeof window !== 'undefined' && Array.isArray(window.metadataBuffer)) ? window.metadataBuffer : [];
-
-    // Also read metadata shards from disk if available
-    let shardItemsFromDisk = [];
-    try {
-      const shardsIndex = await this.readMetadataShardsIndex();
-      if (Array.isArray(shardsIndex?.shardFiles)) {
-        for (const sf of shardsIndex.shardFiles) {
-          const parsed = await this.readMetadataShard(sf);
-          if (Array.isArray(parsed?.items)) {
-            shardItemsFromDisk = shardItemsFromDisk.concat(parsed.items);
-          }
-        }
-      }
-    } catch (e) {}
-
-    const noteMap = new Map();
-    for (const item of [
-      ...manifestFromDisk,
-      ...(Array.isArray(mbFromDisk?.items) ? mbFromDisk.items : []),
-      ...shardItemsFromDisk,
-      ...inMemoryManifest,
-      ...inMemoryMetadata
-    ]) {
-      if (!item) continue;
-      const rawId = item.id || (item.path ? item.path.replace(/^notes\//i, '').replace(/\.html$/i, '') : null);
-      const cleanPath = item.path || (rawId ? `notes/${rawId}.html` : null);
-      if (cleanPath && !noteMap.has(cleanPath)) {
-        noteMap.set(cleanPath, { ...item, id: rawId || item.id, path: cleanPath });
-      }
-    }
-
-    // Walk local notes/ directory to catch all untracked notes
-    try {
-      const htmlFiles = await this.listNoteFiles('notes');
-      for (const relPath of (Array.isArray(htmlFiles) ? htmlFiles : [])) {
-        const normPath = relPath.startsWith('notes/') ? relPath : `notes/${relPath}`;
-        if (!noteMap.has(normPath)) {
-          const id = normPath.replace(/^notes\//i, '').replace(/\.html$/i, '');
-          noteMap.set(normPath, { id, path: normPath, title: '' });
-        }
-      }
-    } catch (e) {}
-
-    // Also check backup directory if present to recover previously archived notes
-    try {
-      const backupHtmlFiles = await this.listNoteFiles(`${backupDir}/notes`);
-      for (const bPath of (Array.isArray(backupHtmlFiles) ? backupHtmlFiles : [])) {
-        const relPath = bPath.replace(new RegExp(`^${backupDir}/`, 'i'), '');
-        const normPath = relPath.startsWith('notes/') ? relPath : `notes/${relPath}`;
-        if (!noteMap.has(normPath)) {
-          const id = normPath.replace(/^notes\//i, '').replace(/\.html$/i, '');
-          noteMap.set(normPath, { id, path: normPath, title: '', _fromBackup: true });
-        }
-      }
-    } catch (e) {}
+    // 1. Collect notes comprehensively (from manifest.json, metadata-buffer.json, shards, in-memory caches, and filesystem)
+    const noteMap = await this._collectLocalNoteEntries({ backupDir, includeShards: true });
 
     // Helper to read note HTML across candidate locations
     const tryReadNoteHtml = async (pathOrId, item = {}) => {
@@ -1358,36 +1271,76 @@ const StorageAPI = {
     };
   },
 
+  async _collectLocalNoteEntries(options = {}) {
+    const backupDir = options.backupDir || null;
+    const includeShards = !!options.includeShards;
+    const manifestFromDisk = await this._readJSON('notes/manifest.json', []);
+    const mbFromDisk = await this._readJSON('notes/metadata-buffer.json', { items: [] });
+    let shardItems = [];
+    if (includeShards) {
+      try {
+        const shardsIndex = await this.readMetadataShardsIndex();
+        if (Array.isArray(shardsIndex?.shardFiles)) {
+          for (const sf of shardsIndex.shardFiles) {
+            const parsed = await this.readMetadataShard(sf);
+            if (Array.isArray(parsed?.items)) {
+              shardItems = shardItems.concat(parsed.items);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    const inMemManifest = (typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : [];
+    const inMemBuffer = (typeof window !== 'undefined' && Array.isArray(window.metadataBuffer)) ? window.metadataBuffer : [];
+    const inMemMetadata = (typeof window !== 'undefined' && window.metadataById instanceof Map) ? Array.from(window.metadataById.values()) : [];
+    const diskHtmlFiles = (typeof this.listNoteFiles === 'function') ? (await this.listNoteFiles('notes')) : [];
+
+    const localMap = new Map();
+    for (const item of [
+      ...manifestFromDisk,
+      ...(Array.isArray(mbFromDisk?.items) ? mbFromDisk.items : []),
+      ...shardItems,
+      ...inMemManifest,
+      ...inMemBuffer,
+      ...inMemMetadata
+    ]) {
+      if (!item) continue;
+      const rawId = typeof normalizeNoteId === 'function' ? normalizeNoteId(item) : (item.id || (item.path ? item.path.replace(/^notes\//i, '').replace(/\.html$/i, '') : null));
+      const cleanPath = item.path || (rawId ? (typeof normalizeNotePath === 'function' ? normalizeNotePath(rawId) : `notes/${rawId}.html`) : null);
+      if (rawId && !localMap.has(rawId)) {
+        localMap.set(rawId, { ...item, id: rawId, path: cleanPath || (item.path ? item.path : `notes/${rawId}.html`) });
+      }
+    }
+    for (const rel of (Array.isArray(diskHtmlFiles) ? diskHtmlFiles : [])) {
+      const id = typeof normalizeNoteId === 'function' ? normalizeNoteId(rel) : rel.replace(/^notes\//i, '').replace(/\.html$/i, '');
+      if (id && !localMap.has(id)) {
+        localMap.set(id, { id, path: rel.startsWith('notes/') ? rel : `notes/${rel}`, title: '' });
+      }
+    }
+
+    if (backupDir) {
+      try {
+        const backupHtmlFiles = await this.listNoteFiles(`${backupDir}/notes`);
+        for (const bPath of (Array.isArray(backupHtmlFiles) ? backupHtmlFiles : [])) {
+          const relPath = bPath.replace(new RegExp(`^${backupDir}/`, 'i'), '');
+          const normPath = relPath.startsWith('notes/') ? relPath : `notes/${relPath}`;
+          const id = typeof normalizeNoteId === 'function' ? normalizeNoteId(normPath) : normPath.replace(/^notes\//i, '').replace(/\.html$/i, '');
+          if (!localMap.has(id)) {
+            localMap.set(id, { id, path: normPath, title: '', _fromBackup: true });
+          }
+        }
+      } catch (e) {}
+    }
+
+    return localMap;
+  },
+
   // ── Sync Conflict Detection & Smart Reconciliation ──
   async detectSyncConflict(options = {}) {
     // 1. Collect local workspace metadata
     let localNotes = [];
     try {
-      const manifestFromDisk = await this._readJSON('notes/manifest.json', []);
-      const mbFromDisk = await this._readJSON('notes/metadata-buffer.json', { items: [] });
-      const inMemManifest = (typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : [];
-      const inMemBuffer = (typeof window !== 'undefined' && Array.isArray(window.metadataBuffer)) ? window.metadataBuffer : [];
-      const diskHtmlFiles = (typeof this.listNoteFiles === 'function') ? (await this.listNoteFiles('notes')) : [];
-
-      const localMap = new Map();
-      for (const item of [
-        ...manifestFromDisk,
-        ...(Array.isArray(mbFromDisk?.items) ? mbFromDisk.items : []),
-        ...inMemManifest,
-        ...inMemBuffer
-      ]) {
-        if (!item) continue;
-        const rawId = item.id || (item.path ? item.path.replace(/^notes\//i, '').replace(/\.html$/i, '') : null);
-        if (rawId && !localMap.has(rawId)) {
-          localMap.set(rawId, { ...item, id: rawId, path: item.path || `notes/${rawId}.html` });
-        }
-      }
-      for (const rel of (Array.isArray(diskHtmlFiles) ? diskHtmlFiles : [])) {
-        const id = rel.replace(/^notes\//i, '').replace(/\.html$/i, '');
-        if (id && !localMap.has(id)) {
-          localMap.set(id, { id, path: rel.startsWith('notes/') ? rel : `notes/${rel}` });
-        }
-      }
+      const localMap = await this._collectLocalNoteEntries();
       localNotes = Array.from(localMap.values());
     } catch (e) {}
 
@@ -1533,26 +1486,7 @@ const StorageAPI = {
     }
 
     // 1. Collect local notes
-    const manifestFromDisk = await this._readJSON('notes/manifest.json', []);
-    const mbFromDisk = await this._readJSON('notes/metadata-buffer.json', { items: [] });
-    const inMemManifest = (typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : [];
-    const inMemBuffer = (typeof window !== 'undefined' && Array.isArray(window.metadataBuffer)) ? window.metadataBuffer : [];
-    const diskHtmlFiles = (typeof this.listNoteFiles === 'function') ? (await this.listNoteFiles('notes')) : [];
-
-    const localNoteMap = new Map();
-    for (const item of [...manifestFromDisk, ...(Array.isArray(mbFromDisk?.items) ? mbFromDisk.items : []), ...inMemManifest, ...inMemBuffer]) {
-      if (!item) continue;
-      const rawId = item.id || (item.path ? item.path.replace(/^notes\//i, '').replace(/\.html$/i, '') : null);
-      if (rawId && !localNoteMap.has(rawId)) {
-        localNoteMap.set(rawId, { ...item, id: rawId, path: item.path || `notes/${rawId}.html` });
-      }
-    }
-    for (const rel of (Array.isArray(diskHtmlFiles) ? diskHtmlFiles : [])) {
-      const id = rel.replace(/^notes\//i, '').replace(/\.html$/i, '');
-      if (id && !localNoteMap.has(id)) {
-        localNoteMap.set(id, { id, path: rel.startsWith('notes/') ? rel : `notes/${rel}` });
-      }
-    }
+    const localNoteMap = await this._collectLocalNoteEntries();
 
     // Helper to read local note content
     const getLocalNoteContent = async (item) => {

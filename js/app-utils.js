@@ -359,6 +359,76 @@ if (typeof window !== 'undefined') {
   };
 }
 
+function safeToast(msg, isError = false) {
+  if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+    window.showToast(msg, isError);
+  } else if (typeof showToast === 'function') {
+    showToast(msg, isError);
+  } else if (typeof toast === 'function') {
+    toast(msg, isError);
+  } else if (typeof window !== 'undefined' && typeof window.toast === 'function') {
+    window.toast(msg, isError);
+  } else {
+    console.warn('[Toast]', msg);
+  }
+}
+if (typeof globalThis !== 'undefined') globalThis.safeToast = safeToast;
+if (typeof window !== 'undefined') window.safeToast = safeToast;
+
+function setElementLoadingState(element, isLoading, loadingText = '') {
+  if (!element) return;
+  if (isLoading) {
+    if (element._origHtml === undefined) element._origHtml = element.innerHTML;
+    element.disabled = true;
+    element.style.opacity = '0.7';
+    element.style.pointerEvents = 'none';
+    element.classList.add('loading');
+    if (loadingText) element.textContent = loadingText;
+  } else {
+    element.disabled = false;
+    element.style.opacity = '';
+    element.style.pointerEvents = '';
+    element.classList.remove('loading');
+    if (element._origHtml !== undefined) {
+      element.innerHTML = element._origHtml;
+      delete element._origHtml;
+    }
+  }
+}
+if (typeof globalThis !== 'undefined') globalThis.setElementLoadingState = setElementLoadingState;
+if (typeof window !== 'undefined') window.setElementLoadingState = setElementLoadingState;
+
+function normalizeNoteId(input) {
+  if (!input) return '';
+  if (typeof input === 'object') {
+    if (input.id) return normalizeNoteId(input.id);
+    if (input.path) return normalizeNoteId(input.path);
+    return '';
+  }
+  return String(input)
+    .replace(/\\/g, '/')
+    .trim()
+    .replace(/^notes\//i, '')
+    .replace(/\.html$/i, '');
+}
+if (typeof globalThis !== 'undefined') globalThis.normalizeNoteId = normalizeNoteId;
+if (typeof window !== 'undefined') window.normalizeNoteId = normalizeNoteId;
+
+function normalizeNotePath(input) {
+  if (!input) return '';
+  if (typeof input === 'object') {
+    if (input.path) return normalizeNotePath(input.path);
+    if (input.id) return normalizeNotePath(input.id);
+    return '';
+  }
+  const clean = String(input).replace(/\\/g, '/').trim();
+  if (!clean) return '';
+  const cleanId = clean.replace(/^notes\//i, '').replace(/\.html$/i, '');
+  return cleanId ? `notes/${cleanId}.html` : '';
+}
+if (typeof globalThis !== 'undefined') globalThis.normalizeNotePath = normalizeNotePath;
+if (typeof window !== 'undefined') window.normalizeNotePath = normalizeNotePath;
+
 
 // Show a toast with an action button (e.g., Undo). actionFn may be async. duration in ms (default 7000).
 function toastAction(msg, actionLabel, actionFn, duration = 7000) {

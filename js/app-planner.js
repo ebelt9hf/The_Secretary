@@ -1581,7 +1581,7 @@ async function loadPlanner() {
       const data = await StorageAPI.readPlanner();
       const result = normalizePlannerEventsStrict(data.events || []);
       plannerEvents = result.events;
-      if (result.mutated) {
+      if (result.mutated && typeof StorageAPI.writePlanner === 'function') {
         await StorageAPI.writePlanner({ events: plannerEvents });
       }
     } else {
@@ -2479,22 +2479,23 @@ function renderPlanner() {
     if (savedLeft) oldScrollLeft = parseInt(savedLeft, 10);
   }
 
-  if (!currentPlannerWeekStart) {
-    initPlannerWeek();
+  if (typeof currentPlannerWeekStart === 'undefined' || !currentPlannerWeekStart) {
+    if (typeof initPlannerWeek === 'function') initPlannerWeek();
   }
 
+  const activeWeekStart = (typeof currentPlannerWeekStart !== 'undefined' && currentPlannerWeekStart) ? currentPlannerWeekStart : new Date();
   const daysToDisplay = getPlannerDaysToDisplay().map(d => formatLocalDateValue(d));
   precreateRecurringEventsForWeek(daysToDisplay);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const prevDate = new Date(currentPlannerWeekStart);
-  prevDate.setDate(currentPlannerWeekStart.getDate() - 1);
+  const prevDate = new Date(activeWeekStart);
+  prevDate.setDate(activeWeekStart.getDate() - 1);
   prevDate.setHours(0, 0, 0, 0);
 
-  const nextDate = new Date(currentPlannerWeekStart);
-  nextDate.setDate(currentPlannerWeekStart.getDate() + 1);
+  const nextDate = new Date(activeWeekStart);
+  nextDate.setDate(activeWeekStart.getDate() + 1);
   nextDate.setHours(0, 0, 0, 0);
 
   const yesterday = new Date(today);

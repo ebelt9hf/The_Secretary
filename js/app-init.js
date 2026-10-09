@@ -1412,6 +1412,56 @@ if (typeof window !== 'undefined') {
 
 let _isSubmittingCloudSync = false;
 
+async function finalizeCloudSyncSessionUI({
+  pass = '',
+  rememberPass = false,
+  toastMessage = '',
+  closeModalId = 'modal-cloud-sync-setup',
+  notificationMsg = ''
+} = {}) {
+  if (rememberPass && pass && typeof rememberPassphraseAfterSetup === 'function') {
+    try {
+      await rememberPassphraseAfterSetup(pass);
+    } catch (e) {
+      console.warn('[CloudSync] Failed to remember passphrase:', e);
+    }
+  }
+
+  if (closeModalId && typeof closeModal === 'function') {
+    closeModal(closeModalId);
+  }
+
+  const sc = document.getElementById('screen-connect');
+  if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
+    try {
+      if (typeof mountFolder === 'function') {
+        await mountFolder({ name: 'Firebase Cloud Vault' });
+      }
+    } catch (mountErr) {
+      console.error('[CloudSync] mountFolder error during finalize:', mountErr);
+    }
+  }
+
+  if (typeof updateCloudSyncUI === 'function') updateCloudSyncUI();
+  if (typeof renderBoard === 'function') renderBoard();
+
+  if (toastMessage) {
+    if (typeof showToast === 'function') {
+      showToast(toastMessage);
+    } else if (typeof toast === 'function') {
+      toast(toastMessage);
+    }
+  }
+
+  if (notificationMsg && window.AppBridge?.notifications?.showNotification) {
+    try {
+      const appTitle = (typeof t === 'function' ? t('app.name') : '') || 'Secretary';
+      window.AppBridge.notifications.showNotification(appTitle, { body: notificationMsg });
+    } catch (e) {}
+  }
+}
+window.finalizeCloudSyncSessionUI = finalizeCloudSyncSessionUI;
+
 async function submitCloudSyncSetup() {
   if (_isSubmittingCloudSync) return;
   _isSubmittingCloudSync = true;
@@ -1427,14 +1477,7 @@ async function submitCloudSyncSetup() {
   };
 
   const submitBtn = document.getElementById('btn-submit-cloud-sync');
-  let origBtnContent = '';
-  if (submitBtn) {
-    origBtnContent = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = '0.7';
-    submitBtn.style.pointerEvents = 'none';
-    submitBtn.classList.add('loading');
-  }
+  setElementLoadingState(submitBtn, true);
 
   const mode = submitBtn?.getAttribute('data-mode') || 'signin';
   const emailInput = document.getElementById('sync-setup-email');
@@ -1563,20 +1606,12 @@ async function submitCloudSyncSetup() {
                 reconProgressDialog.close();
               }
 
-              if (rememberPass) await rememberPassphraseAfterSetup(pass);
-
-              const sc = document.getElementById('screen-connect');
-              if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-                try {
-                  await mountFolder({ name: 'Firebase Cloud Vault' });
-                } catch (mountErr) {
-                  console.error('[CloudSync] mountFolder error after reconcile:', mountErr);
-                }
-              }
-
-              updateCloudSyncUI();
-              if (typeof renderBoard === 'function') renderBoard();
-              if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.reconcileSuccessToast') : 'Reconciliation complete! Encrypted vault synchronized.');
+              await finalizeCloudSyncSessionUI({
+                pass,
+                rememberPass,
+                toastMessage: typeof t === 'function' ? t('sync.reconcileSuccessToast') : 'Reconciliation complete! Encrypted vault synchronized.',
+                closeModalId: null
+              });
               return;
             }
           } catch (cErr) {
@@ -1595,21 +1630,12 @@ async function submitCloudSyncSetup() {
           progressDialog.close();
         }
 
-        if (rememberPass) await rememberPassphraseAfterSetup(pass);
-        if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
-
-        const sc = document.getElementById('screen-connect');
-        if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-          try {
-            await mountFolder({ name: 'Firebase Cloud Vault' });
-          } catch (mountErr) {
-            console.error('[CloudSync] mountFolder error after signin:', mountErr);
-          }
-        }
-
-        updateCloudSyncUI();
-        if (typeof renderBoard === 'function') renderBoard();
-        if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.signInSuccessToast') : 'Signed in successfully! Encrypted vault connected.');
+        await finalizeCloudSyncSessionUI({
+          pass,
+          rememberPass,
+          toastMessage: typeof t === 'function' ? t('sync.signInSuccessToast') : 'Signed in successfully! Encrypted vault connected.',
+          closeModalId: 'modal-cloud-sync-setup'
+        });
       } finally {
         if (progressDialog) progressDialog.close();
       }
@@ -1652,20 +1678,12 @@ async function submitCloudSyncSetup() {
         progressDialog.close();
       }
 
-      if (rememberPass) await rememberPassphraseAfterSetup(pass);
-
-      const sc = document.getElementById('screen-connect');
-      if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-        try {
-          await mountFolder({ name: 'Firebase Cloud Vault' });
-        } catch (mountErr) {
-          console.error('[CloudSync] mountFolder error after signup:', mountErr);
-        }
-      }
-
-      updateCloudSyncUI();
-      if (typeof renderBoard === 'function') renderBoard();
-      if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.signUpSuccessToast') : 'Account created successfully! Vault initialized.');
+      await finalizeCloudSyncSessionUI({
+        pass,
+        rememberPass,
+        toastMessage: typeof t === 'function' ? t('sync.signUpSuccessToast') : 'Account created successfully! Vault initialized.',
+        closeModalId: null
+      });
     } else if (mode === 'link') {
       const progressDialog = typeof showMigrationProgressDialog === 'function' ? showMigrationProgressDialog(
         typeof t === 'function' ? t('sync.linkingProgressTitle') : 'Linking Cloud Vault',
@@ -1681,19 +1699,12 @@ async function submitCloudSyncSetup() {
           await new Promise(r => setTimeout(r, 180));
           progressDialog.close();
         }
-        if (rememberPass) await rememberPassphraseAfterSetup(pass);
-        if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
-        const sc = document.getElementById('screen-connect');
-        if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-          try {
-            await mountFolder({ name: 'Firebase Cloud Vault' });
-          } catch (mountErr) {
-            console.error('[CloudSync] mountFolder error after link:', mountErr);
-          }
-        }
-        updateCloudSyncUI();
-        if (typeof renderBoard === 'function') renderBoard();
-        if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.linkSuccess') : 'Device linked successfully! Encrypted notes synchronized.');
+        await finalizeCloudSyncSessionUI({
+          pass,
+          rememberPass,
+          toastMessage: typeof t === 'function' ? t('sync.linkSuccess') : 'Device linked successfully! Encrypted notes synchronized.',
+          closeModalId: 'modal-cloud-sync-setup'
+        });
       } finally {
         if (progressDialog) progressDialog.close();
       }
@@ -1722,49 +1733,24 @@ async function submitCloudSyncSetup() {
         progressDialog.close();
       }
 
-      if (rememberPass) await rememberPassphraseAfterSetup(pass);
-
-      const sc = document.getElementById('screen-connect');
-      if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-        try {
-          await mountFolder({ name: 'Firebase Cloud Vault' });
-        } catch (mountErr) {
-          console.error('[CloudSync] mountFolder error after guest migrate:', mountErr);
-        }
-      }
-
-      updateCloudSyncUI();
-      if (typeof renderBoard === 'function') renderBoard();
-
       const successMsg = typeof t === 'function'
         ? t('sync.migrationSuccessDetailed')
         : "Migration complete! All data is encrypted in the cloud. Local files moved to '_migrated_to_cloud_backup' (safe to delete).";
 
-      if (typeof showToast === 'function') {
-        showToast(successMsg);
-      } else if (typeof toast === 'function') {
-        toast(successMsg);
-      }
-
-      if (window.AppBridge?.notifications?.showNotification) {
-        try {
-          const appTitle = (typeof t === 'function' ? t('app.name') : '') || 'Secretary';
-          window.AppBridge.notifications.showNotification(appTitle, { body: successMsg });
-        } catch (e) {}
-      }
+      await finalizeCloudSyncSessionUI({
+        pass,
+        rememberPass,
+        toastMessage: successMsg,
+        closeModalId: null,
+        notificationMsg: successMsg
+      });
     }
   } catch (err) {
     console.error('[CloudSync] Setup failed:', err);
     notify((typeof t === 'function' ? t('sync.setupFailed') : 'Setup failed') + ': ' + (err?.message || err || ''), true);
   } finally {
     _isSubmittingCloudSync = false;
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.style.opacity = '';
-      submitBtn.style.pointerEvents = '';
-      submitBtn.classList.remove('loading');
-      if (origBtnContent) submitBtn.innerHTML = origBtnContent;
-    }
+    setElementLoadingState(submitBtn, false);
   }
 }
 window.submitCloudSyncSetup = submitCloudSyncSetup;
@@ -1814,20 +1800,12 @@ async function submitCloudSyncGoogle() {
       if (progressDialog) progressDialog.close();
     }
 
-    if (rememberPass && typeof rememberPassphraseAfterSetup === 'function') {
-      await rememberPassphraseAfterSetup(pass);
-    }
-
-    const sc = document.getElementById('screen-connect');
-    if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-      if (typeof mountFolder === 'function') await mountFolder({ name: 'Firebase Cloud Vault' });
-    }
-
-    if (typeof updateCloudSyncUI === 'function') updateCloudSyncUI();
-    if (typeof renderBoard === 'function') renderBoard();
-    if (typeof showToast === 'function') {
-      showToast(typeof t === 'function' ? t('sync.googleSignInSuccessToast') : 'Successfully signed in with Google!');
-    }
+    await finalizeCloudSyncSessionUI({
+      pass,
+      rememberPass,
+      toastMessage: typeof t === 'function' ? t('sync.googleSignInSuccessToast') : 'Successfully signed in with Google!',
+      closeModalId: null
+    });
   } catch (err) {
     console.error('Google Sign-In failed:', err);
     if (typeof showToast === 'function') {
@@ -1958,26 +1936,31 @@ function openLinkEmailModalUI() {
 }
 window.openLinkEmailModalUI = openLinkEmailModalUI;
 
+let _isSubmittingLinkEmail = false;
+
 async function submitLinkEmailUI() {
+  if (_isSubmittingLinkEmail) return;
+  _isSubmittingLinkEmail = true;
+
   const emailInput = document.getElementById('link-email-input');
   const passInput = document.getElementById('link-password-input');
   const email = emailInput?.value?.trim();
   const password = passInput?.value;
 
-  if (!email || !email.includes('@')) {
-    if (typeof showToast === 'function') {
-      showToast(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address', true);
-    }
-    return;
-  }
-  if (!password || password.length < 6) {
-    if (typeof showToast === 'function') {
-      showToast(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Password must be at least 6 characters', true);
-    }
-    return;
-  }
-
   try {
+    if (!email || !email.includes('@')) {
+      if (typeof showToast === 'function') {
+        showToast(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address', true);
+      }
+      return;
+    }
+    if (!password || password.length < 6) {
+      if (typeof showToast === 'function') {
+        showToast(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Password must be at least 6 characters', true);
+      }
+      return;
+    }
+
     if (!window.FirebaseSyncService) return;
     await window.FirebaseSyncService.linkEmail(email, password);
     if (typeof closeModal === 'function') {
@@ -1992,6 +1975,8 @@ async function submitLinkEmailUI() {
     if (typeof showToast === 'function') {
       showToast((typeof t === 'function' ? t('sync.linkFailed') : 'Account linking failed') + ': ' + (err.message || ''), true);
     }
+  } finally {
+    _isSubmittingLinkEmail = false;
   }
 }
 window.submitLinkEmailUI = submitLinkEmailUI;
@@ -2054,21 +2039,26 @@ function openPasswordResetFromSetupUI() {
 }
 window.openPasswordResetFromSetupUI = openPasswordResetFromSetupUI;
 
+let _isSubmittingPasswordReset = false;
+
 async function submitPasswordResetUI() {
+  if (_isSubmittingPasswordReset) return;
+  _isSubmittingPasswordReset = true;
+
   const email = document.getElementById('sync-reset-password-email')?.value?.trim();
   const msgEl = document.getElementById('sync-reset-password-msg');
 
-  if (!email || !email.includes('@')) {
-    if (msgEl) {
-      msgEl.textContent = typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address';
-      msgEl.style.background = 'rgba(239,68,68,0.12)';
-      msgEl.style.color = '#ef4444';
-      msgEl.style.display = 'block';
-    }
-    return;
-  }
-
   try {
+    if (!email || !email.includes('@')) {
+      if (msgEl) {
+        msgEl.textContent = typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address';
+        msgEl.style.background = 'rgba(239,68,68,0.12)';
+        msgEl.style.color = '#ef4444';
+        msgEl.style.display = 'block';
+      }
+      return;
+    }
+
     if (window.FirebaseSyncService) {
       await window.FirebaseSyncService.sendPasswordReset(email);
       if (msgEl) {
@@ -2091,6 +2081,8 @@ async function submitPasswordResetUI() {
       msgEl.style.color = '#ef4444';
       msgEl.style.display = 'block';
     }
+  } finally {
+    _isSubmittingPasswordReset = false;
   }
 }
 window.submitPasswordResetUI = submitPasswordResetUI;

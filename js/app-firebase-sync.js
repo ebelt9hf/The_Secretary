@@ -107,45 +107,49 @@ const VaultIDBStorage = {
     return this._openPromise;
   },
 
+  async _runTx(storeName, mode, opFn, fallbackVal = false, timeoutMs = 3000) {
+    const db = await this.getDB();
+    if (!db) return fallbackVal;
+    return new Promise((resolve) => {
+      let isSettled = false;
+      const safeResolve = (val) => {
+        if (isSettled) return;
+        isSettled = true;
+        clearTimeout(timer);
+        resolve(val);
+      };
+      const timer = setTimeout(() => safeResolve(fallbackVal), timeoutMs);
+      try {
+        const tx = db.transaction(storeName, mode);
+        tx.oncomplete = () => safeResolve(fallbackVal === false ? true : undefined);
+        tx.onerror = () => safeResolve(fallbackVal);
+        tx.onabort = () => safeResolve(fallbackVal);
+        opFn(tx, tx.objectStore(storeName), safeResolve);
+      } catch (err) {
+        safeResolve(fallbackVal);
+      }
+    });
+  },
+
   async saveMeta(key, value) {
     const db = await this.getDB();
     if (!db) {
       this._memFallback.meta.set(key, value);
       return true;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction('meta', 'readwrite');
-        tx.objectStore('meta').put({ key, value });
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
-      }
-    });
+    return this._runTx('meta', 'readwrite', (tx, store, done) => {
+      store.put({ key, value });
+      tx.oncomplete = () => done(true);
+    }, false, 3000);
   },
 
   async getMeta(key) {
     const db = await this.getDB();
-    if (!db) {
-      return this._memFallback.meta.get(key) || null;
-    }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(null), 3000);
-      try {
-        const tx = db.transaction('meta', 'readonly');
-        const req = tx.objectStore('meta').get(key);
-        req.onsuccess = () => { clearTimeout(timer); resolve(req.result ? req.result.value : null); };
-        req.onerror = () => { clearTimeout(timer); resolve(null); };
-        tx.onabort = () => { clearTimeout(timer); resolve(null); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(null);
-      }
-    });
+    if (!db) return this._memFallback.meta.get(key) || null;
+    return this._runTx('meta', 'readonly', (tx, store, done) => {
+      const req = store.get(key);
+      req.onsuccess = () => done(req.result ? req.result.value : null);
+    }, null, 3000);
   },
 
   async deleteMeta(key) {
@@ -154,200 +158,98 @@ const VaultIDBStorage = {
       this._memFallback.meta.delete(key);
       return true;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction('meta', 'readwrite');
-        tx.objectStore('meta').delete(key);
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
-      }
-    });
+    return this._runTx('meta', 'readwrite', (tx, store, done) => {
+      store.delete(key);
+      tx.oncomplete = () => done(true);
+    }, false, 3000);
   },
 
-  async putNote(docRecord) {
+  // ── Generic record helpers for stores ──
+  async putRecord(storeName, rec) {
+    if (!rec || !rec.id) return false;
     const db = await this.getDB();
-    if (!docRecord || !docRecord.id) return false;
     if (!db) {
-      this._memFallback.notes.set(docRecord.id, docRecord);
+      if (!this._memFallback[storeName]) this._memFallback[storeName] = new Map();
+      this._memFallback[storeName].set(rec.id, rec);
       return true;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction('notes', 'readwrite');
-        tx.objectStore('notes').put(docRecord);
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
-      }
-    });
+    return this._runTx(storeName, 'readwrite', (tx, store, done) => {
+      store.put(rec);
+      tx.oncomplete = () => done(true);
+    }, false, 3000);
+  },
+
+  async getRecord(storeName, id) {
+    if (!id) return null;
+    const db = await this.getDB();
+    if (!db) return this._memFallback[storeName]?.get(id) || null;
+    return this._runTx(storeName, 'readonly', (tx, store, done) => {
+      const req = store.get(id);
+      req.onsuccess = () => done(req.result || null);
+    }, null, 3000);
+  },
+
+  async getAllRecords(storeName) {
+    const db = await this.getDB();
+    if (!db) return Array.from(this._memFallback[storeName]?.values() || []);
+    return this._runTx(storeName, 'readonly', (tx, store, done) => {
+      const req = store.getAll();
+      req.onsuccess = () => done(req.result || []);
+    }, [], 5000);
+  },
+
+  async deleteRecord(storeName, id) {
+    if (!id) return false;
+    const db = await this.getDB();
+    if (!db) {
+      if (this._memFallback[storeName]) this._memFallback[storeName].delete(id);
+      return true;
+    }
+    return this._runTx(storeName, 'readwrite', (tx, store, done) => {
+      store.delete(id);
+      tx.oncomplete = () => done(true);
+    }, false, 3000);
+  },
+
+  async putNote(docRecord, maybeData) {
+    if (typeof docRecord === 'string') {
+      const rec = maybeData && typeof maybeData === 'object' ? { ...maybeData, id: docRecord } : { id: docRecord };
+      return this.putRecord('notes', rec);
+    }
+    return this.putRecord('notes', docRecord);
   },
 
   async putNotesBatch(docRecords = []) {
-    const db = await this.getDB();
     if (!Array.isArray(docRecords) || docRecords.length === 0) return false;
+    const db = await this.getDB();
     if (!db) {
       for (const rec of docRecords) {
         if (rec && rec.id) this._memFallback.notes.set(rec.id, rec);
       }
       return true;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 5000);
-      try {
-        const tx = db.transaction('notes', 'readwrite');
-        const store = tx.objectStore('notes');
-        for (const rec of docRecords) {
-          if (rec && rec.id) store.put(rec);
-        }
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
+    return this._runTx('notes', 'readwrite', (tx, store, done) => {
+      for (const rec of docRecords) {
+        if (rec && rec.id) store.put(rec);
       }
-    });
+      tx.oncomplete = () => done(true);
+    }, false, 5000);
   },
 
   async getNote(cleanId) {
-    const db = await this.getDB();
-    if (!cleanId) return null;
-    if (!db) {
-      return this._memFallback.notes.get(cleanId) || null;
-    }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(null), 3000);
-      try {
-        const tx = db.transaction('notes', 'readonly');
-        const req = tx.objectStore('notes').get(cleanId);
-        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || null); };
-        req.onerror = () => { clearTimeout(timer); resolve(null); };
-        tx.onabort = () => { clearTimeout(timer); resolve(null); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(null);
-      }
-    });
+    return this.getRecord('notes', cleanId);
   },
 
   async getAllNotes() {
-    const db = await this.getDB();
-    if (!db) {
-      return Array.from(this._memFallback.notes.values());
-    }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve([]), 5000);
-      try {
-        const tx = db.transaction('notes', 'readonly');
-        const req = tx.objectStore('notes').getAll();
-        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || []); };
-        req.onerror = () => { clearTimeout(timer); resolve([]); };
-        tx.onabort = () => { clearTimeout(timer); resolve([]); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve([]);
-      }
-    });
+    return this.getAllRecords('notes');
   },
 
   async deleteNote(cleanId) {
-    const db = await this.getDB();
-    if (!cleanId) return false;
-    if (!db) {
-      this._memFallback.notes.delete(cleanId);
-      return true;
-    }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction('notes', 'readwrite');
-        tx.objectStore('notes').delete(cleanId);
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
-      }
-    });
+    return this.deleteRecord('notes', cleanId);
   },
 
   async clearNotes() {
     return this.clearStore('notes');
-  },
-
-  // ── Generic record helpers for the 'docs' and 'assets' stores ──
-  async putRecord(storeName, rec) {
-    const db = await this.getDB();
-    if (!rec || !rec.id) return false;
-    if (!db) {
-      if (!this._memFallback[storeName]) this._memFallback[storeName] = new Map();
-      this._memFallback[storeName].set(rec.id, rec);
-      return true;
-    }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).put(rec);
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
-      }
-    });
-  },
-
-  async getRecord(storeName, id) {
-    const db = await this.getDB();
-    if (!id) return null;
-    if (!db) {
-      return this._memFallback[storeName]?.get(id) || null;
-    }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(null), 3000);
-      try {
-        const tx = db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).get(id);
-        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || null); };
-        req.onerror = () => { clearTimeout(timer); resolve(null); };
-        tx.onabort = () => { clearTimeout(timer); resolve(null); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(null);
-      }
-    });
-  },
-
-  async getAllRecords(storeName) {
-    const db = await this.getDB();
-    if (!db) {
-      return Array.from(this._memFallback[storeName]?.values() || []);
-    }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve([]), 5000);
-      try {
-        const tx = db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).getAll();
-        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || []); };
-        req.onerror = () => { clearTimeout(timer); resolve([]); };
-        tx.onabort = () => { clearTimeout(timer); resolve([]); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve([]);
-      }
-    });
   },
 
   async getRecordsByIndex(storeName, indexName, keyRangeOrValue) {
@@ -357,30 +259,17 @@ const VaultIDBStorage = {
       const list = Array.from(this._memFallback[storeName].values());
       return list.filter(item => item && item[indexName] === keyRangeOrValue);
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve([]), 5000);
-      try {
-        const tx = db.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        if (!store.indexNames.contains(indexName)) {
-          const req = store.getAll();
-          req.onsuccess = () => {
-            clearTimeout(timer);
-            resolve(req.result ? req.result.filter(item => item && item[indexName] === keyRangeOrValue) : []);
-          };
-          req.onerror = () => { clearTimeout(timer); resolve([]); };
-          return;
-        }
-        const index = store.index(indexName);
-        const req = index.getAll(keyRangeOrValue);
-        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || []); };
-        req.onerror = () => { clearTimeout(timer); resolve([]); };
-        tx.onabort = () => { clearTimeout(timer); resolve([]); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve([]);
+    return this._runTx(storeName, 'readonly', (tx, store, done) => {
+      if (!store.indexNames.contains(indexName)) {
+        const req = store.getAll();
+        req.onsuccess = () => {
+          done(req.result ? req.result.filter(item => item && item[indexName] === keyRangeOrValue) : []);
+        };
+        return;
       }
-    });
+      const req = store.index(indexName).getAll(keyRangeOrValue);
+      req.onsuccess = () => done(req.result || []);
+    }, [], 5000);
   },
 
   async clearStore(storeName) {
@@ -389,24 +278,14 @@ const VaultIDBStorage = {
       if (this._memFallback[storeName]) this._memFallback[storeName].clear();
       return true;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).clear();
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
-      }
-    });
+    return this._runTx(storeName, 'readwrite', (tx, store, done) => {
+      store.clear();
+      tx.oncomplete = () => done(true);
+    }, false, 3000);
   },
 
   // ── Write-Ahead Transaction Logging (WAL) ──
   async appendWAL(entry) {
-    const db = await this.getDB();
     if (!entry || !entry.id) return false;
     const rec = {
       id: entry.id,
@@ -415,23 +294,15 @@ const VaultIDBStorage = {
       payload: entry.payload || null,
       timestamp: entry.timestamp || Date.now()
     };
+    const db = await this.getDB();
     if (!db) {
       this._memFallback.wal.set(entry.id, rec);
       return true;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction('wal', 'readwrite');
-        tx.objectStore('wal').put(rec);
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
-      }
-    });
+    return this._runTx('wal', 'readwrite', (tx, store, done) => {
+      store.put(rec);
+      tx.oncomplete = () => done(true);
+    }, false, 3000);
   },
 
   async getPendingWAL() {
@@ -441,24 +312,14 @@ const VaultIDBStorage = {
       list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
       return list;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve([]), 5000);
-      try {
-        const tx = db.transaction('wal', 'readonly');
-        const req = tx.objectStore('wal').getAll();
-        req.onsuccess = () => {
-          clearTimeout(timer);
-          const list = req.result || [];
-          list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-          resolve(list);
-        };
-        req.onerror = () => { clearTimeout(timer); resolve([]); };
-        tx.onabort = () => { clearTimeout(timer); resolve([]); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve([]);
-      }
-    });
+    return this._runTx('wal', 'readonly', (tx, store, done) => {
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const list = req.result || [];
+        list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        done(list);
+      };
+    }, [], 5000);
   },
 
   async clearWAL(ids = null) {
@@ -473,28 +334,18 @@ const VaultIDBStorage = {
       }
       return true;
     }
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve(false), 3000);
-      try {
-        const tx = db.transaction('wal', 'readwrite');
-        const store = tx.objectStore('wal');
-        if (ids === null || ids === undefined) {
-          store.clear();
-        } else if (Array.isArray(ids)) {
-          for (const id of ids) {
-            if (id) store.delete(id);
-          }
-        } else {
-          store.delete(ids);
+    return this._runTx('wal', 'readwrite', (tx, store, done) => {
+      if (ids === null || ids === undefined) {
+        store.clear();
+      } else if (Array.isArray(ids)) {
+        for (const id of ids) {
+          if (id) store.delete(id);
         }
-        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
-        tx.onerror = () => { clearTimeout(timer); resolve(false); };
-        tx.onabort = () => { clearTimeout(timer); resolve(false); };
-      } catch (e) {
-        clearTimeout(timer);
-        resolve(false);
+      } else {
+        store.delete(ids);
       }
-    });
+      tx.oncomplete = () => done(true);
+    }, false, 3000);
   },
 
   _lockQueues: new Map(),
@@ -978,8 +829,29 @@ const FirebaseSyncService = {
     return null;
   },
 
+  _getBridge() {
+    return (typeof window !== 'undefined' && window.FirebaseBridge)
+      || (typeof globalThis !== 'undefined' && globalThis.FirebaseBridge)
+      || this.bridge
+      || null;
+  },
+
+  _validateEmail(email) {
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
+    }
+    return email.trim();
+  },
+
+  _validatePassword(password) {
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      throw new Error(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Account password must be at least 6 characters');
+    }
+    return password;
+  },
+
   async ensureBridgeInitialized(config = null) {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge) return false;
 
     const defaultCfg = typeof window !== 'undefined' ? window.DEFAULT_FIREBASE_CONFIG : (typeof globalThis !== 'undefined' ? globalThis.DEFAULT_FIREBASE_CONFIG : null);
@@ -1008,7 +880,7 @@ const FirebaseSyncService = {
 
   // ── Email / Password & User Auth API ──
   getAuthUser() {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     const bridgeUser = bridge?.getUser?.();
     const providers = (bridge?.getLinkedProviders?.()) || [];
     return {
@@ -1021,7 +893,7 @@ const FirebaseSyncService = {
 
   async linkGoogle(config = null) {
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.linkGoogle !== 'function') {
       throw new Error('Google linking is not supported by Firebase bridge');
     }
@@ -1036,21 +908,17 @@ const FirebaseSyncService = {
   },
 
   async linkEmail(email, password, config = null) {
-    if (!email || !email.includes('@')) {
-      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
-    }
-    if (!password || password.length < 6) {
-      throw new Error(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Account password must be at least 6 characters');
-    }
+    const validEmail = this._validateEmail(email);
+    const validPass = this._validatePassword(password);
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.linkEmail !== 'function') {
       throw new Error('Email linking is not supported by Firebase bridge');
     }
-    const user = await bridge.linkEmail(email.trim(), password);
+    const user = await bridge.linkEmail(validEmail, validPass);
     if (user && user.uid) {
       this.state.userId = user.uid;
-      this.state.userEmail = user.email || email.trim();
+      this.state.userEmail = user.email || validEmail;
       this.state.isAnonymous = false;
       this._notifyStatus();
     }
@@ -1058,7 +926,7 @@ const FirebaseSyncService = {
   },
 
   async unlinkProvider(providerId) {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.unlinkProvider !== 'function') {
       throw new Error('Unlinking provider is not supported');
     }
@@ -1071,26 +939,22 @@ const FirebaseSyncService = {
   },
 
   getLinkedProviders() {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     return bridge?.getLinkedProviders?.() || [];
   },
 
   async signInWithEmail(email, password, config = null) {
-    if (!email || !email.includes('@')) {
-      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
-    }
-    if (!password || password.length < 6) {
-      throw new Error(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Account password must be at least 6 characters');
-    }
+    const validEmail = this._validateEmail(email);
+    const validPass = this._validatePassword(password);
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.signInWithEmail !== 'function') {
       throw new Error('Firebase Authentication is not available');
     }
-    const user = await bridge.signInWithEmail(email.trim(), password);
+    const user = await bridge.signInWithEmail(validEmail, validPass);
     if (user && user.uid) {
       this.state.userId = user.uid;
-      this.state.userEmail = user.email || email.trim();
+      this.state.userEmail = user.email || validEmail;
       this.state.isAnonymous = false;
       if (this.state.isUnlocked) {
         this.listenRemoteVault();
@@ -1102,21 +966,17 @@ const FirebaseSyncService = {
   },
 
   async signUpWithEmail(email, password, config = null) {
-    if (!email || !email.includes('@')) {
-      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
-    }
-    if (!password || password.length < 6) {
-      throw new Error(typeof t === 'function' ? t('sync.accountPasswordTooShort') : 'Account password must be at least 6 characters');
-    }
+    const validEmail = this._validateEmail(email);
+    const validPass = this._validatePassword(password);
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.signUpWithEmail !== 'function') {
       throw new Error('Firebase Authentication is not available');
     }
-    const user = await bridge.signUpWithEmail(email.trim(), password);
+    const user = await bridge.signUpWithEmail(validEmail, validPass);
     if (user && user.uid) {
       this.state.userId = user.uid;
-      this.state.userEmail = user.email || email.trim();
+      this.state.userEmail = user.email || validEmail;
       this.state.isAnonymous = false;
       if (this.state.isUnlocked) {
         this.listenRemoteVault();
@@ -1129,7 +989,7 @@ const FirebaseSyncService = {
 
   async signInWithGoogle(config = null) {
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.signInWithGoogle !== 'function') {
       throw new Error('Google Authentication is not available');
     }
@@ -1148,26 +1008,24 @@ const FirebaseSyncService = {
   },
 
   async sendSignInLink(email, config = null) {
-    if (!email || !email.includes('@')) {
-      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
-    }
+    const validEmail = this._validateEmail(email);
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.sendSignInLink !== 'function') {
       throw new Error('Email link authentication is not available');
     }
     const targetUrl = typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : 'http://localhost';
     if (typeof localStorage !== 'undefined') {
       try {
-        localStorage.setItem('secretary_email_link_email', email.trim());
+        localStorage.setItem('secretary_email_link_email', validEmail);
       } catch (e) {}
     }
-    await bridge.sendSignInLink(email.trim(), targetUrl);
+    await bridge.sendSignInLink(validEmail, targetUrl);
     return true;
   },
 
   isSignInWithEmailLink(url = null) {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.isSignInWithEmailLink !== 'function') return false;
     const testUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
     return bridge.isSignInWithEmailLink(testUrl);
@@ -1180,19 +1038,17 @@ const FirebaseSyncService = {
         targetEmail = localStorage.getItem('secretary_email_link_email');
       } catch (e) {}
     }
-    if (!targetEmail || !targetEmail.includes('@')) {
-      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
-    }
+    const validEmail = this._validateEmail(targetEmail);
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.signInWithEmailLink !== 'function') {
       throw new Error('Email link authentication is not available');
     }
     const targetUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
-    const user = await bridge.signInWithEmailLink(targetEmail.trim(), targetUrl);
+    const user = await bridge.signInWithEmailLink(validEmail, targetUrl);
     if (user && user.uid) {
       this.state.userId = user.uid;
-      this.state.userEmail = user.email || targetEmail.trim();
+      this.state.userEmail = user.email || validEmail;
       this.state.isAnonymous = false;
       if (typeof localStorage !== 'undefined') {
         try { localStorage.removeItem('secretary_email_link_email'); } catch (e) {}
@@ -1207,7 +1063,7 @@ const FirebaseSyncService = {
   },
 
   async signOut() {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (bridge && typeof bridge.signOut === 'function') {
       await bridge.signOut();
     }
@@ -1227,20 +1083,18 @@ const FirebaseSyncService = {
   },
 
   async sendPasswordReset(email) {
-    if (!email || !email.includes('@')) {
-      throw new Error(typeof t === 'function' ? t('sync.emailRequired') : 'Please enter a valid email address');
-    }
+    const validEmail = this._validateEmail(email);
     await this.ensureBridgeInitialized();
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.sendPasswordReset !== 'function') {
       throw new Error('Firebase Authentication is not available');
     }
-    await bridge.sendPasswordReset(email.trim());
+    await bridge.sendPasswordReset(validEmail);
     return true;
   },
 
   listenRemoteVault() {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || !this.state.userId || this.state.userId === 'default_user' || !this.state.isUnlocked) {
       return () => {};
     }
@@ -1572,7 +1426,7 @@ const FirebaseSyncService = {
   },
 
   listenAppVersion() {
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge || typeof bridge.listenAppInfo !== 'function') return () => {};
 
     const defaultCfg = typeof window !== 'undefined' ? window.DEFAULT_FIREBASE_CONFIG : (typeof globalThis !== 'undefined' ? globalThis.DEFAULT_FIREBASE_CONFIG : null);
@@ -1703,7 +1557,7 @@ const FirebaseSyncService = {
 
     report(typeof t === 'function' ? t('sync.linkingConnecting') : 'Connecting to cloud vault...', 15);
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!bridge) {
       throw new Error('Firebase connection not available');
     }
@@ -1980,7 +1834,7 @@ const FirebaseSyncService = {
     }
 
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (bridge && this.state.userId && this.state.userId !== 'default_user') {
       try {
         await bridge.saveVaultMeta(this.state.userId, vaultMeta);
@@ -2010,7 +1864,7 @@ const FirebaseSyncService = {
       meta = await this.loadPersistedVaultMeta();
     }
     await this.ensureBridgeInitialized(config);
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
     if (!meta && bridge && this.state.userId && this.state.userId !== 'default_user') {
       try {
         meta = await bridge.getVaultMeta(this.state.userId);
@@ -2112,6 +1966,55 @@ const FirebaseSyncService = {
     this._notifyStatus('Vault locked');
   },
 
+  async _rotateEncryptedStoreRecords({
+    storeName,
+    stateMapName,
+    cacheName,
+    oldDerivedKey,
+    newKey,
+    saveRemoteFn,
+    isDoc = false,
+    label = storeName
+  }) {
+    try {
+      if (!this.state[stateMapName]) this.state[stateMapName] = new Map();
+      const recordsMap = new Map(this.state[stateMapName]);
+      try {
+        const idbRecords = await VaultIDBStorage.getAllRecords(storeName);
+        for (const item of idbRecords) {
+          if (item && item.id) recordsMap.set(item.id, item);
+        }
+      } catch (e) {}
+
+      const bridge = this._getBridge();
+      const hasRemote = bridge && this.state.userId && this.state.userId !== 'default_user';
+
+      for (const [id, rec] of recordsMap.entries()) {
+        if (!rec || rec.deleted || !rec.ciphertext) continue;
+        try {
+          const dec = await CryptoEngine.decryptData(oldDerivedKey, { iv: rec.iv, ciphertext: rec.ciphertext });
+          if (dec) {
+            const reEnc = await CryptoEngine.encryptData(newKey, dec);
+            const updatedRecord = { ...rec, iv: reEnc.iv, ciphertext: reEnc.ciphertext, updatedAt: Date.now() };
+            this.state[stateMapName].set(id, updatedRecord);
+            try { await VaultIDBStorage.putRecord(storeName, updatedRecord); } catch (e) {}
+            if (cacheName && this.state[cacheName]) {
+              const val = isDoc ? (dec.data !== undefined ? dec.data : dec) : dec;
+              this.state[cacheName].set(id, val);
+            }
+            if (hasRemote && typeof saveRemoteFn === 'function') {
+              try { await saveRemoteFn(this.state.userId, id, updatedRecord); } catch (e) {}
+            }
+          }
+        } catch (err) {
+          console.warn(`Failed to re-encrypt ${label} ${id} during passphrase rotation`, err);
+        }
+      }
+    } catch (rotErr) {
+      console.warn(`Failed to rotate ${label} encryption`, rotErr);
+    }
+  },
+
   async rotatePassphrase(oldPass, newPass) {
     if (!this.state.isUnlocked || !this.state.masterKey) {
       throw new Error('Vault must be unlocked to rotate passphrase');
@@ -2152,7 +2055,7 @@ const FirebaseSyncService = {
       if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
     }
 
-    const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+    const bridge = this._getBridge();
 
     // Re-encrypt notes
     for (const note of reEncryptedNotes) {
@@ -2165,74 +2068,31 @@ const FirebaseSyncService = {
       }
     }
 
-    // Re-encrypt docs store
-    try {
-      const oldDerivedKey = await CryptoEngine.deriveKey(oldPass, oldVaultMeta.salt, oldVaultMeta.kdfIterations || 100000);
-      const docsMap = new Map(this.state.encryptedDocs || []);
-      try {
-        const idbDocs = await VaultIDBStorage.getAllRecords('docs');
-        for (const d of idbDocs) {
-          if (d && d.id) docsMap.set(d.id, d);
-        }
-      } catch (e) {}
+    const oldDerivedKey = await CryptoEngine.deriveKey(oldPass, oldVaultMeta.salt, oldVaultMeta.kdfIterations || 100000);
 
-      for (const [id, d] of docsMap.entries()) {
-        if (!d || d.deleted || !d.ciphertext) continue;
-        try {
-          const dec = await CryptoEngine.decryptData(oldDerivedKey, { iv: d.iv, ciphertext: d.ciphertext });
-          if (dec) {
-            const reEnc = await CryptoEngine.encryptData(newKey, dec);
-            const updatedRecord = { ...d, iv: reEnc.iv, ciphertext: reEnc.ciphertext, updatedAt: Date.now() };
-            if (!this.state.encryptedDocs) this.state.encryptedDocs = new Map();
-            this.state.encryptedDocs.set(id, updatedRecord);
-            try { await VaultIDBStorage.putRecord('docs', updatedRecord); } catch (e) {}
-            const val = dec.data !== undefined ? dec.data : dec;
-            if (this.state.docsCache) this.state.docsCache.set(id, val);
-            if (bridge && this.state.userId && this.state.userId !== 'default_user' && typeof bridge.saveDoc === 'function') {
-              try { await bridge.saveDoc(this.state.userId, id, updatedRecord); } catch (e) {}
-            }
-          }
-        } catch (err) {
-          console.warn(`Failed to re-encrypt doc ${id} during passphrase rotation`, err);
-        }
-      }
-    } catch (docRotErr) {
-      console.warn('Failed to rotate docs encryption', docRotErr);
-    }
+    // Re-encrypt docs store
+    await this._rotateEncryptedStoreRecords({
+      storeName: 'docs',
+      stateMapName: 'encryptedDocs',
+      cacheName: 'docsCache',
+      oldDerivedKey,
+      newKey,
+      saveRemoteFn: bridge && typeof bridge.saveDoc === 'function' ? (uid, id, r) => bridge.saveDoc(uid, id, r) : null,
+      isDoc: true,
+      label: 'doc'
+    });
 
     // Re-encrypt assets store
-    try {
-      const oldDerivedKey = await CryptoEngine.deriveKey(oldPass, oldVaultMeta.salt, oldVaultMeta.kdfIterations || 100000);
-      const assetsMap = new Map(this.state.encryptedAssets || []);
-      try {
-        const idbAssets = await VaultIDBStorage.getAllRecords('assets');
-        for (const a of idbAssets) {
-          if (a && a.id) assetsMap.set(a.id, a);
-        }
-      } catch (e) {}
-
-      for (const [id, a] of assetsMap.entries()) {
-        if (!a || a.deleted || !a.ciphertext) continue;
-        try {
-          const dec = await CryptoEngine.decryptData(oldDerivedKey, { iv: a.iv, ciphertext: a.ciphertext });
-          if (dec) {
-            const reEnc = await CryptoEngine.encryptData(newKey, dec);
-            const updatedRecord = { ...a, iv: reEnc.iv, ciphertext: reEnc.ciphertext, updatedAt: Date.now() };
-            if (!this.state.encryptedAssets) this.state.encryptedAssets = new Map();
-            this.state.encryptedAssets.set(id, updatedRecord);
-            try { await VaultIDBStorage.putRecord('assets', updatedRecord); } catch (e) {}
-            if (this.state.assetsCache) this.state.assetsCache.set(id, dec);
-            if (bridge && this.state.userId && this.state.userId !== 'default_user' && typeof bridge.saveAsset === 'function') {
-              try { await bridge.saveAsset(this.state.userId, id, updatedRecord); } catch (e) {}
-            }
-          }
-        } catch (err) {
-          console.warn(`Failed to re-encrypt asset ${id} during passphrase rotation`, err);
-        }
-      }
-    } catch (assetRotErr) {
-      console.warn('Failed to rotate assets encryption', assetRotErr);
-    }
+    await this._rotateEncryptedStoreRecords({
+      storeName: 'assets',
+      stateMapName: 'encryptedAssets',
+      cacheName: 'assetsCache',
+      oldDerivedKey,
+      newKey,
+      saveRemoteFn: bridge && typeof bridge.saveAsset === 'function' ? (uid, id, r) => bridge.saveAsset(uid, id, r) : null,
+      isDoc: false,
+      label: 'asset'
+    });
 
     // Clear old WAL entries to prevent stale pre-rotation keys from being replayed
     try {
@@ -2603,7 +2463,7 @@ const FirebaseSyncService = {
           }
         } else {
           // Lazy fetch remote body if not yet cached
-          const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+          const bridge = this._getBridge();
           if (bridge && this.state.userId && this.state.userId !== 'default_user' && typeof bridge.getNoteBody === 'function') {
             try {
               const remoteBody = await bridge.getNoteBody(this.state.userId, cleanId);
@@ -3069,7 +2929,7 @@ const FirebaseSyncService = {
     } catch (e) {}
 
     if (!rec) {
-      const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+      const bridge = this._getBridge();
       if (bridge && this.state.userId && this.state.userId !== 'default_user' && typeof bridge.getAsset === 'function') {
         try {
           const remoteRec = await bridge.getAsset(this.state.userId, normalizedId);
@@ -3226,7 +3086,7 @@ const FirebaseSyncService = {
       } catch (e) {}
 
       // Push flushed records to Firebase Realtime Database (Encrypt on the wire!)
-      const bridge = typeof window !== 'undefined' ? window.FirebaseBridge : (typeof globalThis !== 'undefined' ? globalThis.FirebaseBridge : null);
+      const bridge = this._getBridge();
       if (bridge && this.state.userId && this.state.userId !== 'default_user' && this.state.masterKey) {
         for (const [id, flushedRecord] of inFlightBatch.entries()) {
           try {

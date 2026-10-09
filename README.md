@@ -10,8 +10,8 @@ With **Secretary v4.0.0**, you get the best of both worlds: complete **local dis
 
 | Platform | Architecture | Download |
 |---|---|---|
-| 🍎 **macOS** | Apple Silicon (M1/M2/M3/M4) | [**Secretary-4.0.7-arm64.dmg**](https://github.com/ebelt9hf/The_Secretary/releases/download/v4.0.7/Secretary-4.0.7-arm64.dmg) · [.zip](https://github.com/ebelt9hf/The_Secretary/releases/download/v4.0.7/Secretary-4.0.7-arm64-mac.zip) |
-| 🪟 **Windows** | Portable Package (x64 / ARM64) | [**Secretary-4.0.7-win.zip**](https://github.com/ebelt9hf/The_Secretary/releases/download/v4.0.7/Secretary-4.0.7-win.zip) |
+| 🍎 **macOS** | Apple Silicon (M1/M2/M3/M4) | [**Secretary-4.0.8-arm64.dmg**](https://github.com/ebelt9hf/The_Secretary/releases/download/v4.0.8/Secretary-4.0.8-arm64.dmg) · [.zip](https://github.com/ebelt9hf/The_Secretary/releases/download/v4.0.8/Secretary-4.0.8-arm64-mac.zip) |
+| 🪟 **Windows** | Portable Package (x64 / ARM64) | [**Secretary-4.0.8-win.zip**](https://github.com/ebelt9hf/The_Secretary/releases/download/v4.0.8/Secretary-4.0.8-win.zip) |
 
 > **macOS**: Open the `.dmg`, drag **Secretary.app** to Applications. On first launch, right-click → **Open** to bypass Gatekeeper (app is unsigned).  
 > **Windows**: Extract the `.zip` and run `Secretary.exe`. No installation needed.
