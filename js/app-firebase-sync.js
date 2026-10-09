@@ -2984,6 +2984,33 @@ const FirebaseSyncService = {
     return true;
   },
 
+  async deleteRemoteVault(targetCode = null) {
+    const bridge = this.getBridge();
+    const code = targetCode || this.getSyncCode();
+    if (bridge && code && typeof bridge.deleteUserVault === 'function') {
+      try {
+        await bridge.deleteUserVault(code);
+      } catch (err) {
+        console.warn('FirebaseSyncService.deleteRemoteVault bridge error:', err);
+      }
+    }
+    this.lockVault();
+    try {
+      await VaultIDBStorage.clearStore('notes');
+      await VaultIDBStorage.clearStore('docs');
+      await VaultIDBStorage.clearStore('assets');
+      await VaultIDBStorage.clearWAL();
+      await VaultIDBStorage.deleteMeta('vault_meta');
+      await VaultIDBStorage.deleteMeta('manifest_cache');
+    } catch (e) {}
+    if (typeof settings !== 'undefined' && settings) {
+      delete settings.vaultMeta;
+      delete settings.vaultId;
+      if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
+    }
+    return true;
+  },
+
   // ── Full Bidirectional Migration Assistent ──
   async migrateFromFilesystem(rawNotesList = [], passphrase, config = {}, additionalData = {}, onProgress = null) {
     if (!passphrase) throw new Error('Master passphrase is required for migration');

@@ -328,7 +328,8 @@ function renderTodosBoard() {
       const quad = getTodoQuadrant(todo);
       const meta = getQuadrantMeta(quad);
       const isHighStar = Boolean(todo.isHighPriority);
-      const isWip = isTodoWip(todo);
+      const isWontDo = typeof isTodoWontDo === 'function' ? isTodoWontDo(todo) : (todo.status === 'wont_do');
+      const isWip = isTodoWip(todo) && !isWontDo;
       const isBlocked = typeof TaskGraphEngine !== 'undefined' && TaskGraphEngine.isBlocked(todo.id);
       const isCrit = criticalPathSet.has(String(todo.id));
       const dueInfo = typeof getTodoDueDateInfo === 'function' ? getTodoDueDateInfo(todo) : null;
@@ -338,7 +339,7 @@ function renderTodosBoard() {
       const displayTitle = truncateTaskText(fullTitle, 20);
 
       return `
-        <div class="eisenhower-task-text${isHighStar ? ' is-starred' : ''}${isWip ? ' is-wip' : ''}${isOverdue ? ' is-overdue' : ''}${isBlocked ? ' is-blocked' : ''}${isCrit ? ' is-critical-path' : ''}"
+        <div class="eisenhower-task-text${isHighStar ? ' is-starred' : ''}${isWip ? ' is-wip' : ''}${isWontDo ? ' is-wontdo' : ''}${isOverdue ? ' is-overdue' : ''}${isBlocked ? ' is-blocked' : ''}${isCrit ? ' is-critical-path' : ''}"
              role="button"
              tabindex="0"
              data-todo-id="${escA(todo.id)}"
@@ -395,13 +396,14 @@ function renderTodosBoard() {
         const quad = getTodoQuadrant(todo);
         const meta = getQuadrantMeta(quad);
         const isHighStar = Boolean(todo.isHighPriority);
+        const isWontDo = typeof isTodoWontDo === 'function' ? isTodoWontDo(todo) : (todo.status === 'wont_do');
         const isBlocked = typeof TaskGraphEngine !== 'undefined' && TaskGraphEngine.isBlocked(todo.id);
         const isCrit = criticalPathSet.has(String(todo.id));
         const fullTitle = getCleanTaskTitle(todo);
         const displayTitle = truncateTaskText(fullTitle, 18);
 
         return `
-          <div class="eisenhower-task-text eisenhower-radial-dot${isHighStar ? ' is-starred' : ''}${isBlocked ? ' is-blocked' : ''}${isCrit ? ' is-critical-path' : ''}"
+          <div class="eisenhower-task-text eisenhower-radial-dot${isHighStar ? ' is-starred' : ''}${isWontDo ? ' is-wontdo' : ''}${isBlocked ? ' is-blocked' : ''}${isCrit ? ' is-critical-path' : ''}"
                role="button"
                tabindex="0"
                data-todo-id="${escA(todo.id)}"
@@ -811,17 +813,18 @@ function renderTodoCard(todo, rank) {
   const priority = todo.priority;
   const quadrant = getTodoQuadrant(todo);
   const isDone = priority === 'Done';
-  const isWip = isTodoWip(todo) && !isDone;
+  const isWontDo = typeof isTodoWontDo === 'function' ? isTodoWontDo(todo) : (todo.status === 'wont_do');
+  const isWip = isTodoWip(todo) && !isDone && !isWontDo;
   const isHighStar = Boolean(todo.isHighPriority);
-  const badgeCls = isDone ? 'sl-badge-done' : isWip ? 'sl-badge-wip' : quadrant === 'Q1' ? 'sl-badge-high' : quadrant === 'Q2' ? 'sl-badge-med' : 'sl-badge-low';
+  const badgeCls = isDone ? 'sl-badge-done' : isWontDo ? 'sl-badge-wontdo' : isWip ? 'sl-badge-wip' : quadrant === 'Q1' ? 'sl-badge-high' : quadrant === 'Q2' ? 'sl-badge-med' : 'sl-badge-low';
   const qBadgeMap = {
     Q1: `⚡ ${getQuadrantMeta('Q1').shortLabel}`,
     Q2: `☕ ${getQuadrantMeta('Q2').shortLabel}`,
     Q3: `💬 ${getQuadrantMeta('Q3').shortLabel}`,
     Q4: `🌱 ${getQuadrantMeta('Q4').shortLabel}`
   };
-  const badgeText = isDone && todo.originalPriority ? `${t('todo.done').toUpperCase()} · ${qBadgeMap[quadrant] || quadrant}` : isWip ? t('todo.wip') : (qBadgeMap[quadrant] || quadrant);
-  const badgeHtml = (isWip || isDone) ? `<span class="sl-badge ${badgeCls} todo-priority-badge todo-priority-${(isDone ? 'done' : isWip ? 'wip' : priority).toLowerCase()}" style="margin-left:auto">${escH(badgeText)}</span>` : '';
+  const badgeText = isDone && todo.originalPriority ? `${t('todo.done').toUpperCase()} · ${qBadgeMap[quadrant] || quadrant}` : isWontDo ? (t('todo.statusWontDo') || "Won't Do") : isWip ? t('todo.wip') : (qBadgeMap[quadrant] || quadrant);
+  const badgeHtml = (isWip || isDone || isWontDo) ? `<span class="sl-badge ${badgeCls} todo-priority-badge todo-priority-${(isDone ? 'done' : isWontDo ? 'wontdo' : isWip ? 'wip' : priority).toLowerCase()}" style="margin-left:auto">${escH(badgeText)}</span>` : '';
 
   const linkedNote = todo.noteId ? getNoteById(todo.noteId) : null;
   const dueInfo = getTodoDueDateInfo(todo);
@@ -914,7 +917,7 @@ function renderTodoCard(todo, rank) {
   const askedById = typeof getTodoAskedById === 'function' ? getTodoAskedById(todo) : '';
   const isImportant = askedById && typeof isColleagueImportant === 'function' && isColleagueImportant(askedById);
 
-  return `<div class="sl-card todo-board-card${isHighStar ? ' todo-high-priority' : ''}${hasNextStep ? ' todo-commitment-ring' : ''}${isWip ? ' todo-board-card-wip' : ''}${isDone ? ' todo-board-card-done' : ''}${dueInfo ? ` ${dueInfo.urgencyClass}` : ''}${isImportant ? ' todo-board-card-important' : ''}" draggable="true"
+  return `<div class="sl-card todo-board-card${isHighStar ? ' todo-high-priority' : ''}${hasNextStep ? ' todo-commitment-ring' : ''}${isWip ? ' todo-board-card-wip' : ''}${isWontDo ? ' todo-board-card-wontdo' : ''}${isDone ? ' todo-board-card-done' : ''}${dueInfo ? ` ${dueInfo.urgencyClass}` : ''}${isImportant ? ' todo-board-card-important' : ''}" draggable="true"
    data-todo-id="${escA(todo.id)}" data-priority="${escA(priority)}" data-quadrant="${escA(quadrant)}"
    onclick="openTodoOverlay(${jq(todo.id)})"
    oncontextmenu="return showTodoCardContextMenu(event, ${jq(todo.id)})"
@@ -1037,6 +1040,11 @@ function showTodoCardContextMenu(e, todoId) {
       btnLabel('⏳', todo.status === 'WIP' ? 'todo.clearInProgress' : 'todo.markInProgress', todo.status === 'WIP' ? 'Clear In Progress' : 'Mark In Progress'),
       t('todo.toggleInProgressTooltip'),
       async () => toggleTodoWipById(todoId)
+    ));
+    menu.appendChild(makeBtn(
+      btnLabel('🚫', (todo.status === 'wont_do' || (typeof isTodoWontDo === 'function' && isTodoWontDo(todo))) ? 'todo.clearWontDo' : 'todo.markWontDo', (todo.status === 'wont_do' || (typeof isTodoWontDo === 'function' && isTodoWontDo(todo))) ? "Clear Won't Do" : "Won't Do"),
+      t('todo.markWontDoTooltip') || "Mark this task as won't do",
+      async () => setTodoQuickStatus(todoId, (todo.status === 'wont_do' || (typeof isTodoWontDo === 'function' && isTodoWontDo(todo))) ? 'pending' : 'wont_do')
     ));
   }
 
@@ -1832,8 +1840,9 @@ async function openTodoOverlay(todoId, maybeOptions = {}) {
 
   updateTodoDueDateDisplay(todo.dueDate || '');
   const isDone = todo.priority === 'Done';
+  const isWontDo = typeof isTodoWontDo === 'function' ? isTodoWontDo(todo) : (todo.status === 'wont_do');
   const isWip = isTodoWip(todo);
-  setTodoModalStatus(isDone ? 'done' : isWip ? 'wip' : 'pending');
+  setTodoModalStatus(isDone ? 'done' : isWontDo ? 'wont_do' : isWip ? 'wip' : 'pending');
 
   if (typeof populateCollaboratorPicker === 'function') {
     populateCollaboratorPicker('todo-edit-owner-picker', todo.ownerId || todo.owner || 'me', {
@@ -2037,7 +2046,8 @@ async function saveTodoFromOverlay() {
     const selectedQuad = quadSel ? quadSel.value : 'Q2';
     const selectedWs = wsSel ? wsSel.value.trim() : '';
     const isDone = _todoModalStatus === 'done' || selectedQuad === 'Done';
-    const isWip = _todoModalStatus === 'wip' && !isDone;
+    const isWontDo = _todoModalStatus === 'wont_do';
+    const isWip = _todoModalStatus === 'wip' && !isDone && !isWontDo;
 
     const finalPriority = isDone ? 'Done' : (selectedQuad === 'Done' ? 'Q2' : selectedQuad);
     const finalQuad = isDone ? (selectedQuad !== 'Done' ? selectedQuad : 'Q2') : finalPriority;
@@ -2054,7 +2064,7 @@ async function saveTodoFromOverlay() {
       if (typeof _todoModalEisenhowerX === 'number') todo.eisenhowerX = _todoModalEisenhowerX;
       if (typeof _todoModalEisenhowerY === 'number') todo.eisenhowerY = _todoModalEisenhowerY;
       todo.dueDate = _todoModalDueDate;
-      todo.status = isWip ? 'WIP' : '';
+      todo.status = isWontDo ? 'wont_do' : (isWip ? 'WIP' : '');
       todo.context = contextTxt ? contextTxt.value : '';
       todo.depends_on = Array.from(new Set(_todoModalDependsOn));
 
@@ -2151,7 +2161,7 @@ async function saveTodoFromOverlay() {
         owner: ownerLabel,
         ownerId: ownerPickerId,
         dueDate: _todoModalDueDate,
-        status: isWip ? 'WIP' : '',
+        status: isWontDo ? 'wont_do' : (isWip ? 'WIP' : ''),
         workstream: selectedWs,
         major_topic_tags: selectedWs ? [selectedWs] : [],
         context: contextTxt ? contextTxt.value : '',
@@ -4765,6 +4775,11 @@ async function setTodoQuickStatus(todoId, newStatus) {
     }
     todo.priority = 'Done';
     todo.status = '';
+  } else if (newStatus === 'wont_do') {
+    todo.status = 'wont_do';
+    if (todo.priority === 'Done') {
+      todo.priority = todo.originalPriority || (todo.eisenhowerQuadrant || 'Q2');
+    }
   } else if (newStatus === 'pending') {
     todo.status = '';
     if (todo.priority === 'Done') {
@@ -4783,6 +4798,8 @@ async function setTodoQuickStatus(todoId, newStatus) {
     ? (t('todo.quickStatusWip') || 'In Progress')
     : newStatus === 'done'
     ? (t('todo.quickStatusDone') || 'Done')
+    : newStatus === 'wont_do'
+    ? (t('todo.statusWontDo') || "Won't Do")
     : (t('todo.quickStatusPending') || 'Pending');
 
   if (newStatus === 'done') {
@@ -4977,8 +4994,9 @@ function showEisenhowerQuickActionPopover(e, todoId, targetEl) {
   const quad = getTodoQuadrant(todo);
   const meta = getQuadrantMeta(quad);
   const isDone = todo.priority === 'Done';
-  const isWip = isTodoWip(todo) && !isDone;
-  const isPending = !isDone && !isWip;
+  const isWontDo = typeof isTodoWontDo === 'function' ? isTodoWontDo(todo) : (todo.status === 'wont_do');
+  const isWip = isTodoWip(todo) && !isDone && !isWontDo;
+  const isPending = !isDone && !isWip && !isWontDo;
   const isHighStar = Boolean(todo.isHighPriority);
   const cleanTitle = getCleanTaskTitle(todo);
   const ownerLabel = typeof getTodoOwnerLabel === 'function' ? getTodoOwnerLabel(todo) : null;
@@ -5034,6 +5052,9 @@ function showEisenhowerQuickActionPopover(e, todoId, targetEl) {
       </button>
       <button type="button" class="eq-status-btn status-done${isDone ? ' active' : ''}" id="eq-status-done" title="${escA(t('todo.quickStatusDoneTooltip') || 'Mark this task as completed')}">
         ✅ ${escH(t('todo.quickStatusDone') || 'Done')}
+      </button>
+      <button type="button" class="eq-status-btn status-wontdo${isWontDo ? ' active' : ''}" id="eq-status-wontdo" title="${escA(t('todo.quickStatusWontDoTooltip') || "Set task status to Won't Do")}">
+        🚫 ${escH(t('todo.statusWontDo') || "Won't Do")}
       </button>
     </div>
     <div class="eq-popover-actions">
@@ -5104,6 +5125,11 @@ function showEisenhowerQuickActionPopover(e, todoId, targetEl) {
   popover.querySelector('#eq-status-done')?.addEventListener('click', async (ev) => {
     ev.stopPropagation();
     await setTodoQuickStatus(todoId, 'done');
+  });
+
+  popover.querySelector('#eq-status-wontdo')?.addEventListener('click', async (ev) => {
+    ev.stopPropagation();
+    await setTodoQuickStatus(todoId, 'wont_do');
   });
 
   popover.querySelector('#eq-edit-btn')?.addEventListener('click', (ev) => {
@@ -5628,7 +5654,30 @@ const TodoFilterEngine = {
       }
 
       if (status && status !== 'all') {
-        if (item.status !== status) return false;
+        const itemStatus = (item.status || '').toLowerCase();
+        const normFilterStatus = String(status).toLowerCase();
+        if (normFilterStatus === 'wont_do' || normFilterStatus === "won't do" || normFilterStatus === 'wontdo') {
+          if (typeof isTodoWontDo === 'function') {
+            if (!isTodoWontDo(item)) return false;
+          } else if (item.status !== 'wont_do') {
+            return false;
+          }
+        } else if (normFilterStatus === 'wip') {
+          if (typeof isTodoWip === 'function') {
+            if (!isTodoWip(item)) return false;
+          } else if (item.status !== 'WIP') {
+            return false;
+          }
+        } else if (normFilterStatus === 'done') {
+          if (item.priority !== 'Done' && itemStatus !== 'done') return false;
+        } else if (normFilterStatus === 'pending') {
+          const isDoneItem = item.priority === 'Done';
+          const isWipItem = typeof isTodoWip === 'function' ? isTodoWip(item) : item.status === 'WIP';
+          const isWontDoItem = typeof isTodoWontDo === 'function' ? isTodoWontDo(item) : item.status === 'wont_do';
+          if (isDoneItem || isWipItem || isWontDoItem) return false;
+        } else if (item.status !== status) {
+          return false;
+        }
       }
 
       if (workstream && workstream !== 'all') {

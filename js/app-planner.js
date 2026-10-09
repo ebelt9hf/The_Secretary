@@ -2140,6 +2140,33 @@ function getPlannerDaysToDisplay() {
   return days;
 }
 
+/**
+ * Determines whether two displayed calendar dates have a gap between them
+ * (i.e. are non-neighbouring calendar days separated by 1 or more hidden days,
+ * such as weekends or non-working days).
+ *
+ * @param {Date|string} prevDate - The preceding date displayed in the calendar.
+ * @param {Date|string} currDate - The current date displayed in the calendar.
+ * @returns {boolean} True if currDate is more than 1 calendar day after prevDate.
+ */
+function hasPlannerDayGap(prevDate, currDate) {
+  if (!prevDate || !currDate) return false;
+  const p = (prevDate instanceof Date)
+    ? prevDate
+    : ((typeof parseLocalDateValue === 'function') ? parseLocalDateValue(prevDate) : new Date(prevDate));
+  const c = (currDate instanceof Date)
+    ? currDate
+    : ((typeof parseLocalDateValue === 'function') ? parseLocalDateValue(currDate) : new Date(currDate));
+  if (!p || !c || isNaN(p.getTime()) || isNaN(c.getTime())) return false;
+  const utc1 = Date.UTC(p.getFullYear(), p.getMonth(), p.getDate());
+  const utc2 = Date.UTC(c.getFullYear(), c.getMonth(), c.getDate());
+  const diffDays = Math.round((utc2 - utc1) / (1000 * 60 * 60 * 24));
+  return diffDays > 1;
+}
+if (typeof window !== 'undefined') {
+  window.hasPlannerDayGap = hasPlannerDayGap;
+}
+
 function setPlannerViewMode(mode) {
   plannerViewMode = mode;
   try { localStorage.setItem('secretaryPlannerViewMode', mode); } catch (e) { }
@@ -2871,11 +2898,14 @@ function renderCalendarGrid() {
   let gridHTML = `<div class="planner-header-cell-spacer"></div>`;
   const dayNames = t('week.dayNames') || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  days.forEach(colDate => {
+  days.forEach((colDate, idx) => {
     const colDateStr = formatLocalDateValue(colDate);
     const isToday = colDateStr === todayStr;
     const isReviewed = isDailyReviewDateReviewed(colDateStr);
     const isFuture = colDateStr > todayStr;
+    const hasGapBefore = idx > 0 && hasPlannerDayGap(days[idx - 1], colDate);
+    const gapCls = hasGapBefore ? ' planner-day-gap' : '';
+    const gapDataAttr = hasGapBefore ? ' data-has-day-gap="true"' : '';
     // Map Javascript day index (0=Sun, 1=Mon...) to dayNames list (0=Mon...6=Sun)
     const jsDay = colDate.getDay();
     const dayName = dayNames[jsDay === 0 ? 6 : jsDay - 1] || '';
@@ -2925,7 +2955,7 @@ function renderCalendarGrid() {
       : (!isFuture ? ` title="${escA(t(isReviewed ? 'planner.openDailyReviewNoteTooltip' : 'retro.reviewDayTooltip'))}"` : '');
 
     gridHTML += `
-      <div class="planner-header-cell${isToday ? ' today' : ''}${isReviewed ? ' reviewed' : ''}${(!isFuture && !isCoveredByOoo) ? ' reviewable' : ''}${isCoveredByOoo ? ' is-ooo' : ''}" style="background-image: linear-gradient(to top, hsla(${hue}, 75%, 45%, 0.22) ${percentage}%, transparent ${percentage}%);"${cellReviewClickAttr}${cellReviewTitle}>
+      <div class="planner-header-cell${gapCls}${isToday ? ' today' : ''}${isReviewed ? ' reviewed' : ''}${(!isFuture && !isCoveredByOoo) ? ' reviewable' : ''}${isCoveredByOoo ? ' is-ooo' : ''}"${gapDataAttr} style="background-image: linear-gradient(to top, hsla(${hue}, 75%, 45%, 0.22) ${percentage}%, transparent ${percentage}%);"${cellReviewClickAttr}${cellReviewTitle}>
         ${reviewedCheckmarkHtml}
         <span class="planner-header-day">${escH(dayName)}</span>
         <span class="planner-header-date">${dateNum}</span>
@@ -2944,12 +2974,15 @@ function renderCalendarGrid() {
   gridHTML += `</div>`;
 
   // 3. Day timeline columns
-  days.forEach(colDate => {
+  days.forEach((colDate, idx) => {
     const colDateStr = formatLocalDateValue(colDate);
     const isToday = colDateStr === todayStr;
+    const hasGapBefore = idx > 0 && hasPlannerDayGap(days[idx - 1], colDate);
+    const gapCls = hasGapBefore ? ' planner-day-gap' : '';
+    const gapDataAttr = hasGapBefore ? ' data-has-day-gap="true"' : '';
 
     gridHTML += `
-      <div class="planner-day-col${isToday ? ' today' : ''}" data-date="${colDateStr}"
+      <div class="planner-day-col${gapCls}${isToday ? ' today' : ''}" data-date="${colDateStr}"${gapDataAttr}
         ondragover="handlePlannerDayColDragOver(event)"
         ondrop="handlePlannerDayColDrop(event, '${colDateStr}')">
         <!-- Render Empty plannable time slots -->

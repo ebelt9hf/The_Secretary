@@ -789,9 +789,17 @@ body[data-theme='dark'] .collapsible-sidebar.collapsed:hover {
   margin-bottom: 8px;
 }
 .prefs-label {
-  width: 120px;
+  min-width: 170px;
+  width: auto;
   font-weight: 600;
   color: var(--text-muted);
+  flex-shrink: 0;
+}
+.prefs-row[style*="column"] .prefs-label,
+.prefs-row[style*="flex-direction:column"] .prefs-label,
+.prefs-row[style*="flex-direction: column"] .prefs-label {
+  width: auto;
+  min-width: 0;
 }
 .prefs-input {
   padding: .35rem .5rem;

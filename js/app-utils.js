@@ -116,6 +116,7 @@ function getTodoById(id)        { return todosManifest.find(t => t.id === id); }
 function getTodosByPriority(p)  { return todosManifest.filter(t => t.priority === p); }
 function getTodosByStatus(status) { return todosManifest.filter(t => t.status === status); }
 function isTodoWip(todo)       { return !!todo && (todo.status === 'WIP' || todo.priority === 'WIP'); }
+function isTodoWontDo(todo)    { return !!todo && (todo.status === 'wont_do' || todo.status === "won't do" || todo.status === 'WontDo'); }
 function getTodoEffectivePriority(todo) {
   const priority = todo?.priority || 'Medium';
   if (priority === 'WIP') {
@@ -3338,5 +3339,7 @@ window.formatPlannerEventContextForAI = formatPlannerEventContextForAI;
 window.sanitizeHtmlContent = sanitizeHtmlContent;
 window.isDateCoveredByOoo = isDateCoveredByOoo;
 window.getCoveringOooEvent = getCoveringOooEvent;
+window.isTodoWontDo = isTodoWontDo;
+if (typeof globalThis !== 'undefined') globalThis.isTodoWontDo = isTodoWontDo;
 
 

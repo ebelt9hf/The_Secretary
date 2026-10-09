@@ -3861,104 +3861,10 @@ function _escEditorContextMenu(e) {
   }
 }
 
+// Custom editor context menu removed to allow native browser context menu (Copy/Paste/Cut).
+// Formatting is available via the floating toolbar when text is selected.
 function showEditorContextMenu(event) {
-  const ta = document.getElementById('edit-textarea');
-  if (!ta) return;
-
-  event.preventDefault();
-  event.stopPropagation();
   closeEditorContextMenu();
-
-  const menu = document.createElement('div');
-  menu.className = 'note-card-context-menu editor-text-context-menu';
-  menu.style.position = 'absolute';
-  menu.style.zIndex = '3000';
-
-  const makeBtn = (icon, labelKey, defaultText, fn, tooltipKey, defaultTooltipText) => {
-    const b = document.createElement('button');
-    b.className = 'ctx-btn';
-    const txt = typeof t === 'function' ? (t(labelKey) || defaultText) : defaultText;
-    const tooltipText = tooltipKey ? (typeof t === 'function' ? (t(tooltipKey) || defaultTooltipText || txt) : (defaultTooltipText || txt)) : (defaultTooltipText || txt);
-    b.title = tooltipText;
-    b.innerHTML = `<span style="display:inline-block;width:1.2rem;text-align:center;">${icon}</span> ${txt}`;
-    b.addEventListener('click', async (ev) => {
-      ev.stopPropagation();
-      try {
-        await fn();
-      } catch (err) {
-        console.warn(err);
-      }
-      closeEditorContextMenu();
-    });
-    return b;
-  };
-
-  const makeHeader = (labelKey, defaultText) => {
-    const h = document.createElement('div');
-    h.className = 'ctx-header';
-    h.style.cssText = 'padding: 4px 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); opacity: 0.8; border-bottom: 1px solid var(--card-border); margin-bottom: 2px;';
-    const txt = typeof t === 'function' ? (t(labelKey) || defaultText) : defaultText;
-    h.textContent = txt;
-    return h;
-  };
-
-  const makeDivider = () => {
-    const d = document.createElement('div');
-    d.className = 'ctx-divider';
-    d.style.cssText = 'height: 1px; background: var(--card-border); margin: 3px 0;';
-    return d;
-  };
-
-  // Format section
-  menu.appendChild(makeHeader('editor.formatting', 'Formatage'));
-  menu.appendChild(makeBtn('<b>B</b>', 'editor.bold', 'Gras', () => formatRichText('bold'), 'editor.boldTooltip', 'Mettre la sélection en gras avec la syntaxe Markdown'));
-  menu.appendChild(makeBtn('<i>I</i>', 'editor.italic', 'Italique', () => formatRichText('italic'), 'editor.italicTooltip', 'Mettre la sélection en italique avec la syntaxe Markdown'));
-  menu.appendChild(makeBtn('<u>U</u>', 'editor.underline', 'Souligné', () => formatRichText('underline'), 'editor.underlineTooltip', 'Souligner le texte sélectionné'));
-  menu.appendChild(makeBtn('<s>S</s>', 'editor.strike', 'Barré', () => formatRichText('strike'), 'editor.strikeTooltip', 'Barrer la sélection avec la syntaxe Markdown'));
-  menu.appendChild(makeBtn('🖍️', 'editor.highlightText', 'Surligner', () => formatRichText('mark'), 'editor.highlightTextTooltip', 'Surligner le texte sélectionné'));
-  menu.appendChild(makeBtn('`', 'editor.code', 'Code en ligne', () => formatRichText('code'), 'editor.codeTooltip', 'Formater la sélection en code en ligne'));
-  menu.appendChild(makeBtn('<i>fx</i>', 'editor.math', 'Formule', () => formatRichText('math'), 'editor.mathTooltip', 'Insérer une formule mathématique LaTeX'));
-
-  menu.appendChild(makeDivider());
-  menu.appendChild(makeHeader('editor.structure', 'Structure'));
-  menu.appendChild(makeBtn('H1', 'editor.h1', 'Titre 1', () => formatRichText('h1set'), 'editor.h1Tooltip', 'Formater la ligne comme titre de niveau 1'));
-  menu.appendChild(makeBtn('H2', 'editor.h2', 'Titre 2', () => formatRichText('h2set'), 'editor.h2Tooltip', 'Formater la ligne comme titre de niveau 2'));
-  menu.appendChild(makeBtn('H3', 'editor.h3', 'Titre 3', () => formatRichText('h3'), 'editor.h3Tooltip', 'Formater la ligne comme titre de niveau 3'));
-  menu.appendChild(makeBtn('•', 'editor.ul', 'Liste à puces', () => formatRichText('ul'), 'editor.ulTooltip', 'Formater la ligne comme liste à puces'));
-  menu.appendChild(makeBtn('1.', 'editor.ol', 'Liste numérotée', () => formatRichText('ol'), 'editor.olTooltip', 'Formater la ligne comme liste numérotée'));
-  menu.appendChild(makeBtn('☑', 'editor.checklist', 'Checklist', () => formatRichText('checklist'), 'editor.checklistTooltip', 'Insérer un élément de checklist'));
-  menu.appendChild(makeBtn('💬', 'editor.blockquote', 'Citation', () => formatRichText('blockquote'), 'editor.blockquoteTooltip', 'Insérer une citation en retrait'));
-
-  if (typeof generateNoteSummaryWithAI === 'function') {
-    menu.appendChild(makeDivider());
-    menu.appendChild(makeHeader('editor.aiAndAssistants', 'IA & Assistants'));
-    menu.appendChild(makeBtn('🤖', 'editor.aiSummary', 'Générer résumé IA', () => generateNoteSummaryWithAI(), 'editor.aiSummaryTooltip', 'Générer un résumé de la note avec l\'IA'));
-  }
-
-  document.body.appendChild(menu);
-
-  // Position calculation with window boundary check
-  const rect = menu.getBoundingClientRect();
-  let top = event.pageY;
-  let left = event.pageX;
-
-  if (left + rect.width > window.innerWidth - 10) {
-    left = Math.max(10, window.innerWidth - rect.width - 15);
-  }
-  if (top + rect.height > window.innerHeight + window.scrollY - 10) {
-    top = Math.max(10, event.pageY - rect.height);
-  }
-
-  menu.style.top = top + 'px';
-  menu.style.left = left + 'px';
-
-  _editorContextMenu = menu;
-
-  setTimeout(() => {
-    document.addEventListener('click', _dismissEditorContextMenu);
-    document.addEventListener('mousedown', _dismissEditorContextMenu);
-    document.addEventListener('keydown', _escEditorContextMenu);
-  }, 0);
 }
 
 if (typeof window !== 'undefined') {
@@ -4066,16 +3972,23 @@ function showFloatingFormatToolbarForSelection(targetEditor) {
     return btn;
   };
 
+  const svgHighlight = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 6-4.6-4.6a1 1 0 0 0-1.4 0L5 12l7 7 10-10a1 1 0 0 0 0-1.4z"/></svg>`;
+  const svgTodo = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
+  const svgLink = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`;
+  const svgChecklist = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`;
+  const svgQuote = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>`;
+  const svgClear = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><path d="M4 20h16"/></svg>`;
+
   _floatingFormatToolbar.innerHTML = '';
   _floatingFormatToolbar.appendChild(makeBtn('<b>B</b>', 'editor.boldTooltip', 'Bold', () => formatRichTextInEditor(targetEditor, 'bold')));
   _floatingFormatToolbar.appendChild(makeBtn('<i>I</i>', 'editor.italicTooltip', 'Italic', () => formatRichTextInEditor(targetEditor, 'italic')));
   _floatingFormatToolbar.appendChild(makeBtn('<u>U</u>', 'editor.underlineTooltip', 'Underline', () => formatRichTextInEditor(targetEditor, 'underline')));
   _floatingFormatToolbar.appendChild(makeBtn('<s>S</s>', 'editor.strikeTooltip', 'Strikethrough', () => formatRichTextInEditor(targetEditor, 'strike')));
-  _floatingFormatToolbar.appendChild(makeBtn('🖍️', 'editor.highlightTextTooltip', 'Highlight', () => formatRichTextInEditor(targetEditor, 'mark')));
-  _floatingFormatToolbar.appendChild(makeBtn('`', 'editor.codeTooltip', 'Code', () => formatRichTextInEditor(targetEditor, 'code')));
-  _floatingFormatToolbar.appendChild(makeBtn('📋', 'editor.addTodoBtn', 'Create Todo', () => toggleTodoPriority('Medium')));
+  _floatingFormatToolbar.appendChild(makeBtn(svgHighlight, 'editor.highlightTextTooltip', 'Highlight', () => formatRichTextInEditor(targetEditor, 'mark')));
+  _floatingFormatToolbar.appendChild(makeBtn('<span style="font-family:monospace;font-size:12px;font-weight:700;">`</span>', 'editor.codeTooltip', 'Code', () => formatRichTextInEditor(targetEditor, 'code')));
+  _floatingFormatToolbar.appendChild(makeBtn(svgTodo, 'editor.addTodoBtn', 'Create Todo', () => toggleTodoPriority('Medium')));
   _floatingFormatToolbar.appendChild(makeBtn('<i>fx</i>', 'editor.mathTooltip', 'Formula', () => formatRichTextInEditor(targetEditor, 'math')));
-  _floatingFormatToolbar.appendChild(makeBtn('🔗', 'editor.linkTooltip', 'Link', () => formatRichTextInEditor(targetEditor, 'link')));
+  _floatingFormatToolbar.appendChild(makeBtn(svgLink, 'editor.linkTooltip', 'Link', () => formatRichTextInEditor(targetEditor, 'link')));
 
   const sep1 = document.createElement('span');
   sep1.className = 'floating-fmt-sep';
@@ -4084,14 +3997,16 @@ function showFloatingFormatToolbarForSelection(targetEditor) {
   _floatingFormatToolbar.appendChild(makeBtn('H1', 'editor.h1Tooltip', 'Heading 1', () => formatRichTextInEditor(targetEditor, 'h1')));
   _floatingFormatToolbar.appendChild(makeBtn('H2', 'editor.h2Tooltip', 'Heading 2', () => formatRichTextInEditor(targetEditor, 'h2')));
   _floatingFormatToolbar.appendChild(makeBtn('H3', 'editor.h3Tooltip', 'Heading 3', () => formatRichTextInEditor(targetEditor, 'h3')));
+  _floatingFormatToolbar.appendChild(makeBtn(svgChecklist, 'editor.checklistTooltip', 'Checklist', () => formatRichTextInEditor(targetEditor, 'checklist')));
   _floatingFormatToolbar.appendChild(makeBtn('•', 'editor.ulTooltip', 'Bullet List', () => formatRichTextInEditor(targetEditor, 'ul')));
   _floatingFormatToolbar.appendChild(makeBtn('1.', 'editor.olTooltip', 'Numbered List', () => formatRichTextInEditor(targetEditor, 'ol')));
+  _floatingFormatToolbar.appendChild(makeBtn(svgQuote, 'editor.blockquoteTooltip', 'Quote', () => formatRichTextInEditor(targetEditor, 'blockquote')));
 
   const sep2 = document.createElement('span');
   sep2.className = 'floating-fmt-sep';
   _floatingFormatToolbar.appendChild(sep2);
 
-  _floatingFormatToolbar.appendChild(makeBtn('🧹', 'editor.clearFormattingTooltip', 'Clear Formatting', () => formatRichTextInEditor(targetEditor, 'clear')));
+  _floatingFormatToolbar.appendChild(makeBtn(svgClear, 'editor.clearFormattingTooltip', 'Clear Formatting', () => formatRichTextInEditor(targetEditor, 'clear')));
 
   updateFloatingFormatToolbarPosition(targetEditor);
 }
@@ -6573,9 +6488,6 @@ document.getElementById('edit-textarea')?.addEventListener('click', handleImageC
 document.getElementById('edit-summary')?.addEventListener('click', handleImageClickForResize);
 
 document.getElementById('edit-textarea')?.addEventListener('input', () => { scheduleEditorInputRefresh(); scheduleAutoSave(); });
-document.getElementById('edit-textarea')?.addEventListener('contextmenu', e => {
-  showEditorContextMenu(e);
-});
 document.getElementById('edit-title')?.addEventListener('input', () => {
   scheduleAutoSave();
   updateTitleRenameHint();
@@ -9839,6 +9751,7 @@ function applyTodoPriorityToMarker(marker, priority, originalPriority = '', stat
   if (!marker) return;
   marker.setAttribute('data-todo-priority', priority);
   if (status === 'WIP') marker.setAttribute('data-todo-status', 'WIP');
+  else if (status === 'wont_do') marker.setAttribute('data-todo-status', 'wont_do');
   else marker.removeAttribute('data-todo-status');
   if (originalPriority) marker.setAttribute('data-todo-original-priority', originalPriority);
   else marker.removeAttribute('data-todo-original-priority');
@@ -9846,6 +9759,8 @@ function applyTodoPriorityToMarker(marker, priority, originalPriority = '', stat
   else marker.classList.remove('note-todo-done');
   if (status === 'WIP') marker.classList.add('note-todo-wip');
   else marker.classList.remove('note-todo-wip');
+  if (status === 'wont_do') marker.classList.add('note-todo-wontdo');
+  else marker.classList.remove('note-todo-wontdo');
   if (!marker.title) marker.title = (typeof t === 'function' ? t('common.clickToOpenTodo') : '') || 'Click to open todo';
 
   const impBadge = marker.querySelector('.note-todo-badge[class*="imp-"]');
@@ -9853,7 +9768,7 @@ function applyTodoPriorityToMarker(marker, priority, originalPriority = '', stat
     const impClass = (priority || 'medium').toLowerCase();
     impBadge.className = `note-todo-badge imp-${impClass}`;
     impBadge.title = `Importance: ${priority}`;
-    impBadge.textContent = `⚡ ${status === 'WIP' ? 'WIP' : (priority || 'MEDIUM').toUpperCase()}`;
+    impBadge.textContent = `⚡ ${status === 'WIP' ? 'WIP' : (status === 'wont_do' ? "WON'T DO" : (priority || 'MEDIUM').toUpperCase())}`;
   }
 }
 
@@ -9889,7 +9804,7 @@ function updateNoteTodoMarkerInHTML(html, todoId, newText, newPriority, original
 // Patch the opening tag of a note-todo span inside a raw markdown+html string (textarea)
 function patchNoteSpanInText(text, todoId, { setAttr = {} } = {}) {
   const escapedId = todoId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-  const re = new RegExp(`\\{todo:([a-zA-Z]+):(${escapedId})(?::([a-zA-Z]+))?\\|([^\\}]+)\\}`, 'g');
+  const re = new RegExp(`\\{todo:([a-zA-Z]+):(${escapedId})(?::([a-zA-Z_]+))?\\|([^\\}]+)\\}`, 'g');
   return text.replace(re, (match, priority, id, status, contentText) => {
     const nextPriority = setAttr['data-todo-priority'] || priority;
     const nextStatus = setAttr['data-todo-status'] !== undefined ? setAttr['data-todo-status'] : (status || '');

@@ -585,7 +585,7 @@
 
 <!-- ── Cloud Sync / Firebase E2EE Onboarding & Setup Modal ── -->
 <div class="modal-overlay" id="modal-cloud-sync-setup">
-  <div class="modal" style="max-width: 500px; width: 92%; max-height: 88vh; overflow-y: auto; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); padding: 1.25rem 1.4rem;">
+  <div class="modal" style="max-width: 760px; width: 94%; max-height: 90vh; overflow-y: auto; border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.38); padding: 1.5rem 1.8rem;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
       <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.2rem;">
         <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent);">
@@ -977,6 +977,46 @@
         <button type="submit" class="btn btn-primary" id="btn-sync-unlock-submit" data-i18n="sync.unlockBtn" data-i18n-title="sync.unlockBtnTooltip" title="Unlock your encrypted vault and sync notes">Unlock Vault</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ── Local Export Verification & Cloud Data Cleanup Modal ── -->
+<div class="modal-overlay" id="modal-revert-cleanup" style="display:none;">
+  <div class="modal" style="max-width: 620px; width: 94%; border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.4); padding: 1.5rem 1.7rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.2rem;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; background:rgba(16, 185, 129, 0.15); color:#10b981;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </span>
+        <span data-i18n="sync.revertCompleteModalTitle">Local Export Verified & Complete</span>
+      </h2>
+      <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-revert-cleanup')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <!-- Verification Card with checks -->
+    <div style="margin-bottom:16px; padding:12px 14px; border-radius:8px; background:color-mix(in srgb, #10b981 8%, var(--card-bg)); border:1px solid color-mix(in srgb, #10b981 25%, transparent);">
+      <div style="display:flex; align-items:center; gap:8px; font-weight:700; color:#10b981; font-size:0.92rem; margin-bottom:6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        <span id="revert-cleanup-count-msg" data-i18n="sync.revertVerifiedAllNotes">All notes and documents verified on local disk</span>
+      </div>
+      <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.45;" data-i18n="sync.revertCompleteModalDesc">
+        Your workspace is now completely active on your local folder. All files have been decrypted and verified.
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px; padding:12px 14px; border-radius:8px; background:var(--card-bg-alt); border:1px solid var(--card-border);">
+      <div style="font-size:0.86rem; font-weight:600; color:var(--text); margin-bottom:4px;" data-i18n="sync.revertDeletePromptTitle">
+        What would you like to do with your remote Firebase data?
+      </div>
+      <div style="font-size:0.81rem; color:var(--text-muted); line-height:1.45;" data-i18n="sync.revertDeletePromptDesc">
+        You can permanently delete your encrypted vault and files from Firebase to completely clear your cloud footprint, or keep them as an encrypted backup.
+      </div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <button type="button" class="btn btn-secondary" onclick="keepCloudBackupUI()" title="Keep remote encrypted data in Firebase as backup" data-i18n-title="sync.keepCloudDataTooltip" data-i18n="sync.keepCloudDataBtn">Keep Cloud Backup</button>
+      <button type="button" class="btn" id="btn-revert-delete-cloud" onclick="confirmDeleteCloudDataUI()" style="background:#ef4444; color:#fff; border-color:#dc2626;" title="Permanently delete your remote encrypted vault data from Firebase" data-i18n-title="sync.deleteCloudDataTooltip" data-i18n="sync.deleteCloudDataBtn">Delete Cloud Data</button>
+    </div>
   </div>
 </div>
 

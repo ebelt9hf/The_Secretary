@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secretary</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.10">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.10">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.11">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.11">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -208,7 +208,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.10" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.10</p>
+      <p id="connect-version-hint" data-version="4.0.11" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.11</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -799,8 +799,31 @@
       <div class="prefs-section" id="prefs-sec-sync" style="display:none">
         <h3 data-i18n="prefs.syncSectionTitle">Cloud Sync & Storage Engine</h3>
         
-        <div class="prefs-row" id="prefs-sync-account-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
-          <label class="prefs-label" data-i18n="sync.accountCardTitle">Cloud Account</label>
+        <!-- Active Storage Engine & Folder Banner -->
+        <div class="prefs-row" id="prefs-sync-folder-banner" style="flex-direction:column; align-items:flex-start; gap:8px;">
+          <div style="width:100%; padding:14px 16px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span id="prefs-storage-banner-icon" style="display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:8px; background:rgba(16,185,129,0.15); color:#10b981; flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </span>
+              <div>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <span id="prefs-storage-banner-title" style="font-size:0.95rem; font-weight:700; color:var(--text);" data-i18n="sync.activeStorageLocalFolder">Local Folder Storage Active</span>
+                  <span id="prefs-storage-banner-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">Filesystem Mode</span>
+                </div>
+                <div id="prefs-storage-banner-desc" style="font-size:0.82rem; color:var(--text-muted); margin-top:3px;">
+                  <span data-i18n="sync.folderStoringDesc">Notes, tasks, and files are saved directly in your local folder:</span> <strong id="prefs-storage-folder-path" style="color:var(--text); font-family:var(--font-mono, monospace);">Local Folder</strong>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button type="button" class="btn btn-secondary" id="btn-prefs-choose-folder" onclick="changeFolderFromPrefs()" title="Select or change your local notes storage folder" data-i18n-title="sync.chooseFolderTooltip" data-i18n="sync.chooseFolderBtn">Change Local Folder</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="prefs-row" id="prefs-sync-account-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
+          <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.accountCardTitle">Cloud Account</label>
           <div style="display:flex; justify-content:space-between; align-items:center; width:100%; flex-wrap:wrap; gap:10px; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px;">
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; background:rgba(99,102,241,0.15); color:var(--accent);">
@@ -817,20 +840,20 @@
         </div>
 
         <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-            <label class="prefs-label" data-i18n="sync.activeEngineLabel">Active Storage Engine</label>
-            <select id="prefs-storage-engine-select" onchange="changeStorageEngineUI(this.value)" class="prefs-input" style="max-width:320px;" title="Choose between local filesystem and encrypted Firebase Firestore" data-i18n-title="sync.selectStorageBackendTooltip">
-              <option value="filesystem" data-i18n="sync.engineOptionFs">Local Filesystem (Free & Private Default)</option>
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:16px; flex-wrap:wrap;">
+            <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.activeEngineLabel">Active Storage Engine</label>
+            <select id="prefs-storage-engine-select" onchange="changeStorageEngineUI(this.value)" class="prefs-input" style="flex:1; min-width:260px; max-width:420px;" title="Choose between local filesystem and encrypted Firebase Firestore" data-i18n-title="sync.selectStorageBackendTooltip">
+              <option value="filesystem" data-i18n="sync.engineOptionFs">Local Filesystem Folder (Free & Private Default)</option>
               <option value="firebase" data-i18n="sync.engineOptionFirebase">Firebase Cloud Vault (Optional E2EE Sync)</option>
             </select>
           </div>
           <small class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem;" data-i18n="sync.engineDesc">
-            Local Filesystem stores plain HTML/JSON files directly on your computer. Firebase Cloud Vault enables optional multi-device sync with zero-knowledge AES-256-GCM encryption using your own Firebase project.
+            Local Filesystem stores plain HTML/JSON files directly on your computer in your local folder. Firebase Cloud Vault enables optional multi-device sync with zero-knowledge AES-256-GCM encryption using your own Firebase project.
           </small>
         </div>
 
         <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <label class="prefs-label" data-i18n="sync.statusCardTitle">Synchronization Status</label>
+          <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.statusCardTitle">Synchronization Status</label>
           <div style="display:flex; gap:12px; align-items:center; width:100%; flex-wrap:wrap; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px;">
             <span id="prefs-sync-status-text" style="font-size:0.85rem; font-weight:600; color:var(--text);">Status: Disconnected</span>
             <span id="prefs-sync-count-text" style="font-size:0.82rem; color:var(--text-muted);">0 notes cached</span>
@@ -840,9 +863,9 @@
         </div>
 
         <div class="prefs-row" id="prefs-sync-code-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-            <label class="prefs-label" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
-            <span id="prefs-sync-code-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(99,102,241,0.15); color:var(--accent); border:1px solid rgba(99,102,241,0.3);">Cloud Pairing</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:12px;">
+            <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
+            <span id="prefs-sync-code-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(99,102,241,0.15); color:var(--accent); border:1px solid rgba(99,102,241,0.3); white-space:nowrap;">Cloud Pairing</span>
           </div>
           <div style="display:flex; gap:8px; align-items:center; width:100%;">
             <input type="text" id="prefs-sync-code-input" class="prefs-input" readonly style="flex:1; font-family:monospace; font-weight:600; letter-spacing:1px; background:var(--card-bg-alt);" placeholder="SEC-XXXX-YYYY" title="Unique pairing code shared across your devices" data-i18n-title="sync.syncCodeTooltip">
@@ -852,9 +875,9 @@
         </div>
 
         <div class="prefs-row" id="prefs-sync-pass-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-            <label class="prefs-label" data-i18n="sync.masterPasswordLabel">Master Passphrase (E2EE)</label>
-            <span id="prefs-sync-pass-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">AES-256-GCM</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:12px;">
+            <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.masterPasswordLabel">Master Passphrase (E2EE)</label>
+            <span id="prefs-sync-pass-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); white-space:nowrap;">AES-256-GCM</span>
           </div>
           <div style="display:flex; gap:8px; align-items:center; width:100%;">
             <div style="position:relative; flex:1; display:flex; align-items:center;">
@@ -1440,40 +1463,40 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.10"></script>
-<script src="js/app-utils.js?v=4.0.10"></script>
-<script src="js/app-icons.js?v=4.0.10"></script>
-<script src="js/app-popover-manager.js?v=4.0.10"></script>
-<script src="js/translations.js?v=4.0.10"></script>
-<script src="js/app-i18n.js?v=4.0.10"></script>
-<script src="js/app-bridge.js?v=4.0.10"></script>
-<script src="js/app-fs.js?v=4.0.10"></script>
-<script src="js/firebase-bundle.js?v=4.0.10"></script>
-<script src="js/firebase-config.js?v=4.0.10"></script>
-<script src="js/app-crypto.js?v=4.0.10"></script>
-<script src="js/app-image-optimizer.js?v=4.0.10"></script>
-<script src="js/app-idb.js?v=4.0.10"></script>
-<script src="js/app-firebase-sync.js?v=4.0.10"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.10"></script>
-<script src="js/app-storage.js?v=4.0.10"></script>
-<script src="js/storage-migration.js?v=4.0.10"></script>
-<script src="js/app-stash-service.js?v=4.0.10"></script>
-<script src="js/app-omnibar.js?v=4.0.10"></script>
-<script src="js/app-topic-memory.js?v=4.0.10"></script>
-<script src="js/app-prompts.js?v=4.0.10"></script>
-<script src="js/app-llm.js?v=4.0.10"></script>
-<script src="js/app-dailyreview.js?v=4.0.10"></script>
-<script src="js/app-notes.js?v=4.0.10"></script>
-<script src="js/app-todos-board.js?v=4.0.10"></script>
-<script src="js/app-board.js?v=4.0.10"></script>
-<script src="js/app-focus.js?v=4.0.10"></script>
-<script src="js/app-overlay.js?v=4.0.10"></script>
-<script src="js/app-planner.js?v=4.0.10"></script>
-<script src="js/app-collab.js?v=4.0.10"></script>
-<script src="js/app-retro.js?v=4.0.10"></script>
-<script src="js/app-tutorial.js?v=4.0.10"></script>
-<script src="js/app-graph-view.js?v=4.0.10"></script>
-<script src="js/app-chat.js?v=4.0.10"></script>
-<script src="js/app-init.js?v=4.0.10"></script>
+<script src="js/app-state.js?v=4.0.11"></script>
+<script src="js/app-utils.js?v=4.0.11"></script>
+<script src="js/app-icons.js?v=4.0.11"></script>
+<script src="js/app-popover-manager.js?v=4.0.11"></script>
+<script src="js/translations.js?v=4.0.11"></script>
+<script src="js/app-i18n.js?v=4.0.11"></script>
+<script src="js/app-bridge.js?v=4.0.11"></script>
+<script src="js/app-fs.js?v=4.0.11"></script>
+<script src="js/firebase-bundle.js?v=4.0.11"></script>
+<script src="js/firebase-config.js?v=4.0.11"></script>
+<script src="js/app-crypto.js?v=4.0.11"></script>
+<script src="js/app-image-optimizer.js?v=4.0.11"></script>
+<script src="js/app-idb.js?v=4.0.11"></script>
+<script src="js/app-firebase-sync.js?v=4.0.11"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.11"></script>
+<script src="js/app-storage.js?v=4.0.11"></script>
+<script src="js/storage-migration.js?v=4.0.11"></script>
+<script src="js/app-stash-service.js?v=4.0.11"></script>
+<script src="js/app-omnibar.js?v=4.0.11"></script>
+<script src="js/app-topic-memory.js?v=4.0.11"></script>
+<script src="js/app-prompts.js?v=4.0.11"></script>
+<script src="js/app-llm.js?v=4.0.11"></script>
+<script src="js/app-dailyreview.js?v=4.0.11"></script>
+<script src="js/app-notes.js?v=4.0.11"></script>
+<script src="js/app-todos-board.js?v=4.0.11"></script>
+<script src="js/app-board.js?v=4.0.11"></script>
+<script src="js/app-focus.js?v=4.0.11"></script>
+<script src="js/app-overlay.js?v=4.0.11"></script>
+<script src="js/app-planner.js?v=4.0.11"></script>
+<script src="js/app-collab.js?v=4.0.11"></script>
+<script src="js/app-retro.js?v=4.0.11"></script>
+<script src="js/app-tutorial.js?v=4.0.11"></script>
+<script src="js/app-graph-view.js?v=4.0.11"></script>
+<script src="js/app-chat.js?v=4.0.11"></script>
+<script src="js/app-init.js?v=4.0.11"></script>
 </body>
 </html>

@@ -1142,8 +1142,8 @@ const StorageAPI = {
     return await this._getMigrator()._archiveLocalFilesAfterMigration(backupDir, data);
   },
 
-  async revertToFilesystem() {
-    return await this._getMigrator().revertToFilesystem();
+  async revertToFilesystem(onProgress = null) {
+    return await this._getMigrator().revertToFilesystem(onProgress);
   }
 };
 

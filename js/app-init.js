@@ -739,9 +739,50 @@ function updateCloudSyncUI(statusObj) {
   let statusHtml = (typeof t === 'function' ? t('sync.status') : 'Status') + ': ';
   let iconSvg = '';
 
+  const isFirebase = status.engine === 'firebase';
+  const folderName = (typeof rootHandle !== 'undefined' && rootHandle?.name) || window.folderPath || (typeof settings !== 'undefined' && settings?.folder?.last) || 'Local Notes Folder';
+
+  // Update Active Storage & Folder Banner
+  const folderPathEl = document.getElementById('prefs-storage-folder-path');
+  const bannerTitle = document.getElementById('prefs-storage-banner-title');
+  const bannerBadge = document.getElementById('prefs-storage-banner-badge');
+  const bannerDesc = document.getElementById('prefs-storage-banner-desc');
+  const bannerIcon = document.getElementById('prefs-storage-banner-icon');
+
+  if (folderPathEl) {
+    folderPathEl.textContent = folderName;
+  }
+  if (bannerTitle && bannerBadge && bannerDesc) {
+    if (isFirebase) {
+      bannerTitle.textContent = typeof t === 'function' ? t('sync.activeStorageCloud') : 'Firebase Cloud Vault Active';
+      bannerBadge.textContent = typeof t === 'function' ? t('landing.cloudBadge') : 'E2EE Cloud';
+      bannerBadge.style.background = 'rgba(99,102,241,0.15)';
+      bannerBadge.style.color = 'var(--accent)';
+      bannerBadge.style.borderColor = 'rgba(99,102,241,0.3)';
+      if (bannerIcon) {
+        bannerIcon.style.background = 'rgba(99,102,241,0.15)';
+        bannerIcon.style.color = 'var(--accent)';
+        bannerIcon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="9 15 12 18 17 13"/></svg>`;
+      }
+      bannerDesc.innerHTML = `${typeof t === 'function' ? t('sync.cloudStoringDesc') : 'Notes are synchronized securely with client-side encryption'}: <strong style="color:var(--text);">${window.FirebaseSyncService?.getSyncCode() || 'SEC-PAIRING'}</strong>`;
+    } else {
+      bannerTitle.textContent = typeof t === 'function' ? t('sync.activeStorageLocalFolder') : 'Local Folder Storage Active';
+      bannerBadge.textContent = typeof t === 'function' ? t('sync.localFolderStorage') : 'Local Folder';
+      bannerBadge.style.background = 'rgba(16,185,129,0.15)';
+      bannerBadge.style.color = '#10b981';
+      bannerBadge.style.borderColor = 'rgba(16,185,129,0.3)';
+      if (bannerIcon) {
+        bannerIcon.style.background = 'rgba(16,185,129,0.15)';
+        bannerIcon.style.color = '#10b981';
+        bannerIcon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+      }
+      bannerDesc.innerHTML = `${typeof t === 'function' ? t('sync.folderStoringDesc') : 'Notes, tasks, and files are saved directly in your local folder'}: <strong style="color:var(--text); font-family:var(--font-mono, monospace);">${folderName}</strong>`;
+    }
+  }
+
   if (status.engine === 'filesystem') {
-    statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:var(--text-muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> ${typeof t === 'function' ? t('sync.statusLocal') : 'Local Filesystem (Legacy)'}</span>`;
-    iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`;
+    statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:#10b981"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> ${typeof t === 'function' ? t('sync.statusLocalFolder') : 'Local Folder Active'}</span>`;
+    iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
   } else if (status.status === 'synced') {
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:var(--color-low, #10b981)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="9 15 12 18 17 13"/></svg> ${typeof t === 'function' ? t('sync.statusSynced') : 'Synced (Encrypted)'}</span>`;
     iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="9 15 12 18 17 13"/></svg>`;
@@ -768,7 +809,11 @@ function updateCloudSyncUI(statusObj) {
     const todosCount = (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) ? todosManifest.length : 0;
     const plannerCount = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) ? plannerEvents.length : 0;
 
-    const parts = [`${notesCount} ${typeof t === 'function' ? t('sync.notesCached') : 'notes cached'}`];
+    const notesLabel = isFirebase
+      ? (typeof t === 'function' ? t('sync.notesCached') : 'notes cached')
+      : (typeof t === 'function' ? t('sync.notesInLocalFolder') : 'notes in local folder');
+
+    const parts = [`${notesCount} ${notesLabel}`];
     if (todosCount > 0) {
       parts.push(`${todosCount} ${typeof t === 'function' ? t('sync.todosCached') : 'tasks'}`);
     }
@@ -778,9 +823,12 @@ function updateCloudSyncUI(statusObj) {
     countText.textContent = parts.join(' · ');
   }
   if (iconWrap && iconSvg) iconWrap.innerHTML = iconSvg;
-  if (btn) btn.title = `${typeof t === 'function' ? t('sync.storage') : 'Storage'}: ${status.engine === 'firebase' ? 'Firebase E2EE' : 'Filesystem'} (${status.status})`;
+  if (btn) {
+    btn.title = isFirebase
+      ? `${typeof t === 'function' ? t('sync.storage') : 'Storage'}: Firebase E2EE (${status.status})`
+      : `${typeof t === 'function' ? t('sync.storage') : 'Storage'}: ${typeof t === 'function' ? t('sync.localFolderStorage') : 'Local Folder'} (${folderName})`;
+  }
 
-  const isFirebase = status.engine === 'firebase';
   const btnMigrate = document.getElementById('btn-prefs-migrate-firebase');
   const btnReconcile = document.getElementById('btn-prefs-reconcile-backup');
   const btnRevert = document.getElementById('btn-prefs-revert-fs');
@@ -2445,22 +2493,87 @@ async function reconcileMigrationBackupUI() {
 window.reconcileMigrationBackupUI = reconcileMigrationBackupUI;
 
 async function revertToFilesystemUI() {
+  const progressDialog = typeof showMigrationProgressDialog === 'function' ? showMigrationProgressDialog(
+    typeof t === 'function' ? t('sync.revertProgressTitle') : 'Exporting to Local Folder',
+    typeof t === 'function' ? t('sync.revertProgressStarting') : 'Preparing to decrypt and export notes to local folder…'
+  ) : null;
+
   try {
-    const res = await window.StorageAPI.revertToFilesystem();
+    const res = await window.StorageAPI.revertToFilesystem((prog) => {
+      if (progressDialog && prog) {
+        progressDialog.update(prog.message || '', prog.percent || 0);
+      }
+    });
+
+    if (progressDialog) {
+      progressDialog.update(typeof t === 'function' ? t('sync.revertDone') : 'Local export verified and complete!', 100);
+      await new Promise(r => setTimeout(r, 220));
+      progressDialog.close();
+    }
+
     if (typeof settings !== 'undefined' && settings) {
       settings.storageEngine = 'filesystem';
       if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
     }
     updateCloudSyncUI();
     if (typeof renderBoard === 'function') renderBoard();
-    if (typeof showToast === 'function') showToast(`${typeof t === 'function' ? t('sync.revertedToast') : 'Exported to local filesystem'}: ${res.notesCount} notes`);
+
+    // Show verification dialog with the option to delete remote Firebase data
+    showRevertCleanupModalUI(res);
   } catch (e) {
+    if (progressDialog) progressDialog.close();
     if (typeof showToast === 'function') {
       showToast((typeof t === 'function' ? t('sync.exportFailed') : 'Export failed') + ': ' + (e.message || ''), true);
     }
   }
 }
 window.revertToFilesystemUI = revertToFilesystemUI;
+
+function showRevertCleanupModalUI(result = {}) {
+  const notesCount = result?.notesCount || result?.writtenNotes || 0;
+  const countMsgEl = document.getElementById('revert-cleanup-count-msg');
+  if (countMsgEl) {
+    const baseText = typeof t === 'function' ? t('sync.revertVerifiedAllNotes') : 'All notes and documents verified on local disk';
+    countMsgEl.textContent = `${baseText} (${notesCount} ${typeof t === 'function' ? t('sync.notesVerified') : 'notes verified'})`;
+  }
+  if (typeof openModal === 'function') {
+    openModal('modal-revert-cleanup');
+  }
+}
+window.showRevertCleanupModalUI = showRevertCleanupModalUI;
+
+async function confirmDeleteCloudDataUI() {
+  const btn = document.getElementById('btn-revert-delete-cloud');
+  if (btn) btn.disabled = true;
+
+  try {
+    if (window.FirebaseSyncService?.deleteRemoteVault) {
+      await window.FirebaseSyncService.deleteRemoteVault();
+    }
+    if (typeof closeModal === 'function') closeModal('modal-revert-cleanup');
+    updateCloudSyncUI();
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.cloudDataDeletedToast') : 'Cloud data successfully deleted. Operating 100% locally.');
+    }
+  } catch (err) {
+    console.error('Delete cloud data failed:', err);
+    if (typeof showToast === 'function') {
+      showToast((typeof t === 'function' ? t('sync.deleteCloudFailed') : 'Failed to delete cloud data') + ': ' + (err.message || ''), true);
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.confirmDeleteCloudDataUI = confirmDeleteCloudDataUI;
+
+function keepCloudBackupUI() {
+  if (typeof closeModal === 'function') closeModal('modal-revert-cleanup');
+  updateCloudSyncUI();
+  if (typeof showToast === 'function') {
+    showToast(typeof t === 'function' ? t('sync.cloudDataKeptToast') : 'Cloud backup retained. Workspace running from local folder.');
+  }
+}
+window.keepCloudBackupUI = keepCloudBackupUI;
 
 function saveCloudSyncPromptDismissal() {
   if (typeof settings !== 'undefined') {

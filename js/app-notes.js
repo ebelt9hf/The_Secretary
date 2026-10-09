@@ -28,7 +28,7 @@ function normalizeTodoEntry(entry) {
     todo.priority = basePriority;
     if (!todo.originalPriority || todo.originalPriority === 'WIP') todo.originalPriority = basePriority;
   }
-  if (todo.status !== 'WIP') delete todo.status;
+  if (todo.status !== 'WIP' && todo.status !== 'wont_do') delete todo.status;
   if (todo.priority === 'Done' && todo.originalPriority === 'WIP') {
     todo.originalPriority = 'Medium';
   }
@@ -492,7 +492,7 @@ function changeTodoPriority(id, toPriority, insertIndex) {
 function changeTodoStatus(id, toStatus) {
   const todo = getTodoById(id);
   if (!todo) return;
-  const nextStatus = toStatus === 'WIP' ? 'WIP' : '';
+  const nextStatus = toStatus === 'WIP' ? 'WIP' : (toStatus === 'wont_do' ? 'wont_do' : '');
   if ((todo.status || '') === nextStatus) return;
   if (todo.priority === 'WIP') {
     todo.priority = getTodoEffectivePriority(todo);

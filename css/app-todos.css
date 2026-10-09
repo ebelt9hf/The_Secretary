@@ -393,6 +393,14 @@ body[data-theme='dark'] .todo-overlay-panel {
   animation: segPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
+.todo-status-seg-btn.active[data-status="wont_do"] {
+  background: color-mix(in srgb, #ef4444 15%, var(--card-bg));
+  color: #dc2626;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.14);
+  font-weight: 700;
+  animation: segPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 @keyframes segPop {
   0% { transform: scale(0.95); }
   60% { transform: scale(1.03); }
@@ -2451,6 +2459,28 @@ body[data-theme='dark'] .eisenhower-quick-popover {
   border-color: #10b981;
   font-weight: 700;
   box-shadow: 0 1px 6px rgba(5, 150, 105, 0.4);
+}
+
+.eq-status-btn.active.status-wontdo {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #ef4444;
+  font-weight: 700;
+  box-shadow: 0 1px 6px rgba(220, 38, 38, 0.4);
+}
+
+.todo-board-card-wontdo {
+  opacity: 0.72;
+}
+
+.todo-board-card-wontdo .todo-card-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.eisenhower-task-text.is-wontdo {
+  opacity: 0.65;
+  text-decoration: line-through;
 }
 
 .eq-popover-actions {

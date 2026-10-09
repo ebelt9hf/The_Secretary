@@ -800,6 +800,11 @@
   border-color: var(--card-border);
   text-decoration: line-through;
 }
+.sl-badge-wontdo {
+  background: color-mix(in srgb, #ef4444 12%, var(--card-bg));
+  color: #ef4444;
+  border-color: color-mix(in srgb, #ef4444 30%, transparent);
+}
 
 /* ═══ Dark Theme Badge Overrides ═══ */
 body[data-theme='dark'] .sl-badge-high,
@@ -824,6 +829,11 @@ body[data-theme='dark'] .sl-badge-q4 {
   background: rgba(52, 211, 153, 0.22) !important;
   color: #6ee7b7 !important;
   border-color: rgba(52, 211, 153, 0.45) !important;
+}
+body[data-theme='dark'] .sl-badge-wontdo {
+  background: rgba(239, 68, 68, 0.22) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
 }
 
 .sl-lane.todo-lane {

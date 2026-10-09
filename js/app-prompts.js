@@ -767,7 +767,10 @@ Generate the complete structured JSON memory dossier for this Workstream with sc
     const wsPath = (p.workspacePath && typeof p.workspacePath === 'string') ? p.workspacePath.trim() : '';
     const fullPathHint = wsPath ? `${wsPath.replace(/\/+$/, '')}/planner-proposals.json` : './planner-proposals.json';
 
-    return `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary
+    const appVersion = p.version || (typeof getSecretaryVersion === 'function' ? getSecretaryVersion() : '') || (typeof document !== 'undefined' && document.getElementById('connect-version-hint')?.getAttribute('data-version')) || '';
+    const versionHeader = appVersion ? ` (Secretary v${appVersion})` : '';
+
+    return `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary${versionHeader}
 
 You are an AI automation agent responsible for discovering and extracting upcoming meetings, calendar invitations, calls, and scheduled focus sessions from the user's email client${userClause}, and proposing them into Secretary.
 
@@ -822,8 +825,8 @@ You are an AI automation agent responsible for discovering and extracting upcomi
   - Unit strings: e.g. \`"45m"\`, \`"45min"\`, \`"1.5h"\`, \`"2 hrs"\`, \`"1h 30m"\`, \`"01:30"\`, ISO 8601 \`"PT1H30M"\`.
   - All-Day / Full-Day indicators & variance: A full day has 1440 minutes. Secretary supports \`1440\`, \`1439\` (for 23:59 minute variance), \`"1440"\`, \`"1439"\`, \`"1d"\`, \`"1 day"\`, \`"all-day"\`, or \`"full day"\`, automatically spanning 00:00 to 23:59.
 - \`type\` (string, required): The category of the calendar block. Must be one of the following 8 supported event types:
-  - \`"call"\`: Voice or video call (e.g. client calls, Zoom / Google Meet conferences, phone calls, external discussions). In Secretary, calls support linking collaborators and associated meeting notes.
-  - \`"sync"\`: Team synchronization or 1-on-1 meeting (e.g. daily standups, weekly 1:1 check-ins, sprint planning, project alignment). Supports linking collaborators and meeting notes.
+  - \`"call"\`: Voice or video call (DEFAULT FOR ALL MEETINGS & DISCUSSIONS: client calls, Zoom / Google Meet / Microsoft Teams / Webex conferences, phone calls, 1-on-1 calls, demo sessions, external discussions). In Secretary, calls support linking collaborators and associated meeting notes. IMPORTANT: When an email invite represents any remote meeting, video conference, call link, or discussion, ALWAYS set type to "call".
+  - \`"sync"\`: Team synchronization ritual (STRICTLY for internal recurring agile team rituals: daily standups, weekly sprint alignments, sprint planning, internal retrospective check-ins without an external call focus). NEVER set regular meetings, remote video calls, client discussions, or 1-on-1 meetings as "sync" — always use "call" instead.
   - \`"prep"\`: Meeting preparation or follow-up buffer block (e.g. preparing presentation slides, reviewing agendas, pre-meeting or post-meeting buffer). Can be associated with an existing call or meeting.
   - \`"work"\`: Dedicated deep work / focus block (e.g. project work, software engineering, writing, research, analysis, strategy). Supports linking project tags, workstreams, and notes.
   - \`"todo"\`: Scheduled work session specifically dedicated to executing and completing a task or action item from the Todo list.

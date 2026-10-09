@@ -257,6 +257,17 @@ export const FirebaseBridge = {
     return true;
   },
 
+  async deleteUserVault(userId) {
+    if (!this.db || !userId) return false;
+    try {
+      await remove(ref(this.db, `users/${userId}`));
+      return true;
+    } catch (e) {
+      console.warn('FirebaseBridge.deleteUserVault failed:', e);
+      return false;
+    }
+  },
+
   async getVaultMeta(userId, timeoutMs = 15000) {
     if (!this.db || !userId) return null;
     const metaRef = ref(this.db, `users/${userId}/vault_meta`);

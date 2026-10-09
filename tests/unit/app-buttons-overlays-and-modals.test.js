@@ -370,9 +370,9 @@ describe('UI Buttons - Todo Edit Overlay & Interactive Matrix Picker', () => {
       expect(globalThis.clearTodoDueDate).toHaveBeenCalledTimes(1);
     });
 
-    it('handles execution status segmented buttons (pending, wip, done)', () => {
+    it('handles execution status segmented buttons (pending, wip, done, wont_do)', () => {
       const segButtons = document.querySelectorAll('#todo-status-segmented-group button');
-      expect(segButtons.length).toBe(3);
+      expect(segButtons.length).toBe(4);
 
       globalThis.setTodoModalStatus = vi.fn();
 
@@ -384,6 +384,9 @@ describe('UI Buttons - Todo Edit Overlay & Interactive Matrix Picker', () => {
 
       triggerClick(segButtons[2]);
       expect(globalThis.setTodoModalStatus).toHaveBeenCalledWith('done');
+
+      triggerClick(segButtons[3]);
+      expect(globalThis.setTodoModalStatus).toHaveBeenCalledWith('wont_do');
     });
 
     it('handles add checklist item button', () => {

@@ -824,6 +824,17 @@ body[data-theme='dark'] .planner-day-col {
   background-color: color-mix(in srgb, var(--accent) 2%, transparent);
 }
 
+/* Gap separator for non-neighbouring calendar days */
+.planner-header-cell.planner-day-gap,
+.planner-day-col.planner-day-gap {
+  border-left: 3.5px solid color-mix(in srgb, var(--card-border) 40%, var(--text-muted));
+}
+
+body[data-theme='dark'] .planner-header-cell.planner-day-gap,
+body[data-theme='dark'] .planner-day-col.planner-day-gap {
+  border-left-color: color-mix(in srgb, var(--card-border) 35%, var(--text-muted));
+}
+
 /* Time Indicator Line - Apple Human Interface Guidelines */
 .planner-current-time-indicator {
   position: absolute;

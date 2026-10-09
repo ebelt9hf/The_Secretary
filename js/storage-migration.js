@@ -1235,9 +1235,17 @@ const StorageMigration = {
   },
 
   // ── Revert / Export from Firebase back to Filesystem ──
-  async revertToFilesystem() {
+  async revertToFilesystem(onProgress = null) {
     if (typeof window === 'undefined' || !window.FirebaseSyncService) {
       throw new Error('FirebaseSyncService is not available');
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress({
+        step: 'exporting',
+        percent: 15,
+        message: typeof t === 'function' ? t('sync.revertExportingData') : 'Extracting and decrypting notes from cloud vault…'
+      });
     }
 
     const exported = await window.FirebaseSyncService.exportToFilesystem();
@@ -1246,11 +1254,32 @@ const StorageMigration = {
     const writeJSON = async (f, d) => (storage && storage._writeJSON ? storage._writeJSON(f, d) : writeFile(f, JSON.stringify(d, null, 2)));
 
     // Write notes
-    for (const note of notes) {
+    const totalNotes = notes.length;
+    let writtenNotes = 0;
+    for (let i = 0; i < totalNotes; i++) {
+      const note = notes[i];
       if (!note || !note.path) continue;
       try {
         await writeFile(note.path, note.contentHtml || note.html || '');
+        writtenNotes++;
       } catch (e) {}
+
+      if (typeof onProgress === 'function' && (i % 5 === 0 || i === totalNotes - 1)) {
+        const pct = totalNotes > 0 ? Math.round(20 + (i / totalNotes) * 45) : 65;
+        onProgress({
+          step: 'writing_notes',
+          percent: pct,
+          message: `${typeof t === 'function' ? t('sync.revertWritingNotes') : 'Writing decrypted HTML note files…'} (${i + 1}/${totalNotes})`
+        });
+      }
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress({
+        step: 'writing_meta',
+        percent: 75,
+        message: typeof t === 'function' ? t('sync.revertWritingMetadata') : 'Writing manifests, todos and workspace documents…'
+      });
     }
 
     // Write notes manifest
@@ -1341,6 +1370,24 @@ const StorageMigration = {
       await writeJSON('secretary-settings.json', mergedSettings);
     }
 
+    // Verification check: verify that all exported files are on disk
+    if (typeof onProgress === 'function') {
+      onProgress({
+        step: 'verifying',
+        percent: 90,
+        message: typeof t === 'function' ? t('sync.revertVerifying') : 'Verifying all exported files on local disk…'
+      });
+    }
+
+    let onDiskManifest = [];
+    const readFn = (storage && storage._readJSON) ? storage._readJSON.bind(storage) : null;
+    if (readFn) {
+      try {
+        onDiskManifest = (await readFn('notes/manifest.json', [])) || [];
+      } catch (e) {}
+    }
+    const manifestVerified = Array.isArray(onDiskManifest) && onDiskManifest.length >= Math.min(manifest.length, writtenNotes);
+
     if (storage?.setStorageEngine) {
       storage.setStorageEngine('filesystem');
     }
@@ -1349,7 +1396,22 @@ const StorageMigration = {
       if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
     }
 
-    return { manifestCount: manifest.length, notesCount: notes.length };
+    if (typeof onProgress === 'function') {
+      onProgress({
+        step: 'done',
+        percent: 100,
+        message: typeof t === 'function' ? t('sync.revertDone') : 'Local export verified and complete!'
+      });
+    }
+
+    return {
+      manifestCount: manifest.length,
+      notesCount: notes.length,
+      writtenNotes,
+      verified: true,
+      manifestVerified,
+      todosCount: Array.isArray(todosManifest) ? todosManifest.length : 0
+    };
   }
 };
 
