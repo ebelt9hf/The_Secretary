@@ -408,6 +408,72 @@ describe('Firebase Email & Password Authentication and Account UI', () => {
     expect(globalThis.showMigrationProgressDialog).toHaveBeenCalled();
     expect(dialogUpdateSpy).toHaveBeenCalledWith('Connecting...', 20);
     expect(dialogUpdateSpy).toHaveBeenCalledWith('Downloading...', 70);
+    expect(dialogUpdateSpy).toHaveBeenCalledWith(expect.any(String), 100);
+    expect(dialogCloseSpy).toHaveBeenCalled();
+  });
+
+  it('submitCloudSyncSetup in signin mode advances to 100% and closes progress dialog before mount', async () => {
+    const dialogUpdateSpy = vi.fn();
+    const dialogCloseSpy = vi.fn();
+    globalThis.showMigrationProgressDialog = vi.fn().mockReturnValue({
+      update: dialogUpdateSpy,
+      close: dialogCloseSpy
+    });
+
+    window.FirebaseSyncService = {
+      signInWithEmail: vi.fn().mockResolvedValue({ uid: 'test-uid' }),
+      unlockVault: vi.fn().mockResolvedValue(true)
+    };
+    window.StorageAPI = {
+      detectSyncConflict: vi.fn().mockResolvedValue(null)
+    };
+    globalThis.closeModal = vi.fn();
+    globalThis.updateCloudSyncUI = vi.fn();
+    window.showToast = vi.fn();
+
+    document.getElementById('btn-submit-cloud-sync').setAttribute('data-mode', 'signin');
+    document.getElementById('sync-setup-email').value = 'user@test.com';
+    document.getElementById('sync-setup-auth-password').value = 'secure-password';
+    document.getElementById('sync-setup-passphrase').value = 'valid-passphrase-123';
+
+    await globalThis.submitCloudSyncSetup();
+
+    expect(dialogUpdateSpy).toHaveBeenCalledWith(expect.any(String), 95);
+    expect(dialogUpdateSpy).toHaveBeenCalledWith(expect.any(String), 100);
+    expect(dialogCloseSpy).toHaveBeenCalled();
+  });
+
+  it('submitCloudSyncSetup in signup mode advances to 100% and closes progress dialog before mount', async () => {
+    const dialogUpdateSpy = vi.fn();
+    const dialogCloseSpy = vi.fn();
+    globalThis.showMigrationProgressDialog = vi.fn().mockReturnValue({
+      update: dialogUpdateSpy,
+      close: dialogCloseSpy
+    });
+
+    window.FirebaseSyncService = {
+      signUpWithEmail: vi.fn().mockResolvedValue({ uid: 'test-new-uid' })
+    };
+    window.StorageAPI = {
+      migrateToFirebase: vi.fn().mockImplementation(async (pass, config, onProgress) => {
+        if (typeof onProgress === 'function') {
+          onProgress({ message: 'Encrypting...', percent: 50 });
+        }
+      })
+    };
+    globalThis.closeModal = vi.fn();
+    globalThis.updateCloudSyncUI = vi.fn();
+    window.showToast = vi.fn();
+
+    document.getElementById('btn-submit-cloud-sync').setAttribute('data-mode', 'signup');
+    document.getElementById('sync-setup-email').value = 'newuser@test.com';
+    document.getElementById('sync-setup-auth-password').value = 'secure-password';
+    document.getElementById('sync-setup-passphrase').value = 'valid-passphrase-123';
+
+    await globalThis.submitCloudSyncSetup();
+
+    expect(dialogUpdateSpy).toHaveBeenCalledWith('Encrypting...', 50);
+    expect(dialogUpdateSpy).toHaveBeenCalledWith(expect.any(String), 100);
     expect(dialogCloseSpy).toHaveBeenCalled();
   });
 

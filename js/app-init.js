@@ -1533,44 +1533,54 @@ async function submitCloudSyncSetup() {
         }
 
         if (progressDialog) {
-          progressDialog.update(typeof t === 'function' ? t('sync.linkingFinalizing') : 'Finalizing synchronization…', 85);
+          progressDialog.update(typeof t === 'function' ? t('sync.linkingFinalizing') : 'Finalizing synchronization…', 95);
         }
 
         // 3. Detect if there is a conflict between local files and existing cloud vault
         if (window.StorageAPI?.detectSyncConflict) {
-          const conflict = await window.StorageAPI.detectSyncConflict();
-          if (conflict && conflict.hasConflict) {
-            if (progressDialog) progressDialog.close();
-            if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
-            const resolution = await showSyncConflictModalUI(conflict);
-            if (!resolution || resolution.cancelled) {
+          try {
+            const conflict = await window.StorageAPI.detectSyncConflict();
+            if (conflict && conflict.hasConflict) {
+              if (progressDialog) progressDialog.close();
+              if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
+              const resolution = await showSyncConflictModalUI(conflict);
+              if (!resolution || resolution.cancelled) {
+                return;
+              }
+
+              const reconProgressDialog = showMigrationProgressDialog(
+                typeof t === 'function' ? t('sync.reconcileProgressTitle') : 'Synchronizing Vault…',
+                typeof t === 'function' ? t('sync.migrationProgressCollecting') : 'Collecting notes and documents…'
+              );
+
+              try {
+                await window.StorageAPI.reconcileLocalAndCloudVault(pass, resolution.strategy, {}, (prog) => {
+                  reconProgressDialog.update(prog.message, prog.percent);
+                });
+                reconProgressDialog.update(typeof t === 'function' ? t('sync.reconcileSuccessToast') : 'Reconciliation complete! Encrypted vault synchronized.', 100);
+                await new Promise(r => setTimeout(r, 180));
+              } finally {
+                reconProgressDialog.close();
+              }
+
+              if (rememberPass) await rememberPassphraseAfterSetup(pass);
+
+              const sc = document.getElementById('screen-connect');
+              if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
+                try {
+                  await mountFolder({ name: 'Firebase Cloud Vault' });
+                } catch (mountErr) {
+                  console.error('[CloudSync] mountFolder error after reconcile:', mountErr);
+                }
+              }
+
+              updateCloudSyncUI();
+              if (typeof renderBoard === 'function') renderBoard();
+              if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.reconcileSuccessToast') : 'Reconciliation complete! Encrypted vault synchronized.');
               return;
             }
-
-            const reconProgressDialog = showMigrationProgressDialog(
-              typeof t === 'function' ? t('sync.reconcileProgressTitle') : 'Synchronizing Vault…',
-              typeof t === 'function' ? t('sync.migrationProgressCollecting') : 'Collecting notes and documents…'
-            );
-
-            try {
-              await window.StorageAPI.reconcileLocalAndCloudVault(pass, resolution.strategy, {}, (prog) => {
-                reconProgressDialog.update(prog.message, prog.percent);
-              });
-            } finally {
-              reconProgressDialog.close();
-            }
-
-            if (rememberPass) await rememberPassphraseAfterSetup(pass);
-
-            const sc = document.getElementById('screen-connect');
-            if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-              await mountFolder({ name: 'Firebase Cloud Vault' });
-            }
-
-            updateCloudSyncUI();
-            if (typeof renderBoard === 'function') renderBoard();
-            if (typeof showToast === 'function') showToast(typeof t === 'function' ? t('sync.reconcileSuccessToast') : 'Reconciliation complete! Encrypted vault synchronized.');
-            return;
+          } catch (cErr) {
+            console.warn('[CloudSync] detectSyncConflict error:', cErr);
           }
         }
 
@@ -1579,12 +1589,22 @@ async function submitCloudSyncSetup() {
           if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
         }
 
+        if (progressDialog) {
+          progressDialog.update(typeof t === 'function' ? t('sync.signInSuccessToast') : 'Signed in successfully! Encrypted vault connected.', 100);
+          await new Promise(r => setTimeout(r, 180));
+          progressDialog.close();
+        }
+
         if (rememberPass) await rememberPassphraseAfterSetup(pass);
         if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
 
         const sc = document.getElementById('screen-connect');
         if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-          await mountFolder({ name: 'Firebase Cloud Vault' });
+          try {
+            await mountFolder({ name: 'Firebase Cloud Vault' });
+          } catch (mountErr) {
+            console.error('[CloudSync] mountFolder error after signin:', mountErr);
+          }
         }
 
         updateCloudSyncUI();
@@ -1626,6 +1646,8 @@ async function submitCloudSyncSetup() {
             progressDialog.update(prog.message, prog.percent);
           });
         }
+        progressDialog.update(typeof t === 'function' ? t('sync.signUpSuccessToast') : 'Account created successfully! Vault initialized.', 100);
+        await new Promise(r => setTimeout(r, 180));
       } finally {
         progressDialog.close();
       }
@@ -1634,7 +1656,11 @@ async function submitCloudSyncSetup() {
 
       const sc = document.getElementById('screen-connect');
       if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-        await mountFolder({ name: 'Firebase Cloud Vault' });
+        try {
+          await mountFolder({ name: 'Firebase Cloud Vault' });
+        } catch (mountErr) {
+          console.error('[CloudSync] mountFolder error after signup:', mountErr);
+        }
       }
 
       updateCloudSyncUI();
@@ -1650,11 +1676,20 @@ async function submitCloudSyncSetup() {
         await window.FirebaseSyncService.linkExistingVault(syncCode, pass, {}, (msg, pct) => {
           if (progressDialog) progressDialog.update(msg, pct);
         });
+        if (progressDialog) {
+          progressDialog.update(typeof t === 'function' ? t('sync.linkSuccess') : 'Device linked successfully! Encrypted notes synchronized.', 100);
+          await new Promise(r => setTimeout(r, 180));
+          progressDialog.close();
+        }
         if (rememberPass) await rememberPassphraseAfterSetup(pass);
         if (typeof closeModal === 'function') closeModal('modal-cloud-sync-setup');
         const sc = document.getElementById('screen-connect');
-        if (sc && sc.style.display !== 'none' && !rootHandle) {
-          await mountFolder({ name: 'Firebase Cloud Vault' });
+        if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
+          try {
+            await mountFolder({ name: 'Firebase Cloud Vault' });
+          } catch (mountErr) {
+            console.error('[CloudSync] mountFolder error after link:', mountErr);
+          }
         }
         updateCloudSyncUI();
         if (typeof renderBoard === 'function') renderBoard();
@@ -1681,6 +1716,8 @@ async function submitCloudSyncSetup() {
             progressDialog.update(prog.message, prog.percent);
           });
         }
+        progressDialog.update(typeof t === 'function' ? t('sync.migrationProgressFinalizing') : 'Migration complete!', 100);
+        await new Promise(r => setTimeout(r, 180));
       } finally {
         progressDialog.close();
       }
@@ -1689,7 +1726,11 @@ async function submitCloudSyncSetup() {
 
       const sc = document.getElementById('screen-connect');
       if (sc && sc.style.display !== 'none' && (typeof rootHandle === 'undefined' || !rootHandle)) {
-        await mountFolder({ name: 'Firebase Cloud Vault' });
+        try {
+          await mountFolder({ name: 'Firebase Cloud Vault' });
+        } catch (mountErr) {
+          console.error('[CloudSync] mountFolder error after guest migrate:', mountErr);
+        }
       }
 
       updateCloudSyncUI();
@@ -1764,6 +1805,10 @@ async function submitCloudSyncGoogle() {
         });
       } else if (window.FirebaseSyncService?.unlockVault) {
         await window.FirebaseSyncService.unlockVault(pass, !!rememberPass);
+      }
+      if (progressDialog) {
+        progressDialog.update(typeof t === 'function' ? t('sync.signInSuccessToast') : 'Signed in successfully! Encrypted vault connected.', 100);
+        await new Promise(r => setTimeout(r, 180));
       }
     } finally {
       if (progressDialog) progressDialog.close();

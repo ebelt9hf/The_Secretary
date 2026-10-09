@@ -26,6 +26,10 @@ const VaultIDBStorage = {
     if (!idb) return null;
 
     this._openPromise = new Promise((resolve) => {
+      const openTimer = setTimeout(() => {
+        this._openPromise = null;
+        resolve(null);
+      }, 5000);
       try {
         const req = idb.open(this.DB_NAME, this.DB_VERSION);
         req.onupgradeneeded = (e) => {
@@ -79,19 +83,23 @@ const VaultIDBStorage = {
           }
         };
         req.onsuccess = (e) => {
+          clearTimeout(openTimer);
           this._db = e.target.result;
           this._openPromise = null;
           resolve(this._db);
         };
         req.onerror = () => {
+          clearTimeout(openTimer);
           this._openPromise = null;
           resolve(null);
         };
         req.onblocked = () => {
+          clearTimeout(openTimer);
           this._openPromise = null;
           resolve(null);
         };
       } catch (err) {
+        clearTimeout(openTimer);
         this._openPromise = null;
         resolve(null);
       }
@@ -106,13 +114,15 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction('meta', 'readwrite');
         tx.objectStore('meta').put({ key, value });
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -124,13 +134,15 @@ const VaultIDBStorage = {
       return this._memFallback.meta.get(key) || null;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(null), 3000);
       try {
         const tx = db.transaction('meta', 'readonly');
         const req = tx.objectStore('meta').get(key);
-        req.onsuccess = () => resolve(req.result ? req.result.value : null);
-        req.onerror = () => resolve(null);
-        tx.onabort = () => resolve(null);
+        req.onsuccess = () => { clearTimeout(timer); resolve(req.result ? req.result.value : null); };
+        req.onerror = () => { clearTimeout(timer); resolve(null); };
+        tx.onabort = () => { clearTimeout(timer); resolve(null); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(null);
       }
     });
@@ -143,13 +155,15 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction('meta', 'readwrite');
         tx.objectStore('meta').delete(key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -163,13 +177,15 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction('notes', 'readwrite');
         tx.objectStore('notes').put(docRecord);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -185,16 +201,18 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 5000);
       try {
         const tx = db.transaction('notes', 'readwrite');
         const store = tx.objectStore('notes');
         for (const rec of docRecords) {
           if (rec && rec.id) store.put(rec);
         }
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -207,13 +225,15 @@ const VaultIDBStorage = {
       return this._memFallback.notes.get(cleanId) || null;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(null), 3000);
       try {
         const tx = db.transaction('notes', 'readonly');
         const req = tx.objectStore('notes').get(cleanId);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => resolve(null);
-        tx.onabort = () => resolve(null);
+        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || null); };
+        req.onerror = () => { clearTimeout(timer); resolve(null); };
+        tx.onabort = () => { clearTimeout(timer); resolve(null); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(null);
       }
     });
@@ -225,13 +245,15 @@ const VaultIDBStorage = {
       return Array.from(this._memFallback.notes.values());
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve([]), 5000);
       try {
         const tx = db.transaction('notes', 'readonly');
         const req = tx.objectStore('notes').getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => resolve([]);
-        tx.onabort = () => resolve([]);
+        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || []); };
+        req.onerror = () => { clearTimeout(timer); resolve([]); };
+        tx.onabort = () => { clearTimeout(timer); resolve([]); };
       } catch (e) {
+        clearTimeout(timer);
         resolve([]);
       }
     });
@@ -245,13 +267,15 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction('notes', 'readwrite');
         tx.objectStore('notes').delete(cleanId);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -271,13 +295,15 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).put(rec);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -290,13 +316,15 @@ const VaultIDBStorage = {
       return this._memFallback[storeName]?.get(id) || null;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(null), 3000);
       try {
         const tx = db.transaction(storeName, 'readonly');
         const req = tx.objectStore(storeName).get(id);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => resolve(null);
-        tx.onabort = () => resolve(null);
+        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || null); };
+        req.onerror = () => { clearTimeout(timer); resolve(null); };
+        tx.onabort = () => { clearTimeout(timer); resolve(null); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(null);
       }
     });
@@ -308,13 +336,15 @@ const VaultIDBStorage = {
       return Array.from(this._memFallback[storeName]?.values() || []);
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve([]), 5000);
       try {
         const tx = db.transaction(storeName, 'readonly');
         const req = tx.objectStore(storeName).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => resolve([]);
-        tx.onabort = () => resolve([]);
+        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || []); };
+        req.onerror = () => { clearTimeout(timer); resolve([]); };
+        tx.onabort = () => { clearTimeout(timer); resolve([]); };
       } catch (e) {
+        clearTimeout(timer);
         resolve([]);
       }
     });
@@ -328,21 +358,26 @@ const VaultIDBStorage = {
       return list.filter(item => item && item[indexName] === keyRangeOrValue);
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve([]), 5000);
       try {
         const tx = db.transaction(storeName, 'readonly');
         const store = tx.objectStore(storeName);
         if (!store.indexNames.contains(indexName)) {
           const req = store.getAll();
-          req.onsuccess = () => resolve(req.result ? req.result.filter(item => item && item[indexName] === keyRangeOrValue) : []);
-          req.onerror = () => resolve([]);
+          req.onsuccess = () => {
+            clearTimeout(timer);
+            resolve(req.result ? req.result.filter(item => item && item[indexName] === keyRangeOrValue) : []);
+          };
+          req.onerror = () => { clearTimeout(timer); resolve([]); };
           return;
         }
         const index = store.index(indexName);
         const req = index.getAll(keyRangeOrValue);
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => resolve([]);
-        tx.onabort = () => resolve([]);
+        req.onsuccess = () => { clearTimeout(timer); resolve(req.result || []); };
+        req.onerror = () => { clearTimeout(timer); resolve([]); };
+        tx.onabort = () => { clearTimeout(timer); resolve([]); };
       } catch (e) {
+        clearTimeout(timer);
         resolve([]);
       }
     });
@@ -355,13 +390,15 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction(storeName, 'readwrite');
         tx.objectStore(storeName).clear();
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -383,13 +420,15 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction('wal', 'readwrite');
         tx.objectStore('wal').put(rec);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -403,17 +442,20 @@ const VaultIDBStorage = {
       return list;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve([]), 5000);
       try {
         const tx = db.transaction('wal', 'readonly');
         const req = tx.objectStore('wal').getAll();
         req.onsuccess = () => {
+          clearTimeout(timer);
           const list = req.result || [];
           list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
           resolve(list);
         };
-        req.onerror = () => resolve([]);
-        tx.onabort = () => resolve([]);
+        req.onerror = () => { clearTimeout(timer); resolve([]); };
+        tx.onabort = () => { clearTimeout(timer); resolve([]); };
       } catch (e) {
+        clearTimeout(timer);
         resolve([]);
       }
     });
@@ -432,6 +474,7 @@ const VaultIDBStorage = {
       return true;
     }
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 3000);
       try {
         const tx = db.transaction('wal', 'readwrite');
         const store = tx.objectStore('wal');
@@ -444,10 +487,11 @@ const VaultIDBStorage = {
         } else {
           store.delete(ids);
         }
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-        tx.onabort = () => resolve(false);
+        tx.oncomplete = () => { clearTimeout(timer); resolve(true); };
+        tx.onerror = () => { clearTimeout(timer); resolve(false); };
+        tx.onabort = () => { clearTimeout(timer); resolve(false); };
       } catch (e) {
+        clearTimeout(timer);
         resolve(false);
       }
     });
@@ -1753,13 +1797,20 @@ const FirebaseSyncService = {
     }
 
     report(typeof t === 'function' ? t('sync.linkingFinalizing') : 'Finalizing synchronization...', 95);
-    // Persist manifest cache
+    // Persist manifest cache with timeout safeguard
     try {
-      await VaultIDBStorage.saveMeta('manifest_cache', Array.from(this.state.manifestCache.values()));
+      await Promise.race([
+        VaultIDBStorage.saveMeta('manifest_cache', Array.from(this.state.manifestCache.values())),
+        new Promise(resolve => setTimeout(resolve, 2000))
+      ]);
     } catch (e) {}
 
-    // 4. Start real-time cloud listening
-    this.listenRemoteVault();
+    // 4. Start real-time cloud listening safely
+    try {
+      this.listenRemoteVault();
+    } catch (listenErr) {
+      console.warn('[FirebaseSyncService] listenRemoteVault non-blocking error:', listenErr);
+    }
 
     if (typeof window.StorageAPI !== 'undefined') {
       window.StorageAPI.setStorageEngine('firebase');
