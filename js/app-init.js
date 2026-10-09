@@ -2332,6 +2332,7 @@ async function submitCloudSyncUnlock(forceSave = false) {
   const success = await window.FirebaseSyncService.unlockVault(pass);
   if (success) {
     if (shouldSave) {
+      if (rememberCb) rememberCb.checked = true;
       const saved = await window.FirebaseSyncService.savePassphraseLocally(pass);
       if (!saved && typeof showToast === 'function') {
         showToast(typeof t === 'function' ? t('sync.passphraseStorageUnavailable') : 'Secure passphrase storage is not available on this device', true);

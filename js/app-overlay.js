@@ -10128,7 +10128,7 @@ function openModal(id)  {
     }
     const remCb = document.getElementById('sync-unlock-remember-pass');
     if (remCb) {
-      remCb.checked = typeof settings === 'object' && settings?.rememberPassphrase === true;
+      remCb.checked = typeof settings === 'object' && settings?.rememberPassphrase !== false;
     }
     applyPassphraseStorageAvailability(['sync-unlock-remember-pass', 'btn-sync-unlock-save']);
     const passInput = document.getElementById('sync-unlock-passphrase');

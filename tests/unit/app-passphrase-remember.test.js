@@ -172,12 +172,21 @@ describe('Passphrase Autofill & Remember Integration', () => {
       expect(window.FirebaseSyncService.encodePassphrase).toBeUndefined();
     });
 
-    it('refuses to save (returns false) when no secure storage exists, e.g. plain browser', async () => {
+    it('allows saving encrypted passphrase on device in plain browser / web mode', async () => {
       delete window.electronAPI;
-      expect(await window.FirebaseSyncService.isPassphraseStorageAvailable()).toBe(false);
-      expect(await window.FirebaseSyncService.savePassphraseLocally('x-pass-1234')).toBe(false);
+      expect(await window.FirebaseSyncService.isPassphraseStorageAvailable()).toBe(true);
+      expect(await window.FirebaseSyncService.savePassphraseLocally('x-pass-1234')).toBe(true);
+      expect(window.settings.rememberPassphrase).toBe(true);
+      // Ensure plaintext passphrase is never stored directly
+      expect(localStorage.getItem('secretary_saved_passphrase')).toBeNull();
+      const rawDump = JSON.stringify(Object.entries(localStorage));
+      expect(rawDump).not.toContain('x-pass-1234');
+      // Retrieval and clearing
+      expect(await window.FirebaseSyncService.getSavedPassphrase()).toBe('x-pass-1234');
+      expect(await window.FirebaseSyncService.hasSavedPassphrase()).toBe(true);
+      expect(await window.FirebaseSyncService.clearSavedPassphrase()).toBe(true);
+      expect(await window.FirebaseSyncService.getSavedPassphrase()).toBeNull();
       expect(window.settings.rememberPassphrase).toBe(false);
-      expect(localStorage.length).toBe(0);
     });
 
     it('does not flag rememberPassphrase when the keychain save fails', async () => {
@@ -297,6 +306,32 @@ describe('Passphrase Autofill & Remember Integration', () => {
       await window.FirebaseSyncService.rotatePassphrase('rotate-new-pass-5678', 'rotate-third-pass-9012');
       expect(keychain.value).toBeNull();
       expect(window.settings.rememberPassphrase).toBe(false);
+    });
+
+    it('saves on device in browser mode when unlocking from unlock modal', async () => {
+      delete window.electronAPI;
+      const testPass = 'unlock-browser-test-passphrase-1234';
+      const { vaultMeta } = await window.FirebaseSyncService.setupVault(testPass);
+      window.FirebaseSyncService.state.vaultMeta = vaultMeta;
+      window.FirebaseSyncService.lockVault();
+
+      document.getElementById('sync-unlock-passphrase').value = testPass;
+      document.getElementById('sync-unlock-remember-pass').checked = true;
+      await window.submitCloudSyncUnlock();
+
+      expect(window.FirebaseSyncService.state.isUnlocked).toBe(true);
+      expect(window.settings.rememberPassphrase).toBe(true);
+      expect(await window.FirebaseSyncService.getSavedPassphrase()).toBe(testPass);
+    });
+
+    it('keeps remember passphrase controls visible in unlock modal in browser mode', async () => {
+      delete window.electronAPI;
+      window.openModal('modal-cloud-sync-unlock');
+      const remCb = document.getElementById('sync-unlock-remember-pass');
+      const saveBtn = document.getElementById('btn-sync-unlock-save');
+      const label = remCb.closest('label');
+      expect(label.style.display).not.toBe('none');
+      expect(saveBtn.style.display).not.toBe('none');
     });
   });
 });

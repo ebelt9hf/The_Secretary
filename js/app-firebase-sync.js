@@ -1403,11 +1403,178 @@ const FirebaseSyncService = {
 
   async isPassphraseStorageAvailable() {
     const api = this._securePassphraseAPI();
-    if (!api) return false;
+    if (api) {
+      try {
+        return !!(await api.isAvailable());
+      } catch (e) {
+        return false;
+      }
+    }
+    // Web / browser environment: local device storage via IndexedDB / localStorage
     try {
-      return !!(await api.isAvailable());
+      const hasIdb = typeof indexedDB !== 'undefined' || (typeof window !== 'undefined' && !!window.indexedDB);
+      const hasLocal = typeof localStorage !== 'undefined';
+      return !!(hasIdb || hasLocal);
     } catch (e) {
       return false;
+    }
+  },
+
+  async _getDeviceCryptoKey() {
+    let rawB64 = null;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        rawB64 = localStorage.getItem('secretary_device_key');
+      }
+      if (!rawB64 && typeof VaultIDBStorage !== 'undefined' && VaultIDBStorage.getMeta) {
+        rawB64 = await VaultIDBStorage.getMeta('device_key');
+      }
+    } catch (e) {}
+
+    if (!rawB64) {
+      if (typeof CryptoEngine !== 'undefined' && typeof CryptoEngine.generateSalt === 'function') {
+        rawB64 = CryptoEngine.generateSalt(32);
+      } else {
+        const bytes = new Uint8Array(32);
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+          crypto.getRandomValues(bytes);
+        }
+        rawB64 = (typeof btoa === 'function' ? btoa(String.fromCharCode(...bytes)) : Buffer.from(bytes).toString('base64'));
+      }
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem('secretary_device_key', rawB64);
+        if (typeof VaultIDBStorage !== 'undefined' && VaultIDBStorage.saveMeta) {
+          await VaultIDBStorage.saveMeta('device_key', rawB64);
+        }
+      } catch (e) {}
+    }
+
+    const cryptoObj = (typeof CryptoEngine !== 'undefined' && typeof CryptoEngine._getCrypto === 'function')
+      ? CryptoEngine._getCrypto()
+      : (typeof window !== 'undefined' && window.crypto ? window.crypto : (typeof globalThis !== 'undefined' ? globalThis.crypto : null));
+
+    if (cryptoObj && cryptoObj.subtle) {
+      const rawBuffer = (typeof CryptoEngine !== 'undefined' && typeof CryptoEngine.base64ToArrayBuffer === 'function')
+        ? CryptoEngine.base64ToArrayBuffer(rawB64)
+        : (typeof atob === 'function'
+            ? Uint8Array.from(atob(rawB64), c => c.charCodeAt(0)).buffer
+            : Buffer.from(rawB64, 'base64').buffer);
+      return await cryptoObj.subtle.importKey(
+        'raw',
+        rawBuffer,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    }
+    return null;
+  },
+
+  async _saveWebDevicePassphrase(passphrase) {
+    if (!passphrase || typeof passphrase !== 'string') return false;
+    try {
+      const key = await this._getDeviceCryptoKey();
+      if (key && typeof CryptoEngine !== 'undefined' && typeof CryptoEngine.encryptData === 'function') {
+        const encrypted = await CryptoEngine.encryptData(key, passphrase);
+        const json = JSON.stringify(encrypted);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('secretary_saved_passphrase_v4', json);
+        }
+        if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.saveMeta === 'function') {
+          await VaultIDBStorage.saveMeta('saved_passphrase', encrypted);
+        }
+        return true;
+      }
+      // Safe fallback if Web Crypto is unavailable: obfuscated base64 storage
+      const obfuscated = this._obfuscateDevicePassphrase(passphrase);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('secretary_saved_passphrase_v4', obfuscated);
+      }
+      if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.saveMeta === 'function') {
+        await VaultIDBStorage.saveMeta('saved_passphrase', obfuscated);
+      }
+      return true;
+    } catch (e) {
+      console.warn('Failed to save device passphrase in browser', e);
+      return false;
+    }
+  },
+
+  async _getWebDevicePassphrase() {
+    try {
+      let payload = null;
+      if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.getMeta === 'function') {
+        payload = await VaultIDBStorage.getMeta('saved_passphrase');
+      }
+      if (!payload && typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem('secretary_saved_passphrase_v4');
+        if (raw) {
+          try {
+            payload = JSON.parse(raw);
+          } catch (_) {
+            payload = raw;
+          }
+        }
+      }
+      if (!payload) return null;
+
+      if (payload && typeof payload === 'object' && payload.iv && payload.ciphertext) {
+        const key = await this._getDeviceCryptoKey();
+        if (key && typeof CryptoEngine !== 'undefined' && typeof CryptoEngine.decryptData === 'function') {
+          const decrypted = await CryptoEngine.decryptData(key, payload);
+          return typeof decrypted === 'string' ? decrypted : null;
+        }
+      }
+      if (typeof payload === 'string' && payload.startsWith('obf:v1:')) {
+        return this._deobfuscateDevicePassphrase(payload);
+      }
+      return null;
+    } catch (e) {
+      console.warn('Failed to read device passphrase in browser', e);
+      return null;
+    }
+  },
+
+  async _clearWebDevicePassphrase() {
+    let ok = true;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('secretary_saved_passphrase_v4');
+        localStorage.removeItem('secretary_saved_passphrase');
+      }
+    } catch (e) { ok = false; }
+    try {
+      if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.deleteMeta === 'function') {
+        await VaultIDBStorage.deleteMeta('saved_passphrase');
+      }
+    } catch (e) { ok = false; }
+    return ok;
+  },
+
+  _obfuscateDevicePassphrase(plainText) {
+    if (!plainText) return '';
+    const key = 's3cr3t-d3v1c3-v4ult-k3y';
+    const out = [];
+    for (let i = 0; i < plainText.length; i++) {
+      out.push(String.fromCharCode(plainText.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+    }
+    const joined = out.join('');
+    return 'obf:v1:' + (typeof btoa === 'function' ? btoa(joined) : Buffer.from(joined).toString('base64'));
+  },
+
+  _deobfuscateDevicePassphrase(encoded) {
+    if (!encoded || !encoded.startsWith('obf:v1:')) return null;
+    try {
+      const b64 = encoded.slice(7);
+      const raw = (typeof atob === 'function' ? atob(b64) : Buffer.from(b64, 'base64').toString());
+      const key = 's3cr3t-d3v1c3-v4ult-k3y';
+      const out = [];
+      for (let i = 0; i < raw.length; i++) {
+        out.push(String.fromCharCode(raw.charCodeAt(i) ^ key.charCodeAt(i % key.length)));
+      }
+      return out.join('');
+    } catch (e) {
+      return null;
     }
   },
 
@@ -1427,12 +1594,27 @@ const FirebaseSyncService = {
   async savePassphraseLocally(passphrase) {
     if (!passphrase || typeof passphrase !== 'string') return false;
     const api = this._securePassphraseAPI();
-    if (!api || !(await this.isPassphraseStorageAvailable())) return false;
+    if (api) {
+      if (!(await this.isPassphraseStorageAvailable())) return false;
+      let saved = false;
+      try {
+        saved = !!(await api.save(passphrase));
+      } catch (e) {
+        console.warn('Failed to save passphrase to OS keychain', e);
+      }
+      if (saved && typeof settings === 'object' && settings) {
+        settings.rememberPassphrase = true;
+        if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
+      }
+      return saved;
+    }
+
+    if (!(await this.isPassphraseStorageAvailable())) return false;
     let saved = false;
     try {
-      saved = !!(await api.save(passphrase));
+      saved = await this._saveWebDevicePassphrase(passphrase);
     } catch (e) {
-      console.warn('Failed to save passphrase to OS keychain', e);
+      console.warn('Failed to save passphrase on device', e);
     }
     if (saved && typeof settings === 'object' && settings) {
       settings.rememberPassphrase = true;
@@ -1443,16 +1625,23 @@ const FirebaseSyncService = {
 
   async getSavedPassphrase() {
     const api = this._securePassphraseAPI();
-    if (!api) return null;
+    if (api) {
+      try {
+        return (await api.get()) || null;
+      } catch (e) {
+        console.warn('Failed to read passphrase from OS keychain', e);
+        return null;
+      }
+    }
     try {
-      return (await api.get()) || null;
+      return await this._getWebDevicePassphrase();
     } catch (e) {
-      console.warn('Failed to read passphrase from OS keychain', e);
+      console.warn('Failed to read passphrase from device', e);
       return null;
     }
   },
 
-  /** Returns true only when every stored copy (keychain + legacy) was actually removed. */
+  /** Returns true only when every stored copy (keychain + legacy + web) was actually removed. */
   async clearSavedPassphrase() {
     let ok = await this.purgeLegacyPassphraseStorage();
     const api = this._securePassphraseAPI();
@@ -1461,6 +1650,12 @@ const FirebaseSyncService = {
         if (!(await api.clear())) ok = false;
       } catch (e) {
         console.warn('Failed to clear passphrase from OS keychain', e);
+        ok = false;
+      }
+    } else {
+      try {
+        if (!(await this._clearWebDevicePassphrase())) ok = false;
+      } catch (e) {
         ok = false;
       }
     }
