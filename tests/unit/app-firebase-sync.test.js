@@ -375,8 +375,12 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
     const code = window.FirebaseSyncService.generateSyncCode();
     expect(code).toMatch(/^SEC-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
 
-    window.FirebaseSyncService.setSyncCode('SEC-TEST-9999');
+    window.FirebaseSyncService.setSyncCode('sec-test-9999');
     expect(window.FirebaseSyncService.getSyncCode()).toBe('SEC-TEST-9999');
+
+    // Preserves mixed case for Firebase Auth UIDs (must not force uppercase)
+    window.FirebaseSyncService.setSyncCode('  uIdMixedCase12345  ');
+    expect(window.FirebaseSyncService.getSyncCode()).toBe('uIdMixedCase12345');
   });
 
   it('links to an existing vault using Sync Code and decrypts remote notes', async () => {
@@ -428,6 +432,45 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
     const noteA = await window.FirebaseSyncService.getNote('sharedNoteA');
     expect(noteA.title).toBe('Shared Note A');
     expect(noteA.contentHtml).toBe('<p>Synchronized from Device 1</p>');
+  });
+
+  it('links vault with mixed-case UID and tolerates copy-pasted passphrases with newlines/whitespace', async () => {
+    const rawPassphrase = 'secret-multi-device-passphrase-2026';
+    const remoteVaultMeta = (await window.CryptoEngine.setupVault(rawPassphrase)).vaultMeta;
+    const remoteKey = (await window.CryptoEngine.verifyPassphrase(rawPassphrase, remoteVaultMeta)).key;
+
+    const encNote = await window.CryptoEngine.encryptData(remoteKey, {
+      id: 'cloudNoteUid1',
+      title: 'Cloud Document',
+      contentHtml: '<p>Synced via mixed-case Firebase UID</p>'
+    });
+
+    const mixedCaseUid = 'aBcD1234EfGh5678';
+    const mockCloud = {
+      [mixedCaseUid]: {
+        vaultMeta: remoteVaultMeta,
+        notes: [{ id: 'cloudNoteUid1', iv: encNote.iv, ciphertext: encNote.ciphertext, updatedAt: 2000 }]
+      }
+    };
+
+    window.FirebaseBridge = {
+      init: () => true,
+      ensureAuth: async () => ({ uid: mixedCaseUid }),
+      getVaultMeta: async (code) => mockCloud[code]?.vaultMeta || null,
+      getAllNotes: async (code) => mockCloud[code]?.notes || [],
+      listenVault: (code, cb) => () => {}
+    };
+
+    // User copy-pastes passphrase with leading/trailing newlines, tabs, and spaces
+    const dirtyPastedPassphrase = `\r\n\t  ${rawPassphrase}\n  `;
+    const result = await window.FirebaseSyncService.linkExistingVault(mixedCaseUid, dirtyPastedPassphrase);
+
+    expect(result.syncCode).toBe(mixedCaseUid);
+    expect(result.linkedCount).toBe(1);
+    expect(window.FirebaseSyncService.state.isUnlocked).toBe(true);
+
+    const note = await window.FirebaseSyncService.getNote('cloudNoteUid1');
+    expect(note.title).toBe('Cloud Document');
   });
 
   describe('Version Compatibility & Cloud Update Enforcement', () => {
@@ -788,6 +831,33 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
       expect(window.FirebaseSyncService.state.isUnlocked).toBe(false);
       expect(window.FirebaseSyncService.state.masterKey).toBeNull();
       expect(await window.FirebaseSyncService.getSavedPassphrase()).toBeNull();
+      expect(await window.FirebaseSyncService.getActivePassphrase()).toBeNull();
+    });
+
+    it('preserves exact case for Firebase UIDs while standardizing SEC- codes to uppercase', () => {
+      // 1. Standard SEC pairing codes -> uppercase
+      window.FirebaseSyncService.setSyncCode('sec-abcd-1234');
+      expect(window.FirebaseSyncService.getSyncCode()).toBe('SEC-ABCD-1234');
+
+      // 2. Firebase UIDs / alphanumeric mixed-case IDs -> preserved exactly
+      const firebaseUid = 'vB9qXy72LkMnpZ41';
+      window.FirebaseSyncService.setSyncCode(firebaseUid);
+      expect(window.FirebaseSyncService.getSyncCode()).toBe(firebaseUid);
+    });
+
+    it('tracks active passphrase in memory and clears it on lockVault', async () => {
+      const pass = 'test-master-passphrase-2026';
+      await window.FirebaseSyncService.setupVault(pass);
+      expect(await window.FirebaseSyncService.getActivePassphrase()).toBe(pass);
+
+      window.FirebaseSyncService.lockVault();
+      expect(await window.FirebaseSyncService.getActivePassphrase()).toBeNull();
+
+      // Unlock with copy-pasted whitespace and newlines
+      const meta = window.FirebaseSyncService.state.vaultMeta;
+      const unlockSuccess = await window.FirebaseSyncService.unlockVault(`\r\n  ${pass}\n\t`, meta);
+      expect(unlockSuccess).toBe(true);
+      expect(await window.FirebaseSyncService.getActivePassphrase()).toBe(pass);
     });
   });
 });

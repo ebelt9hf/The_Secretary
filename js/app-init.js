@@ -790,15 +790,37 @@ function updateCloudSyncUI(statusObj) {
   if (btnRevert) btnRevert.style.display = isFirebase ? '' : 'none';
   if (btnRotate) btnRotate.style.display = isFirebase ? '' : 'none';
 
+  const user = window.FirebaseSyncService ? window.FirebaseSyncService.getAuthUser() : null;
+
   const syncCodeRow = document.getElementById('prefs-sync-code-row');
   const syncCodeInput = document.getElementById('prefs-sync-code-input');
-  const syncCode = window.FirebaseSyncService ? window.FirebaseSyncService.getSyncCode() : null;
+  let syncCode = window.FirebaseSyncService ? window.FirebaseSyncService.getSyncCode() : null;
+  if (!syncCode && typeof settings !== 'undefined' && settings?.vaultId) {
+    syncCode = settings.vaultId;
+  }
+  if (!syncCode && user && user.uid) {
+    syncCode = user.uid;
+  }
   if (syncCodeRow && syncCodeInput) {
-    if (status.engine === 'firebase' && syncCode) {
-      syncCodeRow.style.display = 'flex';
-      syncCodeInput.value = syncCode;
-    } else {
-      syncCodeRow.style.display = 'none';
+    syncCodeRow.style.display = 'flex';
+    syncCodeInput.value = syncCode || (typeof t === 'function' ? t('sync.syncCodeNotSet') : 'Not Generated Yet');
+  }
+
+  const passRow = document.getElementById('prefs-sync-pass-row');
+  const passInput = document.getElementById('prefs-sync-pass-input');
+  if (passRow && passInput) {
+    passRow.style.display = 'flex';
+    if (window.FirebaseSyncService?.getActivePassphrase) {
+      window.FirebaseSyncService.getActivePassphrase().then(pass => {
+        if (pass && passInput) {
+          passInput.value = pass;
+        } else if (passInput) {
+          passInput.value = '';
+          passInput.placeholder = window.FirebaseSyncService?.state?.isUnlocked
+            ? '•••••••••••• (In Memory)'
+            : (typeof t === 'function' ? t('sync.passphraseLockedPlaceholder') : '•••••••••••• (Locked)');
+        }
+      }).catch(() => {});
     }
   }
 
@@ -806,7 +828,6 @@ function updateCloudSyncUI(statusObj) {
   const btnSignIn = document.getElementById('btn-prefs-sync-signin');
   const btnSignOut = document.getElementById('btn-prefs-sync-signout');
   const btnResetPass = document.getElementById('btn-prefs-sync-reset-pass');
-  const user = window.FirebaseSyncService ? window.FirebaseSyncService.getAuthUser() : null;
 
   if (accountEmailEl) {
     if (user && user.email) {
@@ -1051,12 +1072,36 @@ function regenerateSetupPassphrase() {
 }
 window.regenerateSetupPassphrase = regenerateSetupPassphrase;
 
+function _fallbackCopyText(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function copySetupPassphrase() {
   const passInput = document.getElementById('sync-setup-passphrase');
   const pass = passInput?.value;
   if (!pass) return;
+  const cleanPass = typeof CryptoEngine !== 'undefined' && typeof CryptoEngine.cleanPassphrase === 'function'
+    ? CryptoEngine.cleanPassphrase(pass)
+    : pass.replace(/^[\s\uFEFF\u200B-\u200D\u00A0]+|[\s\uFEFF\u200B-\u200D\u00A0]+$/g, '').normalize('NFC');
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(pass);
+    navigator.clipboard.writeText(cleanPass).catch(() => _fallbackCopyText(cleanPass));
+  } else {
+    _fallbackCopyText(cleanPass);
   }
   if (typeof showToast === 'function') {
     showToast(typeof t === 'function' ? t('sync.passphraseCopied') : 'Master passphrase copied to clipboard');
@@ -1214,10 +1259,12 @@ window.regenerateSetupSyncCode = regenerateSetupSyncCode;
 
 function copySetupSyncCode() {
   const syncInput = document.getElementById('sync-setup-sync-code');
-  const code = syncInput?.value;
+  const code = syncInput?.value ? String(syncInput.value).trim() : '';
   if (!code) return;
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(code).catch(() => _fallbackCopyText(code));
+  } else {
+    _fallbackCopyText(code);
   }
   if (typeof showToast === 'function') {
     showToast(typeof t === 'function' ? t('sync.syncCodeCopied') : 'Sync Code copied to clipboard');
@@ -1226,16 +1273,79 @@ function copySetupSyncCode() {
 window.copySetupSyncCode = copySetupSyncCode;
 
 function copySyncCodeUI() {
-  const syncCode = window.FirebaseSyncService ? window.FirebaseSyncService.getSyncCode() : null;
-  if (!syncCode) return;
+  const syncCodeInput = document.getElementById('prefs-sync-code-input');
+  let syncCode = window.FirebaseSyncService ? window.FirebaseSyncService.getSyncCode() : null;
+  if (!syncCode && syncCodeInput && syncCodeInput.value && !syncCodeInput.value.includes('Not') && !syncCodeInput.value.includes('•')) {
+    syncCode = syncCodeInput.value;
+  }
+  if (!syncCode) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.syncCodeNotSet') : 'No Sync Code found', true);
+    }
+    return;
+  }
+  const clean = String(syncCode).trim();
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(syncCode);
+    navigator.clipboard.writeText(clean).catch(() => _fallbackCopyText(clean));
+  } else {
+    _fallbackCopyText(clean);
   }
   if (typeof showToast === 'function') {
     showToast(typeof t === 'function' ? t('sync.syncCodeCopied') : 'Sync Code copied to clipboard');
   }
 }
 window.copySyncCodeUI = copySyncCodeUI;
+
+async function copyPassphraseUI() {
+  const input = document.getElementById('prefs-sync-pass-input');
+  let pass = input?.value || '';
+  if (!pass || pass.startsWith('••••')) {
+    if (window.FirebaseSyncService?.getActivePassphrase) {
+      pass = await window.FirebaseSyncService.getActivePassphrase();
+    }
+  }
+  if (!pass) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.passphraseUnavailable') : 'Passphrase is not available in memory. Please unlock vault.', true);
+    }
+    return;
+  }
+  const clean = typeof CryptoEngine?.cleanPassphrase === 'function' ? CryptoEngine.cleanPassphrase(pass) : String(pass).trim();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(clean).catch(() => _fallbackCopyText(clean));
+  } else {
+    _fallbackCopyText(clean);
+  }
+  if (typeof showToast === 'function') {
+    showToast(typeof t === 'function' ? t('sync.passphraseCopied') : 'Master passphrase copied to clipboard');
+  }
+}
+window.copyPassphraseUI = copyPassphraseUI;
+
+async function togglePassphraseVisibilityUI() {
+  const input = document.getElementById('prefs-sync-pass-input');
+  const btn = document.getElementById('btn-prefs-sync-pass-visibility');
+  if (!input) return;
+  const isPass = input.type === 'password';
+  if (isPass) {
+    if (!input.value || input.value.startsWith('••••')) {
+      if (window.FirebaseSyncService?.getActivePassphrase) {
+        const p = await window.FirebaseSyncService.getActivePassphrase();
+        if (p) input.value = p;
+      }
+    }
+    input.type = 'text';
+    if (btn) {
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+    }
+  } else {
+    input.type = 'password';
+    if (btn) {
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    }
+  }
+}
+window.togglePassphraseVisibilityUI = togglePassphraseVisibilityUI;
 
 async function changeStorageEngineUI(engine) {
   if (engine === 'firebase') {
@@ -1499,8 +1609,9 @@ async function submitCloudSyncSetup() {
     }
 
     const email = emailInput?.value?.trim() || '';
-    const authPass = authPassInput?.value || '';
-    const pass = passInput?.value || '';
+    const authPass = authPassInput?.value?.trim() || '';
+    const rawPass = passInput?.value || '';
+    const pass = window.CryptoEngine?.cleanPassphrase ? window.CryptoEngine.cleanPassphrase(rawPass) : rawPass.trim();
     const syncCode = syncCodeInput?.value?.trim() || '';
 
     if (dontShow && typeof settings !== 'undefined') {
@@ -1758,7 +1869,8 @@ window.submitCloudSyncSetup = submitCloudSyncSetup;
 async function submitCloudSyncGoogle() {
   const passInput = document.getElementById('sync-setup-passphrase');
   const rememberPass = document.getElementById('sync-setup-remember-pass')?.checked;
-  let pass = passInput?.value || '';
+  let rawPass = passInput?.value || '';
+  let pass = window.CryptoEngine?.cleanPassphrase ? window.CryptoEngine.cleanPassphrase(rawPass) : rawPass.trim();
 
   if (!pass || pass.length < 10) {
     if (window.FirebaseSyncService?.generateDefaultPassphrase) {
@@ -2114,7 +2226,7 @@ function updateCustomFirebaseStatusUI() {
     }
   } else {
     if (pill) {
-      pill.textContent = typeof t === 'function' ? t('sync.customFirebaseStatusDefault') : 'Default Project';
+      pill.textContent = typeof t === 'function' ? t('sync.customFirebaseStatusDefault') : "Etienne's Firebase Project";
       pill.style.background = 'rgba(59, 130, 246, 0.12)';
       pill.style.color = '#3b82f6';
     }
@@ -2155,13 +2267,14 @@ function resetCustomFirebaseConfigUI() {
   if (textarea) textarea.value = '';
   updateCustomFirebaseStatusUI();
   if (typeof showToast === 'function') {
-    showToast(typeof t === 'function' ? t('sync.customFirebaseReset') : 'Reverted to default Firebase project.');
+    showToast(typeof t === 'function' ? t('sync.customFirebaseReset') : "Reverted to Etienne's Firebase project.");
   }
 }
 window.resetCustomFirebaseConfigUI = resetCustomFirebaseConfigUI;
 
 async function submitCloudSyncUnlock(forceSave = false) {
-  const pass = document.getElementById('sync-unlock-passphrase')?.value;
+  const rawPass = document.getElementById('sync-unlock-passphrase')?.value || '';
+  const pass = window.CryptoEngine?.cleanPassphrase ? window.CryptoEngine.cleanPassphrase(rawPass) : rawPass.trim();
   const errEl = document.getElementById('sync-unlock-error');
   const rememberCb = document.getElementById('sync-unlock-remember-pass');
   const shouldSave = forceSave || (rememberCb ? rememberCb.checked : false);
@@ -2251,9 +2364,13 @@ async function refreshRememberPassphraseControl() {
 window.refreshRememberPassphraseControl = refreshRememberPassphraseControl;
 
 async function submitCloudSyncPasswordRotate() {
-  const oldPass = document.getElementById('sync-rotate-current-pass')?.value;
-  const newPass = document.getElementById('sync-rotate-new-pass')?.value;
-  const confirmPass = document.getElementById('sync-rotate-confirm-pass')?.value;
+  const rawOldPass = document.getElementById('sync-rotate-current-pass')?.value || '';
+  const rawNewPass = document.getElementById('sync-rotate-new-pass')?.value || '';
+  const rawConfirmPass = document.getElementById('sync-rotate-confirm-pass')?.value || '';
+  const clean = (s) => (window.CryptoEngine?.cleanPassphrase ? window.CryptoEngine.cleanPassphrase(s) : (typeof s === 'string' ? s.trim() : ''));
+  const oldPass = clean(rawOldPass);
+  const newPass = clean(rawNewPass);
+  const confirmPass = clean(rawConfirmPass);
   const errEl = document.getElementById('sync-rotate-error');
 
   if (!oldPass || !newPass) {

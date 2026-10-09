@@ -1,6 +1,6 @@
 {
   "name": "secretary",
-  "version": "4.0.9",
+  "version": "4.0.10",
   "description": "Private local-first personal note manager and task organizer",
   "main": "electron/main.js",
   "type": "module",

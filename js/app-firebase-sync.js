@@ -1152,19 +1152,51 @@ const FirebaseSyncService = {
     return { score: 'ultra', length: len, textKey: 'sync.badgeUltraSecure' };
   },
 
+  setActivePassphrase(passphrase) {
+    if (!passphrase) {
+      this._activePassphrase = null;
+      return;
+    }
+    this._activePassphrase = typeof CryptoEngine?.cleanPassphrase === 'function'
+      ? CryptoEngine.cleanPassphrase(passphrase)
+      : String(passphrase).trim().normalize('NFC');
+  },
+
+  async getActivePassphrase() {
+    if (this._activePassphrase) {
+      return this._activePassphrase;
+    }
+    const saved = await this.getSavedPassphrase();
+    if (saved) {
+      this._activePassphrase = saved;
+      return saved;
+    }
+    return null;
+  },
+
   getSyncCode() {
+    if (this._syncCode) {
+      return this._syncCode;
+    }
     if (this.state.userId && this.state.userId !== 'default_user') {
       return this.state.userId;
     }
     if (typeof settings !== 'undefined' && settings?.vaultId) {
       return settings.vaultId;
     }
+    const user = this.getAuthUser();
+    if (user && user.uid) {
+      return user.uid;
+    }
     return null;
   },
 
   setSyncCode(code) {
     if (!code) return;
-    const clean = code.trim().toUpperCase();
+    const trimmed = String(code).trim();
+    // Standard SEC-xxxx-yyyy codes are uppercase; preserve exact case for Firebase UIDs or custom IDs
+    const clean = trimmed.toUpperCase().startsWith('SEC-') ? trimmed.toUpperCase() : trimmed;
+    this._syncCode = clean;
     this.state.userId = clean;
     if (typeof settings !== 'undefined' && settings) {
       settings.vaultId = clean;
@@ -1189,11 +1221,16 @@ const FirebaseSyncService = {
     if (!syncCode || !syncCode.trim()) {
       throw new Error(typeof t === 'function' ? t('sync.syncCodeRequired') : 'Sync code is required');
     }
-    if (!passphrase || passphrase.length < 10) {
+    const cleanPass = typeof CryptoEngine !== 'undefined' && typeof CryptoEngine.cleanPassphrase === 'function'
+      ? CryptoEngine.cleanPassphrase(passphrase)
+      : (typeof passphrase === 'string' ? passphrase.trim().normalize('NFC') : '');
+
+    if (!cleanPass || cleanPass.length < 10) {
       throw new Error(typeof t === 'function' ? t('sync.passphraseTooShort') : 'Master passphrase must be at least 10 characters long');
     }
 
-    const cleanCode = syncCode.trim().toUpperCase();
+    const trimmedCode = syncCode.trim();
+    const cleanCode = trimmedCode.toUpperCase().startsWith('SEC-') ? trimmedCode.toUpperCase() : trimmedCode;
     this.setSyncCode(cleanCode);
 
     report(typeof t === 'function' ? t('sync.linkingConnecting') : 'Connecting to cloud vault...', 15);
@@ -1208,10 +1245,20 @@ const FirebaseSyncService = {
     const timeoutMsg = typeof t === 'function'
       ? t('sync.networkTimeout')
       : 'Connection timed out. Please verify your internet connection or Firebase configuration.';
-    const remoteMeta = await Promise.race([
+    let remoteMeta = await Promise.race([
       bridge.getVaultMeta(cleanCode),
       new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMsg)), 15000))
     ]);
+    if (!remoteMeta && cleanCode !== trimmedCode) {
+      try {
+        remoteMeta = await bridge.getVaultMeta(trimmedCode);
+      } catch (e) {}
+    }
+    if (!remoteMeta && !trimmedCode.toUpperCase().startsWith('SEC-')) {
+      try {
+        remoteMeta = await bridge.getVaultMeta(trimmedCode.toUpperCase());
+      } catch (e) {}
+    }
     if (!remoteMeta || !remoteMeta.salt) {
       throw new Error(typeof t === 'function' ? t('sync.syncCodeNotFound') : 'Sync Code not found in cloud. Please check the code.');
     }
@@ -1233,6 +1280,8 @@ const FirebaseSyncService = {
     this.state.vaultMeta = remoteMeta;
     this.state.masterKey = check.key;
     this.state.isUnlocked = true;
+    this.setActivePassphrase(passphrase);
+    this.setSyncCode(cleanCode);
     this.state.engine = 'firebase';
     this.state.status = this.STATUS.SYNCED;
 
@@ -1445,6 +1494,7 @@ const FirebaseSyncService = {
     this.state.vaultMeta = vaultMeta;
     this.state.masterKey = key;
     this.state.isUnlocked = true;
+    this.setActivePassphrase(passphrase);
     this.state.status = this.STATUS.SYNCED;
     this.state.lastSyncTimestamp = Date.now();
     this.state.localCache = new Map();
@@ -1527,6 +1577,7 @@ const FirebaseSyncService = {
     this.state.vaultMeta = meta;
     this.state.masterKey = check.key;
     this.state.isUnlocked = true;
+    this.setActivePassphrase(passphrase);
     this.state.status = this.STATUS.SYNCED;
     this.state.lastError = null;
 
@@ -1601,6 +1652,7 @@ const FirebaseSyncService = {
     }
     this.state.masterKey = null;
     this.state.isUnlocked = false;
+    this.setActivePassphrase(null);
     if (this.state.docsCache) this.state.docsCache.clear();
     if (this.state.assetsCache) this.state.assetsCache.clear();
     this.state.status = this.STATUS.LOCKED;
@@ -1675,6 +1727,7 @@ const FirebaseSyncService = {
     const oldVaultMeta = this.state.vaultMeta;
     this.state.vaultMeta = newVaultMeta;
     this.state.masterKey = newKey;
+    this.setActivePassphrase(newPass);
     try {
       if (await this.hasSavedPassphrase()) {
         const saved = await this.savePassphraseLocally(newPass);

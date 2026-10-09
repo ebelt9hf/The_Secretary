@@ -585,75 +585,49 @@
 
 <!-- ── Cloud Sync / Firebase E2EE Onboarding & Setup Modal ── -->
 <div class="modal-overlay" id="modal-cloud-sync-setup">
-  <div class="modal" style="max-width: 560px; width: 92%; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35);">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.25rem;">
-        <span style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent);">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><rect x="8" y="14" width="8" height="6" rx="1"/><path d="M10 14v-2a2 2 0 1 1 4 0v2"/></svg>
+  <div class="modal" style="max-width: 500px; width: 92%; max-height: 88vh; overflow-y: auto; border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); padding: 1.25rem 1.4rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h2 style="display:flex; align-items:center; gap:10px; margin:0; color:var(--text); font-size:1.2rem;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><rect x="8" y="14" width="8" height="6" rx="1"/><path d="M10 14v-2a2 2 0 1 1 4 0v2"/></svg>
         </span>
         <span data-i18n="sync.setupTitle">Cloud Sync & E2EE Setup</span>
       </h2>
       <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-cloud-sync-setup')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     
-    <p style="margin: 0.2rem 0 0.7rem 0; font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;" data-i18n="sync.setupDesc">
+    <p style="margin: 0 0 10px 0; font-size: 0.83rem; color: var(--text-muted); line-height: 1.45;" data-i18n="sync.setupDesc">
       Synchronize your notes securely across devices with Zero-Knowledge Client-Side Encryption (AES-256-GCM). Your master password never leaves your device.
     </p>
 
-    <!-- Storage Clarity Card: Free Local vs Optional Cloud -->
-    <div style="background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
-      <div style="display:flex; align-items:center; gap:6px; font-weight:600; color:var(--text); margin-bottom:3px;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        <span data-i18n="sync.storageExplanationTitle">Local Files vs Cloud Sync</span>
-      </div>
-      <div style="color:var(--text-muted);" data-i18n="sync.storageExplanationBody">
-        By default, Secretary operates 100% locally and free on your computer with zero accounts or cloud dependencies. Cloud Sync is an optional feature that allows you to connect your own free Firebase project to sync encrypted notes across multiple devices.
-      </div>
-    </div>
-
     <!-- Custom Firebase Project Config Accordion -->
     <div style="margin-bottom:12px; border:1px solid var(--card-border); border-radius:8px; background:var(--card-bg-alt); overflow:hidden;">
-      <button type="button" class="btn" id="btn-toggle-custom-firebase" onclick="toggleCustomFirebaseSetupUI()" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:none; border:none; text-align:left; font-size:0.82rem; font-weight:600; color:var(--text); cursor:pointer;" title="Configure your own Firebase project credentials" data-i18n-title="sync.customFirebaseTooltip">
+      <button type="button" class="btn" id="btn-toggle-custom-firebase" onclick="toggleCustomFirebaseSetupUI()" style="width:100%; display:flex; justify-content:space-between; align-items:center; padding:7px 10px; background:none; border:none; text-align:left; font-size:0.8rem; font-weight:600; color:var(--text); cursor:pointer;" title="Configure your own Firebase project credentials" data-i18n-title="sync.customFirebaseTooltip">
         <span style="display:flex; align-items:center; gap:6px;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
           <span data-i18n="sync.customFirebaseTitle">Firebase Project Connection</span>
         </span>
-        <span id="sync-custom-firebase-status-pill" style="font-size:0.72rem; padding:2px 7px; border-radius:10px; background:rgba(59,130,246,0.12); color:#3b82f6; font-weight:500;" data-i18n="sync.customFirebaseStatusDefault">Default Project</span>
+        <span id="sync-custom-firebase-status-pill" style="font-size:0.72rem; padding:2px 7px; border-radius:10px; background:rgba(59,130,246,0.12); color:#3b82f6; font-weight:500;" data-i18n="sync.customFirebaseStatusDefault">Etienne's Firebase Project</span>
       </button>
 
-      <div id="sync-custom-firebase-body" style="display:none; padding:10px 12px; border-top:1px solid var(--card-border); font-size:0.78rem;">
-        <p style="margin:0 0 8px 0; color:var(--text-muted); line-height:1.4;" data-i18n="sync.customFirebaseHelp">
-          Connect your own Google Firebase project (100% free on Spark tier) by pasting your Web App configuration JSON:
-        </p>
-
+      <div id="sync-custom-firebase-body" style="display:none; padding:8px 10px; border-top:1px solid var(--card-border); font-size:0.76rem;">
         <!-- Step-by-Step Guide for Option B -->
-        <div style="margin: 0 0 10px 0; padding: 8px 10px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 6%, var(--card-bg)); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); font-size: 0.74rem; line-height: 1.5; color: var(--text);">
-          <div style="font-weight: 700; margin-bottom: 4px; color: var(--accent);" data-i18n="sync.firebaseGuideLink">Firebase Setup Guide</div>
+        <div style="margin: 0 0 8px 0; padding: 7px 9px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 6%, var(--card-bg)); border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent); font-size: 0.73rem; line-height: 1.45; color: var(--text);">
+          <div style="font-weight: 700; margin-bottom: 3px; color: var(--accent);" data-i18n="sync.firebaseGuideLink">Firebase Setup Guide</div>
           <div style="color: var(--text-muted); margin-bottom: 2px;" data-i18n="sync.firebaseGuideStep1">1. Create a free project in Firebase Console (Spark tier, 100% free).</div>
           <div style="color: var(--text-muted); margin-bottom: 2px;" data-i18n="sync.firebaseGuideStep2">2. Go to Project Settings -> General -> Your apps and register a Web App (&lt;/&gt; icon).</div>
           <div style="color: var(--text-muted); margin-bottom: 2px;" data-i18n="sync.firebaseGuideStep3">3. Enable Email/Password in Authentication and create a Realtime Database.</div>
           <div style="color: var(--text-muted);" data-i18n="sync.firebaseGuideStep4">4. Copy the firebaseConfig configuration object and paste it into the box below.</div>
         </div>
 
-        <textarea id="sync-custom-firebase-json" class="prefs-input" style="width:100%; height:75px; font-family:monospace; font-size:0.75rem; resize:vertical; margin-bottom:8px;" placeholder='{ "apiKey": "AIza...", "projectId": "my-vault-123", "databaseURL": "https://..." }' title="Paste Firebase Web App config JSON here" data-i18n-title="sync.customFirebaseJsonTooltip" data-i18n-placeholder="sync.customFirebaseJsonPlaceholder"></textarea>
+        <textarea id="sync-custom-firebase-json" class="prefs-input" style="width:100%; height:70px; font-family:monospace; font-size:0.75rem; resize:vertical; margin-bottom:6px;" placeholder='{ "apiKey": "AIza...", "projectId": "my-vault-123", "databaseURL": "https://..." }' title="Paste Firebase Web App config JSON here" data-i18n-title="sync.customFirebaseJsonTooltip" data-i18n-placeholder="sync.customFirebaseJsonPlaceholder"></textarea>
         <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
-          <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent); font-size:0.75rem; text-decoration:none; font-weight:600;" title="Open Firebase Console in browser to create a free project" data-i18n-title="sync.openFirebaseConsoleTooltip" data-i18n="sync.openFirebaseConsole">Open Firebase Console (Free)</a>
+          <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent); font-size:0.74rem; text-decoration:none; font-weight:600;" title="Open Firebase Console in browser to create a free project" data-i18n-title="sync.openFirebaseConsoleTooltip" data-i18n="sync.openFirebaseConsole">Open Firebase Console (Free)</a>
           <div style="display:flex; gap:6px;">
-            <button type="button" class="btn btn-secondary" onclick="resetCustomFirebaseConfigUI()" style="padding:4px 8px; font-size:0.75rem;" title="Reset to default demonstration Firebase project" data-i18n-title="sync.resetDefaultFirebaseTooltip" data-i18n="sync.resetDefaultFirebaseBtn">Reset to Default</button>
-            <button type="button" class="btn btn-primary" onclick="saveCustomFirebaseConfigUI()" style="padding:4px 8px; font-size:0.75rem;" title="Save and apply custom Firebase project configuration" data-i18n-title="sync.saveCustomFirebaseTooltip" data-i18n="sync.saveCustomFirebaseBtn">Apply Config</button>
+            <button type="button" class="btn btn-secondary" onclick="resetCustomFirebaseConfigUI()" style="padding:4px 8px; font-size:0.74rem;" title="Reset to Etienne's Firebase project" data-i18n-title="sync.resetDefaultFirebaseTooltip" data-i18n="sync.resetDefaultFirebaseBtn">Reset to Default</button>
+            <button type="button" class="btn btn-primary" onclick="saveCustomFirebaseConfigUI()" style="padding:4px 8px; font-size:0.74rem;" title="Save and apply custom Firebase project configuration" data-i18n-title="sync.saveCustomFirebaseTooltip" data-i18n="sync.saveCustomFirebaseBtn">Apply Config</button>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
-      <div style="padding:8px 10px; border-radius:6px; background:var(--card-bg-alt); border:1px solid var(--card-border); font-size:0.78rem; display:flex; align-items:center; gap:8px; color:var(--text);">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>AES-256-GCM Zero-Knowledge</span>
-      </div>
-      <div style="padding:8px 10px; border-radius:6px; background:var(--card-bg-alt); border:1px solid var(--card-border); font-size:0.78rem; display:flex; align-items:center; gap:8px; color:var(--text);">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        <span>Instant Local IndexedDB Cache</span>
       </div>
     </div>
 
@@ -661,7 +635,7 @@
     <form id="form-cloud-sync-setup" novalidate onsubmit="event.preventDefault(); submitCloudSyncSetup();" style="margin:0;">
       <!-- Hidden username input for browser password managers and autofill support -->
       <input type="text" id="sync-setup-username" name="username" autocomplete="username" value="Secretary Vault" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;" tabindex="-1" aria-hidden="true">
-      <div style="display:flex; border-bottom:1px solid var(--card-border); margin-bottom:14px; gap:6px; flex-wrap:wrap;">
+      <div style="display:flex; border-bottom:1px solid var(--card-border); margin-bottom:12px; gap:4px; flex-wrap:wrap;">
         <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-signin" onclick="switchSyncSetupTab('signin')" style="padding:6px 12px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid var(--accent); color:var(--accent);" data-i18n="sync.tabSignIn" title="Sign in with your email and password" data-i18n-title="sync.tabSignInTooltip">Sign In</button>
         <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-signup" onclick="switchSyncSetupTab('signup')" style="padding:6px 12px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--text-muted);" data-i18n="sync.tabSignUp" title="Create a new cloud sync account with your email" data-i18n-title="sync.tabSignUpTooltip">Create Account</button>
         <button type="button" class="btn btn-secondary sync-tab-btn" id="tab-sync-link" onclick="switchSyncSetupTab('link')" style="padding:6px 12px; border:none; background:none; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--text-muted);" data-i18n="sync.tabLinkVault" title="Connect to an existing vault using a sync code and passphrase" data-i18n-title="sync.tabLinkVaultTooltip">Link Device</button>
@@ -672,41 +646,41 @@
       <div id="sync-setup-auth-fields" style="margin-bottom:12px;">
         <!-- Google 1-Click Sign-In (Option C / Managed Cloud Vault) -->
         <div id="sync-setup-google-container" style="margin-bottom:12px;">
-          <button type="button" class="btn btn-secondary sync-social-btn" id="btn-sync-google" onclick="submitCloudSyncGoogle()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; padding:8px 14px; border-radius:8px; font-weight:600; font-size:0.86rem; border:1px solid var(--card-border); background:var(--card-bg-alt); color:var(--text); cursor:pointer;" title="Sign in with your Google account" data-i18n-title="sync.googleSignInTooltip">
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.6H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.4l4.03-3.13z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.6l4.03 3.13c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
+          <button type="button" class="btn btn-secondary sync-social-btn" id="btn-sync-google" onclick="submitCloudSyncGoogle()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; padding:7px 14px; border-radius:8px; font-weight:600; font-size:0.84rem; border:1px solid var(--card-border); background:var(--card-bg-alt); color:var(--text); cursor:pointer;" title="Sign in with your Google account" data-i18n-title="sync.googleSignInTooltip">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.6H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.4l4.03-3.13z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.6l4.03 3.13c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
             <span data-i18n="sync.googleSignInBtn">Continue with Google</span>
           </button>
-          <div style="display:flex; align-items:center; margin:10px 0; color:var(--text-muted); font-size:0.75rem;">
+          <div style="display:flex; align-items:center; margin:8px 0; color:var(--text-muted); font-size:0.73rem;">
             <span style="flex:1; border-top:1px solid var(--card-border);"></span>
             <span style="padding:0 8px;" data-i18n="sync.orEmailDivider">or continue with email</span>
             <span style="flex:1; border-top:1px solid var(--card-border);"></span>
           </div>
         </div>
 
-        <div class="form-field" style="margin-bottom:10px;">
-          <label for="sync-setup-email" data-i18n="sync.emailLabel" style="margin-bottom:4px; font-weight:600; font-size:0.85rem;">Email Address</label>
-          <input type="email" id="sync-setup-email" name="email" autocomplete="username" placeholder="you@example.com" class="prefs-input" style="width:100%; font-size:0.85rem;" title="Your cloud account email address" data-i18n-title="sync.emailTooltip" data-i18n-placeholder="sync.emailPlaceholder">
+        <div class="form-field" style="margin-bottom:8px;">
+          <label for="sync-setup-email" data-i18n="sync.emailLabel" style="margin-bottom:3px; font-weight:600; font-size:0.83rem;">Email Address</label>
+          <input type="email" id="sync-setup-email" name="email" autocomplete="username" placeholder="you@example.com" class="prefs-input" style="width:100%; font-size:0.83rem;" title="Your cloud account email address" data-i18n-title="sync.emailTooltip" data-i18n-placeholder="sync.emailPlaceholder">
         </div>
-        <div class="form-field" style="margin-bottom:6px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <label for="sync-setup-auth-password" data-i18n="sync.accountPasswordLabel" style="margin-bottom:0; font-weight:600; font-size:0.85rem;">Account Password</label>
+        <div class="form-field" style="margin-bottom:4px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+            <label for="sync-setup-auth-password" data-i18n="sync.accountPasswordLabel" style="margin-bottom:0; font-weight:600; font-size:0.83rem;">Account Password</label>
             <div style="display:flex; align-items:center; gap:8px;">
-              <button type="button" id="btn-sync-send-magic-link" onclick="submitCloudSyncMagicLink()" style="background:none; border:none; padding:0; font-size:0.75rem; color:var(--accent); cursor:pointer; text-decoration:underline;" data-i18n="sync.sendMagicLinkBtn" title="Send a passwordless sign-in link to your email" data-i18n-title="sync.sendMagicLinkTooltip">Email Magic Link</button>
-              <a href="javascript:void(0)" id="sync-setup-forgot-pass-link" onclick="openPasswordResetFromSetupUI()" style="font-size:0.75rem; color:var(--accent); text-decoration:none;" data-i18n="sync.forgotPasswordLink" title="Send a password reset link to your email" data-i18n-title="sync.forgotPasswordTooltip">Forgot password?</a>
+              <button type="button" id="btn-sync-send-magic-link" onclick="submitCloudSyncMagicLink()" style="background:none; border:none; padding:0; font-size:0.73rem; color:var(--accent); cursor:pointer; text-decoration:underline;" data-i18n="sync.sendMagicLinkBtn" title="Send a passwordless sign-in link to your email" data-i18n-title="sync.sendMagicLinkTooltip">Email Magic Link</button>
+              <a href="javascript:void(0)" id="sync-setup-forgot-pass-link" onclick="openPasswordResetFromSetupUI()" style="font-size:0.73rem; color:var(--accent); text-decoration:none;" data-i18n="sync.forgotPasswordLink" title="Send a password reset link to your email" data-i18n-title="sync.forgotPasswordTooltip">Forgot password?</a>
             </div>
           </div>
           <div style="position:relative; display:flex; align-items:center;">
-            <input type="password" id="sync-setup-auth-password" name="auth-password" autocomplete="current-password" placeholder="Enter account password..." class="prefs-input" style="width:100%; padding-right:36px; font-size:0.85rem;" title="Your cloud account password" data-i18n-title="sync.accountPasswordTooltip" data-i18n-placeholder="sync.accountPasswordPlaceholder">
+            <input type="password" id="sync-setup-auth-password" name="auth-password" autocomplete="current-password" placeholder="Enter account password..." class="prefs-input" style="width:100%; padding-right:36px; font-size:0.83rem;" title="Your cloud account password" data-i18n-title="sync.accountPasswordTooltip" data-i18n-placeholder="sync.accountPasswordPlaceholder">
             <button type="button" id="btn-sync-setup-auth-pass-visibility" onclick="togglePassVisibility('sync-setup-auth-password', this)" style="position:absolute; right:8px; background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px;" title="Toggle password visibility" data-i18n-title="common.togglePasswordVisibility">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
-          <small id="sync-setup-auth-pass-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:3px; display:block;" data-i18n="sync.accountPasswordHelp">Minimum 6 characters for Firebase cloud authentication.</small>
+          <small id="sync-setup-auth-pass-hint" style="color:var(--text-muted); font-size:0.73rem; margin-top:2px; display:block;" data-i18n="sync.accountPasswordHelp">Minimum 6 characters for Firebase cloud authentication.</small>
         </div>
       </div>
 
       <!-- Sync Code input row (for Linking existing vault or Guest mode) -->
-      <div id="sync-setup-code-container" class="form-field" style="margin-bottom:12px; display:none;">
+      <div id="sync-setup-code-container" class="form-field" style="margin-bottom:10px; display:none;">
         <label for="sync-setup-sync-code" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
         <div style="display:flex; gap:6px; align-items:center;">
           <input type="text" id="sync-setup-sync-code" name="sync-code" placeholder="e.g. SEC-8B4K-9D2F" class="prefs-input" style="flex:1; font-family:monospace; font-weight:600; letter-spacing:1px;" title="Unique pairing code shared across your devices" data-i18n-title="sync.syncCodeTooltip" data-i18n-placeholder="sync.syncCodePlaceholder">
@@ -717,14 +691,14 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
         </div>
-        <small id="sync-setup-code-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:3px; display:block;" data-i18n="sync.syncCodeHelp">Enter this Sync Code and your Master Passphrase on any other computer to synchronize your notes.</small>
+        <small id="sync-setup-code-hint" style="color:var(--text-muted); font-size:0.73rem; margin-top:2px; display:block;" data-i18n="sync.syncCodeHelp">Enter this Sync Code and your Master Passphrase on any other computer to synchronize your notes.</small>
       </div>
 
       <!-- Master Passphrase (E2EE) -->
-      <div id="sync-setup-passphrase-container" class="form-field" style="margin-bottom:12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <label for="sync-setup-passphrase" data-i18n="sync.masterPasswordLabel" style="margin-bottom:0; font-weight:600; font-size:0.85rem;">Master Passphrase (E2EE)</label>
-          <span id="sync-setup-pass-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); display:inline-flex; align-items:center; gap:4px;"></span>
+      <div id="sync-setup-passphrase-container" class="form-field" style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;">
+          <label for="sync-setup-passphrase" data-i18n="sync.masterPasswordLabel" style="margin-bottom:0; font-weight:600; font-size:0.83rem;">Master Passphrase (E2EE)</label>
+          <span id="sync-setup-pass-badge" style="font-size:0.7rem; padding:1px 6px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); display:inline-flex; align-items:center; gap:4px;"></span>
         </div>
         <div style="display:flex; gap:6px; align-items:center;">
           <div style="position:relative; flex:1; display:flex; align-items:center;">
@@ -742,28 +716,25 @@
         </div>
 
         <!-- Security & Encryption Clarity Notice -->
-        <div id="sync-setup-pass-clarity-card" style="margin-top:8px; padding:10px 12px; border-radius:8px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); font-size:0.75rem; line-height:1.45; color:var(--text);">
-          <div style="display:flex; align-items:center; gap:6px; font-weight:600; color:#10b981; margin-bottom:4px;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div id="sync-setup-pass-clarity-card" style="margin-top:6px; padding:6px 10px; border-radius:6px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.2); font-size:0.72rem; line-height:1.35; color:var(--text);">
+          <div style="display:flex; align-items:center; gap:6px; font-weight:600; color:#10b981; margin-bottom:2px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             <span data-i18n="sync.passphraseClarityTitle">All Data Encrypted With This Key</span>
           </div>
-          <div id="sync-setup-pass-clarity-text" data-i18n="sync.passphraseClarityNotice" style="color:var(--text-muted);">
+          <div id="sync-setup-pass-clarity-text" data-i18n="sync.passphraseClarityNotice" style="color:var(--text-muted); font-size:0.7rem;">
             All your notes, titles, tags, and content are encrypted locally on your device with this passphrase using AES-256-GCM before syncing. It is never sent to the cloud. A longer passphrase provides exponentially stronger protection against brute-force attacks — longer means significantly better security.
           </div>
         </div>
-        <small id="sync-setup-pass-hint" style="color:var(--text-muted); font-size:0.75rem; margin-top:4px; display:block;" data-i18n="sync.passphraseSignInHelp">Enter the master passphrase configured for your vault to decrypt your notes.</small>
+        <small id="sync-setup-pass-hint" style="color:var(--text-muted); font-size:0.73rem; margin-top:3px; display:block;" data-i18n="sync.passphraseSignInHelp">Enter the master passphrase configured for your vault to decrypt your notes.</small>
       </div>
 
-      <div style="margin-bottom:10px;">
-        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:normal; text-transform:none; color:var(--text); margin:0;" title="Save passphrase locally to automatically unlock vault on startup" data-i18n-title="sync.rememberPassphraseTooltip">
-          <input type="checkbox" id="sync-setup-remember-pass" style="width:16px; height:16px; margin:0; flex-shrink:0; accent-color:var(--accent);">
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem; font-weight:normal; text-transform:none; color:var(--text); margin:0;" title="Save passphrase locally to automatically unlock vault on startup" data-i18n-title="sync.rememberPassphraseTooltip">
+          <input type="checkbox" id="sync-setup-remember-pass" style="width:15px; height:15px; margin:0; flex-shrink:0; accent-color:var(--accent);">
           <span data-i18n="sync.rememberPassphraseLabel">Remember passphrase on this device</span>
         </label>
-      </div>
-
-      <div style="margin-bottom:14px;">
-        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:normal; text-transform:none; color:var(--text-muted); margin:0;" title="Do not show this onboarding dialog on startup" data-i18n-title="sync.dontShowAgain">
-          <input type="checkbox" id="sync-setup-dont-show-again" style="width:16px; height:16px; margin:0; flex-shrink:0; accent-color:var(--accent);">
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem; font-weight:normal; text-transform:none; color:var(--text-muted); margin:0;" title="Do not show this onboarding dialog on startup" data-i18n-title="sync.dontShowAgain">
+          <input type="checkbox" id="sync-setup-dont-show-again" style="width:15px; height:15px; margin:0; flex-shrink:0; accent-color:var(--accent);">
           <span data-i18n="sync.dontShowAgain">Do not show this onboarding dialog on startup</span>
         </label>
       </div>

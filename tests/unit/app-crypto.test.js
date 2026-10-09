@@ -174,5 +174,34 @@ describe('Zero-Knowledge CryptoEngine (js/app-crypto.js)', () => {
     expect(Object.prototype.polluted).toBeUndefined();
     expect(decrypted.__proto__).toBe(Object.prototype);
   });
+
+  it('cleanPassphrase cleans surrounding whitespace, newlines, tabs, zero-width chars, and normalizes to NFC', () => {
+    const raw = '\r\n\t  \uFEFF\u200Bsecret master passphrase 2026\u200C\u00A0 \n';
+    const cleaned = window.CryptoEngine.cleanPassphrase(raw);
+    expect(cleaned).toBe('secret master passphrase 2026');
+
+    // Decomposed unicode (NFD) normalized to composed (NFC)
+    const decomposed = 'caf\u0065\u0301-passphrase-2026'; // café in NFD
+    const normalized = window.CryptoEngine.cleanPassphrase(decomposed);
+    expect(normalized).toBe('café-passphrase-2026');
+    expect(normalized).toBe('café-passphrase-2026'.normalize('NFC'));
+  });
+
+  it('verifies passphrases copy-pasted with newlines or cross-platform NFC/NFD encoding differences', async () => {
+    const originalPass = 'café-secret-master-vault-2026';
+    const { vaultMeta } = await window.CryptoEngine.setupVault(originalPass, 1000);
+
+    // 1. Copy-pasted from web or electron with surrounding newlines and spaces
+    const pastedWithNewlines = `\n  ${originalPass}\r\n  `;
+    const check1 = await window.CryptoEngine.verifyPassphrase(pastedWithNewlines, vaultMeta);
+    expect(check1.valid).toBe(true);
+    expect(check1.key).toBeDefined();
+
+    // 2. macOS native clipboard decomposing composed UTF-8 characters (NFD)
+    const macOsNfdPasted = `\r\n${originalPass.normalize('NFD')}\n`;
+    const check2 = await window.CryptoEngine.verifyPassphrase(macOsNfdPasted, vaultMeta);
+    expect(check2.valid).toBe(true);
+    expect(check2.key).toBeDefined();
+  });
 });
 

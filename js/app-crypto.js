@@ -191,14 +191,22 @@ const CryptoEngine = {
     }
   },
 
+  cleanPassphrase(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      .replace(/^[\s\uFEFF\u200B-\u200D\u00A0]+|[\s\uFEFF\u200B-\u200D\u00A0]+$/g, '')
+      .normalize('NFC');
+  },
+
   // ── Vault Lifecycle & Password Canary ──
   async setupVault(passphrase, iterations = 100000) {
-    if (!passphrase || passphrase.length < 10) {
+    const cleanPass = this.cleanPassphrase(passphrase) || (typeof passphrase === 'string' ? passphrase.trim() : '');
+    if (!cleanPass || cleanPass.length < 10) {
       throw new Error('Passphrase must be at least 10 characters long');
     }
 
     const salt = this.generateSalt(this.SALT_LENGTH);
-    const key = await this.deriveKey(passphrase, salt, iterations);
+    const key = await this.deriveKey(cleanPass, salt, iterations);
 
     // Create verification canary token
     const canaryPayload = {
@@ -231,20 +239,37 @@ const CryptoEngine = {
       return { valid: false, error: 'Invalid vault metadata' };
     }
 
-    try {
-      const key = await this.deriveKey(passphrase, vaultMeta.salt, vaultMeta.kdfIterations || this.KDF_ITERATIONS);
-      const canaryData = await this.decryptData(key, {
-        iv: vaultMeta.canaryIv,
-        ciphertext: vaultMeta.canaryCiphertext
-      });
+    const raw = typeof passphrase === 'string' ? passphrase : String(passphrase);
+    const cleanedNfc = this.cleanPassphrase(raw);
+    const trimmed = raw.trim();
+    const cleanedNfd = cleanedNfc ? cleanedNfc.normalize('NFD') : '';
+    const rawNfd = raw ? raw.normalize('NFD') : '';
 
-      if (canaryData && canaryData.tag === this.CANARY_PAYLOAD) {
-        return { valid: true, key };
+    const candidates = [];
+    if (cleanedNfc) candidates.push(cleanedNfc);
+    if (trimmed && !candidates.includes(trimmed)) candidates.push(trimmed);
+    if (!candidates.includes(raw)) candidates.push(raw);
+    if (cleanedNfd && !candidates.includes(cleanedNfd)) candidates.push(cleanedNfd);
+    if (rawNfd && !candidates.includes(rawNfd)) candidates.push(rawNfd);
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      try {
+        const key = await this.deriveKey(candidate, vaultMeta.salt, vaultMeta.kdfIterations || this.KDF_ITERATIONS);
+        const canaryData = await this.decryptData(key, {
+          iv: vaultMeta.canaryIv,
+          ciphertext: vaultMeta.canaryCiphertext
+        });
+
+        if (canaryData && canaryData.tag === this.CANARY_PAYLOAD) {
+          return { valid: true, key, matchedPassphrase: candidate };
+        }
+      } catch (e) {
+        // Continue to next candidate
       }
-      return { valid: false, error: 'Invalid canary payload' };
-    } catch (e) {
-      return { valid: false, error: 'Incorrect passphrase' };
     }
+
+    return { valid: false, error: 'Incorrect passphrase' };
   },
 
   async rotateVaultPassphrase(oldPassphrase, newPassphrase, vaultMeta, encryptedNotesList = []) {
