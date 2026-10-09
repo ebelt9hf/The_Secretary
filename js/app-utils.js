@@ -1000,6 +1000,150 @@ function knownTagsForType(type) {
 }
 
 /**
+ * Normalizes, trims, and deduplicates a list or comma-separated string of tags.
+ * @param {Array|Set|string} tags
+ * @param {Object} [options]
+ * @param {boolean} [options.toLowerCase=false] - Whether to lowercase all tags
+ * @param {boolean} [options.dedupe=true] - Whether to case-insensitively deduplicate
+ * @returns {string[]}
+ */
+function cleanTagList(tags, options = {}) {
+  if (!tags) return [];
+  const toLower = !!options.toLowerCase;
+  const dedupe = options.dedupe !== false;
+  let list;
+  if (Array.isArray(tags) || tags instanceof Set) {
+    list = Array.from(tags);
+  } else if (typeof tags === 'string') {
+    list = tags.includes(',') ? tags.split(',') : [tags];
+  } else {
+    list = [tags];
+  }
+  const result = [];
+  const seen = new Set();
+  for (const raw of list) {
+    if (raw === null || raw === undefined) continue;
+    let s = String(raw).trim();
+    if (!s) continue;
+    if (toLower) s = s.toLowerCase();
+    const key = s.toLowerCase();
+    if (dedupe) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    result.push(s);
+  }
+  return result;
+}
+
+/**
+ * Merges multiple tag arrays, sets, or comma-separated strings into a clean, deduplicated array.
+ * @param {...(Array|Set|string)} lists
+ * @returns {string[]}
+ */
+function mergeTagLists(...lists) {
+  const combined = [];
+  for (const l of lists) {
+    if (l) combined.push(...cleanTagList(l));
+  }
+  return cleanTagList(combined);
+}
+
+/**
+ * Canonical normalization for comparing and cataloging workstreams.
+ * Strips accents, lowercases, and converts spaces/dashes/symbols to clean underscores.
+ * @param {string} name
+ * @returns {string}
+ */
+function normalizeWorkstreamKey(name) {
+  if (!name || typeof name !== 'string') return '';
+  const clean = name.trim();
+  if (!clean) return '';
+  if (typeof sanitizeTopicMemoryKey === 'function') {
+    const s = sanitizeTopicMemoryKey(clean);
+    if (s) return s;
+  }
+  return clean
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[\s\-_]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+/**
+ * Extracts and consolidates all tag fields from a note, todo, or planner event entity.
+ * Supports group_tags, major_topic_tags, topic_tags, extra_tags, other_tags, tags, and workstreams.
+ * @param {Object} entity
+ * @param {Object} [options]
+ * @param {boolean} [options.includeWorkstreams=true]
+ * @returns {string[]}
+ */
+function getAllEntityTags(entity, options = {}) {
+  if (!entity || typeof entity !== 'object') return [];
+  const includeWorkstreams = options.includeWorkstreams !== false;
+  const raw = [
+    ...(Array.isArray(entity.group_tags) ? entity.group_tags : []),
+    ...(Array.isArray(entity.major_topic_tags) ? entity.major_topic_tags : []),
+    ...(Array.isArray(entity.topic_tags) ? entity.topic_tags : []),
+    ...(Array.isArray(entity.extra_tags) ? entity.extra_tags : []),
+    ...(Array.isArray(entity.other_tags) ? entity.other_tags : []),
+    ...(Array.isArray(entity.tags) ? entity.tags : [])
+  ];
+  if (includeWorkstreams) {
+    if (Array.isArray(entity.workstreams)) raw.push(...entity.workstreams);
+    if (typeof entity.workstream === 'string' && entity.workstream) raw.push(...entity.workstream.split(','));
+  }
+  return cleanTagList(raw, options);
+}
+const getAllNoteTags = getAllEntityTags;
+
+/**
+ * Finds a workstream topic entry matching a given name or key.
+ * @param {string} nameOrKey
+ * @param {Array} [topicsList]
+ * @returns {Object|null}
+ */
+function findWorkstreamByNameOrKey(nameOrKey, topicsList = null) {
+  if (!nameOrKey || typeof nameOrKey !== 'string') return null;
+  const clean = nameOrKey.trim().toLowerCase();
+  if (!clean) return null;
+  const norm = normalizeWorkstreamKey(clean);
+  const list = Array.isArray(topicsList)
+    ? topicsList
+    : ((typeof _topicMemoriesIndexCache !== 'undefined' && Array.isArray(_topicMemoriesIndexCache?.topics)) ? _topicMemoriesIndexCache.topics : []);
+  for (const t of list) {
+    if (!t) continue;
+    const tName = String(t.topicName || t.majorTopic || '').trim().toLowerCase();
+    const tKey = String(t.key || '').trim().toLowerCase();
+    const tNorm = normalizeWorkstreamKey(t.topicName || t.key || '');
+    if (tName === clean || tKey === clean || (norm && tNorm === norm)) {
+      return t;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extracts a deduplicated array of workstreams from an entity (note, todo, event).
+ * @param {Object} entity
+ * @returns {string[]}
+ */
+function extractEntityWorkstreams(entity) {
+  if (!entity || typeof entity !== 'object') return [];
+  const results = [];
+  if (Array.isArray(entity.workstreams)) {
+    results.push(...cleanTagList(entity.workstreams));
+  }
+  if (typeof entity.workstream === 'string' && entity.workstream.trim()) {
+    results.push(...cleanTagList(entity.workstream));
+  }
+  return cleanTagList(results);
+}
+
+/**
  * Normalizes an item or raw tag collection into separate group, major, and topic string arrays (lowercased & trimmed).
  * @param {Object|Array} itemOrTags
  * @returns {{ groups: string[], majors: string[], topics: string[] }}
@@ -1007,19 +1151,16 @@ function knownTagsForType(type) {
 function normalizeItemTagSets(itemOrTags) {
   if (!itemOrTags) return { groups: [], majors: [], topics: [] };
   if (Array.isArray(itemOrTags)) {
-    const list = itemOrTags.map(t => String(t || '').trim().toLowerCase()).filter(Boolean);
+    const list = cleanTagList(itemOrTags, { toLowerCase: true });
     return { groups: list, majors: list, topics: list };
   }
-  const cleanList = arr => (Array.isArray(arr) ? arr : (arr ? [arr] : []))
-    .map(t => String(t || '').trim().toLowerCase())
-    .filter(Boolean);
 
-  const groups = cleanList(itemOrTags.group_tags || itemOrTags.group || []);
-  let majors = cleanList(itemOrTags.major_topic_tags || itemOrTags.major_topic || itemOrTags.major || []);
-  const topics = cleanList(itemOrTags.topic_tags || itemOrTags.topic || []);
+  const groups = cleanTagList(itemOrTags.group_tags || itemOrTags.group || [], { toLowerCase: true });
+  let majors = cleanTagList(itemOrTags.major_topic_tags || itemOrTags.major_topic || itemOrTags.major || [], { toLowerCase: true });
+  const topics = cleanTagList(itemOrTags.topic_tags || itemOrTags.topic || [], { toLowerCase: true });
 
   if (itemOrTags.tags && Array.isArray(itemOrTags.tags)) {
-    const allTags = cleanList(itemOrTags.tags);
+    const allTags = cleanTagList(itemOrTags.tags, { toLowerCase: true });
     allTags.forEach(t => {
       if (!groups.includes(t)) groups.push(t);
       if (!majors.includes(t)) majors.push(t);
@@ -1118,6 +1259,13 @@ function matchTagsToWorkstreamSelectionGroups(itemOrTags, workstreamOrMemoryOrTa
 }
 
 if (typeof globalThis !== 'undefined') {
+  globalThis.cleanTagList = cleanTagList;
+  globalThis.mergeTagLists = mergeTagLists;
+  globalThis.normalizeWorkstreamKey = normalizeWorkstreamKey;
+  globalThis.getAllEntityTags = getAllEntityTags;
+  globalThis.getAllNoteTags = getAllNoteTags;
+  globalThis.findWorkstreamByNameOrKey = findWorkstreamByNameOrKey;
+  globalThis.extractEntityWorkstreams = extractEntityWorkstreams;
   globalThis.normalizeItemTagSets = normalizeItemTagSets;
   globalThis.matchTagsToSelectionGroup = matchTagsToSelectionGroup;
   globalThis.matchTagsToWorkstreamSelectionGroups = matchTagsToWorkstreamSelectionGroups;
@@ -2449,17 +2597,17 @@ async function syncTagsBetweenBlocAndNote(event, noteOrIdOrPath) {
   }
   if (!note) return false;
 
-  const eventGroups = Array.isArray(event.group_tags) ? event.group_tags.map(t => String(t).trim()).filter(Boolean) : [];
-  const eventMajors = Array.isArray(event.major_topic_tags) ? event.major_topic_tags.map(t => String(t).trim()).filter(Boolean) : [];
-  const eventTopics = Array.isArray(event.topic_tags) ? event.topic_tags.map(t => String(t).trim()).filter(Boolean) : [];
+  const eventGroups = cleanTagList(event.group_tags);
+  const eventMajors = cleanTagList(event.major_topic_tags);
+  const eventTopics = cleanTagList(event.topic_tags);
 
-  const noteGroups = Array.isArray(note.group_tags) ? note.group_tags.map(t => String(t).trim()).filter(Boolean) : [];
-  const noteMajors = Array.isArray(note.major_topic_tags) ? note.major_topic_tags.map(t => String(t).trim()).filter(Boolean) : [];
-  const noteTopics = Array.isArray(note.topic_tags) ? note.topic_tags.map(t => String(t).trim()).filter(Boolean) : [];
+  const noteGroups = cleanTagList(note.group_tags);
+  const noteMajors = cleanTagList(note.major_topic_tags);
+  const noteTopics = cleanTagList(note.topic_tags);
 
-  const mergedGroups = Array.from(new Set([...noteGroups, ...eventGroups]));
-  const mergedMajors = Array.from(new Set([...noteMajors, ...eventMajors]));
-  const mergedTopics = Array.from(new Set([...noteTopics, ...eventTopics]));
+  const mergedGroups = mergeTagLists(noteGroups, eventGroups);
+  const mergedMajors = mergeTagLists(noteMajors, eventMajors);
+  const mergedTopics = mergeTagLists(noteTopics, eventTopics);
 
   let eventChanged = false;
   event.group_tags = [...mergedGroups];
@@ -2477,9 +2625,9 @@ async function syncTagsBetweenBlocAndNote(event, noteOrIdOrPath) {
   if (Array.isArray(plannerEvents) && resolvedNoteId) {
     plannerEvents.forEach(pe => {
       if (pe && (String(pe.noteId || '').trim() === resolvedNoteId || (Array.isArray(pe.linkedNoteIds) && pe.linkedNoteIds.includes(resolvedNoteId)))) {
-        const peG = Array.isArray(pe.group_tags) ? pe.group_tags : [];
-        const peM = Array.isArray(pe.major_topic_tags) ? pe.major_topic_tags : [];
-        const peT = Array.isArray(pe.topic_tags) ? pe.topic_tags : [];
+        const peG = cleanTagList(pe.group_tags);
+        const peM = cleanTagList(pe.major_topic_tags);
+        const peT = cleanTagList(pe.topic_tags);
         if (JSON.stringify(peG) !== JSON.stringify(mergedGroups) ||
             JSON.stringify(peM) !== JSON.stringify(mergedMajors) ||
             JSON.stringify(peT) !== JSON.stringify(mergedTopics)) {
@@ -2568,10 +2716,16 @@ function isWorkstreamTag(tagName) {
   if (!tagName || typeof tagName !== 'string') return false;
   const clean = tagName.trim().toLowerCase();
   if (!clean) return false;
+  const norm = typeof normalizeWorkstreamKey === 'function' ? normalizeWorkstreamKey(clean) : clean;
   if (typeof getKnownWorkstreamsList === 'function') {
     const list = getKnownWorkstreamsList();
     if (list && list.length > 0) {
-      return list.some(w => String(w || '').trim().toLowerCase() === clean);
+      return list.some(w => {
+        const itemClean = String(w || '').trim().toLowerCase();
+        if (itemClean === clean) return true;
+        if (norm && typeof normalizeWorkstreamKey === 'function' && normalizeWorkstreamKey(itemClean) === norm) return true;
+        return false;
+      });
     }
   }
   if (typeof _topicMemoriesIndexCache !== 'undefined' && _topicMemoriesIndexCache?.topics && Array.isArray(_topicMemoriesIndexCache.topics)) {
@@ -2579,7 +2733,8 @@ function isWorkstreamTag(tagName) {
       if (!t || t.status === 'archived') return false;
       const name = String(t.topicName || t.majorTopic || '').trim().toLowerCase();
       const key = String(t.key || (typeof sanitizeTopicMemoryKey === 'function' ? sanitizeTopicMemoryKey(t.topicName || '') : '')).trim().toLowerCase();
-      return name === clean || key === clean;
+      const normKey = typeof normalizeWorkstreamKey === 'function' ? normalizeWorkstreamKey(t.topicName || t.key || '') : key;
+      return name === clean || key === clean || (norm && normKey === norm);
     });
   }
   return false;
@@ -2614,10 +2769,22 @@ function compareTodoDates(a, b) {
 }
 
 function tagArrayContains(tagList, targetTag) {
-  if (!Array.isArray(tagList) || !targetTag) return false;
+  if (!tagList || !targetTag) return false;
   const cleanTarget = String(targetTag).trim().toLowerCase();
   if (!cleanTarget) return false;
-  return tagList.some(t => String(t || '').trim().toLowerCase() === cleanTarget);
+  if (Array.isArray(tagList)) {
+    return tagList.some(t => String(t || '').trim().toLowerCase() === cleanTarget);
+  }
+  if (tagList instanceof Set) {
+    for (const t of tagList) {
+      if (String(t || '').trim().toLowerCase() === cleanTarget) return true;
+    }
+    return false;
+  }
+  if (typeof tagList === 'string') {
+    return tagList.split(',').some(t => t.trim().toLowerCase() === cleanTarget);
+  }
+  return false;
 }
 
 function noteHasTag(note, tag) {
@@ -2627,7 +2794,11 @@ function noteHasTag(note, tag) {
   return tagArrayContains(note.group_tags, cleanTag) ||
          tagArrayContains(note.major_topic_tags, cleanTag) ||
          tagArrayContains(note.topic_tags, cleanTag) ||
-         tagArrayContains(note.extra_tags, cleanTag);
+         tagArrayContains(note.extra_tags, cleanTag) ||
+         tagArrayContains(note.other_tags, cleanTag) ||
+         tagArrayContains(note.tags, cleanTag) ||
+         tagArrayContains(note.workstreams, cleanTag) ||
+         tagArrayContains(note.workstream, cleanTag);
 }
 
 function noteHasAnyTag(note, tagList) {
@@ -3033,12 +3204,8 @@ function computeTagScores(options = {}) {
 
   const titleTokens = tokenizeTitle(title);
   const titleLower = String(title || '').trim().toLowerCase();
-  const selectedTagSet = new Set((selectedTags || []).map(t => String(t).trim().toLowerCase()).filter(Boolean));
-  const associatedTagSet = new Set(
-    associatedTags instanceof Set
-      ? Array.from(associatedTags).map(t => String(t).trim().toLowerCase())
-      : (Array.isArray(associatedTags) ? associatedTags.map(t => String(t).trim().toLowerCase()) : [])
-  );
+  const selectedTagSet = new Set(cleanTagList(selectedTags, { toLowerCase: true }));
+  const associatedTagSet = new Set(cleanTagList(associatedTags, { toLowerCase: true }));
 
   const isWs = t => (typeof isWorkstreamTag === 'function' ? isWorkstreamTag(t) : false);
 
@@ -3149,6 +3316,13 @@ window.makeTagChip = makeTagChip;
 window.positionTagDropdown = positionTagDropdown;
 window.knownTagsForType = knownTagsForType;
 window.invalidateKnownTagsCache = invalidateKnownTagsCache;
+window.cleanTagList = cleanTagList;
+window.mergeTagLists = mergeTagLists;
+window.normalizeWorkstreamKey = normalizeWorkstreamKey;
+window.getAllEntityTags = getAllEntityTags;
+window.getAllNoteTags = getAllNoteTags;
+window.findWorkstreamByNameOrKey = findWorkstreamByNameOrKey;
+window.extractEntityWorkstreams = extractEntityWorkstreams;
 window.normalizeItemTagSets = normalizeItemTagSets;
 window.matchTagsToSelectionGroup = matchTagsToSelectionGroup;
 window.matchTagsToWorkstreamSelectionGroups = matchTagsToWorkstreamSelectionGroups;
@@ -3164,4 +3338,5 @@ window.formatPlannerEventContextForAI = formatPlannerEventContextForAI;
 window.sanitizeHtmlContent = sanitizeHtmlContent;
 window.isDateCoveredByOoo = isDateCoveredByOoo;
 window.getCoveringOooEvent = getCoveringOooEvent;
+
 

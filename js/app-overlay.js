@@ -334,10 +334,16 @@ async function processAndExternalizeImages(html) {
 
       if (!_savedAssetPaths.has(relPath)) {
         try {
-          if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
-            await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
+          if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
+            await StorageAPI.writeAsset(relPath, fullDataUrl);
+          } else {
+            if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
+              await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
+            }
+            if (typeof writeFile === 'function') {
+              await writeFile(relPath, fullDataUrl);
+            }
           }
-          await writeFile(relPath, fullDataUrl);
           _savedAssetPaths.add(relPath);
         } catch (e) {
           console.warn('Failed to save image asset:', relPath, e);
@@ -402,7 +408,8 @@ async function resolveNoteImages(html) {
       const normalizedPath = cleanPath.startsWith('notes/') ? cleanPath : `notes/${cleanPath}`;
       const altKey = normalizedPath.startsWith('notes/') ? normalizedPath.slice(6) : `notes/${normalizedPath}`;
       const fileName = normalizedPath.split('/').pop();
-      const dataUrl = (typeof readAssetAsDataUrl === 'function' ? await readAssetAsDataUrl(normalizedPath) : null)
+      const dataUrl = (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readAsset === 'function' ? await StorageAPI.readAsset(normalizedPath) : null)
+        || (typeof readAssetAsDataUrl === 'function' ? await readAssetAsDataUrl(normalizedPath) : null)
         || cache?.get(normalizedPath) || cache?.get(altKey) || cache?.get(fileName) || null;
       if (dataUrl) {
         resolvedHtml = resolvedHtml.replaceAll(`src="${originalSrc}"`, `src="${dataUrl}" data-asset-path="${normalizedPath}"`);
@@ -1669,11 +1676,19 @@ function detectWorkstreamDetailsForNote(note = currentNote, liveTags = null) {
     ? getKnownWorkstreamsList(typeof manifest !== 'undefined' ? manifest : [])
     : [];
 
-  const lowerMajors = majorTags.map(m => String(m || '').trim().toLowerCase()).filter(Boolean);
-  const lowerGroups = groupTags.map(g => String(g || '').trim().toLowerCase()).filter(Boolean);
-  const lowerTopics = topicTags.map(t => String(t || '').trim().toLowerCase()).filter(Boolean);
+  const cleanTags = (typeof cleanTagList === 'function')
+    ? cleanTagList
+    : ((typeof globalThis !== 'undefined' && typeof globalThis.cleanTagList === 'function')
+      ? globalThis.cleanTagList
+      : ((typeof window !== 'undefined' && typeof window.cleanTagList === 'function')
+        ? window.cleanTagList
+        : (arr) => (Array.isArray(arr) ? arr : (arr ? [arr] : [])).map(t => String(t || '').trim().toLowerCase()).filter(Boolean)));
 
-  const excludedList = (Array.isArray(note?.excluded_workstreams) ? note.excluded_workstreams : []).map(w => String(w || '').trim().toLowerCase());
+  const lowerMajors = cleanTags(majorTags, { toLowerCase: true });
+  const lowerGroups = cleanTags(groupTags, { toLowerCase: true });
+  const lowerTopics = cleanTags(topicTags, { toLowerCase: true });
+
+  const excludedList = cleanTags(note?.excluded_workstreams, { toLowerCase: true });
 
   const getMemory = (wsName) => {
     let mem = null;
@@ -1719,9 +1734,9 @@ function detectWorkstreamDetailsForNote(note = currentNote, liveTags = null) {
       }
     }
 
-    const mappedMajors = (mapped.major_topic_tags || []).map(t => String(t || '').trim().toLowerCase());
-    const mappedGroups = (mapped.group_tags || []).map(t => String(t || '').trim().toLowerCase());
-    const mappedTopics = (mapped.topic_tags || []).map(t => String(t || '').trim().toLowerCase());
+    const mappedMajors = cleanTags(mapped.major_topic_tags, { toLowerCase: true });
+    const mappedGroups = cleanTags(mapped.group_tags, { toLowerCase: true });
+    const mappedTopics = cleanTags(mapped.topic_tags, { toLowerCase: true });
 
     if (mappedMajors.length > 0 || mappedGroups.length > 0 || mappedTopics.length > 0) {
       const matchMajors = mappedMajors.includes('*') || mappedMajors.some(m => lowerMajors.includes(m));
@@ -1834,7 +1849,6 @@ function detectWorkstreamDetailsForNote(note = currentNote, liveTags = null) {
 
   return results;
 }
-window.detectWorkstreamDetailsForNote = detectWorkstreamDetailsForNote;
 window.detectWorkstreamDetailsForNote = detectWorkstreamDetailsForNote;
 
 // Detect all workstreams associated with this note (names array)
@@ -5601,10 +5615,16 @@ function handleImagePaste(e) {
       }
       
       try {
-        if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
-          await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+        if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
+          await StorageAPI.writeAsset(assetPath, dataUrl);
+        } else {
+          if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
+            await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+          }
+          if (typeof writeFile === 'function') {
+            await writeFile(assetPath, dataUrl);
+          }
         }
-        await writeFile(assetPath, dataUrl);
         _savedAssetPaths.add(assetPath);
       } catch (err) {
         console.warn('Failed to write pasted image asset:', err);
@@ -5830,10 +5850,16 @@ function handleImageDrop(e) {
       }
       
       try {
-        if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
-          await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+        if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
+          await StorageAPI.writeAsset(assetPath, dataUrl);
+        } else {
+          if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
+            await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+          }
+          if (typeof writeFile === 'function') {
+            await writeFile(assetPath, dataUrl);
+          }
         }
-        await writeFile(assetPath, dataUrl);
         _savedAssetPaths.add(assetPath);
       } catch (err) {
         console.warn('Failed to write dropped image asset:', err);
@@ -8065,8 +8091,9 @@ function populateTagEditor(containerId, tags, type, onChange = null) {
       });
     }
 
+    const isWs = t => (typeof isWorkstreamTag === 'function' ? isWorkstreamTag(t) : ((typeof window !== 'undefined' && typeof window.isWorkstreamTag === 'function') ? window.isWorkstreamTag(t) : false));
+
     function sortScoredTags(arr) {
-      const isWs = t => (typeof isWorkstreamTag === 'function' ? isWorkstreamTag(t) : false);
       return [...arr].sort((a, b) => {
         const scoreA = scores[a] || 0;
         const scoreB = scores[b] || 0;
@@ -8085,7 +8112,6 @@ function populateTagEditor(containerId, tags, type, onChange = null) {
 
     function sortTagsWithWorkstream(arr) {
       if (type !== 'major') return arr;
-      const isWs = t => (typeof isWorkstreamTag === 'function' ? isWorkstreamTag(t) : false);
       return [...arr].sort((a, b) => {
         const wsA = isWs(a);
         const wsB = isWs(b);
@@ -8117,7 +8143,7 @@ function populateTagEditor(containerId, tags, type, onChange = null) {
       const tagScore = scores[tag] || 0;
       let isMatch = !isAssigned && (tagScore >= 20 || suggestionMatches(tag));
       let isAssociated = !isAssigned && (associatedTags.has(String(tag).trim().toLowerCase()) || tagScore >= 40);
-      let isWorkstream = type === 'major' && (typeof isWorkstreamTag === 'function' ? isWorkstreamTag(tag) : false);
+      let isWorkstream = type === 'major' && isWs(tag);
 
       if (typeof window.makeTagChip === 'function') {
         return window.makeTagChip(tag, {

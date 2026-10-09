@@ -17,7 +17,7 @@
 // If running in a true Web Worker context, import dependencies
 if (typeof importScripts === 'function') {
   try {
-    importScripts('firebase-bundle.js', 'firebase-config.js', 'app-crypto.js');
+    importScripts('firebase-bundle.js', 'firebase-config.js', 'app-crypto.js', 'app-idb.js');
   } catch (e) {
     // In some test runners or bundlers, scripts are loaded into scope already
   }
@@ -52,19 +52,37 @@ const SyncWorkerEngine = {
   _remoteUnsubscribe: null,
   _remoteDocsUnsubscribe: null,
 
+  _responseHandler: null,
+
+  setResponseHandler(fn) {
+    this._responseHandler = fn;
+  },
+
   _postEvent(event, data) {
-    if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
-      self.postMessage({ isEvent: true, event, data });
+    if (typeof this._responseHandler === 'function') {
+      this._responseHandler({ isEvent: true, event, data });
+      return;
+    }
+    const postFn = (typeof self !== 'undefined' && typeof self.postMessage === 'function' ? self.postMessage : null)
+      || (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function' ? globalThis.postMessage : null);
+    if (postFn) {
+      postFn({ isEvent: true, event, data });
     }
   },
 
   _postResponse(id, success, data = null, error = null, superseded = false, transferables = []) {
-    if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
-      const msg = { id, success, data, error, superseded };
+    const msg = { id, success, data, error, superseded };
+    if (typeof this._responseHandler === 'function') {
+      this._responseHandler(msg);
+      return;
+    }
+    const postFn = (typeof self !== 'undefined' && typeof self.postMessage === 'function' ? self.postMessage : null)
+      || (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function' ? globalThis.postMessage : null);
+    if (postFn) {
       if (transferables && transferables.length > 0) {
-        self.postMessage(msg, transferables);
+        postFn(msg, transferables);
       } else {
-        self.postMessage(msg);
+        postFn(msg);
       }
     }
   },
@@ -631,7 +649,7 @@ const SyncWorkerEngine = {
       this.state.inFlight.delete(docKey);
     }
 
-    return { docKey, success: true, superseded: false };
+    return { id: this._normalizeId(id), kind, docKey, success: true, superseded: false };
   },
 
   async getDoc(kind, id) {
@@ -818,7 +836,9 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 if (typeof window !== 'undefined') {
   window.SyncWorkerEngine = SyncWorkerEngine;
+  window.handleWorkerMessage = handleWorkerMessage;
 }
 if (typeof globalThis !== 'undefined') {
   globalThis.SyncWorkerEngine = SyncWorkerEngine;
+  globalThis.handleWorkerMessage = handleWorkerMessage;
 }

@@ -52,6 +52,7 @@ describe('Firebase Migration, Note Merging & Zero-Disk Dependency', () => {
       'js/app-firebase-sync.js',
       'js/app-notes.js',
       'js/app-storage.js',
+      'js/storage-migration.js',
       'js/app-topic-memory.js'
     ]);
   });

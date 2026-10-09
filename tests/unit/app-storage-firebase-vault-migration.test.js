@@ -45,8 +45,10 @@ describe('Complete Secretary Data Migration to Firebase Vault', () => {
     loadScriptsIntoGlobal([
       'js/app-fs.js',
       'js/app-crypto.js',
+      'js/app-idb.js',
       'js/app-firebase-sync.js',
-      'js/app-storage.js'
+      'js/app-storage.js',
+      'js/storage-migration.js'
     ]);
   });
 

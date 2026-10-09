@@ -1006,6 +1006,12 @@ function getKnownWorkstreamsList(notes = []) {
   const ignoredSet = new Set(['other', 'autre', '(untagged)', '*', 'uncategorized', 'non classé', 'non catégorisé']);
 
   const normalizeKey = (name) => {
+    if (typeof normalizeWorkstreamKey === 'function') {
+      return normalizeWorkstreamKey(name);
+    }
+    if (typeof globalThis !== 'undefined' && typeof globalThis.normalizeWorkstreamKey === 'function') {
+      return globalThis.normalizeWorkstreamKey(name);
+    }
     if (!name || typeof name !== 'string') return '';
     const clean = name.trim();
     if (!clean) return '';
@@ -1060,23 +1066,27 @@ function getKnownWorkstreamsList(notes = []) {
 
   // 1. In-memory topic memories cache or fallback to localStorage (Authoritative source: Workstreams tab)
   let hasAuthoritativeIndex = false;
-  if (typeof _topicMemoriesIndexCache !== 'undefined' && _topicMemoriesIndexCache && Array.isArray(_topicMemoriesIndexCache.topics)) {
-    hasAuthoritativeIndex = true;
-    for (const t of _topicMemoriesIndexCache.topics) {
-      if (t) {
-        const rawKey = (t.key || '').trim();
-        const rawName = (t.topicName || rawKey).trim();
-        const normKey = normalizeKey(rawKey || rawName);
-        if (t.status === 'archived') {
-          if (normKey) archivedSet.add(normKey);
-          if (rawName) archivedSet.add(rawName.toLowerCase());
-          if (rawKey) archivedSet.add(rawKey.toLowerCase());
-          if (normKey) canonicalMap.delete(normKey);
-        } else if (rawName && isValidWs(rawName)) {
-          addCandidate(rawName, 4, !!t.pinned);
-        }
+  const ingestTopicList = (topicArray, priority = 4) => {
+    if (!Array.isArray(topicArray)) return;
+    for (const t of topicArray) {
+      if (!t) continue;
+      const rawKey = (t.key || '').trim();
+      const rawName = (t.topicName || rawKey).trim();
+      const normKey = normalizeKey(rawKey || rawName);
+      if (t.status === 'archived') {
+        if (normKey) archivedSet.add(normKey);
+        if (rawName) archivedSet.add(rawName.toLowerCase());
+        if (rawKey) archivedSet.add(rawKey.toLowerCase());
+        if (normKey) canonicalMap.delete(normKey);
+      } else if (rawName && isValidWs(rawName)) {
+        addCandidate(rawName, priority, !!t.pinned);
       }
     }
+  };
+
+  if (typeof _topicMemoriesIndexCache !== 'undefined' && _topicMemoriesIndexCache && Array.isArray(_topicMemoriesIndexCache.topics)) {
+    hasAuthoritativeIndex = true;
+    ingestTopicList(_topicMemoriesIndexCache.topics, 4);
   } else if (typeof localStorage !== 'undefined') {
     try {
       const cached = localStorage.getItem('secretary_topic_memories_index_v1') || localStorage.getItem('secretary_topic_memories_index');
@@ -1087,21 +1097,7 @@ function getKnownWorkstreamsList(notes = []) {
           if (typeof _topicMemoriesIndexCache !== 'undefined' && !_topicMemoriesIndexCache) {
             _topicMemoriesIndexCache = parsed;
           }
-          for (const t of parsed.topics) {
-            if (t) {
-              const rawKey = (t.key || '').trim();
-              const rawName = (t.topicName || rawKey).trim();
-              const normKey = normalizeKey(rawKey || rawName);
-              if (t.status === 'archived') {
-                if (normKey) archivedSet.add(normKey);
-                if (rawName) archivedSet.add(rawName.toLowerCase());
-                if (rawKey) archivedSet.add(rawKey.toLowerCase());
-                if (normKey) canonicalMap.delete(normKey);
-              } else if (rawName && isValidWs(rawName)) {
-                addCandidate(rawName, 4, !!t.pinned);
-              }
-            }
-          }
+          ingestTopicList(parsed.topics, 4);
         }
       }
     } catch (_) {}
@@ -1135,18 +1131,13 @@ function getKnownWorkstreamsList(notes = []) {
 
     for (const n of candidateNotes) {
       if (!n) continue;
-      if (typeof n.workstream === 'string' && n.workstream.trim()) {
-        n.workstream.split(',').forEach(w => {
-          const trimmed = w.trim();
-          if (isValidWs(trimmed)) addCandidate(trimmed, 2);
-        });
-      }
-      if (Array.isArray(n.workstreams)) {
-        n.workstreams.forEach(w => {
-          const trimmed = String(w || '').trim();
-          if (isValidWs(trimmed)) addCandidate(trimmed, 2);
-        });
-      }
+      const wsList = typeof getNoteWorkstreams === 'function'
+        ? getNoteWorkstreams(n)
+        : (Array.isArray(n.workstreams) ? n.workstreams : (typeof n.workstream === 'string' ? n.workstream.split(',') : []));
+      wsList.forEach(w => {
+        const trimmed = String(w || '').trim();
+        if (isValidWs(trimmed)) addCandidate(trimmed, 2);
+      });
     }
 
     const candidateTodos = (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest))

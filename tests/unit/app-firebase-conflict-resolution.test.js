@@ -65,6 +65,7 @@ describe('Firebase Cloud Sync & Local Workspace Conflict Resolution', () => {
       'js/app-crypto.js',
       'js/app-firebase-sync.js',
       'js/app-storage.js',
+      'js/storage-migration.js',
       'js/app-init.js'
     ]);
   });

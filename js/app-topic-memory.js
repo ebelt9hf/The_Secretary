@@ -65,7 +65,14 @@ function parseFlexibleTimestamp(dateStr) {
 async function loadTopicMemoriesIndex() {
   let indexData = { topics: [] };
 
-  if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readDocEntity === 'function') {
+    try {
+      const doc = await StorageAPI.readDocEntity('topic_memories', 'index', TOPIC_MEMORY_INDEX_PATH);
+      if (doc && Array.isArray(doc.topics)) {
+        indexData = doc;
+      }
+    } catch (_e) {}
+  } else if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
     try {
       const remoteIndex = await window.FirebaseSyncService.getDoc('topic_memories', 'index');
       if (remoteIndex && Array.isArray(remoteIndex.topics)) {
@@ -125,7 +132,11 @@ async function persistTopicMemoriesIndex(indexData) {
     localStorage.setItem('secretary_topic_memories_index_v1', jsonStr);
   } catch (_e) {}
 
-  if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeDocEntity === 'function') {
+    try {
+      await StorageAPI.writeDocEntity('topic_memories', 'index', TOPIC_MEMORY_INDEX_PATH, indexData);
+    } catch (_e) {}
+  } else if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
     try {
       await window.FirebaseSyncService.putDoc('topic_memories', 'index', indexData);
     } catch (_e) {}
@@ -207,7 +218,14 @@ async function getMajorTopicMemory(majorTopic, options = {}) {
   const filePath = `raw/topic-memories/${sanitized}.json`;
   let memoryPayload = null;
 
-  if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readDocEntity === 'function') {
+    try {
+      const doc = await StorageAPI.readDocEntity('topic_memories', sanitized, filePath, null);
+      if (doc && typeof doc === 'object') {
+        memoryPayload = doc;
+      }
+    } catch (_e) {}
+  } else if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
     try {
       const remoteMem = await window.FirebaseSyncService.getDoc('topic_memories', sanitized);
       if (remoteMem) {
@@ -322,7 +340,11 @@ async function saveMajorTopicMemory(majorTopic, data, options = {}) {
   } catch (_e) {}
 
   // Storage engine write
-  if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeDocEntity === 'function') {
+    try {
+      await StorageAPI.writeDocEntity('topic_memories', sanitized, filePath, payload);
+    } catch (_e) {}
+  } else if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
     try {
       await window.FirebaseSyncService.putDoc('topic_memories', sanitized, payload);
     } catch (_e) {}
@@ -1022,7 +1044,14 @@ async function loadWorkstreamChat(topicName) {
 
   let chatData = null;
 
-  if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readDocEntity === 'function') {
+    try {
+      const doc = await StorageAPI.readDocEntity('workstream_chat', sanitized, filePath, null);
+      if (doc && Array.isArray(doc.messages)) {
+        chatData = doc;
+      }
+    } catch (_e) {}
+  } else if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
     try {
       const remoteChat = await window.FirebaseSyncService.getDoc('workstream_chat', sanitized);
       if (remoteChat && Array.isArray(remoteChat.messages)) {
@@ -1078,7 +1107,11 @@ async function saveWorkstreamChat(topicName, chatData) {
     localStorage.setItem(lsKey, jsonStr);
   } catch (_e) {}
 
-  if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeDocEntity === 'function') {
+    try {
+      await StorageAPI.writeDocEntity('workstream_chat', sanitized, filePath, payload);
+    } catch (_e) {}
+  } else if (typeof StorageAPI !== 'undefined' && StorageAPI.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
     try {
       await window.FirebaseSyncService.putDoc('workstream_chat', sanitized, payload);
     } catch (_e) {}
