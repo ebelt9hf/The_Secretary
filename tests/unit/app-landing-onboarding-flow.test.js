@@ -349,6 +349,49 @@ describe('Landing Screen Onboarding & Language Flow', () => {
       const body = document.getElementById('sync-custom-firebase-body');
       expect(body.style.display).toBe('none');
     });
+
+    it('navigates back to welcome step when Escape is pressed on Step 2 and no modal is active', () => {
+      showLandingStep('setup');
+      const card = document.getElementById('screen-connect-card');
+      expect(card.classList.contains('is-setup-step')).toBe(true);
+
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+      document.dispatchEvent(event);
+
+      expect(card.classList.contains('is-setup-step')).toBe(false);
+      expect(document.getElementById('landing-step-welcome').style.display).toBe('flex');
+      expect(document.getElementById('landing-step-setup').style.display).toBe('none');
+    });
+
+    it('safely calls copyWebAppUrl when btn-open-folder is clicked without File System Access API', () => {
+      const origPicker = window.showDirectoryPicker;
+      try {
+        let copyCalled = false;
+        window.copyWebAppUrl = () => { copyCalled = true; };
+        delete window.showDirectoryPicker;
+
+        const btnOpen = document.getElementById('btn-open-folder');
+        expect(btnOpen).toBeTruthy();
+        btnOpen.click();
+
+        expect(copyCalled).toBe(true);
+      } finally {
+        if (origPicker !== undefined) {
+          window.showDirectoryPicker = origPicker;
+        }
+      }
+    });
+
+    it('adapts local storage card to Chrome copy link when has-browser-options is present on card', () => {
+      const card = document.getElementById('screen-connect-card');
+      card.classList.add('has-browser-options');
+      showLandingStep('setup');
+
+      const localCard = document.querySelector('.landing-storage-card-local');
+      expect(localCard.querySelector('h3').textContent).toBe(t('landing.optionChromeTitle'));
+      const btnText = document.getElementById('btn-open-folder-text');
+      expect(btnText.textContent).toBe(t('landing.optionChromeBtn'));
+    });
   });
 });
 

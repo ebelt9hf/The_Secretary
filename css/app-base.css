@@ -310,9 +310,10 @@ button:focus-visible {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  min-height: var(--app-vh);
-  height: 100vh;
-  padding: 2rem 1rem;
+  min-height: 100dvh;
+  min-height: var(--app-vh, 100dvh);
+  height: auto;
+  padding: clamp(0.75rem, 2vh, 1.75rem) clamp(0.5rem, 2vw, 1rem);
   position: relative;
   background-color: var(--bg);
   overflow-y: auto;
@@ -352,32 +353,33 @@ button:focus-visible {
   position: relative;
   z-index: 1;
   margin: auto 0;
+  min-height: 0;
   background: var(--card-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  border-radius: 20px;
-  padding: 2rem 2.25rem;
+  border-radius: clamp(14px, 2vh, 20px);
+  padding: clamp(1rem, 2.2vh, 1.75rem) clamp(1rem, 2.5vw, 2rem);
   max-width: 480px;
-  width: calc(100% - 2rem);
+  width: calc(100% - 1.5rem);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.1rem;
+  gap: clamp(0.6rem, 1.4vh, 1rem);
   text-align: center;
   animation: heroCardEntrance 0.45s cubic-bezier(0.16, 1, 0.3, 1);
   transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform var(--transition), box-shadow var(--transition);
 }
 
 #screen-connect-card.is-setup-step {
-  max-width: 860px;
-  width: min(860px, calc(100% - 2rem));
+  max-width: 900px;
+  width: min(900px, calc(100% - 1.5rem));
 }
 
 #screen-connect-card.has-browser-options {
-  max-width: 880px;
-  width: min(880px, calc(100% - 2rem));
+  max-width: 900px;
+  width: min(900px, calc(100% - 1.5rem));
 }
 
 @keyframes heroCardEntrance {
@@ -457,7 +459,7 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.1rem;
+  gap: clamp(0.55rem, 1.3vh, 0.95rem);
   animation: stepEntrance 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes stepEntrance {
@@ -470,9 +472,9 @@ button:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 16px;
+  width: clamp(42px, 6vh, 56px);
+  height: clamp(42px, 6vh, 56px);
+  border-radius: clamp(12px, 2vh, 16px);
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 18%, transparent) 0%, color-mix(in srgb, var(--accent) 6%, transparent) 100%);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 22%, transparent);
@@ -484,20 +486,20 @@ button:focus-visible {
 }
 
 .landing-logo {
-  width: 38px;
-  height: 38px;
+  width: clamp(26px, 4vh, 36px);
+  height: clamp(26px, 4vh, 36px);
 }
 
 .landing-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
+  padding: 2px 9px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
   border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   color: var(--accent);
-  font-size: 0.72rem;
+  font-size: clamp(0.68rem, 1.2vw, 0.72rem);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -510,7 +512,7 @@ button:focus-visible {
 }
 
 #screen-connect h1 {
-  font-size: 2.1rem;
+  font-size: clamp(1.5rem, 3.5vw, 2.1rem);
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.025em;
@@ -522,9 +524,9 @@ button:focus-visible {
 }
 #screen-connect p {
   color: var(--text-muted);
-  max-width: 390px;
-  line-height: 1.5;
-  font-size: 0.88rem;
+  max-width: 400px;
+  line-height: 1.45;
+  font-size: clamp(0.78rem, 1.3vw, 0.88rem);
   margin: 0;
 }
 
@@ -534,20 +536,20 @@ button:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  margin: 0.1rem 0 0.35rem 0;
+  gap: 0.35rem;
+  margin: 0.05rem 0 0.15rem 0;
 }
 .landing-feature-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.74rem;
+  font-size: clamp(0.68rem, 1.2vw, 0.74rem);
   font-weight: 600;
   color: var(--text-muted);
   background: color-mix(in srgb, var(--text) 4%, var(--card-bg-alt));
   border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
   border-radius: 999px;
-  padding: 3px 8px;
+  padding: 2px 8px;
   transition: border-color var(--transition), color var(--transition);
 }
 .landing-feature-pill:hover {
@@ -562,12 +564,12 @@ button:focus-visible {
   color: #ffffff;
   border: 1px solid color-mix(in srgb, #ffffff 28%, transparent);
   border-radius: var(--radius-md);
-  padding: 0.82rem 1.4rem;
+  padding: clamp(0.62rem, 1.3vh, 0.8rem) 1.25rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.65rem;
-  font-size: 0.94rem;
+  font-size: clamp(0.85rem, 1.5vw, 0.94rem);
   font-weight: 700;
   cursor: pointer;
   font-family: inherit;
@@ -587,58 +589,53 @@ button:focus-visible {
 /* ── Step 2: Storage Setup Grid & Cards ── */
 .landing-step-setup {
   text-align: center;
-  gap: 1.25rem;
+  gap: clamp(0.55rem, 1.3vh, 0.95rem);
 }
 .landing-setup-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 .landing-setup-title {
-  font-size: 1.4rem;
+  font-size: clamp(1.15rem, 2.5vw, 1.4rem);
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.02em;
   margin: 0;
 }
 .landing-setup-subtitle {
-  font-size: 0.84rem;
+  font-size: clamp(0.75rem, 1.4vw, 0.84rem);
   color: var(--text-muted);
-  max-width: 480px;
-  line-height: 1.45;
+  max-width: 520px;
+  line-height: 1.4;
   margin: 0;
 }
 .landing-storage-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  gap: clamp(0.55rem, 1.2vw, 0.9rem);
   width: 100%;
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
   align-items: stretch;
-}
-@media (max-width: 768px) {
-  .landing-storage-grid {
-    grid-template-columns: 1fr;
-  }
 }
 .landing-storage-card {
   background: color-mix(in srgb, var(--text) 3%, var(--card-bg-alt));
   border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  border-radius: 16px;
-  padding: 1.25rem 1.1rem;
+  border-radius: clamp(12px, 1.5vh, 16px);
+  padding: clamp(0.75rem, 1.4vh, 1.15rem) clamp(0.7rem, 1.2vw, 1rem);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   align-items: stretch;
   text-align: center;
-  gap: 0.9rem;
+  gap: clamp(0.45rem, 1vh, 0.75rem);
   position: relative;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 .landing-storage-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
   background: color-mix(in srgb, var(--text) 5%, var(--card-bg-alt));
@@ -652,16 +649,16 @@ button:focus-visible {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.6rem;
+  gap: clamp(0.3rem, 0.8vh, 0.55rem);
   width: 100%;
-  min-height: 84px;
+  min-height: auto;
 }
 .landing-card-badge {
-  font-size: 0.68rem;
+  font-size: clamp(0.65rem, 1.1vw, 0.68rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text) 8%, var(--card-bg));
   color: var(--text-muted);
@@ -693,15 +690,19 @@ button:focus-visible {
   border-color: rgba(245, 158, 11, 0.3);
 }
 .landing-card-icon-wrap {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  width: clamp(36px, 5vh, 44px);
+  height: clamp(36px, 5vh, 44px);
+  border-radius: 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--text);
   background: color-mix(in srgb, var(--text) 8%, var(--card-bg));
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+.landing-card-icon-wrap svg {
+  width: clamp(18px, 2.5vh, 22px);
+  height: clamp(18px, 2.5vh, 22px);
 }
 .landing-card-icon-wrap.is-primary {
   background: color-mix(in srgb, var(--accent) 16%, var(--card-bg));
@@ -726,28 +727,28 @@ button:focus-visible {
 .landing-card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
   flex: 1;
   justify-content: flex-start;
   width: 100%;
 }
 .landing-card-body h3 {
-  font-size: 0.96rem;
+  font-size: clamp(0.86rem, 1.4vw, 0.96rem);
   font-weight: 700;
   color: var(--text);
   margin: 0;
-  min-height: 2.5em;
+  min-height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
 }
 .landing-card-body p {
-  font-size: 0.78rem;
-  line-height: 1.45;
+  font-size: clamp(0.72rem, 1.2vw, 0.78rem);
+  line-height: 1.4;
   color: var(--text-muted);
   margin: 0;
-  min-height: 4.2em;
+  min-height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -758,15 +759,15 @@ button:focus-visible {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
 }
 .landing-card-btn {
   width: 100%;
-  height: 44px;
-  min-height: 44px;
+  height: clamp(36px, 4.5vh, 42px);
+  min-height: clamp(36px, 4.5vh, 42px);
   max-height: 44px;
-  padding: 0 0.85rem;
-  font-size: 0.82rem;
+  padding: 0 clamp(0.6rem, 1vw, 0.85rem);
+  font-size: clamp(0.76rem, 1.2vw, 0.82rem);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -832,12 +833,12 @@ button:focus-visible {
   color: var(--text);
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
   border-radius: var(--radius-md);
-  padding: 0.65rem 1.2rem;
+  padding: clamp(0.5rem, 1vh, 0.65rem) 1.1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  font-size: 0.88rem;
+  font-size: clamp(0.8rem, 1.3vw, 0.88rem);
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -858,12 +859,12 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.9rem 1.15rem;
-  border-radius: 14px;
+  gap: 0.85rem;
+  padding: clamp(0.55rem, 1.2vh, 0.85rem) clamp(0.75rem, 1.5vw, 1.1rem);
+  border-radius: 12px;
   background: color-mix(in srgb, #f59e0b 7%, var(--card-bg-alt));
   border: 1px solid color-mix(in srgb, #f59e0b 25%, var(--card-border));
-  margin-top: 0.4rem;
+  margin-top: 0.2rem;
   text-align: left;
   box-sizing: border-box;
 }
@@ -875,15 +876,15 @@ button:focus-visible {
 }
 .landing-demo-banner-content h4 {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: clamp(0.82rem, 1.3vw, 0.92rem);
   font-weight: 700;
   color: var(--text);
 }
 .landing-demo-banner-content p {
   margin: 0;
-  font-size: 0.77rem;
+  font-size: clamp(0.72rem, 1.1vw, 0.77rem);
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.35;
 }
 .landing-demo-badge {
   display: inline-flex;
@@ -903,10 +904,31 @@ button:focus-visible {
 }
 .landing-demo-banner .landing-card-btn-demo {
   width: auto;
-  min-width: 170px;
+  min-width: 155px;
+  height: clamp(34px, 4.2vh, 38px);
+  min-height: clamp(34px, 4.2vh, 38px);
+  font-size: 0.78rem;
   white-space: nowrap;
 }
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .landing-storage-grid {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+  .landing-storage-card {
+    padding: 0.8rem 0.9rem;
+    gap: 0.45rem;
+  }
+  .landing-card-top {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .landing-card-body h3,
+  .landing-card-body p {
+    text-align: left;
+    justify-content: flex-start;
+  }
   .landing-demo-banner {
     flex-direction: column;
     align-items: stretch;
@@ -919,13 +941,132 @@ button:focus-visible {
     width: 100%;
   }
 }
+
+/* Small viewport height optimizations: laptops (1366x768, 1440x900 with browser chrome), netbooks */
+@media (max-height: 750px) {
+  #screen-connect {
+    padding: 0.5rem 0.5rem;
+  }
+  #screen-connect-card {
+    padding: 0.75rem 1.15rem;
+    gap: 0.45rem;
+    margin: 0.25rem auto;
+  }
+  .landing-topbar {
+    min-height: 26px;
+    margin-bottom: -0.2rem;
+  }
+  .landing-logo-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+  .landing-logo {
+    width: 22px;
+    height: 22px;
+  }
+  #screen-connect h1 {
+    font-size: 1.45rem;
+  }
+  #screen-connect p {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  .landing-features {
+    margin: 0;
+    gap: 0.25rem;
+  }
+  .landing-feature-pill {
+    font-size: 0.68rem;
+    padding: 1px 6px;
+  }
+  .landing-btn-primary-start {
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+  }
+  .landing-btn-secondary-demo {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+  }
+  .landing-setup-title {
+    font-size: 1.15rem;
+  }
+  .landing-setup-subtitle {
+    font-size: 0.76rem;
+    line-height: 1.3;
+  }
+  .landing-storage-card {
+    padding: 0.6rem 0.65rem;
+    gap: 0.35rem;
+  }
+  .landing-card-icon-wrap {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+  .landing-card-icon-wrap svg {
+    width: 16px;
+    height: 16px;
+  }
+  .landing-card-body h3 {
+    font-size: 0.84rem;
+  }
+  .landing-card-body p {
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+  .landing-card-btn {
+    height: 34px;
+    min-height: 34px;
+    font-size: 0.75rem;
+  }
+  .landing-demo-banner {
+    padding: 0.45rem 0.75rem;
+    margin-top: 0.15rem;
+    gap: 0.5rem;
+  }
+  .landing-demo-banner-content h4 {
+    font-size: 0.82rem;
+  }
+  .landing-demo-banner-content p {
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+  .landing-demo-banner .landing-card-btn-demo {
+    height: 32px;
+    min-height: 32px;
+    font-size: 0.75rem;
+    min-width: 140px;
+  }
+  .landing-setup-footer {
+    margin-top: 0.1rem;
+    gap: 0.2rem;
+  }
+  .landing-kbd-hint {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-height: 600px) {
+  #screen-connect-card {
+    padding: 0.5rem 0.85rem;
+    gap: 0.35rem;
+  }
+  .landing-logo-wrap {
+    display: none;
+  }
+  .landing-kbd-hint {
+    display: none;
+  }
+}
+
 .landing-setup-footer {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.2rem;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
 }
 
 #screen-connect.loading { cursor: wait; }

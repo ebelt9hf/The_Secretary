@@ -429,10 +429,10 @@
 
 /* Body & Content */
 .setup-wizard-body {
-  padding: 1.5rem;
+  padding: clamp(0.85rem, 2vh, 1.4rem) clamp(1rem, 2.5vw, 1.5rem);
   overflow-y: auto;
   flex: 1;
-  min-height: 320px;
+  min-height: 0;
 }
 
 .setup-wizard-step-pane {
@@ -995,7 +995,7 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .setup-wizard-modal {
     max-height: 95vh;
     border-radius: var(--radius-lg);
@@ -1004,7 +1004,7 @@
   .setup-wizard-body,
   .setup-wizard-footer,
   .setup-wizard-stepper {
-    padding: 0.85rem 1rem;
+    padding: 0.75rem 0.95rem;
   }
   .setup-wizard-step-name {
     display: none;
@@ -1015,6 +1015,136 @@
   }
   .setup-wizard-providers-grid {
     grid-template-columns: 1fr;
+  }
+  .tutorial-popover {
+    width: min(320px, calc(100vw - 24px));
+    padding: 1rem;
+  }
+  .tutorial-popover-centered {
+    width: min(360px, calc(100vw - 24px));
+  }
+}
+
+/* Small screen height optimizations for laptops, netbooks, landscape mobile */
+@media (max-height: 750px) {
+  .setup-wizard-overlay {
+    padding: 0.65rem;
+  }
+  .setup-wizard-modal {
+    max-height: 96vh;
+    border-radius: var(--radius-lg);
+  }
+  .setup-wizard-header {
+    padding: 0.65rem 1.15rem;
+  }
+  .setup-wizard-logo {
+    width: 28px;
+    height: 28px;
+  }
+  .setup-wizard-title {
+    font-size: 1rem;
+  }
+  .setup-wizard-subtitle {
+    font-size: 0.74rem;
+  }
+  .setup-wizard-stepper {
+    padding: 0.45rem 1.15rem;
+  }
+  .setup-wizard-step-pill {
+    padding: 0.15rem 0.35rem;
+  }
+  .setup-wizard-step-badge {
+    width: 19px;
+    height: 19px;
+    font-size: 0.7rem;
+  }
+  .setup-wizard-step-name {
+    font-size: 0.72rem;
+  }
+  .setup-wizard-body {
+    padding: 0.75rem 1.15rem;
+  }
+  .setup-wizard-step-pane {
+    gap: 0.75rem;
+  }
+  .setup-wizard-step-intro {
+    font-size: 0.82rem;
+    margin-bottom: 0.25rem;
+  }
+  .setup-wizard-form-group {
+    gap: 0.3rem;
+  }
+  .setup-wizard-input,
+  .setup-wizard-select {
+    padding: 0.42rem 0.7rem;
+    font-size: 0.82rem;
+  }
+  .setup-wizard-providers-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.45rem;
+  }
+  .setup-wizard-provider-card {
+    padding: 0.5rem 0.65rem;
+    gap: 0.2rem;
+  }
+  .setup-wizard-provider-icon {
+    font-size: 1rem;
+  }
+  .setup-wizard-provider-name {
+    font-size: 0.78rem;
+  }
+  .setup-wizard-day-chip {
+    padding: 0.35rem 0;
+    font-size: 0.74rem;
+  }
+  .setup-wizard-summary-card {
+    padding: 0.55rem 0.85rem;
+    gap: 0.65rem;
+  }
+  .setup-wizard-summary-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 1.15rem;
+  }
+  .setup-wizard-celebrate-badge {
+    font-size: 2rem;
+    margin-bottom: 0.2rem;
+  }
+  .setup-wizard-celebrate-title {
+    font-size: 1.15rem;
+  }
+  .setup-wizard-footer {
+    padding: 0.65rem 1.15rem;
+  }
+  .setup-wizard-btn {
+    padding: 0.42rem 0.85rem;
+    font-size: 0.8rem;
+  }
+  .tutorial-popover {
+    padding: 0.85rem 1rem;
+    gap: 0.65rem;
+  }
+  .tutorial-popover-title {
+    font-size: 0.95rem;
+  }
+  .tutorial-popover-body {
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+}
+
+@media (max-height: 600px) {
+  .setup-wizard-stepper {
+    display: none;
+  }
+  .setup-wizard-header {
+    padding: 0.5rem 0.85rem;
+  }
+  .setup-wizard-body {
+    padding: 0.5rem 0.85rem;
+  }
+  .setup-wizard-footer {
+    padding: 0.5rem 0.85rem;
   }
 }
 

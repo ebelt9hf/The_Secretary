@@ -18330,6 +18330,23 @@ window.APP_TRANSLATIONS_BUNDLE = {
       "tr": "Ücretsiz Önizleme",
       "uk": "Безкоштовний перегляд"
     },
+    "landing.badgeChromiumDesktop": {
+      "cs": "Chromium / Počítač",
+      "de": "Chromium / Desktop-App",
+      "en": "Chromium / Desktop",
+      "es": "Chromium / Escritorio",
+      "fr": "Chromium / Bureau",
+      "hu": "Chromium / Asztali gép",
+      "it": "Chromium / Computer",
+      "nl": "Chromium / Vaste computer",
+      "pl": "Chromium / Komputer stacjonarny",
+      "pt": "Chromium / Computador",
+      "ro": "Chromium / Calculator",
+      "ru": "Chromium / ПК",
+      "sv": "Chromium / Dator",
+      "tr": "Chromium / Masaüstü",
+      "uk": "Chromium / ПК"
+    },
     "landing.demoWorkspaceToast": {
       "cs": "Ukázkový prostor načten! Prozkoumejte ukázkové poznámky, úkoly a kalendář.",
       "de": "Demo-Arbeitsbereich geladen! Erkunden Sie Beispielnotizen, Aufgaben und Kalender.",

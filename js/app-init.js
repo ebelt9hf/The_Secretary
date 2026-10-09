@@ -4141,21 +4141,28 @@ async function checkSavedFolder() {
   };
 }
 
-const btnOpenFolder = document.getElementById('btn-open-folder');
-if (btnOpenFolder) {
-  btnOpenFolder.addEventListener('click', async () => {
-    try {
-      const handle = await showSecretaryFolderPicker();
-      await saveHandleIDB(handle);   // remember for next time
-      rememberedFolderHandle = handle;
-      settings.folder.last = handle.name;
-      saveLocalSettings();
-      await mountFolder(handle);
-    } catch (e) {
-      if (e.name !== 'AbortError') toast(t('common.couldNotOpenFolder', { message: e.message }), true);
+document.addEventListener('click', async e => {
+  const btnOpenFolder = e.target?.closest ? e.target.closest('#btn-open-folder') : null;
+  if (!btnOpenFolder) return;
+  if (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS()) {
+    if (typeof window.copyWebAppUrl === 'function') {
+      window.copyWebAppUrl(btnOpenFolder);
+    } else if (typeof toast === 'function') {
+      toast(typeof t === 'function' ? t('landing.chromeOnly') : 'Direct disk storage requires Chrome, Edge, or Desktop App.', true);
     }
-  });
-}
+    return;
+  }
+  try {
+    const handle = await showSecretaryFolderPicker();
+    await saveHandleIDB(handle);   // remember for next time
+    rememberedFolderHandle = handle;
+    settings.folder.last = handle.name;
+    saveLocalSettings();
+    await mountFolder(handle);
+  } catch (err) {
+    if (err.name !== 'AbortError') toast(t('common.couldNotOpenFolder', { message: err.message }), true);
+  }
+});
 
 // Keyboard shortcuts
 // ═══ Keyboard & Resize ═══
@@ -4205,9 +4212,10 @@ document.addEventListener('keydown', e => {
       if (typeof closeSingleTodoMatrixPicker === 'function') closeSingleTodoMatrixPicker();
       return;
     }
-    if (document.getElementById('todo-edit-overlay')?.style.display !== 'none') {
+    const todoOverlay = document.getElementById('todo-edit-overlay');
+    if (todoOverlay && (todoOverlay.style.display === 'flex' || todoOverlay.style.display === 'block' || todoOverlay.classList.contains('active'))) {
       if (typeof requestCloseTodoOverlay === 'function') requestCloseTodoOverlay();
-      else closeTodoOverlay();
+      else if (typeof closeTodoOverlay === 'function') closeTodoOverlay();
       return;
     }
     const activeModals = Array.from(document.querySelectorAll('.modal-overlay.active'));
@@ -4221,15 +4229,23 @@ document.addEventListener('keydown', e => {
       return;
     }
     const overlay = document.getElementById('note-edit-overlay');
-    if (overlay && overlay.style.display !== 'none' && (typeof activeTab === 'undefined' || activeTab !== 'daily-review' || typeof DailyReviewController === 'undefined' || !DailyReviewController.currentStep)) {
+    if (overlay && overlay.classList.contains('active') && overlay.style.display !== 'none' && (typeof activeTab === 'undefined' || activeTab !== 'daily-review' || typeof DailyReviewController === 'undefined' || !DailyReviewController.currentStep)) {
       if (typeof requestCloseNoteOverlay === 'function') requestCloseNoteOverlay();
-      else closeNoteOverlay();
+      else if (typeof closeNoteOverlay === 'function') closeNoteOverlay();
       return;
     }
     const drOverlay = document.getElementById('daily-review-overlay');
     if (drOverlay && drOverlay.style.display !== 'none' && typeof activeTab !== 'undefined' && activeTab === 'daily-review' && typeof DailyReviewController !== 'undefined' && DailyReviewController.currentStep > 0) {
       DailyReviewController.confirmQuit();
       return;
+    }
+    const setupStep = document.getElementById('landing-step-setup');
+    const connectCard = document.getElementById('screen-connect-card');
+    if (setupStep && setupStep.style.display !== 'none' && connectCard && connectCard.classList.contains('is-setup-step')) {
+      if (typeof showLandingStep === 'function') {
+        showLandingStep('welcome');
+        return;
+      }
     }
   }
 
@@ -4437,6 +4453,22 @@ function showLandingStep(step) {
     if (btnBack) btnBack.style.display = 'inline-flex';
     if (card) {
       card.classList.add('is-setup-step');
+      if (card.classList.contains('has-browser-options')) {
+        const localCard = document.getElementById('landing-card-local') || document.querySelector('.landing-storage-card-local');
+        if (localCard) {
+          const badge = localCard.querySelector('.landing-card-badge');
+          if (badge) {
+            badge.textContent = typeof t === 'function' ? t('landing.badgeChromiumDesktop') : 'Chromium / Desktop';
+            badge.className = 'landing-card-badge';
+          }
+          const title = localCard.querySelector('h3');
+          if (title) title.textContent = typeof t === 'function' ? t('landing.optionChromeTitle') : 'Google Chrome / Desktop App';
+          const desc = localCard.querySelector('p');
+          if (desc) desc.textContent = typeof t === 'function' ? t('landing.optionChromeDesc') : 'Free local-first disk storage. Run Secretary in Chrome, Edge, Brave, or Desktop App for direct folder reading & writing.';
+          const btnText = document.getElementById('btn-open-folder-text');
+          if (btnText) btnText.textContent = typeof t === 'function' ? t('landing.optionChromeBtn') : 'Copy Web App Link';
+        }
+      }
     }
   } else {
     if (welcomeStep) welcomeStep.style.display = 'flex';
