@@ -502,5 +502,44 @@ describe('Eisenhower Matrix Enhancements: 3-Todo Clusters, Workstream & Delegate
       expect(newBtn).not.toBeNull();
       expect(newBtn.getAttribute('title')).toBeTruthy();
     });
+
+    it('renders Eisenhower search box and input aligned to toolbar buttons (34px height)', () => {
+      document.body.innerHTML = '<div id="swimlane-board"></div>';
+      global.todosManifest = [];
+      renderTodosBoard();
+
+      const searchBox = document.querySelector('.eisenhower-search-box');
+      expect(searchBox).not.toBeNull();
+
+      const searchIcon = searchBox.querySelector('.eisenhower-search-icon');
+      expect(searchIcon).not.toBeNull();
+
+      const searchInput = document.getElementById('todos-board-search');
+      expect(searchInput).not.toBeNull();
+      expect(searchInput.classList.contains('eisenhower-search-input')).toBe(true);
+      expect(searchInput.classList.contains('topbar-search')).toBe(false);
+      expect(searchInput.getAttribute('title')).toBeTruthy();
+      expect(searchInput.getAttribute('placeholder')).toBeTruthy();
+
+      // Verify CSS styles in app-todos.css
+      const fs = require('fs');
+      const path = require('path');
+      const todosCss = fs.readFileSync(path.resolve(__dirname, '../../css/app-todos.css'), 'utf8');
+
+      const inputRuleMatch = todosCss.match(/\.eisenhower-search-input\s*\{([^}]+)\}/);
+      expect(inputRuleMatch).toBeTruthy();
+      const inputRule = inputRuleMatch[1];
+
+      const btnRuleMatch = todosCss.match(/\.eisenhower-toggle-done-btn\s*\{([^}]+)\}/);
+      expect(btnRuleMatch).toBeTruthy();
+      const btnRule = btnRuleMatch[1];
+
+      // Heights must match 34px
+      expect(inputRule).toContain('height: 34px;');
+      expect(btnRule).toContain('height: 34px;');
+      expect(inputRule).toContain('border-radius: var(--radius-sm, 6px);');
+      expect(btnRule).toContain('border-radius: var(--radius-sm, 6px);');
+    });
   });
 });
+

@@ -1369,6 +1369,62 @@ body[data-theme='dark'] .todo-delegate-select {
   gap: 0.5rem;
 }
 
+.eisenhower-search-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.eisenhower-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.eisenhower-search-input {
+  height: 34px;
+  min-height: 34px !important;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0 10px 0 28px;
+  width: 190px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt, rgba(0, 0, 0, 0.05));
+  color: var(--text);
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.eisenhower-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.eisenhower-search-input:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--card-border));
+}
+
+.eisenhower-search-input:focus {
+  border-color: var(--accent);
+  background: var(--card-bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--text);
+}
+
+.eisenhower-search-input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
 .eisenhower-toggle-done-btn {
   font-size: 0.78rem;
   font-weight: 600;
@@ -1446,12 +1502,6 @@ body[data-theme='dark'] .todo-delegate-select {
 .eisenhower-add-btn:hover {
   background: color-mix(in srgb, var(--accent) 88%, #000);
   transform: translateY(-1px);
-}
-
-.eisenhower-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 /* 2D Map Canvas (Strict no-overflow container to eliminate scrollbar jitter) */
