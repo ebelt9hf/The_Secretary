@@ -199,8 +199,16 @@ const AIChatController = {
     }
     if (!panel) return;
 
-    if (typeof LLMService !== 'undefined' && typeof LLMService.isSetup === 'function' ? !LLMService.isSetup() : !LLMService.isEnabled()) {
+    const isAiSetup = (typeof LLMService !== 'undefined' && typeof LLMService.isSetup === 'function')
+      ? LLMService.isSetup()
+      : (typeof LLMService !== 'undefined' && typeof LLMService.isEnabled === 'function' ? LLMService.isEnabled() : false);
+
+    if (!isAiSetup) {
       panel.innerHTML = this.renderOnboardingHTML();
+      const existingSidebar = document.getElementById('chat-history-sidebar');
+      if (existingSidebar) existingSidebar.style.display = 'none';
+      const existingResizeHandle = document.getElementById('chat-history-resize-handle');
+      if (existingResizeHandle) existingResizeHandle.style.display = 'none';
       return;
     }
 
@@ -5510,11 +5518,18 @@ function toggleFloatingChat() {
 
     if (isMinimized) {
       el.classList.remove('minimized');
-      el.style.height = el.dataset.prevHeight || '680px';
-      el.style.minHeight = '440px';
+      el.style.height = el.dataset.prevHeight || '740px';
+      el.style.minHeight = '480px';
     }
 
-    AIChatController.leftSidebarCollapsed = true;
+    const isAiSetup = (typeof LLMService !== 'undefined' && typeof LLMService.isSetup === 'function')
+      ? LLMService.isSetup()
+      : (typeof LLMService !== 'undefined' && typeof LLMService.isEnabled === 'function' ? LLMService.isEnabled() : false);
+
+    // When AI is not setup, strictly ensure no left bar is shown
+    if (!isAiSetup) {
+      AIChatController.leftSidebarCollapsed = true;
+    }
     AIChatController.rightSidebarCollapsed = true;
 
     el.classList.add('is-open');
@@ -5523,11 +5538,11 @@ function toggleFloatingChat() {
     updateAiButtons(true);
 
     if (!el.style.top && !el.style.left) {
-      const initialWidth = Math.min(880, Math.floor(window.innerWidth * 0.9));
-      const initialHeight = Math.min(680, Math.floor(window.innerHeight * 0.85));
+      const initialWidth = Math.min(1040, Math.floor(window.innerWidth * 0.92));
+      const initialHeight = Math.min(740, Math.floor(window.innerHeight * 0.88));
       el.style.width = `${initialWidth}px`;
       el.style.height = `${initialHeight}px`;
-      el.style.top = `${Math.max(40, Math.floor((window.innerHeight - initialHeight) / 2))}px`;
+      el.style.top = `${Math.max(30, Math.floor((window.innerHeight - initialHeight) / 2))}px`;
       el.style.left = `${Math.max(20, Math.floor((window.innerWidth - initialWidth) / 2))}px`;
       el.style.right = 'auto';
     }
@@ -5615,8 +5630,8 @@ function toggleMaximizeFloatingChat(el) {
 
   if (el.classList.contains('minimized')) {
     el.classList.remove('minimized');
-    el.style.height = el.dataset.prevHeight || '680px';
-    el.style.minHeight = '440px';
+    el.style.height = el.dataset.prevHeight || '740px';
+    el.style.minHeight = '480px';
     el.style.boxShadow = 'var(--shadow-lg)';
     const body = document.getElementById('floating-chat-body');
     if (body) body.style.display = 'flex';
@@ -5625,8 +5640,8 @@ function toggleMaximizeFloatingChat(el) {
   const isMaximized = el.classList.contains('is-maximized');
   if (isMaximized) {
     el.classList.remove('is-maximized');
-    el.style.width = el.dataset.prevWidth || '880px';
-    el.style.height = el.dataset.prevHeight || '680px';
+    el.style.width = el.dataset.prevWidth || '1040px';
+    el.style.height = el.dataset.prevHeight || '740px';
     el.style.top = el.dataset.prevTop || '40px';
     el.style.left = el.dataset.prevLeft || '40px';
     el.style.right = 'auto';

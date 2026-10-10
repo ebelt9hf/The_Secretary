@@ -1505,8 +1505,8 @@ body[data-theme='dark'] .chat-onboarding-steps code {
   display: none; /* Controlled by .is-open class */
   position: fixed;
   z-index: 10000;
-  width: 880px;
-  height: 680px;
+  width: 1040px;
+  height: 740px;
   background: var(--card-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -1515,8 +1515,8 @@ body[data-theme='dark'] .chat-onboarding-steps code {
   box-shadow: var(--shadow-lg);
   flex-direction: column;
   overflow: hidden;
-  min-width: 540px;
-  min-height: 440px;
+  min-width: 680px;
+  min-height: 480px;
   max-width: 98vw;
   max-height: 98vh;
   transform-origin: bottom right;
