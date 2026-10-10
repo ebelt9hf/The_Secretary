@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secretary</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.16">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.16">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.17">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -208,7 +208,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.16" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.16</p>
+      <p id="connect-version-hint" data-version="4.0.17" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.17</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -311,6 +311,10 @@
           <div class="landing-card-body">
             <h3 data-i18n="landing.optionOwnFirebaseTitle">Connect Own Firebase</h3>
             <p data-i18n="landing.optionOwnFirebaseDesc">100% Free on Google's Spark tier. Bring your own Firebase project with client-side AES-256-GCM Zero-Knowledge encryption.</p>
+            <p style="margin-top:6px; font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:5px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span data-i18n="sync.localEnvMachineWarning">The local environment should only be used on machines that you know and trust.</span>
+            </p>
           </div>
           <div class="landing-card-footer">
             <button type="button" class="landing-card-btn landing-card-btn-own-firebase" id="btn-landing-own-firebase" onclick="window.openCustomFirebaseSetupFromLanding()" title="Connect your own free Google Firebase project" data-i18n-title="sync.customFirebaseTooltip">
@@ -331,6 +335,10 @@
           <div class="landing-card-body">
             <h3 data-i18n="landing.optionManagedFirebaseTitle">Etienne's Managed Cloud Vault</h3>
             <p data-i18n="landing.optionManagedFirebaseDesc">Turnkey managed cloud infrastructure with Zero-Knowledge E2EE encryption, automated sync and backups. Free during early preview (Paid subscription service in future).</p>
+            <p style="margin-top:6px; font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:5px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span data-i18n="sync.localEnvMachineWarning">The local environment should only be used on machines that you know and trust.</span>
+            </p>
           </div>
           <div class="landing-card-footer">
             <button type="button" class="landing-card-btn landing-card-btn-cloud" id="btn-landing-cloud-link" onclick="window.openManagedFirebaseSetupFromLanding()" title="Connect and unlock your encrypted cloud workspace" data-i18n-title="landing.cloudOptionTooltip">
@@ -390,6 +398,7 @@
       <button class="topbar-icon-btn" id="btn-tutorial-icon" onclick="startTutorial()" title="Tutorial"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
       <button class="topbar-icon-btn" id="btn-cloud-sync-status" onclick="openCloudSyncModalOrPrefs()" title="Cloud Sync & Storage Status" data-i18n-title="sync.statusTooltip"><span id="cloud-sync-icon-wrap" style="display:inline-flex; align-items:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span></button>
       <button class="topbar-icon-btn" id="btn-prefs-icon" onclick="switchTab('prefs')" title="Preferences"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="3" r="1"/><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      <button class="topbar-icon-btn" id="btn-topbar-logoff" onclick="handleLogOffUI()" title="Log off from current session" data-i18n-title="sync.logOffTooltip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
     </div>
     <!-- Row 2: context controls (notes view mode switcher / timeline zoom / search) -->
     <div class="topbar-row topbar-sub-row" id="topbar-sub-row">
@@ -834,7 +843,7 @@
             <div style="display:flex; gap:6px; align-items:center;" id="prefs-sync-account-actions">
               <button type="button" class="btn" id="btn-prefs-sync-signin" onclick="openModal('modal-cloud-sync-setup'); switchSyncSetupTab('signin');" title="Sign in or switch cloud account" data-i18n-title="sync.accountSignInTooltip" data-i18n="sync.accountSignInBtn">Sign In / Switch User</button>
               <button type="button" class="btn btn-secondary" id="btn-prefs-sync-reset-pass" onclick="openPasswordResetModalUI()" title="Send password reset link" data-i18n-title="sync.accountResetPassTooltip" data-i18n="sync.accountResetPassBtn" style="display:none;">Reset Password</button>
-              <button type="button" class="btn btn-secondary" id="btn-prefs-sync-signout" onclick="signOutCloudAccountUI()" title="Sign out from your cloud account on this device" data-i18n-title="sync.accountSignOutTooltip" data-i18n="sync.accountSignOutBtn" style="display:none;">Sign Out</button>
+              <button type="button" class="btn btn-secondary" id="btn-prefs-sync-signout" onclick="handleLogOffUI()" title="Sign out from your cloud account on this device" data-i18n-title="sync.accountSignOutTooltip" data-i18n="sync.accountSignOutBtn">Sign Out</button>
             </div>
           </div>
         </div>
@@ -948,7 +957,7 @@
               </div>
               <div style="display:flex; gap:6px; align-items:center;">
                 <button type="button" class="btn btn-secondary" id="btn-user-switch-account" onclick="openModal('modal-cloud-sync-setup'); switchSyncSetupTab('signin');" title="Sign in or switch to a different cloud account" data-i18n-title="sync.accountSignInTooltip" data-i18n="sync.accountSignInBtn">Switch User</button>
-                <button type="button" class="btn btn-secondary" id="btn-user-signout" onclick="signOutCloudAccountUI()" title="Sign out from your cloud account on this device" data-i18n-title="sync.accountSignOutTooltip" data-i18n="sync.accountSignOutBtn">Sign Out</button>
+                <button type="button" class="btn btn-secondary" id="btn-user-signout" onclick="handleLogOffUI()" title="Sign out from your cloud account on this device" data-i18n-title="sync.accountSignOutTooltip" data-i18n="sync.accountSignOutBtn">Sign Out</button>
               </div>
             </div>
           </div>
@@ -1463,40 +1472,40 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.16"></script>
-<script src="js/app-utils.js?v=4.0.16"></script>
-<script src="js/app-icons.js?v=4.0.16"></script>
-<script src="js/app-popover-manager.js?v=4.0.16"></script>
-<script src="js/translations.js?v=4.0.16"></script>
-<script src="js/app-i18n.js?v=4.0.16"></script>
-<script src="js/app-bridge.js?v=4.0.16"></script>
-<script src="js/app-fs.js?v=4.0.16"></script>
-<script src="js/firebase-bundle.js?v=4.0.16"></script>
-<script src="js/firebase-config.js?v=4.0.16"></script>
-<script src="js/app-crypto.js?v=4.0.16"></script>
-<script src="js/app-image-optimizer.js?v=4.0.16"></script>
-<script src="js/app-idb.js?v=4.0.16"></script>
-<script src="js/app-firebase-sync.js?v=4.0.16"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.16"></script>
-<script src="js/app-storage.js?v=4.0.16"></script>
-<script src="js/storage-migration.js?v=4.0.16"></script>
-<script src="js/app-stash-service.js?v=4.0.16"></script>
-<script src="js/app-omnibar.js?v=4.0.16"></script>
-<script src="js/app-topic-memory.js?v=4.0.16"></script>
-<script src="js/app-prompts.js?v=4.0.16"></script>
-<script src="js/app-llm.js?v=4.0.16"></script>
-<script src="js/app-dailyreview.js?v=4.0.16"></script>
-<script src="js/app-notes.js?v=4.0.16"></script>
-<script src="js/app-todos-board.js?v=4.0.16"></script>
-<script src="js/app-board.js?v=4.0.16"></script>
-<script src="js/app-focus.js?v=4.0.16"></script>
-<script src="js/app-overlay.js?v=4.0.16"></script>
-<script src="js/app-planner.js?v=4.0.16"></script>
-<script src="js/app-collab.js?v=4.0.16"></script>
-<script src="js/app-retro.js?v=4.0.16"></script>
-<script src="js/app-tutorial.js?v=4.0.16"></script>
-<script src="js/app-graph-view.js?v=4.0.16"></script>
-<script src="js/app-chat.js?v=4.0.16"></script>
-<script src="js/app-init.js?v=4.0.16"></script>
+<script src="js/app-state.js?v=4.0.17"></script>
+<script src="js/app-utils.js?v=4.0.17"></script>
+<script src="js/app-icons.js?v=4.0.17"></script>
+<script src="js/app-popover-manager.js?v=4.0.17"></script>
+<script src="js/translations.js?v=4.0.17"></script>
+<script src="js/app-i18n.js?v=4.0.17"></script>
+<script src="js/app-bridge.js?v=4.0.17"></script>
+<script src="js/app-fs.js?v=4.0.17"></script>
+<script src="js/firebase-bundle.js?v=4.0.17"></script>
+<script src="js/firebase-config.js?v=4.0.17"></script>
+<script src="js/app-crypto.js?v=4.0.17"></script>
+<script src="js/app-image-optimizer.js?v=4.0.17"></script>
+<script src="js/app-idb.js?v=4.0.17"></script>
+<script src="js/app-firebase-sync.js?v=4.0.17"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.17"></script>
+<script src="js/app-storage.js?v=4.0.17"></script>
+<script src="js/storage-migration.js?v=4.0.17"></script>
+<script src="js/app-stash-service.js?v=4.0.17"></script>
+<script src="js/app-omnibar.js?v=4.0.17"></script>
+<script src="js/app-topic-memory.js?v=4.0.17"></script>
+<script src="js/app-prompts.js?v=4.0.17"></script>
+<script src="js/app-llm.js?v=4.0.17"></script>
+<script src="js/app-dailyreview.js?v=4.0.17"></script>
+<script src="js/app-notes.js?v=4.0.17"></script>
+<script src="js/app-todos-board.js?v=4.0.17"></script>
+<script src="js/app-board.js?v=4.0.17"></script>
+<script src="js/app-focus.js?v=4.0.17"></script>
+<script src="js/app-overlay.js?v=4.0.17"></script>
+<script src="js/app-planner.js?v=4.0.17"></script>
+<script src="js/app-collab.js?v=4.0.17"></script>
+<script src="js/app-retro.js?v=4.0.17"></script>
+<script src="js/app-tutorial.js?v=4.0.17"></script>
+<script src="js/app-graph-view.js?v=4.0.17"></script>
+<script src="js/app-chat.js?v=4.0.17"></script>
+<script src="js/app-init.js?v=4.0.17"></script>
 </body>
 </html>

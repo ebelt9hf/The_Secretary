@@ -2046,20 +2046,66 @@ async function checkPendingEmailLinkAuth() {
 }
 window.checkPendingEmailLinkAuth = checkPendingEmailLinkAuth;
 
-async function signOutCloudAccountUI() {
+async function handleLogOffUI() {
+  const isFs = (typeof StorageAPI !== 'undefined' && typeof StorageAPI.getStorageEngine === 'function')
+    ? (StorageAPI.getStorageEngine() === 'filesystem')
+    : true;
+  const hasLocalHandle = Boolean(typeof rootHandle !== 'undefined' && rootHandle);
+  const isDataSavedLocally = isFs || hasLocalHandle;
+
+  if (isDataSavedLocally) {
+    if (typeof openModal === 'function' && document.getElementById('modal-logoff-local-warning')) {
+      openModal('modal-logoff-local-warning');
+    }
+    if (typeof showToast === 'function') {
+      const msg = typeof t === 'function'
+        ? t('confirm.logOffNotPossibleToast')
+        : 'Cannot log off: Data is saved locally on this machine';
+      showToast(msg, true);
+    }
+    return false;
+  }
+
   try {
     if (window.FirebaseSyncService) {
       await window.FirebaseSyncService.signOut();
-      updateCloudSyncUI();
-      if (typeof showToast === 'function') {
-        showToast(typeof t === 'function' ? t('sync.signOutSuccessToast') : 'Signed out from cloud account');
+      if (typeof window.FirebaseSyncService.lockVault === 'function') {
+        window.FirebaseSyncService.lockVault();
       }
     }
+    if (typeof manifest !== 'undefined') manifest = [];
+    if (typeof todosManifest !== 'undefined') todosManifest = [];
+    if (typeof plannerEvents !== 'undefined') plannerEvents = [];
+
+    const sm = document.getElementById('screen-main');
+    if (sm) sm.classList.remove('active');
+    const sc = document.getElementById('screen-connect');
+    if (sc) {
+      sc.style.display = '';
+      sc.classList.remove('loading');
+    }
+    if (typeof showLandingStep === 'function') {
+      showLandingStep('welcome');
+    }
+    if (typeof updateCloudSyncUI === 'function') {
+      updateCloudSyncUI();
+    }
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.signOutSuccessToast') : 'Signed out from cloud account');
+    }
+    return true;
   } catch (err) {
+    console.error('Sign out failed:', err);
     if (typeof showToast === 'function') {
       showToast((typeof t === 'function' ? t('sync.setupFailed') : 'Sign out failed') + ': ' + (err.message || ''), true);
     }
+    return false;
   }
+}
+window.handleLogOffUI = handleLogOffUI;
+
+async function signOutCloudAccountUI() {
+  return await handleLogOffUI();
 }
 window.signOutCloudAccountUI = signOutCloudAccountUI;
 
@@ -4418,6 +4464,11 @@ function renderBrowserCompatibilityOptions() {
           </button>
         </div>
       </div>
+    </div>
+
+    <div style="margin-top:12px; padding:8px 12px; border-radius:8px; background:rgba(245, 158, 11, 0.08); border:1px solid rgba(245, 158, 11, 0.25); display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--text);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>${typeof t === 'function' ? t('sync.localEnvMachineWarning') : 'The local environment should only be used on machines that you know and trust.'}</span>
     </div>
   `;
 
