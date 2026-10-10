@@ -1,4 +1,47 @@
-'use strict';
+function renderAiOnboardingHTML(customTitle) {
+  const headerText = customTitle || (typeof t === 'function' ? t('chat.tabTitle') : '') || 'AI Chat';
+  const introText = (typeof t === 'function' ? t('chat.onboardingIntro') : '') || 'Local LLM features are currently disabled. You can easily enable a local LLM from the settings panel to chat, fetch contexts, and orchestrate planner events.';
+  const stepsTitle = (typeof t === 'function' ? t('chat.onboardingStepsTitle') : '') || 'How to setup your local AI Agent';
+  const btnText = (typeof t === 'function' ? t('chat.goToPreferences') : '') || 'Go to Preferences';
+  const btnTooltip = (typeof t === 'function' ? t('chat.goToPreferencesTooltip') : '') || 'Open AI configuration settings';
+
+  return `
+    <div class="chat-onboarding">
+      <h2>💬 ${escH(headerText)}</h2>
+      <p>${escH(introText)}</p>
+      
+      <div class="chat-onboarding-steps">
+        <h3>🛠️ ${escH(stepsTitle)}</h3>
+        <ol>
+          <li><strong>LM Studio</strong>:
+            <ul>
+              <li>Download and open LM Studio.</li>
+              <li>Download a model (e.g. <code>qwen2.5-coder-7b-instruct</code>).</li>
+              <li>Go to the Local Server tab and click "Start Server" (runs on <code>http://localhost:1234/v1</code>).</li>
+            </ul>
+          </li>
+          <li><strong>Ollama</strong>:
+            <ul>
+              <li>Install Ollama and run <code>ollama run qwen2.5-coder:7b</code> in your terminal.</li>
+              <li>Ollama exposes an OpenAI-compatible endpoint at <code>http://localhost:11434/v1</code>.</li>
+            </ul>
+          </li>
+          <li><strong>Jan</strong>:
+            <ul>
+              <li>Open Jan, download a model, and click "Start Server" on the Local API page (runs on <code>http://localhost:1337/v1</code>).</li>
+            </ul>
+          </li>
+        </ol>
+      </div>
+
+      <button class="btn btn-primary" onclick="if (typeof switchTab === 'function') switchTab('prefs'); if (typeof switchPrefsTab === 'function') switchPrefsTab('ai');" title="${escA(btnTooltip)}" style="margin-top: 1rem; padding: var(--space-3) var(--space-6);">
+        ⚙️ ${escH(btnText)}
+      </button>
+    </div>
+  `;
+}
+window.renderAiOnboardingHTML = renderAiOnboardingHTML;
+if (typeof globalThis !== 'undefined') globalThis.renderAiOnboardingHTML = renderAiOnboardingHTML;
 
 /**
  * Secretary - AI Chat & Agentic Tool Resolver Controller
@@ -156,7 +199,7 @@ const AIChatController = {
     }
     if (!panel) return;
 
-    if (!LLMService.isEnabled()) {
+    if (typeof LLMService !== 'undefined' && typeof LLMService.isSetup === 'function' ? !LLMService.isSetup() : !LLMService.isEnabled()) {
       panel.innerHTML = this.renderOnboardingHTML();
       return;
     }
@@ -511,41 +554,8 @@ const AIChatController = {
     this.openAttachModal(val);
   },
 
-  renderOnboardingHTML() {
-    return `
-      <div class="chat-onboarding">
-        <h2>💬 ${escH(t('chat.tabTitle') || 'AI Chat')}</h2>
-        <p>${escH(t('chat.onboardingIntro') || 'Local LLM features are currently disabled. You can easily enable a local LLM from the settings panel to chat, fetch contexts, and orchestrate planner events.')}</p>
-        
-        <div class="chat-onboarding-steps">
-          <h3>🛠️ ${escH(t('chat.onboardingStepsTitle') || 'How to setup your local AI Agent')}</h3>
-          <ol>
-            <li><strong>LM Studio</strong>:
-              <ul>
-                <li>Download and open LM Studio.</li>
-                <li>Download a model (e.g. <code>qwen2.5-coder-7b-instruct</code>).</li>
-                <li>Go to the Local Server tab and click "Start Server" (runs on <code>http://localhost:1234/v1</code>).</li>
-              </ul>
-            </li>
-            <li><strong>Ollama</strong>:
-              <ul>
-                <li>Install Ollama and run <code>ollama run qwen2.5-coder:7b</code> in your terminal.</li>
-                <li>Ollama exposes an OpenAI-compatible endpoint at <code>http://localhost:11434/v1</code>.</li>
-              </ul>
-            </li>
-            <li><strong>Jan</strong>:
-              <ul>
-                <li>Open Jan, download a model, and click "Start Server" on the Local API page (runs on <code>http://localhost:1337/v1</code>).</li>
-              </ul>
-            </li>
-          </ol>
-        </div>
-
-        <button class="btn btn-primary" onclick="switchTab('prefs')" style="margin-top: 1rem; padding: var(--space-3) var(--space-6);">
-          ⚙️ ${escH(t('chat.goToPreferences') || 'Go to Preferences')}
-        </button>
-      </div>
-    `;
+  renderOnboardingHTML(customTitle) {
+    return renderAiOnboardingHTML(customTitle);
   },
 
   showAgentGuide() {
@@ -4268,7 +4278,9 @@ Directives importantes:
         const parsed = parseNoteHTML(html);
         
         // Skip calling the LLM if the HTML already has a valid summary
-        const hasSummary = parsed.summary && parsed.summary.trim() !== '' && parsed.summary !== '<p></p>' && parsed.summary !== '<p><br></p>';
+        const hasSummary = typeof hasValidNoteSummary === 'function'
+          ? hasValidNoteSummary(parsed.summary)
+          : (parsed.summary && parsed.summary.trim() !== '' && parsed.summary !== '<p></p>' && parsed.summary !== '<p><br></p>');
         if (hasSummary) {
           n.summary = parsed.summary;
           const mfIdx = manifest.findIndex(item => item.path === n.path);
@@ -5300,7 +5312,9 @@ window.runBulkAISummaries = async function() {
   const cutoffTime = now.getTime() - numWeeks * 7 * 24 * 60 * 60 * 1000;
   
   const notesToProcess = manifest.filter(n => {
-    const hasSummary = n.summary && n.summary.trim() !== '' && n.summary !== '<p></p>' && n.summary !== '<p><br></p>';
+    const hasSummary = typeof hasValidNoteSummary === 'function'
+      ? hasValidNoteSummary(n.summary)
+      : (n.summary && n.summary.trim() !== '' && n.summary !== '<p></p>' && n.summary !== '<p><br></p>');
     if (hasSummary) return false;
     
     let noteTime = 0;

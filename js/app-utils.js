@@ -116,7 +116,11 @@ function getTodoById(id)        { return todosManifest.find(t => t.id === id); }
 function getTodosByPriority(p)  { return todosManifest.filter(t => t.priority === p); }
 function getTodosByStatus(status) { return todosManifest.filter(t => t.status === status); }
 function isTodoWip(todo)       { return !!todo && (todo.status === 'WIP' || todo.priority === 'WIP'); }
-function isTodoWontDo(todo)    { return !!todo && (todo.status === 'wont_do' || todo.status === "won't do" || todo.status === 'WontDo'); }
+function isTodoWontDo(todo) {
+  if (!todo) return false;
+  const status = String(todo.status || todo.workflow_state || '').toLowerCase();
+  return status === "won't do" || status === "wont do" || status === "wont_do" || status === 'cancelled';
+}
 function getTodoEffectivePriority(todo) {
   const priority = todo?.priority || 'Medium';
   if (priority === 'WIP') {
@@ -3336,9 +3340,18 @@ window.getPlannerEventLinkedTodoIds = getPlannerEventLinkedTodoIds;
 window.formatNoteContextForAI = formatNoteContextForAI;
 window.formatTaskContextForAI = formatTaskContextForAI;
 window.formatPlannerEventContextForAI = formatPlannerEventContextForAI;
-window.sanitizeHtmlContent = sanitizeHtmlContent;
-window.isDateCoveredByOoo = isDateCoveredByOoo;
-window.getCoveringOooEvent = getCoveringOooEvent;
+function hasValidNoteSummary(summary) {
+  if (!summary || typeof summary !== 'string') return false;
+  const stripped = summary
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#160;/g, ' ')
+    .trim();
+  return stripped.length > 0;
+}
+window.hasValidNoteSummary = hasValidNoteSummary;
+if (typeof globalThis !== 'undefined') globalThis.hasValidNoteSummary = hasValidNoteSummary;
+
 window.isTodoWontDo = isTodoWontDo;
 if (typeof globalThis !== 'undefined') globalThis.isTodoWontDo = isTodoWontDo;
 

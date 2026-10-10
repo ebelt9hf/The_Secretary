@@ -9154,6 +9154,58 @@ if (typeof window !== 'undefined') {
 
 async function renderWorkstreamChatTab(topicName, parentContainer, currentWsMemory) {
   parentContainer.innerHTML = '';
+
+  const isAiSetup = (typeof LLMService !== 'undefined' && typeof LLMService.isSetup === 'function')
+    ? LLMService.isSetup()
+    : false;
+
+  if (!isAiSetup) {
+    if (typeof renderAiOnboardingHTML === 'function') {
+      parentContainer.innerHTML = renderAiOnboardingHTML();
+    } else if (typeof AIChatController !== 'undefined' && typeof AIChatController.renderOnboardingHTML === 'function') {
+      parentContainer.innerHTML = AIChatController.renderOnboardingHTML();
+    } else {
+      const headerText = (typeof t === 'function' ? t('chat.tabTitle') : '') || 'AI Chat';
+      const introText = (typeof t === 'function' ? t('chat.onboardingIntro') : '') || 'Local LLM features are currently disabled. You can easily enable a local LLM from the settings panel to chat, fetch contexts, and orchestrate planner events.';
+      const stepsTitle = (typeof t === 'function' ? t('chat.onboardingStepsTitle') : '') || 'How to setup your local AI Agent';
+      const btnText = (typeof t === 'function' ? t('chat.goToPreferences') : '') || 'Go to Preferences';
+      const btnTooltip = (typeof t === 'function' ? t('chat.goToPreferencesTooltip') : '') || 'Open AI configuration settings';
+      parentContainer.innerHTML = `
+        <div class="chat-onboarding">
+          <h2>💬 ${escH(headerText)}</h2>
+          <p>${escH(introText)}</p>
+          <div class="chat-onboarding-steps">
+            <h3>🛠️ ${escH(stepsTitle)}</h3>
+            <ol>
+              <li><strong>LM Studio</strong>:
+                <ul>
+                  <li>Download and open LM Studio.</li>
+                  <li>Download a model (e.g. <code>qwen2.5-coder-7b-instruct</code>).</li>
+                  <li>Go to the Local Server tab and click "Start Server" (runs on <code>http://localhost:1234/v1</code>).</li>
+                </ul>
+              </li>
+              <li><strong>Ollama</strong>:
+                <ul>
+                  <li>Install Ollama and run <code>ollama run qwen2.5-coder:7b</code> in your terminal.</li>
+                  <li>Ollama exposes an OpenAI-compatible endpoint at <code>http://localhost:11434/v1</code>.</li>
+                </ul>
+              </li>
+              <li><strong>Jan</strong>:
+                <ul>
+                  <li>Open Jan, download a model, and click "Start Server" on the Local API page (runs on <code>http://localhost:1337/v1</code>).</li>
+                </ul>
+              </li>
+            </ol>
+          </div>
+          <button class="btn btn-primary" onclick="if (typeof switchTab === 'function') switchTab('prefs'); if (typeof switchPrefsTab === 'function') switchPrefsTab('ai');" title="${escA(btnTooltip)}" style="margin-top: 1rem; padding: var(--space-3) var(--space-6);">
+            ⚙️ ${escH(btnText)}
+          </button>
+        </div>
+      `;
+    }
+    return;
+  }
+
   const chatLayout = document.createElement('div');
   chatLayout.className = 'workstream-chat-layout';
 

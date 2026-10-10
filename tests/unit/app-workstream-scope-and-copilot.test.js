@@ -271,6 +271,11 @@ describe('Workstream Tab Add & Other Workstream AI Copilot', () => {
     window.favoriteRegistryProjects = new Set();
     window.workstreamCustomOrder = [];
     window.selectedRegistryProject = '__OTHER_WORKSTREAM__';
+    window.LLMService = {
+      isEnabled: () => true,
+      isSetup: () => true,
+      chat: vi.fn()
+    };
   });
 
   describe('Workstream + Tab Rendering', () => {
@@ -326,6 +331,49 @@ describe('Workstream Tab Add & Other Workstream AI Copilot', () => {
       expect(prompt).toContain('Core Engine');
       expect(prompt).toContain('UI Redesign');
       expect(prompt).toContain('remaining work');
+    });
+  });
+
+  describe('Workstream Copilot AI Setup Required State', () => {
+    it('shows setup needed notice and link to settings if AI is not setup', async () => {
+      window.LLMService = {
+        isEnabled: () => false,
+        isSetup: () => false
+      };
+
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+
+      await renderWorkstreamChatTab('Core Engine', container, null);
+
+      expect(container.querySelector('.workstream-chat-header')).toBeNull();
+      const onboarding = container.querySelector('.chat-onboarding');
+      expect(onboarding).not.toBeNull();
+      expect(onboarding.textContent).toContain('Local LLM features are currently disabled');
+      expect(onboarding.textContent).toContain('How to setup your local AI Agent');
+
+      const prefsBtn = onboarding.querySelector('button');
+      expect(prefsBtn).not.toBeNull();
+      expect(prefsBtn.textContent).toContain('Go to Preferences');
+
+      container.remove();
+    });
+
+    it('renders normal copilot chat layout when AI is properly setup', async () => {
+      window.LLMService = {
+        isEnabled: () => true,
+        isSetup: () => true
+      };
+
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+
+      await renderWorkstreamChatTab('Core Engine', container, null);
+
+      expect(container.querySelector('.workstream-chat-header')).not.toBeNull();
+      expect(container.querySelector('.chat-onboarding')).toBeNull();
+
+      container.remove();
     });
   });
 
