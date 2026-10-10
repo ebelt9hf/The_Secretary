@@ -671,11 +671,11 @@ function switchPrefsTab(tabId) {
     btn.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
   });
   const sections = {
-    general: ['prefs-sec-language', 'prefs-sec-profile'],
+    general: ['prefs-sec-user-info', 'prefs-sec-profile', 'prefs-sec-language'],
     appearance: ['prefs-sec-appearance'],
     schedule: ['prefs-sec-schedule'],
     ai: ['prefs-sec-ai'],
-    sync: ['prefs-sec-sync', 'prefs-sec-user-info'],
+    sync: ['prefs-sec-sync'],
     system: ['prefs-sec-folder', 'prefs-sec-maintenance', 'prefs-sec-help']
   };
   Object.entries(sections).forEach(([tId, secIds]) => {
@@ -909,7 +909,8 @@ function updateCloudSyncUI(statusObj) {
   const userInfoSec = document.getElementById('prefs-sec-user-info');
   if (userInfoSec) {
     const isFirebase = status.engine === 'firebase';
-    userInfoSec.style.display = isFirebase ? 'block' : 'none';
+    const activeTab = (typeof activePrefsTab !== 'undefined') ? activePrefsTab : 'general';
+    userInfoSec.style.display = (isFirebase && (activeTab === 'general' || activeTab === 'sync')) ? 'block' : 'none';
 
     if (isFirebase) {
       const avatarEl = document.getElementById('prefs-user-avatar');

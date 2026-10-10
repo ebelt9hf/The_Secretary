@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secretary</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.17">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.17">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.18">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.18">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -208,7 +208,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.17" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.17</p>
+      <p id="connect-version-hint" data-version="4.0.18" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.18</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -490,12 +490,12 @@
       <h2 style="display:flex; align-items:center; gap:8px;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> <span data-i18n="topbar.prefsTitle">Preferences</span></h2>
 
       <div class="prefs-tabs" role="tablist">
-        <button class="prefs-tab-btn active" id="prefs-tab-general-btn" data-tab="general" onclick="switchPrefsTab('general')" role="tab" aria-selected="true"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <span data-i18n="prefs.tabGeneral">Général</span></button>
-        <button class="prefs-tab-btn" id="prefs-tab-appearance-btn" data-tab="appearance" onclick="switchPrefsTab('appearance')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg> <span data-i18n="prefs.tabAppearance">Apparence</span></button>
-        <button class="prefs-tab-btn" id="prefs-tab-schedule-btn" data-tab="schedule" onclick="switchPrefsTab('schedule')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span data-i18n="prefs.tabSchedule">Agenda</span></button>
-        <button class="prefs-tab-btn" id="prefs-tab-ai-btn" data-tab="ai" onclick="switchPrefsTab('ai')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> <span data-i18n="prefs.tabAi">Assistant IA</span></button>
-        <button class="prefs-tab-btn" id="prefs-tab-sync-btn" data-tab="sync" onclick="switchPrefsTab('sync')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><rect x="8" y="14" width="8" height="6" rx="1"/><path d="M10 14v-2a2 2 0 1 1 4 0v2"/></svg> <span data-i18n="prefs.tabCloudSync">Cloud Sync & E2EE</span></button>
-        <button class="prefs-tab-btn" id="prefs-tab-system-btn" data-tab="system" onclick="switchPrefsTab('system')" role="tab" aria-selected="false"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> <span data-i18n="prefs.tabSystem">Système</span></button>
+        <button class="prefs-tab-btn active" id="prefs-tab-general-btn" data-tab="general" onclick="switchPrefsTab('general')" role="tab" aria-selected="true" title="Open user account and preference settings" data-i18n-title="prefs.tabGeneralTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> <span data-i18n="prefs.tabGeneral">Paramètres utilisateur</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-appearance-btn" data-tab="appearance" onclick="switchPrefsTab('appearance')" role="tab" aria-selected="false" title="Open appearance and theme settings" data-i18n-title="prefs.tabAppearanceTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg> <span data-i18n="prefs.tabAppearance">Apparence</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-schedule-btn" data-tab="schedule" onclick="switchPrefsTab('schedule')" role="tab" aria-selected="false" title="Open work schedule and calendar settings" data-i18n-title="prefs.tabScheduleTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span data-i18n="prefs.tabSchedule">Agenda</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-ai-btn" data-tab="ai" onclick="switchPrefsTab('ai')" role="tab" aria-selected="false" title="Open AI assistant and model settings" data-i18n-title="prefs.tabAiTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> <span data-i18n="prefs.tabAi">Assistant IA</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-sync-btn" data-tab="sync" onclick="switchPrefsTab('sync')" role="tab" aria-selected="false" title="Open cloud synchronization and encryption settings" data-i18n-title="prefs.tabCloudSyncTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><rect x="8" y="14" width="8" height="6" rx="1"/><path d="M10 14v-2a2 2 0 1 1 4 0v2"/></svg> <span data-i18n="prefs.tabCloudSync">Cloud Sync & E2EE</span></button>
+        <button class="prefs-tab-btn" id="prefs-tab-system-btn" data-tab="system" onclick="switchPrefsTab('system')" role="tab" aria-selected="false" title="Open system, storage, and maintenance settings" data-i18n-title="prefs.tabSystemTooltip"><svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> <span data-i18n="prefs.tabSystem">Système</span></button>
       </div>
 
       <div class="prefs-section" id="prefs-sec-appearance">
@@ -573,6 +573,118 @@
           </select>
         </div>
         <small style="display:block;color:#6b7280;margin-top:.3rem">Used by the Planner to show unplanned time during work hours</small>
+      </div>
+
+      <!-- ── User Information & Multi-Provider Authentication Section (Promoted into User Settings) ── -->
+      <div class="prefs-section" id="prefs-sec-user-info" style="display:none;">
+        <h3 style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <svg class="app-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <span data-i18n="sync.userInfoSectionTitle">User Information & Authentication</span>
+        </h3>
+        <p class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem; margin:0 0 12px 0;" data-i18n="sync.userInfoSectionDesc">
+          Authenticate and link multiple sign-in methods (Google, Email, Magic Link, Passphrase) to access your zero-knowledge encrypted vault from any device.
+        </p>
+
+        <!-- Current User Account Overview Card -->
+        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
+          <div style="width:100%; padding:14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(16,185,129,0.2)); border:1px solid var(--accent); display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:700; font-size:1.1rem;" id="prefs-user-avatar">
+                  U
+                </div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span id="prefs-user-display-name" style="font-size:0.95rem; font-weight:700; color:var(--text);">User Account</span>
+                    <span id="prefs-user-session-badge" style="font-size:0.7rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(99,102,241,0.15); color:var(--accent); border:1px solid rgba(99,102,241,0.3);">Cloud Connected</span>
+                  </div>
+                  <div id="prefs-user-email-text" style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">user@example.com</div>
+                  <div id="prefs-user-uid-text" style="font-size:0.72rem; font-family:monospace; color:var(--text-muted); margin-top:2px;">UID: user-123456</div>
+                </div>
+              </div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button type="button" class="btn btn-secondary" id="btn-user-switch-account" onclick="openModal('modal-cloud-sync-setup'); switchSyncSetupTab('signin');" title="Sign in or switch to a different cloud account" data-i18n-title="sync.accountSignInTooltip" data-i18n="sync.accountSignInBtn">Switch User</button>
+                <button type="button" class="btn btn-secondary" id="btn-user-signout" onclick="handleLogOffUI()" title="Sign out from your cloud account on this device" data-i18n-title="sync.accountSignOutTooltip" data-i18n="sync.accountSignOutBtn">Sign Out</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linked Authentication Methods List -->
+        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
+          <label class="prefs-label" data-i18n="sync.linkedAuthMethodsTitle">Available Authentication Methods</label>
+          <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+
+            <!-- 1. Master Passphrase (E2EE) -->
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(16,185,129,0.15); color:#10b981;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </span>
+                <div>
+                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodPassphraseTitle">Master Passphrase (Zero-Knowledge)</div>
+                  <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodPassphraseDesc">Client-side AES-256-GCM key used to decrypt notes locally.</small>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);" data-i18n="sync.authStatusActive">Active</span>
+                <button type="button" class="btn btn-secondary" onclick="openModal('modal-cloud-sync-password-rotate')" title="Change your master encryption passphrase" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn" style="padding:4px 10px; font-size:0.78rem;">Change Passphrase</button>
+              </div>
+            </div>
+
+            <!-- 2. Google Sign-In -->
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;" id="auth-method-row-google">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(66,133,244,0.15);">
+                  <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.6H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.4l4.03-3.13z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.6l4.03 3.13c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
+                </span>
+                <div>
+                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodGoogleTitle">Google Account</div>
+                  <small id="auth-method-google-desc" style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodGoogleDesc">Sign in with one click using your Google account.</small>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;" id="auth-method-google-action-wrap">
+                <span id="badge-auth-google" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(255,255,255,0.08); color:var(--text-muted);" data-i18n="sync.authStatusNotLinked">Not Linked</span>
+                <button type="button" class="btn btn-secondary" id="btn-link-auth-google" onclick="linkCloudSyncGoogleUI()" title="Link your Google account to this vault" data-i18n-title="sync.linkGoogleTooltip" data-i18n="sync.linkGoogleBtn" style="padding:4px 10px; font-size:0.78rem;">Link Google</button>
+              </div>
+            </div>
+
+            <!-- 3. Email & Password -->
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;" id="auth-method-row-email">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(168,85,247,0.15); color:#a855f7;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </span>
+                <div>
+                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodEmailTitle">Email & Password</div>
+                  <small id="auth-method-email-desc" style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodEmailDesc">Authenticate with standard email address and password.</small>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;" id="auth-method-email-action-wrap">
+                <span id="badge-auth-email" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(255,255,255,0.08); color:var(--text-muted);" data-i18n="sync.authStatusNotLinked">Not Linked</span>
+                <button type="button" class="btn btn-secondary" id="btn-link-auth-email" onclick="openLinkEmailModalUI()" title="Link an email address and password to this vault" data-i18n-title="sync.linkEmailTooltip" data-i18n="sync.linkEmailBtn" style="padding:4px 10px; font-size:0.78rem;">Link Email</button>
+                <button type="button" class="btn btn-secondary" id="btn-user-reset-pass" onclick="openPasswordResetModalUI()" title="Send password reset link to your email" data-i18n-title="sync.accountResetPassTooltip" data-i18n="sync.accountResetPassBtn" style="padding:4px 10px; font-size:0.78rem; display:none;">Reset Password</button>
+              </div>
+            </div>
+
+            <!-- 4. Email Magic Link (Passwordless) -->
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;" id="auth-method-row-magic">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(245,158,11,0.15); color:#f59e0b;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                </span>
+                <div>
+                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodMagicTitle">Email Magic Link</div>
+                  <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodMagicDesc">Send passwordless one-time login links directly to your inbox.</small>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button type="button" class="btn btn-secondary" id="btn-user-send-magic" onclick="sendMagicLinkForCurrentAccountUI()" title="Send passwordless sign-in link to your email inbox" data-i18n-title="sync.sendMagicLinkTooltip" data-i18n="sync.sendMagicLinkBtn" style="padding:4px 10px; font-size:0.78rem;">Send Link</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
 
       <div class="prefs-section" id="prefs-sec-profile">
@@ -928,117 +1040,7 @@
         </div>
       </div>
 
-      <!-- ── User Information & Multi-Provider Authentication Section (Hidden if local only) ── -->
-      <div class="prefs-section" id="prefs-sec-user-info" style="display:none; margin-top:16px;">
-        <h3 style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-          <svg class="app-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          <span data-i18n="sync.userInfoSectionTitle">User Information & Authentication</span>
-        </h3>
-        <p class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem; margin:0 0 12px 0;" data-i18n="sync.userInfoSectionDesc">
-          Authenticate and link multiple sign-in methods (Google, Email, Magic Link, Passphrase) to access your zero-knowledge encrypted vault from any device.
-        </p>
 
-        <!-- Current User Account Overview Card -->
-        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px;">
-          <div style="width:100%; padding:14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
-              <div style="display:flex; align-items:center; gap:12px;">
-                <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(16,185,129,0.2)); border:1px solid var(--accent); display:flex; align-items:center; justify-content:center; color:var(--accent); font-weight:700; font-size:1.1rem;" id="prefs-user-avatar">
-                  U
-                </div>
-                <div>
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <span id="prefs-user-display-name" style="font-size:0.95rem; font-weight:700; color:var(--text);">User Account</span>
-                    <span id="prefs-user-session-badge" style="font-size:0.7rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(99,102,241,0.15); color:var(--accent); border:1px solid rgba(99,102,241,0.3);">Cloud Connected</span>
-                  </div>
-                  <div id="prefs-user-email-text" style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">user@example.com</div>
-                  <div id="prefs-user-uid-text" style="font-size:0.72rem; font-family:monospace; color:var(--text-muted); margin-top:2px;">UID: user-123456</div>
-                </div>
-              </div>
-              <div style="display:flex; gap:6px; align-items:center;">
-                <button type="button" class="btn btn-secondary" id="btn-user-switch-account" onclick="openModal('modal-cloud-sync-setup'); switchSyncSetupTab('signin');" title="Sign in or switch to a different cloud account" data-i18n-title="sync.accountSignInTooltip" data-i18n="sync.accountSignInBtn">Switch User</button>
-                <button type="button" class="btn btn-secondary" id="btn-user-signout" onclick="handleLogOffUI()" title="Sign out from your cloud account on this device" data-i18n-title="sync.accountSignOutTooltip" data-i18n="sync.accountSignOutBtn">Sign Out</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Linked Authentication Methods List -->
-        <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <label class="prefs-label" data-i18n="sync.linkedAuthMethodsTitle">Available Authentication Methods</label>
-          <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
-
-            <!-- 1. Master Passphrase (E2EE) -->
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(16,185,129,0.15); color:#10b981;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                </span>
-                <div>
-                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodPassphraseTitle">Master Passphrase (Zero-Knowledge)</div>
-                  <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodPassphraseDesc">Client-side AES-256-GCM key used to decrypt notes locally.</small>
-                </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);" data-i18n="sync.authStatusActive">Active</span>
-                <button type="button" class="btn btn-secondary" onclick="openModal('modal-cloud-sync-password-rotate')" title="Change your master encryption passphrase" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn" style="padding:4px 10px; font-size:0.78rem;">Change Passphrase</button>
-              </div>
-            </div>
-
-            <!-- 2. Google Sign-In -->
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;" id="auth-method-row-google">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(66,133,244,0.15);">
-                  <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.6H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.4l4.03-3.13z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.6l4.03 3.13c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
-                </span>
-                <div>
-                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodGoogleTitle">Google Account</div>
-                  <small id="auth-method-google-desc" style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodGoogleDesc">Sign in with one click using your Google account.</small>
-                </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;" id="auth-method-google-action-wrap">
-                <span id="badge-auth-google" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(255,255,255,0.08); color:var(--text-muted);" data-i18n="sync.authStatusNotLinked">Not Linked</span>
-                <button type="button" class="btn btn-secondary" id="btn-link-auth-google" onclick="linkCloudSyncGoogleUI()" title="Link your Google account to this vault" data-i18n-title="sync.linkGoogleTooltip" data-i18n="sync.linkGoogleBtn" style="padding:4px 10px; font-size:0.78rem;">Link Google</button>
-              </div>
-            </div>
-
-            <!-- 3. Email & Password -->
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;" id="auth-method-row-email">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(168,85,247,0.15); color:#a855f7;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                </span>
-                <div>
-                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodEmailTitle">Email & Password</div>
-                  <small id="auth-method-email-desc" style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodEmailDesc">Authenticate with standard email address and password.</small>
-                </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;" id="auth-method-email-action-wrap">
-                <span id="badge-auth-email" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(255,255,255,0.08); color:var(--text-muted);" data-i18n="sync.authStatusNotLinked">Not Linked</span>
-                <button type="button" class="btn btn-secondary" id="btn-link-auth-email" onclick="openLinkEmailModalUI()" title="Link an email address and password to this vault" data-i18n-title="sync.linkEmailTooltip" data-i18n="sync.linkEmailBtn" style="padding:4px 10px; font-size:0.78rem;">Link Email</button>
-                <button type="button" class="btn btn-secondary" id="btn-user-reset-pass" onclick="openPasswordResetModalUI()" title="Send password reset link to your email" data-i18n-title="sync.accountResetPassTooltip" data-i18n="sync.accountResetPassBtn" style="padding:4px 10px; font-size:0.78rem; display:none;">Reset Password</button>
-              </div>
-            </div>
-
-            <!-- 4. Email Magic Link (Passwordless) -->
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;" id="auth-method-row-magic">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(245,158,11,0.15); color:#f59e0b;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                </span>
-                <div>
-                  <div style="font-size:0.85rem; font-weight:600; color:var(--text);" data-i18n="sync.authMethodMagicTitle">Email Magic Link</div>
-                  <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.authMethodMagicDesc">Send passwordless one-time login links directly to your inbox.</small>
-                </div>
-              </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <button type="button" class="btn btn-secondary" id="btn-user-send-magic" onclick="sendMagicLinkForCurrentAccountUI()" title="Send passwordless sign-in link to your email inbox" data-i18n-title="sync.sendMagicLinkTooltip" data-i18n="sync.sendMagicLinkBtn" style="padding:4px 10px; font-size:0.78rem;">Send Link</button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
 
       <div class="prefs-global-actions">
         <button class="btn" onclick="loadSettingsFromFolderUI()" title="Load settings from the current folder" data-i18n-title="prefs.loadSettings" data-i18n="prefs.load">Load</button>
@@ -1472,40 +1474,40 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.17"></script>
-<script src="js/app-utils.js?v=4.0.17"></script>
-<script src="js/app-icons.js?v=4.0.17"></script>
-<script src="js/app-popover-manager.js?v=4.0.17"></script>
-<script src="js/translations.js?v=4.0.17"></script>
-<script src="js/app-i18n.js?v=4.0.17"></script>
-<script src="js/app-bridge.js?v=4.0.17"></script>
-<script src="js/app-fs.js?v=4.0.17"></script>
-<script src="js/firebase-bundle.js?v=4.0.17"></script>
-<script src="js/firebase-config.js?v=4.0.17"></script>
-<script src="js/app-crypto.js?v=4.0.17"></script>
-<script src="js/app-image-optimizer.js?v=4.0.17"></script>
-<script src="js/app-idb.js?v=4.0.17"></script>
-<script src="js/app-firebase-sync.js?v=4.0.17"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.17"></script>
-<script src="js/app-storage.js?v=4.0.17"></script>
-<script src="js/storage-migration.js?v=4.0.17"></script>
-<script src="js/app-stash-service.js?v=4.0.17"></script>
-<script src="js/app-omnibar.js?v=4.0.17"></script>
-<script src="js/app-topic-memory.js?v=4.0.17"></script>
-<script src="js/app-prompts.js?v=4.0.17"></script>
-<script src="js/app-llm.js?v=4.0.17"></script>
-<script src="js/app-dailyreview.js?v=4.0.17"></script>
-<script src="js/app-notes.js?v=4.0.17"></script>
-<script src="js/app-todos-board.js?v=4.0.17"></script>
-<script src="js/app-board.js?v=4.0.17"></script>
-<script src="js/app-focus.js?v=4.0.17"></script>
-<script src="js/app-overlay.js?v=4.0.17"></script>
-<script src="js/app-planner.js?v=4.0.17"></script>
-<script src="js/app-collab.js?v=4.0.17"></script>
-<script src="js/app-retro.js?v=4.0.17"></script>
-<script src="js/app-tutorial.js?v=4.0.17"></script>
-<script src="js/app-graph-view.js?v=4.0.17"></script>
-<script src="js/app-chat.js?v=4.0.17"></script>
-<script src="js/app-init.js?v=4.0.17"></script>
+<script src="js/app-state.js?v=4.0.18"></script>
+<script src="js/app-utils.js?v=4.0.18"></script>
+<script src="js/app-icons.js?v=4.0.18"></script>
+<script src="js/app-popover-manager.js?v=4.0.18"></script>
+<script src="js/translations.js?v=4.0.18"></script>
+<script src="js/app-i18n.js?v=4.0.18"></script>
+<script src="js/app-bridge.js?v=4.0.18"></script>
+<script src="js/app-fs.js?v=4.0.18"></script>
+<script src="js/firebase-bundle.js?v=4.0.18"></script>
+<script src="js/firebase-config.js?v=4.0.18"></script>
+<script src="js/app-crypto.js?v=4.0.18"></script>
+<script src="js/app-image-optimizer.js?v=4.0.18"></script>
+<script src="js/app-idb.js?v=4.0.18"></script>
+<script src="js/app-firebase-sync.js?v=4.0.18"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.18"></script>
+<script src="js/app-storage.js?v=4.0.18"></script>
+<script src="js/storage-migration.js?v=4.0.18"></script>
+<script src="js/app-stash-service.js?v=4.0.18"></script>
+<script src="js/app-omnibar.js?v=4.0.18"></script>
+<script src="js/app-topic-memory.js?v=4.0.18"></script>
+<script src="js/app-prompts.js?v=4.0.18"></script>
+<script src="js/app-llm.js?v=4.0.18"></script>
+<script src="js/app-dailyreview.js?v=4.0.18"></script>
+<script src="js/app-notes.js?v=4.0.18"></script>
+<script src="js/app-todos-board.js?v=4.0.18"></script>
+<script src="js/app-board.js?v=4.0.18"></script>
+<script src="js/app-focus.js?v=4.0.18"></script>
+<script src="js/app-overlay.js?v=4.0.18"></script>
+<script src="js/app-planner.js?v=4.0.18"></script>
+<script src="js/app-collab.js?v=4.0.18"></script>
+<script src="js/app-retro.js?v=4.0.18"></script>
+<script src="js/app-tutorial.js?v=4.0.18"></script>
+<script src="js/app-graph-view.js?v=4.0.18"></script>
+<script src="js/app-chat.js?v=4.0.18"></script>
+<script src="js/app-init.js?v=4.0.18"></script>
 </body>
 </html>

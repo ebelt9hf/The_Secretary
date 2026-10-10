@@ -495,14 +495,22 @@ function applyLocalizedUI() {
     setElementHTML('#prefs-tab-appearance-btn', window.AppIcons.wrap('palette', t('prefs.tabAppearance'), { size: 14 }));
     setElementHTML('#prefs-tab-schedule-btn', window.AppIcons.wrap('planner', t('prefs.tabSchedule'), { size: 14 }));
     setElementHTML('#prefs-tab-ai-btn', window.AppIcons.wrap('ai', t('prefs.tabAi'), { size: 14 }));
+    setElementHTML('#prefs-tab-sync-btn', window.AppIcons.wrap('sync', t('prefs.tabCloudSync'), { size: 14 }));
     setElementHTML('#prefs-tab-system-btn', window.AppIcons.wrap('prefs', t('prefs.tabSystem'), { size: 14 }));
   } else {
     setElementText('#prefs-tab-general-btn', t('prefs.tabGeneral'));
     setElementText('#prefs-tab-appearance-btn', t('prefs.tabAppearance'));
     setElementText('#prefs-tab-schedule-btn', t('prefs.tabSchedule'));
     setElementText('#prefs-tab-ai-btn', t('prefs.tabAi'));
+    setElementText('#prefs-tab-sync-btn', t('prefs.tabCloudSync'));
     setElementText('#prefs-tab-system-btn', t('prefs.tabSystem'));
   }
+  setElementTitle('#prefs-tab-general-btn', t('prefs.tabGeneralTooltip'));
+  setElementTitle('#prefs-tab-appearance-btn', t('prefs.tabAppearanceTooltip'));
+  setElementTitle('#prefs-tab-schedule-btn', t('prefs.tabScheduleTooltip'));
+  setElementTitle('#prefs-tab-ai-btn', t('prefs.tabAiTooltip'));
+  setElementTitle('#prefs-tab-sync-btn', t('prefs.tabCloudSyncTooltip'));
+  setElementTitle('#prefs-tab-system-btn', t('prefs.tabSystemTooltip'));
   setElementText('#prefs-sec-appearance h3', t('prefs.appearance'));
 
   // Theme
