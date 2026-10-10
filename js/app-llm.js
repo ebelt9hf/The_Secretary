@@ -5935,10 +5935,12 @@ async function runBulkAISummaries() {
   cutoffDate.setDate(cutoffDate.getDate() - (weeks * 7));
   const cutoffStr = cutoffDate.toISOString().slice(0, 10); // YYYY-MM-DD
 
-  // Filter notes from manifest
+  // Filter notes from manifest - strictly skip notes that are already summarized
   const candidateNotes = manifest.filter(note => {
     if (!note.date || !note.path) return false;
-    const hasSummary = typeof note.summary === 'string' && note.summary.trim().length > 0;
+    const hasSummary = typeof hasValidNoteSummary === 'function'
+      ? hasValidNoteSummary(note.summary)
+      : (typeof note.summary === 'string' && note.summary.trim().length > 0);
     return note.date >= cutoffStr && !hasSummary;
   });
 
@@ -5983,6 +5985,21 @@ async function runBulkAISummaries() {
     try {
       const html = (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readNoteContent === 'function') ? await StorageAPI.readNoteContent(note.path) : await readFile(note.path);
       const parsed = parseNoteHTML(html);
+
+      // Verify again from note content on disk: skip LLM call if the note HTML already contains a valid summary
+      const alreadySummarized = typeof hasValidNoteSummary === 'function'
+        ? hasValidNoteSummary(parsed.summary)
+        : (typeof parsed.summary === 'string' && parsed.summary.trim().length > 0);
+      if (alreadySummarized) {
+        note.summary = parsed.summary;
+        const mfIdx = manifest.findIndex(item => item.path === note.path);
+        if (mfIdx !== -1) {
+          manifest[mfIdx].summary = parsed.summary;
+        }
+        processedCount++;
+        continue;
+      }
+
       const summary = await LLMService.generateNoteSummary(note, parsed.mainHTML || '');
 
       if (summary && summary.trim().length > 0) {
