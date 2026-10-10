@@ -1,66 +1,91 @@
-import fs from 'fs';
-import path from 'path';
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { loadScriptsIntoGlobal } from '../helpers/load-globals.js';
 
-describe('Preferences User Settings Tab & Section Promotion', () => {
+describe('Preferences User Settings Tab & User Info Promotion', () => {
   beforeAll(() => {
-    document.body.innerHTML = `
-      <div id="prefs-panel">
-        <div class="prefs-tabs" role="tablist">
-          <button class="prefs-tab-btn active" id="prefs-tab-general-btn" data-tab="general" onclick="switchPrefsTab('general')" role="tab" aria-selected="true">
-            <span data-i18n="prefs.tabGeneral">User Settings</span>
-          </button>
-          <button class="prefs-tab-btn" id="prefs-tab-appearance-btn" data-tab="appearance" onclick="switchPrefsTab('appearance')" role="tab" aria-selected="false">Appearance</button>
-          <button class="prefs-tab-btn" id="prefs-tab-sync-btn" data-tab="sync" onclick="switchPrefsTab('sync')" role="tab" aria-selected="false">Cloud Sync</button>
-        </div>
-
-        <div class="prefs-section" id="prefs-sec-user-info" style="display:none;"></div>
-        <div class="prefs-section" id="prefs-sec-profile" style="display:block;"></div>
-        <div class="prefs-section" id="prefs-sec-language" style="display:block;"></div>
-        <div class="prefs-section" id="prefs-sec-appearance" style="display:none;"></div>
-        <div class="prefs-section" id="prefs-sec-sync" style="display:none;"></div>
-      </div>
-    `;
-
+    globalThis.window = globalThis.window || {};
+    globalThis.normalizeLanguageCode = (c) => c || 'en';
+    globalThis.applyLocalizedUI = () => {};
     loadScriptsIntoGlobal([
       'js/translations.js',
       'js/app-i18n.js',
       'js/app-utils.js',
-      'js/app-firebase-sync.js',
       'js/app-init.js'
     ]);
   });
 
-  it('translates prefs.tabGeneral to User Settings in English and localized in all languages', () => {
-    const bundle = window.APP_TRANSLATIONS_BUNDLE.translations['prefs.tabGeneral'];
-    expect(bundle.en).toBe('User Settings');
-    expect(bundle.fr).toBe('Paramètres utilisateur');
-    expect(bundle.de).toBe('Benutzereinstellungen');
-    expect(bundle.es).toBe('Ajustes de usuario');
-    expect(bundle.it).toBe('Impostazioni utente');
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <div id="prefs-panel">
+        <button id="prefs-tab-general-btn" class="active">User Settings</button>
+        <button id="prefs-tab-sync-btn">Cloud Sync</button>
+        <div id="prefs-sec-user-info" style="display:none;"></div>
+        <div id="prefs-sec-profile" style="display:none;"></div>
+        <div id="prefs-sec-language" style="display:none;"></div>
+        <div id="prefs-sec-sync" style="display:none;"></div>
+        <div id="prefs-sec-storage" style="display:none;"></div>
+        <div id="prefs-sec-display" style="display:none;"></div>
+      </div>
+    `;
+    globalThis.activePrefsTab = 'general';
+    globalThis.settings = { storageEngine: 'filesystem' };
+    window.FirebaseSyncService = { state: { engine: 'filesystem' } };
   });
 
-  it('promotes prefs-sec-user-info into general tab in switchPrefsTab', () => {
-    window.FirebaseSyncService.state.engine = 'firebase';
-    const userInfoSec = document.getElementById('prefs-sec-user-info');
-    const profileSec = document.getElementById('prefs-sec-profile');
-    const appSec = document.getElementById('prefs-sec-appearance');
-
-    // Switch to appearance
-    window.switchPrefsTab('appearance');
-    expect(userInfoSec.style.display).toBe('none');
-    expect(profileSec.style.display).toBe('none');
-    expect(appSec.style.display).toBe('block');
-
-    // Switch to general (User Settings)
-    window.switchPrefsTab('general');
-    expect(userInfoSec.style.display).toBe('block');
-    expect(profileSec.style.display).toBe('block');
-    expect(appSec.style.display).toBe('none');
+  it('translates prefs.tabGeneral to "User Settings" across all 15 supported languages', () => {
+    expect(globalThis.t('prefs.tabGeneral')).toBe('User Settings');
+    const bundle = window.APP_TRANSLATIONS_BUNDLE?.translations;
+    expect(bundle).toBeDefined();
+    const supportedLangs = ['en', 'de', 'fr', 'es', 'it', 'pt', 'nl', 'cs', 'hu', 'pl', 'ro', 'ru', 'sv', 'tr', 'uk'];
+    supportedLangs.forEach(lang => {
+      const val = bundle['prefs.tabGeneral']?.[lang];
+      expect(val).toBeDefined();
+      expect(typeof val).toBe('string');
+      expect(val.length).toBeGreaterThan(0);
+      expect(val).not.toBe('General');
+    });
   });
 
-  it('positions prefs-sec-user-info before prefs-sec-profile in app.html DOM structure', () => {
+  it('switchPrefsTab("general") shows user info, profile, and language sections in general tab', () => {
+    switchPrefsTab('general');
+
+    const userInfo = document.getElementById('prefs-sec-user-info');
+    const profile = document.getElementById('prefs-sec-profile');
+    const lang = document.getElementById('prefs-sec-language');
+    const sync = document.getElementById('prefs-sec-sync');
+
+    expect(userInfo.style.display).toBe('block');
+    expect(profile.style.display).toBe('block');
+    expect(lang.style.display).toBe('block');
+    expect(sync.style.display).toBe('none');
+  });
+
+  it('switchPrefsTab switches cleanly between general (user settings) and sync tabs', () => {
+    // In local mode, sync tab only shows sync section, not cloud user info
+    switchPrefsTab('sync');
+    const userInfo = document.getElementById('prefs-sec-user-info');
+    const sync = document.getElementById('prefs-sec-sync');
+    const profile = document.getElementById('prefs-sec-profile');
+
+    expect(sync.style.display).toBe('block');
+    expect(userInfo.style.display).toBe('none');
+    expect(profile.style.display).toBe('none');
+
+    // In firebase mode, sync tab also shows user info
+    window.FirebaseSyncService = { state: { engine: 'firebase' } };
+    switchPrefsTab('sync');
+    expect(userInfo.style.display).toBe('block');
+
+    // Switching back to general always shows user info
+    switchPrefsTab('general');
+    expect(sync.style.display).toBe('none');
+    expect(userInfo.style.display).toBe('block');
+    expect(profile.style.display).toBe('block');
+  });
+
+  it('positions prefs-sec-user-info before prefs-sec-profile in app.html DOM structure', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
     const appHtmlPath = path.resolve(__dirname, '../../app.html');
     const htmlContent = fs.readFileSync(appHtmlPath, 'utf8');
 

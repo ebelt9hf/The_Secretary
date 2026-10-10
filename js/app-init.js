@@ -675,7 +675,7 @@ function switchPrefsTab(tabId) {
     appearance: ['prefs-sec-appearance'],
     schedule: ['prefs-sec-schedule'],
     ai: ['prefs-sec-ai'],
-    sync: ['prefs-sec-sync'],
+    sync: ['prefs-sec-sync', 'prefs-sec-user-info'],
     system: ['prefs-sec-folder', 'prefs-sec-maintenance', 'prefs-sec-help']
   };
   Object.entries(sections).forEach(([tId, secIds]) => {
@@ -685,7 +685,7 @@ function switchPrefsTab(tabId) {
       if (el) {
         if (id === 'prefs-sec-user-info') {
           const isFirebase = window.FirebaseSyncService?.state?.engine === 'firebase';
-          el.style.display = (isCurrent && isFirebase) ? 'block' : 'none';
+          el.style.display = (tabId === 'general' || (tabId === 'sync' && isFirebase)) ? 'block' : 'none';
         } else {
           el.style.display = isCurrent ? 'block' : 'none';
         }
@@ -910,7 +910,7 @@ function updateCloudSyncUI(statusObj) {
   if (userInfoSec) {
     const isFirebase = status.engine === 'firebase';
     const activeTab = (typeof activePrefsTab !== 'undefined') ? activePrefsTab : 'general';
-    userInfoSec.style.display = (isFirebase && (activeTab === 'general' || activeTab === 'sync')) ? 'block' : 'none';
+    userInfoSec.style.display = (activeTab === 'general' || (activeTab === 'sync' && isFirebase)) ? 'block' : 'none';
 
     if (isFirebase) {
       const avatarEl = document.getElementById('prefs-user-avatar');
@@ -990,6 +990,36 @@ function updateCloudSyncUI(statusObj) {
       const btnSendMagic = document.getElementById('btn-user-send-magic');
       if (btnSendMagic) {
         btnSendMagic.style.display = (user && user.email && !user.isAnonymous) ? 'inline-flex' : 'none';
+      }
+    } else {
+      const avatarEl = document.getElementById('prefs-user-avatar');
+      const nameEl = document.getElementById('prefs-user-display-name');
+      const badgeEl = document.getElementById('prefs-user-session-badge');
+      const emailEl = document.getElementById('prefs-user-email-text');
+      const uidEl = document.getElementById('prefs-user-uid-text');
+      const btnSignOut = document.getElementById('btn-user-signout');
+      const btnSwitch = document.getElementById('btn-user-switch-account');
+
+      if (avatarEl) {
+        avatarEl.textContent = (typeof settings !== 'undefined' && settings?.username)
+          ? settings.username.charAt(0).toUpperCase()
+          : 'L';
+      }
+      if (nameEl) {
+        nameEl.textContent = (typeof settings !== 'undefined' && settings?.username)
+          ? settings.username
+          : (typeof t === 'function' ? t('sync.engineOptionFs') : 'Local Filesystem User');
+      }
+      if (badgeEl) {
+        badgeEl.textContent = typeof t === 'function' ? t('sync.activeStorageLocalFolder') : 'Local Storage Active';
+      }
+      if (emailEl) {
+        emailEl.textContent = typeof t === 'function' ? t('sync.folderStoringDesc') : 'Notes and tasks stored locally';
+      }
+      if (uidEl) uidEl.textContent = '';
+      if (btnSignOut) btnSignOut.style.display = 'none';
+      if (btnSwitch) {
+        btnSwitch.textContent = typeof t === 'function' ? t('sync.accountSignInBtn') : 'Sign In / Connect Cloud';
       }
     }
   }

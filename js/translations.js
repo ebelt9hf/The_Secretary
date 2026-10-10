@@ -2639,6 +2639,23 @@ window.APP_TRANSLATIONS_BUNDLE = {
       "tr": "Tercihlere Git",
       "uk": "Перейдіть до Налаштувань"
     },
+    "chat.goToPreferencesTooltip": {
+      "cs": "Otevřít nastavení konfigurace AI",
+      "de": "KI-Konfigurationseinstellungen öffnen",
+      "en": "Open AI configuration settings",
+      "es": "Abrir la configuración de la IA",
+      "fr": "Ouvrir les paramètres de configuration de l'IA",
+      "hu": "AI konfigurációs beállítások megnyitása",
+      "it": "Apri le impostazioni di configurazione dell'IA",
+      "nl": "Open AI-configuratie-instellingen",
+      "pl": "Otwórz ustawienia konfiguracji AI",
+      "pt": "Abrir definições de configuração da IA",
+      "ro": "Deschideți setările de configurare AI",
+      "ru": "Открыть настройки конфигурации ИИ",
+      "sv": "Öppna AI-konfigurationsinställningar",
+      "tr": "Yapay zeka yapılandırma ayarlarını aç",
+      "uk": "Відкрити налаштування конфігурації ШІ"
+    },
     "chat.guideTooltip": {
       "cs": "Uživatelská příručka AI asistenta",
       "de": "Benutzerhandbuch für den KI-Assistenten",

@@ -109,6 +109,20 @@ const LLMService = {
     return !!(settings && settings.ai && settings.ai.enabled);
   },
 
+  isSetup() {
+    if (!this.isEnabled()) return false;
+    const ai = settings && settings.ai;
+    if (!ai) return false;
+    const provider = String(ai.provider || 'custom').toLowerCase();
+    const endpoint = String(ai.endpoint || '').trim();
+    const model = String(ai.model || '').trim();
+    const apiKey = String(ai.apiKey || '').trim();
+    if (['openai', 'anthropic', 'groq', 'google'].includes(provider)) {
+      return !!apiKey;
+    }
+    return !!(endpoint || model);
+  },
+
   normalizeEndpoint(endpointRaw, provider) {
     const raw = String(endpointRaw || '').trim();
     const withoutTrailingSlash = raw.endsWith('/') ? raw.slice(0, -1) : raw;
