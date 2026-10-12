@@ -15,7 +15,8 @@ import {
   linkWithPopup,
   linkWithCredential,
   EmailAuthProvider,
-  unlink
+  unlink,
+  deleteUser
 } from 'firebase/auth';
 import { getDatabase, ref, set, get, onValue, remove, child } from 'firebase/database';
 
@@ -113,6 +114,21 @@ export const FirebaseBridge = {
     if (!this.auth) return;
     await signOut(this.auth);
     this.currentUser = null;
+  },
+
+  async deleteCurrentUser() {
+    if (!this.auth) return false;
+    const user = this.getUser();
+    if (!user) return false;
+    await deleteUser(user);
+    this.currentUser = null;
+    return true;
+  },
+
+  async deleteUserData(userId) {
+    if (!this.db || !userId) return false;
+    await remove(ref(this.db, `users/${userId}`));
+    return true;
   },
 
   async sendPasswordReset(email) {

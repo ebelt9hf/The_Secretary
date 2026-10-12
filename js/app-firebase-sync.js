@@ -3206,6 +3206,48 @@ const FirebaseSyncService = {
     return true;
   },
 
+  async deleteUserAccountAndCloudVault() {
+    const bridge = this._getBridge();
+    const userId = this.state.userId || (bridge && typeof bridge.getUserId === 'function' ? bridge.getUserId() : null);
+
+    // 1. Delete user cloud vault from Realtime Database
+    if (bridge && userId && typeof bridge.deleteUserData === 'function') {
+      try {
+        await bridge.deleteUserData(userId);
+      } catch (err) {
+        console.warn('FirebaseSyncService.deleteUserAccountAndCloudVault: deleteUserData error:', err);
+      }
+    }
+
+    // 2. Delete auth account in Firebase
+    if (bridge && typeof bridge.deleteCurrentUser === 'function') {
+      try {
+        await bridge.deleteCurrentUser();
+      } catch (err) {
+        console.warn('FirebaseSyncService.deleteUserAccountAndCloudVault: deleteCurrentUser error:', err);
+      }
+    }
+
+    // 3. Purge local session and IDB
+    await this.purgeLocalSessionAndQuit();
+
+    // 4. Delete IDB database entirely
+    if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.deleteDatabase === 'function') {
+      try {
+        await VaultIDBStorage.deleteDatabase();
+      } catch (e) {}
+    }
+
+    // 5. Clean local settings references
+    if (typeof settings !== 'undefined' && settings) {
+      delete settings.vaultMeta;
+      delete settings.vaultId;
+      delete settings.lastSyncEmail;
+    }
+
+    return true;
+  },
+
   // ── Full Bidirectional Migration Assistent ──
   async migrateFromFilesystem(rawNotesList = [], passphrase, config = {}, additionalData = {}, onProgress = null) {
     if (!passphrase) throw new Error('Master passphrase is required for migration');

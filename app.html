@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secretary</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.24">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.24">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.25">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.25">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -208,7 +208,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.24" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.24</p>
+      <p id="connect-version-hint" data-version="4.0.25" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.25</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -683,6 +683,25 @@
               </div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- Danger Zone: User Account & Data Deletion Card -->
+        <div class="prefs-row" id="prefs-danger-zone-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:16px;">
+          <label class="prefs-label" style="color:var(--color-danger, #ef4444); font-weight:700;" data-i18n="prefs.dangerZoneTitle">Danger Zone</label>
+          <div style="width:100%; padding:14px; background:var(--card-bg-alt); border:1px solid color-mix(in srgb, var(--color-danger, #ef4444) 30%, transparent); border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:8px; background:rgba(239, 68, 68, 0.12); color:#ef4444;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </span>
+                <div>
+                  <div style="font-size:0.9rem; font-weight:700; color:var(--text);" data-i18n="prefs.deleteUserCardTitle">Delete User & Data</div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;" data-i18n="prefs.deleteUserCardDesc">Permanently delete your user account and erase all notes, tasks, and data.</div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-danger" id="btn-user-delete-account" onclick="openDeleteUserConfirmModalUI()" title="Open confirmation to permanently delete user account and all data" data-i18n-title="prefs.deleteUserTooltip" data-i18n="prefs.deleteUserBtn">Delete User & Data</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1474,40 +1493,40 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.24"></script>
-<script src="js/app-utils.js?v=4.0.24"></script>
-<script src="js/app-icons.js?v=4.0.24"></script>
-<script src="js/app-popover-manager.js?v=4.0.24"></script>
-<script src="js/translations.js?v=4.0.24"></script>
-<script src="js/app-i18n.js?v=4.0.24"></script>
-<script src="js/app-bridge.js?v=4.0.24"></script>
-<script src="js/app-fs.js?v=4.0.24"></script>
-<script src="js/firebase-bundle.js?v=4.0.24"></script>
-<script src="js/firebase-config.js?v=4.0.24"></script>
-<script src="js/app-crypto.js?v=4.0.24"></script>
-<script src="js/app-image-optimizer.js?v=4.0.24"></script>
-<script src="js/app-idb.js?v=4.0.24"></script>
-<script src="js/app-firebase-sync.js?v=4.0.24"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.24"></script>
-<script src="js/app-storage.js?v=4.0.24"></script>
-<script src="js/storage-migration.js?v=4.0.24"></script>
-<script src="js/app-stash-service.js?v=4.0.24"></script>
-<script src="js/app-omnibar.js?v=4.0.24"></script>
-<script src="js/app-topic-memory.js?v=4.0.24"></script>
-<script src="js/app-prompts.js?v=4.0.24"></script>
-<script src="js/app-llm.js?v=4.0.24"></script>
-<script src="js/app-dailyreview.js?v=4.0.24"></script>
-<script src="js/app-notes.js?v=4.0.24"></script>
-<script src="js/app-todos-board.js?v=4.0.24"></script>
-<script src="js/app-board.js?v=4.0.24"></script>
-<script src="js/app-focus.js?v=4.0.24"></script>
-<script src="js/app-overlay.js?v=4.0.24"></script>
-<script src="js/app-planner.js?v=4.0.24"></script>
-<script src="js/app-collab.js?v=4.0.24"></script>
-<script src="js/app-retro.js?v=4.0.24"></script>
-<script src="js/app-tutorial.js?v=4.0.24"></script>
-<script src="js/app-graph-view.js?v=4.0.24"></script>
-<script src="js/app-chat.js?v=4.0.24"></script>
-<script src="js/app-init.js?v=4.0.24"></script>
+<script src="js/app-state.js?v=4.0.25"></script>
+<script src="js/app-utils.js?v=4.0.25"></script>
+<script src="js/app-icons.js?v=4.0.25"></script>
+<script src="js/app-popover-manager.js?v=4.0.25"></script>
+<script src="js/translations.js?v=4.0.25"></script>
+<script src="js/app-i18n.js?v=4.0.25"></script>
+<script src="js/app-bridge.js?v=4.0.25"></script>
+<script src="js/app-fs.js?v=4.0.25"></script>
+<script src="js/firebase-bundle.js?v=4.0.25"></script>
+<script src="js/firebase-config.js?v=4.0.25"></script>
+<script src="js/app-crypto.js?v=4.0.25"></script>
+<script src="js/app-image-optimizer.js?v=4.0.25"></script>
+<script src="js/app-idb.js?v=4.0.25"></script>
+<script src="js/app-firebase-sync.js?v=4.0.25"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.25"></script>
+<script src="js/app-storage.js?v=4.0.25"></script>
+<script src="js/storage-migration.js?v=4.0.25"></script>
+<script src="js/app-stash-service.js?v=4.0.25"></script>
+<script src="js/app-omnibar.js?v=4.0.25"></script>
+<script src="js/app-topic-memory.js?v=4.0.25"></script>
+<script src="js/app-prompts.js?v=4.0.25"></script>
+<script src="js/app-llm.js?v=4.0.25"></script>
+<script src="js/app-dailyreview.js?v=4.0.25"></script>
+<script src="js/app-notes.js?v=4.0.25"></script>
+<script src="js/app-todos-board.js?v=4.0.25"></script>
+<script src="js/app-board.js?v=4.0.25"></script>
+<script src="js/app-focus.js?v=4.0.25"></script>
+<script src="js/app-overlay.js?v=4.0.25"></script>
+<script src="js/app-planner.js?v=4.0.25"></script>
+<script src="js/app-collab.js?v=4.0.25"></script>
+<script src="js/app-retro.js?v=4.0.25"></script>
+<script src="js/app-tutorial.js?v=4.0.25"></script>
+<script src="js/app-graph-view.js?v=4.0.25"></script>
+<script src="js/app-chat.js?v=4.0.25"></script>
+<script src="js/app-init.js?v=4.0.25"></script>
 </body>
 </html>

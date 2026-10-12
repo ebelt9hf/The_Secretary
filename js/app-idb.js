@@ -444,6 +444,37 @@ const VaultIDBStorage = {
     } finally {
       releaseLock();
     }
+  },
+
+  async deleteDatabase() {
+    if (this._db) {
+      try {
+        this._db.close();
+      } catch (e) {}
+      this._db = null;
+    }
+    this._openPromise = null;
+    this._memFallback = {
+      meta: new Map(),
+      notes: new Map(),
+      docs: new Map(),
+      assets: new Map(),
+      wal: new Map()
+    };
+
+    const idb = typeof window !== 'undefined'
+      ? (window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB)
+      : (typeof self !== 'undefined' && self.indexedDB ? self.indexedDB : (typeof globalThis !== 'undefined' ? globalThis.indexedDB : null));
+
+    if (idb && typeof idb.deleteDatabase === 'function') {
+      return new Promise((resolve) => {
+        const req = idb.deleteDatabase(this.DB_NAME);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => resolve(false);
+        req.onblocked = () => resolve(true);
+      });
+    }
+    return true;
   }
 };
 

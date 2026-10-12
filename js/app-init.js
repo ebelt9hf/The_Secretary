@@ -2084,6 +2084,17 @@ async function handleLogOffUI() {
   const hasLocalHandle = Boolean(typeof rootHandle !== 'undefined' && rootHandle);
   const isDataSavedLocally = isFs || hasLocalHandle;
 
+  const confirmModal = document.getElementById('modal-logoff-confirm');
+  if (confirmModal && typeof openModal === 'function') {
+    const isCloudMode = !isDataSavedLocally;
+    const keepCacheCard = document.getElementById('logoff-keep-cache-card');
+    const keepCacheBtn = document.getElementById('btn-logoff-keep-cache');
+    if (keepCacheCard) keepCacheCard.style.display = isCloudMode ? '' : 'none';
+    if (keepCacheBtn) keepCacheBtn.style.display = isCloudMode ? '' : 'none';
+    openModal('modal-logoff-confirm');
+    return true;
+  }
+
   if (isDataSavedLocally) {
     if (typeof openModal === 'function' && document.getElementById('modal-logoff-local-warning')) {
       openModal('modal-logoff-local-warning');
@@ -2097,7 +2108,15 @@ async function handleLogOffUI() {
     return false;
   }
 
+  if (typeof confirmStandardSignOutUI === 'function') {
+    return await confirmStandardSignOutUI();
+  }
+
   try {
+    if (typeof closeModal === 'function') {
+      closeModal('modal-logoff-confirm');
+      closeModal('modal-logoff-local-warning');
+    }
     if (window.FirebaseSyncService) {
       await window.FirebaseSyncService.signOut();
       if (typeof window.FirebaseSyncService.lockVault === 'function') {
@@ -2134,6 +2153,146 @@ async function handleLogOffUI() {
   }
 }
 window.handleLogOffUI = handleLogOffUI;
+
+async function confirmStandardSignOutUI() {
+  try {
+    if (typeof closeModal === 'function') {
+      closeModal('modal-logoff-confirm');
+      closeModal('modal-logoff-local-warning');
+    }
+    if (window.FirebaseSyncService) {
+      await window.FirebaseSyncService.signOut();
+      if (typeof window.FirebaseSyncService.lockVault === 'function') {
+        window.FirebaseSyncService.lockVault();
+      }
+    }
+    if (typeof manifest !== 'undefined') manifest = [];
+    if (typeof todosManifest !== 'undefined') todosManifest = [];
+    if (typeof plannerEvents !== 'undefined') plannerEvents = [];
+
+    const sm = document.getElementById('screen-main');
+    if (sm) sm.classList.remove('active');
+    const sc = document.getElementById('screen-connect');
+    if (sc) {
+      sc.style.display = '';
+      sc.classList.remove('loading');
+    }
+    if (typeof showLandingStep === 'function') {
+      showLandingStep('welcome');
+    }
+    if (typeof updateCloudSyncUI === 'function') {
+      updateCloudSyncUI();
+    }
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.signOutSuccessToast') : 'Signed out from cloud account');
+    }
+    return true;
+  } catch (err) {
+    console.error('Sign out failed:', err);
+    if (typeof showToast === 'function') {
+      showToast((typeof t === 'function' ? t('sync.setupFailed') : 'Sign out failed') + ': ' + (err.message || ''), true);
+    }
+    return false;
+  }
+}
+window.confirmStandardSignOutUI = confirmStandardSignOutUI;
+
+async function confirmLogOffWithLocalWipeUI() {
+  try {
+    if (typeof closeModal === 'function') {
+      closeModal('modal-logoff-confirm');
+      closeModal('modal-logoff-local-warning');
+    }
+    if (window.FirebaseSyncService) {
+      try {
+        await window.FirebaseSyncService.signOut();
+        if (typeof window.FirebaseSyncService.lockVault === 'function') {
+          window.FirebaseSyncService.lockVault();
+        }
+      } catch (e) {}
+    }
+
+    if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.wipeAllLocalData === 'function') {
+      await StorageAPI.wipeAllLocalData({ clearEntireLocalStorage: true });
+    }
+
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('confirm.logOffWipedSuccessToast') : 'Logged off and all local data cleared from this device');
+    }
+    return true;
+  } catch (err) {
+    console.error('Log off and wipe failed:', err);
+    if (typeof showToast === 'function') {
+      showToast(((typeof t === 'function' ? t('sync.setupFailed') : null) || 'Sign out failed') + ': ' + (err.message || ''), true);
+    }
+    return false;
+  }
+}
+window.confirmLogOffWithLocalWipeUI = confirmLogOffWithLocalWipeUI;
+
+function openDeleteUserConfirmModalUI() {
+  const input = document.getElementById('delete-user-confirm-input');
+  if (input) input.value = '';
+  const btn = document.getElementById('btn-confirm-delete-user');
+  if (btn) btn.disabled = true;
+  if (typeof openModal === 'function') {
+    openModal('modal-delete-user-confirm');
+    if (input) {
+      setTimeout(() => input.focus(), 60);
+    }
+  }
+}
+window.openDeleteUserConfirmModalUI = openDeleteUserConfirmModalUI;
+
+function onDeleteUserConfirmInputChange(val) {
+  const btn = document.getElementById('btn-confirm-delete-user');
+  if (btn) {
+    btn.disabled = ((val || '').trim() !== 'DELETE');
+  }
+}
+window.onDeleteUserConfirmInputChange = onDeleteUserConfirmInputChange;
+
+async function confirmDeleteUserAndDataUI() {
+  const input = document.getElementById('delete-user-confirm-input');
+  if (input && input.value.trim() !== 'DELETE') return false;
+
+  const btn = document.getElementById('btn-confirm-delete-user');
+  if (btn) btn.disabled = true;
+
+  try {
+    // 1. If in Cloud Mode, delete cloud vault and Firebase Auth user
+    if (window.FirebaseSyncService && typeof window.FirebaseSyncService.deleteUserAccountAndCloudVault === 'function') {
+      try {
+        await window.FirebaseSyncService.deleteUserAccountAndCloudVault();
+      } catch (err) {
+        console.warn('FirebaseSyncService.deleteUserAccountAndCloudVault error:', err);
+      }
+    }
+
+    // 2. Wipe all local data, IndexedDB, localStorage, and in-memory caches
+    if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.wipeAllLocalData === 'function') {
+      await StorageAPI.wipeAllLocalData({ clearEntireLocalStorage: true });
+    }
+
+    if (typeof closeModal === 'function') {
+      closeModal('modal-delete-user-confirm');
+    }
+
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('confirm.deleteUserSuccessToast') : 'User account and all data have been permanently deleted');
+    }
+    return true;
+  } catch (err) {
+    console.error('Delete user and data failed:', err);
+    if (typeof showToast === 'function') {
+      showToast(((typeof t === 'function' ? t('sync.deleteCloudFailed') : null) || 'Failed to delete data') + ': ' + (err.message || ''), true);
+    }
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.confirmDeleteUserAndDataUI = confirmDeleteUserAndDataUI;
 
 async function signOutCloudAccountUI() {
   return await handleLogOffUI();

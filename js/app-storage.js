@@ -1144,6 +1144,122 @@ const StorageAPI = {
 
   async revertToFilesystem(onProgress = null) {
     return await this._getMigrator().revertToFilesystem(onProgress);
+  },
+
+  async wipeAllLocalData(options = {}) {
+    // 1. Delete operational IndexedDB store
+    try {
+      if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.deleteDatabase === 'function') {
+        await VaultIDBStorage.deleteDatabase();
+      }
+    } catch (e) {
+      console.warn('StorageAPI.wipeAllLocalData: VaultIDBStorage.deleteDatabase failed', e);
+    }
+
+    // 2. Delete secretary-app handle IndexedDB database
+    try {
+      const idb = typeof window !== 'undefined' ? (window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB) : null;
+      if (idb && typeof idb.deleteDatabase === 'function') {
+        await new Promise(resolve => {
+          const req = idb.deleteDatabase('secretary-app');
+          req.onsuccess = () => resolve(true);
+          req.onerror = () => resolve(false);
+          req.onblocked = () => resolve(true);
+        });
+      }
+    } catch (e) {
+      console.warn('StorageAPI.wipeAllLocalData: delete secretary-app IDB failed', e);
+    }
+
+    // 3. Delete any other Secretary IndexedDB databases found if supported
+    try {
+      const idb = typeof window !== 'undefined' ? (window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB) : null;
+      if (idb && typeof idb.databases === 'function') {
+        const dbs = await idb.databases();
+        if (Array.isArray(dbs)) {
+          for (const dbInfo of dbs) {
+            if (dbInfo && dbInfo.name && (dbInfo.name.includes('Secretary') || dbInfo.name.includes('secretary'))) {
+              try {
+                idb.deleteDatabase(dbInfo.name);
+              } catch (_e) {}
+            }
+          }
+        }
+      }
+    } catch (_e) {}
+
+    // 4. Clear localStorage items
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('secretary') || k.startsWith('Secretary') || k.includes('vault') || k.includes('topic_memories'))) {
+            keysToRemove.push(k);
+          }
+        }
+        for (const k of keysToRemove) {
+          localStorage.removeItem(k);
+        }
+        if (options.clearEntireLocalStorage) {
+          localStorage.clear();
+        }
+      } catch (e) {
+        console.warn('StorageAPI.wipeAllLocalData: localStorage cleanup failed', e);
+      }
+    }
+
+    // 5. Clear sessionStorage
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.clear();
+      } catch (e) {}
+    }
+
+    // 6. Purge Firebase sync service local memory and lock vault
+    if (typeof window !== 'undefined' && window.FirebaseSyncService) {
+      try {
+        if (typeof window.FirebaseSyncService.lockVault === 'function') {
+          window.FirebaseSyncService.lockVault();
+        }
+        if (typeof window.FirebaseSyncService.clearSavedPassphrase === 'function') {
+          await window.FirebaseSyncService.clearSavedPassphrase();
+        }
+      } catch (e) {}
+    }
+
+    // 7. Clear in-memory manifests and handle
+    if (typeof globalThis !== 'undefined') {
+      if (typeof globalThis.manifest !== 'undefined') globalThis.manifest = [];
+      if (typeof globalThis.todosManifest !== 'undefined') globalThis.todosManifest = [];
+      if (typeof globalThis.plannerEvents !== 'undefined') globalThis.plannerEvents = [];
+      globalThis.rootHandle = null;
+    }
+    if (typeof window !== 'undefined') {
+      if (typeof window.manifest !== 'undefined') window.manifest = [];
+      if (typeof window.todosManifest !== 'undefined') window.todosManifest = [];
+      if (typeof window.plannerEvents !== 'undefined') window.plannerEvents = [];
+      window.rootHandle = null;
+    }
+
+    // 8. Reset UI to welcome screen
+    if (typeof window !== 'undefined') {
+      const sm = document.getElementById('screen-main');
+      if (sm) sm.classList.remove('active');
+      const sc = document.getElementById('screen-connect');
+      if (sc) {
+        sc.style.display = '';
+        sc.classList.remove('loading');
+      }
+      if (typeof showLandingStep === 'function') {
+        showLandingStep('welcome');
+      }
+      if (typeof updateCloudSyncUI === 'function') {
+        updateCloudSyncUI();
+      }
+    }
+
+    return true;
   }
 };
 
