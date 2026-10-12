@@ -4417,11 +4417,17 @@ async function checkSavedFolder() {
 document.addEventListener('click', async e => {
   const btnOpenFolder = e.target?.closest ? e.target.closest('#btn-open-folder') : null;
   if (!btnOpenFolder) return;
-  if (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS()) {
+  if (typeof isLocalFolderOptionAvailable === 'function' ? !isLocalFolderOptionAvailable() : (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS())) {
     if (typeof window.copyWebAppUrl === 'function') {
       window.copyWebAppUrl(btnOpenFolder);
+    }
+    const msg = (typeof isSafariBrowser === 'function' && isSafariBrowser())
+      ? (typeof t === 'function' ? t('landing.safariUnsupportedToast') : 'Local folder storage is not supported in Safari. Please choose a Cloud Vault option or use Google Chrome or the Desktop App.')
+      : (typeof t === 'function' ? t('landing.chromeOnly') : 'Direct disk storage requires Chrome, Edge, or Desktop App.');
+    if (typeof showToast === 'function') {
+      showToast(msg);
     } else if (typeof toast === 'function') {
-      toast(typeof t === 'function' ? t('landing.chromeOnly') : 'Direct disk storage requires Chrome, Edge, or Desktop App.', true);
+      toast(msg, true);
     }
     return;
   }
@@ -4590,6 +4596,110 @@ function openManagedFirebaseSetupFromLanding() {
 }
 window.openManagedFirebaseSetupFromLanding = openManagedFirebaseSetupFromLanding;
 
+function isLocalFilesystemSupported() {
+  if (typeof window === 'undefined') return false;
+  if (window.AppBridge?.fs?.hasNativeFS && window.AppBridge.fs.hasNativeFS()) return true;
+  return typeof window.showDirectoryPicker === 'function' || typeof window.showDirectoryPicker === 'object';
+}
+window.isLocalFilesystemSupported = isLocalFilesystemSupported;
+
+function isSafariBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const vendor = navigator.vendor || '';
+  return (/^((?!chrome|android).)*safari/i.test(ua) || vendor.includes('Apple')) && !ua.includes('Electron');
+}
+window.isSafariBrowser = isSafariBrowser;
+
+function isLocalFolderOptionAvailable() {
+  return isLocalFilesystemSupported() && !isSafariBrowser();
+}
+window.isLocalFolderOptionAvailable = isLocalFolderOptionAvailable;
+
+function updateLocalStorageCardState() {
+  const localCard = document.getElementById('landing-card-local') || document.querySelector('.landing-storage-card-local');
+  if (!localCard) return;
+
+  const btnOpen = document.getElementById('btn-open-folder');
+  const btnText = document.getElementById('btn-open-folder-text');
+  const badge = localCard.querySelector('.landing-card-badge');
+  const desc = localCard.querySelector('p');
+  const title = localCard.querySelector('h3');
+  const isAvailable = typeof isLocalFolderOptionAvailable === 'function' ? isLocalFolderOptionAvailable() : (typeof window.showDirectoryPicker !== 'undefined');
+  const isSafari = typeof isSafariBrowser === 'function' ? isSafariBrowser() : false;
+
+  if (!isAvailable) {
+    localCard.classList.remove('is-recommended');
+    localCard.classList.add('is-disabled');
+    localCard.setAttribute('aria-disabled', 'true');
+
+    if (badge) {
+      badge.textContent = isSafari
+        ? (typeof t === 'function' ? t('landing.badgeUnsupportedSafari') : 'Not Supported in Safari')
+        : (typeof t === 'function' ? t('landing.badgeChromiumDesktop') : 'Chromium / Desktop');
+      badge.className = 'landing-card-badge is-disabled';
+    }
+
+    if (title) {
+      title.textContent = typeof t === 'function' ? t('landing.localOptionTitle') : 'Local Folder';
+    }
+
+    if (desc) {
+      desc.textContent = isSafari
+        ? (typeof t === 'function' ? t('landing.localOptionSafariDesc') : 'Direct disk storage is not supported in Safari. Run Secretary in Chrome, Edge, Brave, or the Desktop App for local folders, or choose an encrypted Cloud Vault below.')
+        : (typeof t === 'function' ? t('landing.optionChromeDesc') : 'Free local-first disk storage. Run Secretary in Chrome, Edge, Brave, or the Desktop App for direct folder reading & writing.');
+    }
+
+    if (btnOpen) {
+      btnOpen.style.display = '';
+      btnOpen.disabled = true;
+      btnOpen.classList.add('is-disabled');
+      btnOpen.classList.remove('landing-card-btn-primary');
+      btnOpen.setAttribute('aria-disabled', 'true');
+      btnOpen.title = isSafari
+        ? (typeof t === 'function' ? t('landing.localUnsupportedSafariTooltip') : 'Direct local folder storage is not supported in Safari. Please choose Connect Own Firebase or Etienne\'s Managed Cloud Vault, or run Secretary in Google Chrome or the Desktop App.')
+        : (typeof t === 'function' ? t('landing.localOptionTooltip') : 'Pick a folder on your computer to store your Secretary workspace');
+    }
+
+    if (btnText) {
+      btnText.textContent = isSafari
+        ? (typeof t === 'function' ? t('landing.localUnavailableBtn') : 'Unavailable in Safari')
+        : (typeof t === 'function' ? t('landing.localOptionBtn') : 'Open Local Folder');
+    }
+  } else {
+    localCard.classList.add('is-recommended');
+    localCard.classList.remove('is-disabled');
+    localCard.removeAttribute('aria-disabled');
+
+    if (badge) {
+      badge.textContent = typeof t === 'function' ? t('landing.recommendedBadge') : 'Recommended';
+      badge.className = 'landing-card-badge is-primary';
+    }
+
+    if (title) {
+      title.textContent = typeof t === 'function' ? t('landing.localOptionTitle') : 'Local Folder';
+    }
+
+    if (desc) {
+      desc.textContent = typeof t === 'function' ? t('landing.localOptionDesc') : 'Direct read and write access to files on your computer. 100% private, offline-first, fast, and no cloud lock-in.';
+    }
+
+    if (btnOpen) {
+      btnOpen.style.display = '';
+      btnOpen.disabled = false;
+      btnOpen.classList.remove('is-disabled');
+      btnOpen.classList.add('landing-card-btn-primary');
+      btnOpen.removeAttribute('aria-disabled');
+      btnOpen.title = typeof t === 'function' ? t('landing.localOptionTooltip') : 'Pick a folder on your computer to store your Secretary workspace';
+    }
+
+    if (btnText) {
+      btnText.textContent = typeof t === 'function' ? t('landing.localOptionBtn') : 'Open Local Folder';
+    }
+  }
+}
+window.updateLocalStorageCardState = updateLocalStorageCardState;
+
 function renderBrowserCompatibilityOptions() {
   const screenConnect = document.getElementById('screen-connect');
   if (!screenConnect) return;
@@ -4599,6 +4709,19 @@ function renderBrowserCompatibilityOptions() {
   screenConnect.removeAttribute('aria-busy');
   const status = document.getElementById('connect-status-hint');
   if (status) status.textContent = '';
+
+  const card = document.getElementById('screen-connect-card') || screenConnect;
+  if (card && card.classList) card.classList.add('has-browser-options');
+
+  const setupStep = document.getElementById('landing-step-setup');
+  // If the 2-step setup layout exists, the 3 storage options belong on Step 2 (landing-step-setup),
+  // NEVER on the top screen (landing-step-welcome).
+  if (setupStep) {
+    const existing = document.getElementById('browser-compatibility-options');
+    if (existing) existing.remove();
+    updateLocalStorageCardState();
+    return;
+  }
 
   const existing = document.getElementById('browser-compatibility-options');
   if (existing) existing.remove();
@@ -4698,8 +4821,6 @@ function renderBrowserCompatibilityOptions() {
     </div>
   `;
 
-  const card = document.getElementById('screen-connect-card') || screenConnect;
-  if (card && card.classList) card.classList.add('has-browser-options');
   const actionsContainer = card.querySelector ? card.querySelector('.landing-actions-container') : null;
   if (actionsContainer && actionsContainer.parentNode) {
     actionsContainer.parentNode.insertBefore(container, actionsContainer);
@@ -4731,22 +4852,9 @@ function showLandingStep(step) {
     if (btnBack) btnBack.style.display = 'inline-flex';
     if (card) {
       card.classList.add('is-setup-step');
-      if (card.classList.contains('has-browser-options')) {
-        const localCard = document.getElementById('landing-card-local') || document.querySelector('.landing-storage-card-local');
-        if (localCard) {
-          const badge = localCard.querySelector('.landing-card-badge');
-          if (badge) {
-            badge.textContent = typeof t === 'function' ? t('landing.badgeChromiumDesktop') : 'Chromium / Desktop';
-            badge.className = 'landing-card-badge';
-          }
-          const title = localCard.querySelector('h3');
-          if (title) title.textContent = typeof t === 'function' ? t('landing.optionChromeTitle') : 'Google Chrome / Desktop App';
-          const desc = localCard.querySelector('p');
-          if (desc) desc.textContent = typeof t === 'function' ? t('landing.optionChromeDesc') : 'Free local-first disk storage. Run Secretary in Chrome, Edge, Brave, or Desktop App for direct folder reading & writing.';
-          const btnText = document.getElementById('btn-open-folder-text');
-          if (btnText) btnText.textContent = typeof t === 'function' ? t('landing.optionChromeBtn') : 'Copy Web App Link';
-        }
-      }
+    }
+    if (typeof updateLocalStorageCardState === 'function') {
+      updateLocalStorageCardState();
     }
   } else {
     if (welcomeStep) welcomeStep.style.display = 'flex';
@@ -4770,6 +4878,9 @@ function changeLandingLanguage(langCode) {
   if (typeof settings !== 'undefined') {
     settings.language = normalized;
     if (typeof saveLocalSettings === 'function') saveLocalSettings();
+  }
+  if (typeof updateLocalStorageCardState === 'function') {
+    updateLocalStorageCardState();
   }
 }
 window.changeLandingLanguage = changeLandingLanguage;
@@ -5165,40 +5276,43 @@ window.startDemoWorkspaceFromLanding = async function() {
 };
 
 // Browser compatibility check for File System Access API
-if (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS()) {
+if (typeof isLocalFolderOptionAvailable === 'function' ? !isLocalFolderOptionAvailable() : (typeof window.showDirectoryPicker === 'undefined' && !window.AppBridge?.fs?.hasNativeFS())) {
   if (settings && settings.storageEngine === 'firebase') {
     mountFolder({ name: 'Firebase Cloud Vault' });
   } else {
     renderBrowserCompatibilityOptions();
   }
-} else {
-  // Hash routing: detect #note=<id> or #path=<path> or #chat-window=true
-  (function initHashRouting() {
-    const hash = location.hash;
-    const isCompanion = hash.includes('chat-window=true') || document.body.classList.contains('secretary-window-standalone');
-    if (isCompanion) {
-      document.body.classList.add('chat-window-mode');
-      setTimeout(() => {
-        const floating = document.getElementById('floating-secretary-chat');
-        if (floating) floating.classList.add('is-open');
-      }, 50);
-    }
-    if (hash.includes('focus-pip=true')) {
-      document.body.classList.add('focus-pip-mode');
-      setTimeout(() => {
-        if (typeof renderFocusPipHud === 'function') renderFocusPipHud();
-      }, 100);
-    }
-    const isPreloaded = hash.includes('preloaded=true');
-    const m = hash.match(/[#&](note|path)=([^&]+)/);
-    if (m || isPreloaded) {
-      _isFocusedMode = true;
-      document.body.classList.add('focused-note-mode');
-      // Update connect screen hint
-      const hint = document.querySelector('.connect-note-hint');
-      if (hint && m) hint.textContent = t('common.noteLinkDetected');
-    }
-  })();
+}
+
+// Hash routing: detect #note=<id> or #path=<path> or #chat-window=true
+(function initHashRouting() {
+  const hash = location.hash;
+  const isCompanion = hash.includes('chat-window=true') || document.body.classList.contains('secretary-window-standalone');
+  if (isCompanion) {
+    document.body.classList.add('chat-window-mode');
+    setTimeout(() => {
+      const floating = document.getElementById('floating-secretary-chat');
+      if (floating) floating.classList.add('is-open');
+    }, 50);
+  }
+  if (hash.includes('focus-pip=true')) {
+    document.body.classList.add('focus-pip-mode');
+    setTimeout(() => {
+      if (typeof renderFocusPipHud === 'function') renderFocusPipHud();
+    }, 100);
+  }
+  const isPreloaded = hash.includes('preloaded=true');
+  const m = hash.match(/[#&](note|path)=([^&]+)/);
+  if (m || isPreloaded) {
+    _isFocusedMode = true;
+    document.body.classList.add('focused-note-mode');
+    // Update connect screen hint
+    const hint = document.querySelector('.connect-note-hint');
+    if (hint && m) hint.textContent = t('common.noteLinkDetected');
+  }
+})();
+
+if (typeof isLocalFolderOptionAvailable === 'function' ? isLocalFolderOptionAvailable() : (typeof window.showDirectoryPicker !== 'undefined' || !!window.AppBridge?.fs?.hasNativeFS())) {
   const isCompanionMode = document.body.classList.contains('secretary-window-standalone') ||
                           document.body.classList.contains('chat-window-mode') ||
                           (location.hash && location.hash.includes('chat-window=true'));

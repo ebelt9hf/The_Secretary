@@ -943,6 +943,11 @@ function applyLocalizedUI() {
   if (typeof updateLLMToolbarVisibility === 'function') {
     try { updateLLMToolbarVisibility(); } catch (e) { }
   }
+  if (typeof updateLocalStorageCardState === 'function') {
+    try { updateLocalStorageCardState(); } catch (e) { }
+  } else if (typeof window !== 'undefined' && typeof window.updateLocalStorageCardState === 'function') {
+    try { window.updateLocalStorageCardState(); } catch (e) { }
+  }
 }
 
 function setAppLanguage(lang, { persist = true } = {}) {

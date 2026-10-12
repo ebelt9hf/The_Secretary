@@ -51,7 +51,8 @@ describe('Landing Screen Onboarding & Language Flow', () => {
             <h2 class="landing-setup-title" data-i18n="landing.setupTitle">Choose Workspace Storage</h2>
             <p class="landing-setup-subtitle" data-i18n="landing.setupDesc">Select how and where you want Secretary to store and sync your notes</p>
             <div class="landing-storage-grid">
-              <div class="landing-storage-card landing-storage-card-local">
+              <div class="landing-storage-card landing-storage-card-local is-recommended" id="landing-card-local">
+                <span class="landing-card-badge is-primary" data-i18n="landing.recommendedBadge">Recommended</span>
                 <h3 data-i18n="landing.localOptionTitle">Local Folder</h3>
                 <p data-i18n="landing.localOptionDesc">Direct disk access</p>
                 <button id="btn-open-folder"><span id="btn-open-folder-text" data-i18n="landing.localOptionBtn">Open Local Folder</span></button>
@@ -382,15 +383,106 @@ describe('Landing Screen Onboarding & Language Flow', () => {
       }
     });
 
-    it('adapts local storage card to Chrome copy link when has-browser-options is present on card', () => {
-      const card = document.getElementById('screen-connect-card');
-      card.classList.add('has-browser-options');
-      showLandingStep('setup');
+    it('does not inject storage options onto Step 1 welcome screen when 2-step setup layout exists', () => {
+      const origPicker = window.showDirectoryPicker;
+      try {
+        delete window.showDirectoryPicker;
+        renderBrowserCompatibilityOptions();
 
-      const localCard = document.querySelector('.landing-storage-card-local');
-      expect(localCard.querySelector('h3').textContent).toBe(t('landing.optionChromeTitle'));
-      const btnText = document.getElementById('btn-open-folder-text');
-      expect(btnText.textContent).toBe(t('landing.optionChromeBtn'));
+        // Compatibility options should NOT be inserted into Step 1
+        expect(document.getElementById('browser-compatibility-options')).toBeNull();
+
+        // Step 1 Welcome Screen should remain clean
+        expect(document.getElementById('landing-step-welcome').style.display).not.toBe('none');
+        expect(document.getElementById('landing-step-setup').style.display).toBe('none');
+      } finally {
+        if (origPicker !== undefined) {
+          window.showDirectoryPicker = origPicker;
+        }
+      }
+    });
+
+    it('grays out local storage option on Step 2 in Safari and when File System Access API is unavailable', () => {
+      const origPicker = window.showDirectoryPicker;
+      const origUserAgent = navigator.userAgent;
+      try {
+        delete window.showDirectoryPicker;
+        Object.defineProperty(navigator, 'userAgent', {
+          value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+          configurable: true
+        });
+
+        showLandingStep('setup');
+
+        const localCard = document.getElementById('landing-card-local');
+        expect(localCard).toBeTruthy();
+        expect(localCard.classList.contains('is-disabled')).toBe(true);
+        expect(localCard.classList.contains('is-recommended')).toBe(false);
+
+        const badge = localCard.querySelector('.landing-card-badge');
+        expect(badge.textContent).toBe(t('landing.badgeUnsupportedSafari'));
+
+        const title = localCard.querySelector('h3');
+        expect(title.textContent).toBe(t('landing.localOptionTitle'));
+
+        const desc = localCard.querySelector('p');
+        expect(desc.textContent).toBe(t('landing.localOptionSafariDesc'));
+
+        const btn = document.getElementById('btn-open-folder');
+        expect(btn.disabled).toBe(true);
+        expect(btn.classList.contains('is-disabled')).toBe(true);
+        expect(btn.title).toBe(t('landing.localUnsupportedSafariTooltip'));
+
+        const btnText = document.getElementById('btn-open-folder-text');
+        expect(btnText.textContent).toBe(t('landing.localUnavailableBtn'));
+
+        // Step 1 must NOT have any injected browser-compatibility-options
+        expect(document.getElementById('browser-compatibility-options')).toBeNull();
+      } finally {
+        if (origPicker !== undefined) {
+          window.showDirectoryPicker = origPicker;
+        }
+        Object.defineProperty(navigator, 'userAgent', {
+          value: origUserAgent,
+          configurable: true
+        });
+      }
+    });
+
+    it('keeps local storage option active and recommended when File System Access API is supported (e.g. Chrome)', () => {
+      const origPicker = window.showDirectoryPicker;
+      const origUserAgent = navigator.userAgent;
+      try {
+        window.showDirectoryPicker = vi.fn();
+        Object.defineProperty(navigator, 'userAgent', {
+          value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          configurable: true
+        });
+
+        showLandingStep('setup');
+
+        const localCard = document.getElementById('landing-card-local');
+        expect(localCard).toBeTruthy();
+        expect(localCard.classList.contains('is-disabled')).toBe(false);
+        expect(localCard.classList.contains('is-recommended')).toBe(true);
+
+        const badge = localCard.querySelector('.landing-card-badge');
+        expect(badge.textContent).toBe(t('landing.recommendedBadge'));
+
+        const btn = document.getElementById('btn-open-folder');
+        expect(btn.disabled).toBe(false);
+        expect(btn.classList.contains('is-disabled')).toBe(false);
+      } finally {
+        if (origPicker !== undefined) {
+          window.showDirectoryPicker = origPicker;
+        } else {
+          delete window.showDirectoryPicker;
+        }
+        Object.defineProperty(navigator, 'userAgent', {
+          value: origUserAgent,
+          configurable: true
+        });
+      }
     });
   });
 });
