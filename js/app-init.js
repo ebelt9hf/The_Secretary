@@ -1142,8 +1142,30 @@ function updatePassphraseStrengthUI(passphrase) {
 }
 window.updatePassphraseStrengthUI = updatePassphraseStrengthUI;
 
+function calculatePassphraseCrackTime(passphrase) {
+  const valEl = document.getElementById('sync-crack-time-value');
+  if (!valEl) return;
+  const pass = String(passphrase || '').trim();
+  let key = 'sync.crackTimeMillionsYears';
+  let color = '#3b82f6';
+  if (!pass || pass.length < 10) {
+    key = 'sync.crackTimeTooShort';
+    color = '#ef4444';
+  } else if (pass.length < 25) {
+    key = 'sync.crackTimeMillionsYears';
+    color = '#3b82f6';
+  } else {
+    key = 'sync.crackTimeTrillionsYears';
+    color = '#10b981';
+  }
+  valEl.textContent = typeof t === 'function' ? t(key) : key;
+  valEl.style.color = color;
+}
+window.calculatePassphraseCrackTime = calculatePassphraseCrackTime;
+
 function handleSetupPassphraseInput(value) {
   updatePassphraseStrengthUI(value);
+  calculatePassphraseCrackTime(value);
 }
 window.handleSetupPassphraseInput = handleSetupPassphraseInput;
 
@@ -1153,6 +1175,7 @@ function regenerateSetupPassphrase() {
     const newPass = window.FirebaseSyncService.generateDefaultPassphrase();
     passInput.value = newPass;
     updatePassphraseStrengthUI(newPass);
+    calculatePassphraseCrackTime(newPass);
   }
 }
 window.regenerateSetupPassphrase = regenerateSetupPassphrase;
@@ -1194,7 +1217,252 @@ function copySetupPassphrase() {
 }
 window.copySetupPassphrase = copySetupPassphrase;
 
+let _cloudSyncCurrentStep = 'intent';
+let _cloudSyncSubMode = 'connect';
+let _cloudSyncCameFromConfig = false;
+
+function clearCloudSyncDiagnosticError() {
+  const alertEl = document.getElementById('sync-connect-error-alert');
+  if (alertEl) alertEl.style.display = 'none';
+}
+window.clearCloudSyncDiagnosticError = clearCloudSyncDiagnosticError;
+
+function showCloudSyncDiagnosticError(type, detail = '') {
+  const alertEl = document.getElementById('sync-connect-error-alert');
+  const titleEl = document.getElementById('sync-connect-error-title');
+  const descEl = document.getElementById('sync-connect-error-desc');
+  const recoveryEl = document.getElementById('sync-connect-error-recovery');
+  if (!alertEl || !titleEl || !descEl || !recoveryEl) return;
+
+  let titleKey = 'sync.errorAuthTitle';
+  let descKey = 'sync.errorAuthDesc';
+
+  if (type === 'passphrase') {
+    titleKey = 'sync.errorPassphraseTitle';
+    descKey = 'sync.errorPassphraseDesc';
+  } else if (type === 'syncCode') {
+    titleKey = 'sync.errorSyncCodeTitle';
+    descKey = 'sync.errorSyncCodeDesc';
+  } else if (type === 'network') {
+    titleKey = 'sync.errorNetworkTitle';
+    descKey = 'sync.errorNetworkDesc';
+  }
+
+  titleEl.textContent = typeof t === 'function' ? t(titleKey) : titleKey;
+  descEl.textContent = typeof t === 'function' ? t(descKey) : descKey;
+  recoveryEl.textContent = (type !== 'passphrase' && detail && detail !== descEl.textContent) ? detail : '';
+
+  alertEl.style.display = 'block';
+}
+window.showCloudSyncDiagnosticError = showCloudSyncDiagnosticError;
+
+function setCloudSyncStep(stepName, options = {}) {
+  clearCloudSyncDiagnosticError();
+
+  const stepConfig = document.getElementById('sync-step-config');
+  const stepIntent = document.getElementById('sync-step-intent');
+  const stepAuth = document.getElementById('sync-step-auth');
+
+  const backBtn = document.getElementById('btn-sync-step-back');
+  const modalTitle = document.getElementById('sync-setup-modal-title');
+  const modalDesc = document.getElementById('sync-setup-modal-desc');
+
+  const backendBar = document.getElementById('sync-active-backend-bar');
+  const backendName = document.getElementById('sync-active-backend-name');
+  const changeBackendBtn = document.getElementById('btn-sync-change-backend');
+
+  let targetStep = stepName;
+  if (stepName === 'connect' || stepName === 'create') {
+    targetStep = 'auth';
+    _cloudSyncSubMode = stepName;
+  }
+
+  _cloudSyncCurrentStep = targetStep;
+
+  if (stepConfig) stepConfig.style.display = targetStep === 'config' ? 'block' : 'none';
+  if (stepIntent) stepIntent.style.display = targetStep === 'intent' ? 'block' : 'none';
+  if (stepAuth) stepAuth.style.display = targetStep === 'auth' ? 'block' : 'none';
+
+  const customCfg = window.FirebaseSyncService?.getCustomFirebaseConfig?.();
+  if (backendBar) {
+    if (targetStep === 'config') {
+      backendBar.style.display = 'none';
+    } else {
+      backendBar.style.display = 'flex';
+      if (backendName) {
+        if (customCfg) {
+          backendName.textContent = customCfg.projectId
+            ? `Custom (${customCfg.projectId})`
+            : (typeof t === 'function' ? t('sync.customFirebaseActive') : 'Custom Project');
+        } else {
+          backendName.textContent = typeof t === 'function'
+            ? t('sync.customFirebaseStatusDefault')
+            : "Etienne's Cloud Vault";
+        }
+      }
+      if (changeBackendBtn) {
+        changeBackendBtn.style.display = customCfg ? 'inline-flex' : 'none';
+      }
+    }
+  }
+
+  if (targetStep === 'config') {
+    _cloudSyncCameFromConfig = true;
+    if (modalTitle) modalTitle.textContent = typeof t === 'function' ? t('sync.configStepTitle') : 'Configure Firebase Project';
+    if (modalDesc) modalDesc.textContent = typeof t === 'function' ? t('sync.configStepDesc') : 'Paste your Firebase Web App configuration below to connect Secretary to your own Firebase project.';
+    if (backBtn) backBtn.style.display = 'none';
+    const textarea = document.getElementById('sync-custom-firebase-json');
+    if (textarea) setTimeout(() => textarea.focus(), 100);
+  } else if (targetStep === 'intent') {
+    if (modalTitle) modalTitle.textContent = typeof t === 'function' ? t('sync.intentStepTitle') : 'Cloud Vault Setup';
+    if (modalDesc) modalDesc.textContent = typeof t === 'function' ? t('sync.intentStepDesc') : 'Choose whether to connect to an existing account and encrypted vault, or create a new one.';
+    if (backBtn) {
+      backBtn.style.display = _cloudSyncCameFromConfig ? 'inline-flex' : 'none';
+    }
+  } else if (targetStep === 'auth') {
+    if (backBtn) backBtn.style.display = 'inline-flex';
+
+    const tabSignIn = document.getElementById('tab-sync-signin');
+    const tabSignUp = document.getElementById('tab-sync-signup');
+    const tabLink = document.getElementById('tab-sync-link');
+    const tabGuest = document.getElementById('tab-sync-guest');
+
+    const crackTimeDisplay = document.getElementById('sync-crack-time-display');
+    const unrecoverableCard = document.getElementById('sync-passphrase-unrecoverable-card');
+    const clarityCard = document.getElementById('sync-setup-pass-clarity-card');
+
+    if (_cloudSyncSubMode === 'connect') {
+      if (modalTitle) modalTitle.textContent = typeof t === 'function' ? t('sync.connectStepTitle') : 'Connect Existing Account';
+      if (modalDesc) modalDesc.textContent = typeof t === 'function' ? t('sync.connectStepDesc') : 'Sign in or link an existing encrypted vault to sync your notes.';
+
+      if (tabSignIn) tabSignIn.style.display = 'inline-block';
+      if (tabLink) tabLink.style.display = 'inline-block';
+      if (tabSignUp) tabSignUp.style.display = 'none';
+      if (tabGuest) tabGuest.style.display = 'none';
+
+      if (crackTimeDisplay) crackTimeDisplay.style.display = 'none';
+      if (unrecoverableCard) unrecoverableCard.style.display = 'none';
+      if (clarityCard) clarityCard.style.display = 'block';
+
+      switchSyncSetupTab(options.tab || 'signin');
+    } else {
+      // 'create'
+      if (modalTitle) modalTitle.textContent = typeof t === 'function' ? t('sync.createStepTitle') : 'Create New Account';
+      if (modalDesc) modalDesc.textContent = typeof t === 'function' ? t('sync.createStepDesc') : 'Create a cloud account and generate your Zero-Knowledge Master Passphrase.';
+
+      if (tabSignIn) tabSignIn.style.display = 'none';
+      if (tabLink) tabLink.style.display = 'none';
+      if (tabSignUp) tabSignUp.style.display = 'inline-block';
+      if (tabGuest) tabGuest.style.display = 'inline-block';
+
+      if (crackTimeDisplay) crackTimeDisplay.style.display = 'flex';
+      if (unrecoverableCard) unrecoverableCard.style.display = 'block';
+      if (clarityCard) clarityCard.style.display = 'none';
+
+      switchSyncSetupTab(options.tab || 'signup');
+      const passInput = document.getElementById('sync-setup-passphrase');
+      if (passInput) calculatePassphraseCrackTime(passInput.value);
+    }
+  }
+}
+window.setCloudSyncStep = setCloudSyncStep;
+
+function navigateCloudSyncStepBack() {
+  if (_cloudSyncCurrentStep === 'auth') {
+    setCloudSyncStep('intent');
+  } else if (_cloudSyncCurrentStep === 'intent') {
+    if (_cloudSyncCameFromConfig) {
+      setCloudSyncStep('config');
+    }
+  }
+}
+window.navigateCloudSyncStepBack = navigateCloudSyncStepBack;
+
+function openCustomFirebaseConfigFromIntent() {
+  setCloudSyncStep('config');
+}
+window.openCustomFirebaseConfigFromIntent = openCustomFirebaseConfigFromIntent;
+
+function saveCustomFirebaseConfigAndProceed() {
+  const textarea = document.getElementById('sync-custom-firebase-json');
+  if (!textarea || !textarea.value.trim()) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.customFirebaseEmpty') : 'Please paste your Firebase configuration JSON', true);
+    }
+    return;
+  }
+
+  const parsed = window.FirebaseSyncService?.parseFirebaseConfigString?.(textarea.value);
+  if (!parsed || !parsed.apiKey) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.customFirebaseInvalid') : 'Invalid Firebase configuration. Must include apiKey and projectId.', true);
+    }
+    return;
+  }
+
+  const success = window.FirebaseSyncService.setCustomFirebaseConfig(parsed);
+  if (success) {
+    if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.customFirebaseSaved') : 'Custom Firebase configuration applied successfully!');
+    }
+    setCloudSyncStep('intent');
+  }
+}
+window.saveCustomFirebaseConfigAndProceed = saveCustomFirebaseConfigAndProceed;
+
+function copyFirebaseGeminiPrompt() {
+  const promptText = `I want to use Firebase Realtime Database and Firebase Authentication (Email/Password) for a private, zero-knowledge encrypted notes web app called Secretary.
+Please guide me step by step:
+1. Register a Web App in Project Settings and provide the firebaseConfig JSON.
+2. Enable Email/Password provider under Authentication -> Sign-in method.
+3. Create a Realtime Database and set the security rules so that only authenticated users can read and write their own data under "/users/{uid}":
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}`;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(promptText).catch(() => _fallbackCopyText(promptText));
+  } else {
+    _fallbackCopyText(promptText);
+  }
+  if (typeof showToast === 'function') {
+    showToast(typeof t === 'function' ? t('sync.geminiPromptCopiedToast') : 'AI setup prompt copied to clipboard!');
+  }
+}
+window.copyFirebaseGeminiPrompt = copyFirebaseGeminiPrompt;
+
+function copyFirebaseSecurityRules() {
+  const rulesText = JSON.stringify({
+    rules: {
+      users: {
+        "$uid": {
+          ".read": "$uid === auth.uid",
+          ".write": "$uid === auth.uid"
+        }
+      }
+    }
+  }, null, 2);
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(rulesText).catch(() => _fallbackCopyText(rulesText));
+  } else {
+    _fallbackCopyText(rulesText);
+  }
+  if (typeof showToast === 'function') {
+    showToast(typeof t === 'function' ? t('sync.rulesCopiedToast') : 'Firebase security rules copied to clipboard!');
+  }
+}
+window.copyFirebaseSecurityRules = copyFirebaseSecurityRules;
+
 function switchSyncSetupTab(mode) {
+  clearCloudSyncDiagnosticError();
+
   const normMode = mode === 'new' ? 'signup' : mode;
   const isSignIn = normMode === 'signin';
   const isSignUp = normMode === 'signup';
@@ -1221,6 +1489,8 @@ function switchSyncSetupTab(mode) {
   const passRegenBtn = document.getElementById('btn-sync-setup-pass-regen');
   const passCopyBtn = document.getElementById('btn-sync-setup-pass-copy');
   const passClarityCard = document.getElementById('sync-setup-pass-clarity-card');
+  const crackTimeDisplay = document.getElementById('sync-crack-time-display');
+  const unrecoverableCard = document.getElementById('sync-passphrase-unrecoverable-card');
   const passHint = document.getElementById('sync-setup-pass-hint');
   const passVisibilityBtn = document.getElementById('btn-sync-setup-pass-visibility');
 
@@ -1260,7 +1530,16 @@ function switchSyncSetupTab(mode) {
   if (regenBtn) regenBtn.style.display = (isSignUp || isGuest) ? 'inline-flex' : 'none';
   if (passRegenBtn) passRegenBtn.style.display = (isSignUp || isGuest) ? 'inline-flex' : 'none';
   if (passCopyBtn) passCopyBtn.style.display = (isSignUp || isGuest) ? 'inline-flex' : 'none';
-  if (passClarityCard) passClarityCard.style.display = 'block';
+
+  if (isSignUp || isGuest) {
+    if (passClarityCard) passClarityCard.style.display = 'none';
+    if (crackTimeDisplay) crackTimeDisplay.style.display = 'flex';
+    if (unrecoverableCard) unrecoverableCard.style.display = 'block';
+  } else {
+    if (passClarityCard) passClarityCard.style.display = 'block';
+    if (crackTimeDisplay) crackTimeDisplay.style.display = 'none';
+    if (unrecoverableCard) unrecoverableCard.style.display = 'none';
+  }
 
   if (syncInput) {
     if ((isSignUp || isGuest) && (!syncInput.value || syncInput.getAttribute('data-linked') === 'true')) {
@@ -1295,6 +1574,7 @@ function switchSyncSetupTab(mode) {
       }
     }
     updatePassphraseStrengthUI(passInput.value);
+    calculatePassphraseCrackTime(passInput.value);
   }
 
   if (passHint) {
@@ -1436,6 +1716,7 @@ async function changeStorageEngineUI(engine) {
   if (engine === 'firebase') {
     if (!window.FirebaseSyncService?.state?.isUnlocked) {
       if (typeof openModal === 'function') openModal('modal-cloud-sync-setup');
+      if (typeof setCloudSyncStep === 'function') setCloudSyncStep('intent');
     } else {
       window.StorageAPI.setStorageEngine('firebase');
       updateCloudSyncUI();
@@ -1943,7 +2224,17 @@ async function submitCloudSyncSetup() {
     }
   } catch (err) {
     console.error('[CloudSync] Setup failed:', err);
-    notify((typeof t === 'function' ? t('sync.setupFailed') : 'Setup failed') + ': ' + (err?.message || err || ''), true);
+    const msg = String(err?.message || err?.code || err || '');
+    if (msg.includes('passphrase') || msg.includes('decrypt') || msg.includes('Incorrect') || msg.includes('MAC') || msg.includes('cipher')) {
+      showCloudSyncDiagnosticError('passphrase', msg);
+    } else if (msg.includes('sync-code') || msg.includes('Sync Code') || msg.includes('pairing') || msg.includes('Vault not found')) {
+      showCloudSyncDiagnosticError('syncCode', msg);
+    } else if (msg.includes('network') || msg.includes('permission-denied') || msg.includes('offline') || msg.includes('database')) {
+      showCloudSyncDiagnosticError('network', msg);
+    } else {
+      showCloudSyncDiagnosticError('auth', msg);
+    }
+    notify((typeof t === 'function' ? t('sync.setupFailed') : 'Setup failed') + ': ' + msg, true);
   } finally {
     _isSubmittingCloudSync = false;
     setElementLoadingState(submitBtn, false);
@@ -1952,6 +2243,7 @@ async function submitCloudSyncSetup() {
 window.submitCloudSyncSetup = submitCloudSyncSetup;
 
 async function submitCloudSyncGoogle() {
+  clearCloudSyncDiagnosticError();
   const passInput = document.getElementById('sync-setup-passphrase');
   const rememberPass = document.getElementById('sync-setup-remember-pass')?.checked;
   let rawPass = passInput?.value || '';
@@ -2005,8 +2297,10 @@ async function submitCloudSyncGoogle() {
     });
   } catch (err) {
     console.error('Google Sign-In failed:', err);
+    const msg = String(err?.message || err?.code || err || '');
+    showCloudSyncDiagnosticError('auth', msg);
     if (typeof showToast === 'function') {
-      showToast((typeof t === 'function' ? t('sync.setupFailed') : 'Setup failed') + ': ' + (err.message || ''), true);
+      showToast((typeof t === 'function' ? t('sync.setupFailed') : 'Setup failed') + ': ' + msg, true);
     }
   }
 }
@@ -4572,9 +4866,10 @@ function openCustomFirebaseSetupFromLanding() {
   } else if (typeof window.openModal === 'function') {
     window.openModal('modal-cloud-sync-setup');
   }
-  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signup');
   const body = document.getElementById('sync-custom-firebase-body');
   if (body) body.style.display = 'block';
+  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signup');
+  if (typeof setCloudSyncStep === 'function') setCloudSyncStep('config');
   if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
   const textarea = document.getElementById('sync-custom-firebase-json');
   if (textarea) setTimeout(() => textarea.focus(), 150);
@@ -4587,9 +4882,11 @@ function openManagedFirebaseSetupFromLanding() {
   } else if (typeof window.openModal === 'function') {
     window.openModal('modal-cloud-sync-setup');
   }
-  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signup');
   const body = document.getElementById('sync-custom-firebase-body');
   if (body) body.style.display = 'none';
+  if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signup');
+  _cloudSyncCameFromConfig = false;
+  if (typeof setCloudSyncStep === 'function') setCloudSyncStep('intent');
   if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
   const emailInput = document.getElementById('sync-setup-email');
   if (emailInput) setTimeout(() => emailInput.focus(), 150);
