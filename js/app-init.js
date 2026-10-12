@@ -856,9 +856,24 @@ function updateCloudSyncUI(statusObj) {
 
   const passRow = document.getElementById('prefs-sync-pass-row');
   const passInput = document.getElementById('prefs-sync-pass-input');
+  const vaultUnlocked = !!window.FirebaseSyncService?.state?.isUnlocked;
+
+  // Master passphrase only exists for the encrypted Firebase vault; local folder storage is plaintext.
+  const authPassRow = document.getElementById('auth-method-row-passphrase');
+  const authPassBadge = document.getElementById('auth-method-passphrase-badge');
+  if (authPassRow) authPassRow.style.display = isFirebase ? 'flex' : 'none';
+  if (authPassBadge && isFirebase) {
+    authPassBadge.textContent = vaultUnlocked
+      ? (typeof t === 'function' ? t('sync.authStatusActive') : 'Active')
+      : (typeof t === 'function' ? t('sync.statusLocked') : 'Vault Locked');
+    authPassBadge.style.background = vaultUnlocked ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)';
+    authPassBadge.style.color = vaultUnlocked ? '#10b981' : '#ef4444';
+    authPassBadge.style.borderColor = vaultUnlocked ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+  }
+
   if (passRow && passInput) {
-    passRow.style.display = 'flex';
-    if (window.FirebaseSyncService?.getActivePassphrase) {
+    passRow.style.display = isFirebase ? 'flex' : 'none';
+    if (isFirebase && window.FirebaseSyncService?.getActivePassphrase) {
       window.FirebaseSyncService.getActivePassphrase().then(pass => {
         if (pass && passInput) {
           passInput.value = pass;
@@ -2978,6 +2993,21 @@ async function refreshRememberPassphraseControl() {
 }
 window.refreshRememberPassphraseControl = refreshRememberPassphraseControl;
 
+function openPassphraseRotateUI() {
+  const svc = window.FirebaseSyncService;
+  const isFirebase = svc?.state?.engine === 'firebase';
+  if (!isFirebase) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.rotateRequiresCloudVault') : 'Changing the passphrase is only available when the encrypted Firebase Cloud Vault is active.', true);
+    }
+    return;
+  }
+  if (typeof openModal !== 'function') return;
+  // A locked vault cannot be re-encrypted: unlock first instead of failing inside the rotate modal.
+  openModal(svc?.state?.isUnlocked ? 'modal-cloud-sync-password-rotate' : 'modal-cloud-sync-unlock');
+}
+window.openPassphraseRotateUI = openPassphraseRotateUI;
+
 async function submitCloudSyncPasswordRotate() {
   const rawOldPass = document.getElementById('sync-rotate-current-pass')?.value || '';
   const rawNewPass = document.getElementById('sync-rotate-new-pass')?.value || '';
@@ -2987,6 +3017,19 @@ async function submitCloudSyncPasswordRotate() {
   const newPass = clean(rawNewPass);
   const confirmPass = clean(rawConfirmPass);
   const errEl = document.getElementById('sync-rotate-error');
+
+  if (window.FirebaseSyncService?.state?.engine !== 'firebase') {
+    if (errEl) {
+      errEl.textContent = typeof t === 'function' ? t('sync.rotateRequiresCloudVault') : 'Changing the passphrase is only available when the encrypted Firebase Cloud Vault is active.';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+  if (!window.FirebaseSyncService?.state?.isUnlocked) {
+    if (typeof closeModal === 'function') closeModal('modal-cloud-sync-password-rotate');
+    if (typeof openModal === 'function') openModal('modal-cloud-sync-unlock');
+    return;
+  }
 
   if (!oldPass || !newPass) {
     if (errEl) {

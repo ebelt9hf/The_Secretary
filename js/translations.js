@@ -45194,6 +45194,23 @@ window.APP_TRANSLATIONS_BUNDLE = {
       "tr": "Yerel dosya sistemine aktarıldı",
       "uk": "Експортовано в локальну файлову систему"
     },
+    "sync.rotateRequiresCloudVault": {
+      "cs": "Změna hesla je dostupná pouze při aktivním šifrovaném cloudovém trezoru Firebase.",
+      "de": "Das Ändern der Passphrase ist nur verfügbar, wenn der verschlüsselte Firebase Cloud Vault aktiv ist.",
+      "en": "Changing the passphrase is only available when the encrypted Firebase Cloud Vault is active.",
+      "es": "Cambiar la frase de contraseña solo está disponible cuando la bóveda cifrada de Firebase Cloud está activa.",
+      "fr": "La modification de la phrase secrète n'est disponible que lorsque le coffre-fort chiffré Firebase Cloud est actif.",
+      "hu": "A jelmondat módosítása csak akkor érhető el, ha a titkosított Firebase felhőtároló aktív.",
+      "it": "La modifica della passphrase è disponibile solo quando la cassaforte crittografata Firebase Cloud è attiva.",
+      "nl": "Het wijzigen van de wachtzin is alleen beschikbaar wanneer de versleutelde Firebase Cloud-kluis actief is.",
+      "pl": "Zmiana hasła jest dostępna tylko wtedy, gdy aktywny jest zaszyfrowany skarbiec Firebase Cloud.",
+      "pt": "A alteração da frase-passe só está disponível quando o cofre encriptado Firebase Cloud está ativo.",
+      "ro": "Schimbarea frazei de acces este disponibilă doar când seiful criptat Firebase Cloud este activ.",
+      "ru": "Изменение мастер-пароля доступно только при активном зашифрованном облачном хранилище Firebase.",
+      "sv": "Att byta lösenfras är endast tillgängligt när det krypterade Firebase-molnvalvet är aktivt.",
+      "tr": "Parola değiştirme yalnızca şifrelenmiş Firebase Bulut Kasası etkin olduğunda kullanılabilir.",
+      "uk": "Зміна кодової фрази доступна лише тоді, коли активне зашифроване хмарне сховище Firebase."
+    },
     "sync.rotatePassBtn": {
       "cs": "Změnit heslo",
       "de": "Passphrase ändern",

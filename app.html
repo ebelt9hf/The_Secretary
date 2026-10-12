@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secretary</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.28">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.28">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.29">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.29">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -208,7 +208,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.28" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.28</p>
+      <p id="connect-version-hint" data-version="4.0.29" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.29</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -616,7 +616,7 @@
           <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
 
             <!-- 1. Master Passphrase (E2EE) -->
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;">
+            <div id="auth-method-row-passphrase" style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; flex-wrap:wrap; gap:8px;">
               <div style="display:flex; align-items:center; gap:10px;">
                 <span style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:6px; background:rgba(16,185,129,0.15); color:#10b981;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -627,8 +627,8 @@
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);" data-i18n="sync.authStatusActive">Active</span>
-                <button type="button" class="btn btn-secondary" onclick="openModal('modal-cloud-sync-password-rotate')" title="Change your master encryption passphrase" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn" style="padding:4px 10px; font-size:0.78rem;">Change Passphrase</button>
+                <span id="auth-method-passphrase-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">Active</span>
+                <button type="button" class="btn btn-secondary" id="btn-auth-change-pass" onclick="openPassphraseRotateUI()" title="Change your master encryption passphrase" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn" style="padding:4px 10px; font-size:0.78rem;">Change Passphrase</button>
               </div>
             </div>
 
@@ -1028,7 +1028,7 @@
               </button>
             </div>
             <button type="button" class="btn btn-secondary" id="btn-copy-sync-pass" onclick="copyPassphraseUI()" title="Copy master passphrase to clipboard" data-i18n-title="sync.copyPassphraseTooltip" data-i18n="sync.copyPassphraseBtn">Copy Passphrase</button>
-            <button type="button" class="btn btn-secondary" id="btn-change-sync-pass" onclick="openModal('modal-cloud-sync-password-rotate')" title="Change your master passphrase and re-encrypt all notes" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn">Change Passphrase</button>
+            <button type="button" class="btn btn-secondary" id="btn-change-sync-pass" onclick="openPassphraseRotateUI()" title="Change your master passphrase and re-encrypt all notes" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn">Change Passphrase</button>
           </div>
           <small class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem;" data-i18n="sync.passphrasePrefsHelp">
             Your master passphrase encrypts all your notes with Zero-Knowledge AES-256-GCM before syncing and never leaves your device.
@@ -1055,7 +1055,7 @@
             <button type="button" class="btn" id="btn-prefs-configure-firebase" onclick="openModal('modal-cloud-sync-setup'); toggleCustomFirebaseSetupUI();" title="Configure your custom Google Firebase project credentials" data-i18n-title="sync.configureFirebaseTooltip" data-i18n="sync.configureFirebaseBtn">Configure Firebase Project</button>
             <button type="button" class="btn" id="btn-prefs-reconcile-backup" onclick="reconcileMigrationBackupUI()" title="Scan backup folder to repair missing notes and reconcile merged edits" data-i18n-title="sync.reconcileBackupTooltip" data-i18n="sync.reconcileBackupBtn">Reconcile Backup Notes</button>
             <button type="button" class="btn" id="btn-prefs-revert-fs" onclick="revertToFilesystemUI()" title="Decrypt and export all notes back to local HTML files" data-i18n-title="sync.revertToFilesystemTooltip" data-i18n="sync.revertToFilesystemBtn">Export to Local Files</button>
-            <button type="button" class="btn" id="btn-prefs-rotate-pass" onclick="openModal('modal-cloud-sync-password-rotate')" title="Change your master passphrase and re-encrypt all notes" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn">Change Passphrase</button>
+            <button type="button" class="btn" id="btn-prefs-rotate-pass" onclick="openPassphraseRotateUI()" title="Change your master passphrase and re-encrypt all notes" data-i18n-title="sync.rotatePassTooltip" data-i18n="sync.rotatePassBtn">Change Passphrase</button>
           </div>
         </div>
       </div>
@@ -1494,40 +1494,40 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.28"></script>
-<script src="js/app-utils.js?v=4.0.28"></script>
-<script src="js/app-icons.js?v=4.0.28"></script>
-<script src="js/app-popover-manager.js?v=4.0.28"></script>
-<script src="js/translations.js?v=4.0.28"></script>
-<script src="js/app-i18n.js?v=4.0.28"></script>
-<script src="js/app-bridge.js?v=4.0.28"></script>
-<script src="js/app-fs.js?v=4.0.28"></script>
-<script src="js/firebase-bundle.js?v=4.0.28"></script>
-<script src="js/firebase-config.js?v=4.0.28"></script>
-<script src="js/app-crypto.js?v=4.0.28"></script>
-<script src="js/app-image-optimizer.js?v=4.0.28"></script>
-<script src="js/app-idb.js?v=4.0.28"></script>
-<script src="js/app-firebase-sync.js?v=4.0.28"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.28"></script>
-<script src="js/app-storage.js?v=4.0.28"></script>
-<script src="js/storage-migration.js?v=4.0.28"></script>
-<script src="js/app-stash-service.js?v=4.0.28"></script>
-<script src="js/app-omnibar.js?v=4.0.28"></script>
-<script src="js/app-topic-memory.js?v=4.0.28"></script>
-<script src="js/app-prompts.js?v=4.0.28"></script>
-<script src="js/app-llm.js?v=4.0.28"></script>
-<script src="js/app-dailyreview.js?v=4.0.28"></script>
-<script src="js/app-notes.js?v=4.0.28"></script>
-<script src="js/app-todos-board.js?v=4.0.28"></script>
-<script src="js/app-board.js?v=4.0.28"></script>
-<script src="js/app-focus.js?v=4.0.28"></script>
-<script src="js/app-overlay.js?v=4.0.28"></script>
-<script src="js/app-planner.js?v=4.0.28"></script>
-<script src="js/app-collab.js?v=4.0.28"></script>
-<script src="js/app-retro.js?v=4.0.28"></script>
-<script src="js/app-tutorial.js?v=4.0.28"></script>
-<script src="js/app-graph-view.js?v=4.0.28"></script>
-<script src="js/app-chat.js?v=4.0.28"></script>
-<script src="js/app-init.js?v=4.0.28"></script>
+<script src="js/app-state.js?v=4.0.29"></script>
+<script src="js/app-utils.js?v=4.0.29"></script>
+<script src="js/app-icons.js?v=4.0.29"></script>
+<script src="js/app-popover-manager.js?v=4.0.29"></script>
+<script src="js/translations.js?v=4.0.29"></script>
+<script src="js/app-i18n.js?v=4.0.29"></script>
+<script src="js/app-bridge.js?v=4.0.29"></script>
+<script src="js/app-fs.js?v=4.0.29"></script>
+<script src="js/firebase-bundle.js?v=4.0.29"></script>
+<script src="js/firebase-config.js?v=4.0.29"></script>
+<script src="js/app-crypto.js?v=4.0.29"></script>
+<script src="js/app-image-optimizer.js?v=4.0.29"></script>
+<script src="js/app-idb.js?v=4.0.29"></script>
+<script src="js/app-firebase-sync.js?v=4.0.29"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.29"></script>
+<script src="js/app-storage.js?v=4.0.29"></script>
+<script src="js/storage-migration.js?v=4.0.29"></script>
+<script src="js/app-stash-service.js?v=4.0.29"></script>
+<script src="js/app-omnibar.js?v=4.0.29"></script>
+<script src="js/app-topic-memory.js?v=4.0.29"></script>
+<script src="js/app-prompts.js?v=4.0.29"></script>
+<script src="js/app-llm.js?v=4.0.29"></script>
+<script src="js/app-dailyreview.js?v=4.0.29"></script>
+<script src="js/app-notes.js?v=4.0.29"></script>
+<script src="js/app-todos-board.js?v=4.0.29"></script>
+<script src="js/app-board.js?v=4.0.29"></script>
+<script src="js/app-focus.js?v=4.0.29"></script>
+<script src="js/app-overlay.js?v=4.0.29"></script>
+<script src="js/app-planner.js?v=4.0.29"></script>
+<script src="js/app-collab.js?v=4.0.29"></script>
+<script src="js/app-retro.js?v=4.0.29"></script>
+<script src="js/app-tutorial.js?v=4.0.29"></script>
+<script src="js/app-graph-view.js?v=4.0.29"></script>
+<script src="js/app-chat.js?v=4.0.29"></script>
+<script src="js/app-init.js?v=4.0.29"></script>
 </body>
 </html>
