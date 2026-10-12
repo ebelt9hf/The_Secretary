@@ -610,6 +610,34 @@ body[data-theme='dark'] .planner-todo-card-btn.btn-plan-sync:hover {
   overflow-y: auto;
   overflow-x: auto;
   position: relative;
+  /* Keep two-finger horizontal swipes inside the planner (no browser back/forward) */
+  overscroll-behavior-x: contain;
+}
+
+.planner-main-content {
+  overscroll-behavior-x: contain;
+}
+
+/* Slide-in feedback after trackpad swipe navigation */
+@keyframes plannerSwipeInNext {
+  from { opacity: 0.35; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes plannerSwipeInPrev {
+  from { opacity: 0.35; transform: translateX(-24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.planner-calendar-grid.planner-swipe-in-next {
+  animation: plannerSwipeInNext 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.planner-calendar-grid.planner-swipe-in-prev {
+  animation: plannerSwipeInPrev 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .planner-calendar-grid.planner-swipe-in-next,
+  .planner-calendar-grid.planner-swipe-in-prev {
+    animation: none;
+  }
 }
 
 .planner-calendar-grid {

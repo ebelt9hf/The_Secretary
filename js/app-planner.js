@@ -2753,6 +2753,105 @@ function renderPlanner() {
       });
     }
   });
+
+  // Two-finger trackpad swipe (or Shift + mouse wheel) to move through days/weeks.
+  // Panel innerHTML is rebuilt on every render, so the listener is bound to the fresh node.
+  const mainContent = panel.querySelector('.planner-main-content');
+  if (mainContent) {
+    mainContent.addEventListener('wheel', _onPlannerWheelSwipe, { passive: false });
+  }
+
+  // Play a short slide-in animation after a swipe-driven navigation
+  if (_plannerPendingSwipeAnim) {
+    const grid = document.getElementById('planner-grid-body');
+    const cls = _plannerPendingSwipeAnim > 0 ? 'planner-swipe-in-next' : 'planner-swipe-in-prev';
+    _plannerPendingSwipeAnim = 0;
+    if (grid) {
+      grid.classList.add(cls);
+      grid.addEventListener('animationend', () => grid.classList.remove(cls), { once: true });
+    }
+  }
+}
+
+// ── Horizontal swipe navigation (macOS trackpad two-finger swipe) ──
+const PLANNER_SWIPE_THRESHOLD_PX = 80;   // accumulated horizontal delta before navigating
+const PLANNER_SWIPE_GESTURE_GAP_MS = 220; // pause that marks the end of one gesture (incl. inertia)
+let _plannerPendingSwipeAnim = 0;
+const _plannerSwipeState = { accum: 0, lastEventAt: 0, locked: false };
+
+/**
+ * Pure gesture interpreter for wheel events on the planner.
+ * Returns { direction, handled }:
+ *  - direction: -1 (previous), 1 (next) or 0 (no navigation yet)
+ *  - handled: true when the event is a horizontal gesture the planner owns
+ *    (caller should preventDefault to block the browser back/forward swipe).
+ * One physical swipe (including macOS momentum events) triggers at most one navigation.
+ */
+function computePlannerWheelSwipe(state, input) {
+  const deltaX = Number(input.deltaX) || 0;
+  const deltaY = Number(input.deltaY) || 0;
+  const now = Number(input.now) || Date.now();
+  if (input.ctrlKey) return { direction: 0, handled: false }; // pinch-zoom
+
+  // Shift + vertical mouse wheel acts as horizontal scroll (classic mice)
+  let dx = deltaX;
+  if (input.shiftKey && dx === 0) dx = deltaY;
+  else if (Math.abs(deltaX) <= Math.abs(deltaY)) return { direction: 0, handled: false };
+  if (dx === 0) return { direction: 0, handled: false };
+
+  // Let native horizontal scroll run while the grid can still scroll that way
+  const sl = Number(input.scrollLeft) || 0;
+  const maxSl = Math.max(0, (Number(input.scrollWidth) || 0) - (Number(input.clientWidth) || 0));
+  if ((dx > 0 && sl < maxSl - 1) || (dx < 0 && sl > 1)) {
+    // Native scroll owns this gesture; its trailing momentum must not flip the date
+    state.accum = 0;
+    state.locked = true;
+    state.lastEventAt = now;
+    return { direction: 0, handled: false };
+  }
+
+  if (now - state.lastEventAt > PLANNER_SWIPE_GESTURE_GAP_MS) {
+    state.accum = 0;
+    state.locked = false;
+  }
+  state.lastEventAt = now;
+  if (state.locked) return { direction: 0, handled: true };
+
+  if (state.accum !== 0 && Math.sign(state.accum) !== Math.sign(dx)) state.accum = 0;
+  state.accum += dx;
+  if (Math.abs(state.accum) >= PLANNER_SWIPE_THRESHOLD_PX) {
+    const direction = state.accum > 0 ? 1 : -1;
+    state.accum = 0;
+    state.locked = true;
+    return { direction, handled: true };
+  }
+  return { direction: 0, handled: true };
+}
+
+function _onPlannerWheelSwipe(e) {
+  if (typeof plannerDisplayDateOverride !== 'undefined' && Array.isArray(plannerDisplayDateOverride) && plannerDisplayDateOverride.length > 0) return;
+  const scroll = document.querySelector('.planner-calendar-scroll');
+  const res = computePlannerWheelSwipe(_plannerSwipeState, {
+    deltaX: e.deltaX,
+    deltaY: e.deltaY,
+    shiftKey: e.shiftKey,
+    ctrlKey: e.ctrlKey,
+    now: (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(),
+    scrollLeft: scroll ? scroll.scrollLeft : 0,
+    scrollWidth: scroll ? scroll.scrollWidth : 0,
+    clientWidth: scroll ? scroll.clientWidth : 0
+  });
+  if (!res.handled) return;
+  e.preventDefault();
+  if (res.direction !== 0) {
+    const step = plannerViewMode === 'week' ? 7 : 1;
+    _plannerPendingSwipeAnim = res.direction;
+    navigatePlannerWeek(res.direction * step);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.computePlannerWheelSwipe = computePlannerWheelSwipe;
 }
 
 
