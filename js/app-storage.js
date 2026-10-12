@@ -1188,9 +1188,12 @@ const StorageAPI = {
       }
     } catch (_e) {}
 
-    // 4. Clear localStorage items
+    // 4. Clear localStorage items (including email link tokens and pending auth state)
     if (typeof localStorage !== 'undefined') {
       try {
+        localStorage.removeItem('secretary_email_link_email');
+        localStorage.removeItem('secretary_magic_link_pending_pass');
+        localStorage.removeItem('secretary_pending_email_link');
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
@@ -1209,16 +1212,27 @@ const StorageAPI = {
       }
     }
 
-    // 5. Clear sessionStorage
+    // 5. Clear sessionStorage & scrub any magic link tokens from browser address bar
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.clear();
       } catch (e) {}
     }
+    if (typeof window !== 'undefined' && window.history?.replaceState && window.location) {
+      if (window.location.search?.includes('apiKey') || window.location.search?.includes('oobCode') || window.location.search?.includes('mode=signIn')) {
+        try {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (_e) {}
+      }
+    }
 
-    // 6. Purge Firebase sync service local memory and lock vault
+    // 6. Purge Firebase sync service local memory, email identity, and lock vault
     if (typeof window !== 'undefined' && window.FirebaseSyncService) {
       try {
+        if (window.FirebaseSyncService.state) {
+          window.FirebaseSyncService.state.userEmail = null;
+          window.FirebaseSyncService.state.userId = 'default_user';
+        }
         if (typeof window.FirebaseSyncService.lockVault === 'function') {
           window.FirebaseSyncService.lockVault();
         }
@@ -1226,6 +1240,13 @@ const StorageAPI = {
           await window.FirebaseSyncService.clearSavedPassphrase();
         }
       } catch (e) {}
+    }
+
+    // Clear settings references to sync emails and vault metadata
+    if (typeof settings !== 'undefined' && settings) {
+      delete settings.vaultMeta;
+      delete settings.vaultId;
+      delete settings.lastSyncEmail;
     }
 
     // 7. Clear in-memory manifests and handle

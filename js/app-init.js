@@ -972,6 +972,7 @@ function updateCloudSyncUI(statusObj) {
       const badgeEmail = document.getElementById('badge-auth-email');
       const btnLinkEmail = document.getElementById('btn-link-auth-email');
       const btnUserReset = document.getElementById('btn-user-reset-pass');
+      const btnUnlinkEmail = document.getElementById('btn-unlink-auth-email');
       if (badgeEmail) {
         badgeEmail.textContent = hasPassword
           ? (typeof t === 'function' ? t('sync.authStatusLinked') : 'Linked')
@@ -984,6 +985,9 @@ function updateCloudSyncUI(statusObj) {
       }
       if (btnUserReset) {
         btnUserReset.style.display = (hasPassword && user && user.email) ? 'inline-flex' : 'none';
+      }
+      if (btnUnlinkEmail) {
+        btnUnlinkEmail.style.display = (hasPassword && user && user.email) ? 'inline-flex' : 'none';
       }
 
       // Magic link
@@ -1018,6 +1022,8 @@ function updateCloudSyncUI(statusObj) {
       }
       if (uidEl) uidEl.textContent = '';
       if (btnSignOut) btnSignOut.style.display = 'none';
+      const btnUnlinkEmail = document.getElementById('btn-unlink-auth-email');
+      if (btnUnlinkEmail) btnUnlinkEmail.style.display = 'none';
       if (btnSwitch) {
         btnSwitch.textContent = typeof t === 'function' ? t('sync.accountSignInBtn') : 'Sign In / Connect Cloud';
       }
@@ -2398,6 +2404,36 @@ async function sendMagicLinkForCurrentAccountUI() {
   }
 }
 window.sendMagicLinkForCurrentAccountUI = sendMagicLinkForCurrentAccountUI;
+
+async function unlinkEmailAccountUI() {
+  if (!window.FirebaseSyncService) return;
+  const confirmed = typeof window.confirm === 'function'
+    ? window.confirm(
+        typeof t === 'function'
+          ? t('sync.unlinkEmailConfirmPrompt')
+          : 'Are you sure you want to unlink your email address from this account?'
+      )
+    : true;
+  if (!confirmed) return;
+
+  try {
+    await window.FirebaseSyncService.unlinkEmail();
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.unlinkEmailSuccess') : 'Email address unlinked successfully');
+    }
+    updateCloudSyncUI();
+  } catch (err) {
+    console.warn('Unlink email failed:', err);
+    const isOnlyProvider = err && (err.code === 'auth/no-such-provider' || err.message?.includes('only') || err.message?.includes('provider'));
+    const msg = isOnlyProvider
+      ? (typeof t === 'function' ? t('sync.unlinkEmailOnlyProviderWarning') : 'Cannot unlink email because it is your only sign-in method. Add another sign-in method first or delete the account.')
+      : ((typeof t === 'function' ? t('sync.unlinkEmailFailed') : 'Failed to unlink email address') + ': ' + (err.message || ''));
+    if (typeof showToast === 'function') {
+      showToast(msg, true);
+    }
+  }
+}
+window.unlinkEmailAccountUI = unlinkEmailAccountUI;
 
 async function unlinkAuthProviderUI(providerId) {
   try {

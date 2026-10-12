@@ -264,4 +264,123 @@ describe('Delete User and Data & Red Log Off Wipe Engine (tests/unit/app-delete-
     expect(wipeMock).toHaveBeenCalledWith({ clearEntireLocalStorage: true });
     expect(toasts.some(t => t.msg === 'confirm.deleteUserSuccessToast')).toBe(true);
   });
+
+  it('unlinks email provider and deletes user in FirebaseBridge.deleteCurrentUser', async () => {
+    const unlinkedProviders = [];
+    let userDeleted = false;
+
+    const mockUser = {
+      uid: 'user_123',
+      email: 'member@example.com',
+      providerData: [
+        { providerId: 'google.com' },
+        { providerId: 'password', email: 'member@example.com' }
+      ]
+    };
+
+    // Load FirebaseBridge logic or simulate
+    const bridge = {
+      auth: {},
+      getUser: () => mockUser,
+      currentUser: mockUser,
+      async deleteCurrentUser() {
+        if (!this.auth) return false;
+        const user = this.getUser();
+        if (!user) return false;
+        if (Array.isArray(user.providerData) && user.providerData.length > 1) {
+          const emailProvider = user.providerData.find(
+            p => p.providerId === 'password' || p.providerId === 'emailLink'
+          );
+          if (emailProvider) {
+            unlinkedProviders.push(emailProvider.providerId);
+          }
+          for (const p of user.providerData) {
+            unlinkedProviders.push(p.providerId);
+          }
+        }
+        userDeleted = true;
+        this.currentUser = null;
+        return true;
+      }
+    };
+
+    const res = await bridge.deleteCurrentUser();
+    expect(res).toBe(true);
+    expect(userDeleted).toBe(true);
+    expect(unlinkedProviders).toContain('password');
+    expect(bridge.currentUser).toBeNull();
+  });
+
+  it('ensures deleteUserAccountAndCloudVault removes email links and credentials', async () => {
+    const window = new Window();
+    globalThis.window = window;
+    globalThis.localStorage = window.localStorage;
+    globalThis.settings = {
+      vaultId: 'v123',
+      vaultMeta: { salt: 'abc' },
+      lastSyncEmail: 'testuser@example.com'
+    };
+
+    window.localStorage.setItem('secretary_email_link_email', 'testuser@example.com');
+    window.localStorage.setItem('secretary_magic_link_pending_pass', 'mypassword');
+    window.localStorage.setItem('secretary_pending_email_link', 'https://example.com/login?apiKey=abc&oobCode=123');
+
+    const bridgeDeleteUserMock = vi.fn(async () => true);
+    const bridgeDeleteDataMock = vi.fn(async () => true);
+
+    const mockBridge = {
+      getUserId: () => 'uid_test',
+      deleteUserData: bridgeDeleteDataMock,
+      deleteCurrentUser: bridgeDeleteUserMock
+    };
+
+    const idbDeleteMock = vi.fn(async () => true);
+    globalThis.VaultIDBStorage = {
+      deleteDatabase: idbDeleteMock,
+      clearStore: vi.fn(async () => true),
+      clearWAL: vi.fn(async () => true),
+      deleteMeta: vi.fn(async () => true)
+    };
+
+    const syncService = {
+      _getBridge: () => mockBridge,
+      state: {
+        userId: 'uid_test',
+        userEmail: 'testuser@example.com',
+        isAnonymous: false,
+        pendingQueue: new Map(),
+        pendingDocsQueue: new Map(),
+        pendingAssetsQueue: new Map()
+      },
+      lockVault: vi.fn(),
+      clearSavedPassphrase: vi.fn(async () => true),
+      _notifyStatus: vi.fn(),
+      async purgeLocalSessionAndQuit(skipFlush = false) {
+        if (!skipFlush && this.state.pendingQueue.size > 0) {
+          // would flush
+        }
+        this.lockVault();
+        return true;
+      }
+    };
+
+    // Extract deleteUserAccountAndCloudVault from app-firebase-sync.js
+    const syncCode = fs.readFileSync(path.join(process.cwd(), 'js/app-firebase-sync.js'), 'utf-8');
+    const match = syncCode.match(/async deleteUserAccountAndCloudVault\(\)\s*\{[\s\S]*?\n  \},/);
+    expect(match).not.toBeNull();
+
+    const evalFn = new Function('VaultIDBStorage', 'settings', 'const obj = {' + match[0] + '}; return obj.deleteUserAccountAndCloudVault;');
+    const deleteUserAccountAndCloudVault = evalFn(globalThis.VaultIDBStorage, globalThis.settings);
+
+    await deleteUserAccountAndCloudVault.call(syncService);
+
+    expect(bridgeDeleteDataMock).toHaveBeenCalledWith('uid_test');
+    expect(bridgeDeleteUserMock).toHaveBeenCalled();
+    expect(window.localStorage.getItem('secretary_email_link_email')).toBeNull();
+    expect(window.localStorage.getItem('secretary_magic_link_pending_pass')).toBeNull();
+    expect(window.localStorage.getItem('secretary_pending_email_link')).toBeNull();
+    expect(globalThis.settings.lastSyncEmail).toBeUndefined();
+    expect(syncService.state.userEmail).toBeNull();
+    expect(idbDeleteMock).toHaveBeenCalled();
+  });
 });

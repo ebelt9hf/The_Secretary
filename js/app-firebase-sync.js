@@ -579,6 +579,32 @@ const FirebaseSyncService = {
     return user;
   },
 
+  async unlinkEmail(config = null) {
+    await this.ensureBridgeInitialized(config);
+    const bridge = this._getBridge();
+    if (!bridge) throw new Error('Firebase Authentication is not available');
+    let user = null;
+    if (typeof bridge.unlinkEmail === 'function') {
+      user = await bridge.unlinkEmail();
+    } else {
+      user = await this.unlinkProvider('password');
+    }
+    this.state.userEmail = null;
+    if (typeof settings !== 'undefined' && settings) {
+      delete settings.lastSyncEmail;
+      if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('secretary_email_link_email');
+        localStorage.removeItem('secretary_magic_link_pending_pass');
+        localStorage.removeItem('secretary_pending_email_link');
+      }
+    } catch (_e) {}
+    this._notifyStatus();
+    return user;
+  },
+
   getLinkedProviders() {
     const bridge = this._getBridge();
     return bridge?.getLinkedProviders?.() || [];
@@ -3136,14 +3162,20 @@ const FirebaseSyncService = {
     }
   },
 
-  async purgeLocalSessionAndQuit() {
-    // 1. Flush any pending items to Firebase cloud
-    try {
-      if (this.state.pendingQueue.size > 0 || (this.state.pendingDocsQueue && this.state.pendingDocsQueue.size > 0) || (this.state.pendingAssetsQueue && this.state.pendingAssetsQueue.size > 0)) {
-        await this.flushQueue();
+  async purgeLocalSessionAndQuit(skipFlush = false) {
+    // 1. Flush any pending items to Firebase cloud (unless skipFlush is true, e.g. during account deletion)
+    if (!skipFlush) {
+      try {
+        if (this.state.pendingQueue.size > 0 || (this.state.pendingDocsQueue && this.state.pendingDocsQueue.size > 0) || (this.state.pendingAssetsQueue && this.state.pendingAssetsQueue.size > 0)) {
+          await this.flushQueue();
+        }
+      } catch (e) {
+        console.warn('Failed to flush queue before purge', e);
       }
-    } catch (e) {
-      console.warn('Failed to flush queue before purge', e);
+    } else {
+      if (this.state.pendingQueue) this.state.pendingQueue.clear();
+      if (this.state.pendingDocsQueue) this.state.pendingDocsQueue.clear();
+      if (this.state.pendingAssetsQueue) this.state.pendingAssetsQueue.clear();
     }
 
     // 2. Clear all local IDB stores: notes, docs, assets, wal
@@ -3219,7 +3251,7 @@ const FirebaseSyncService = {
       }
     }
 
-    // 2. Delete auth account in Firebase
+    // 2. Delete auth account in Firebase (severs email link, unlinks providers, and deletes user record)
     if (bridge && typeof bridge.deleteCurrentUser === 'function') {
       try {
         await bridge.deleteCurrentUser();
@@ -3228,22 +3260,55 @@ const FirebaseSyncService = {
       }
     }
 
-    // 3. Purge local session and IDB
-    await this.purgeLocalSessionAndQuit();
+    // 3. Clear email links, tokens, and credentials in localStorage
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('secretary_email_link_email');
+        localStorage.removeItem('secretary_magic_link_pending_pass');
+        localStorage.removeItem('secretary_pending_email_link');
+      }
+    } catch (_e) {}
 
-    // 4. Delete IDB database entirely
+    // Scrub URL if it contains email sign-in link parameters
+    if (typeof window !== 'undefined' && window.history?.replaceState && window.location) {
+      if (window.location.search?.includes('apiKey') || window.location.search?.includes('oobCode') || window.location.search?.includes('mode=signIn')) {
+        try {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (_e) {}
+      }
+    }
+
+    // 4. Purge local session and IDB (without flushing pending queue to deleted vault)
+    await this.purgeLocalSessionAndQuit(true);
+
+    // 5. Delete IDB database entirely
     if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.deleteDatabase === 'function') {
       try {
         await VaultIDBStorage.deleteDatabase();
       } catch (e) {}
     }
 
-    // 5. Clean local settings references
+    // 6. Clean local settings references
     if (typeof settings !== 'undefined' && settings) {
       delete settings.vaultMeta;
       delete settings.vaultId;
       delete settings.lastSyncEmail;
+      if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
     }
+
+    // 7. Unsubscribe any active remote listeners & reset in-memory identity
+    if (this._remoteUnsubscribe) {
+      try { this._remoteUnsubscribe(); } catch (e) {}
+      this._remoteUnsubscribe = null;
+    }
+    if (this._remoteDocsUnsubscribe) {
+      try { this._remoteDocsUnsubscribe(); } catch (e) {}
+      this._remoteDocsUnsubscribe = null;
+    }
+    this.state.userId = 'default_user';
+    this.state.userEmail = null;
+    this.state.isAnonymous = false;
+    this._notifyStatus();
 
     return true;
   },

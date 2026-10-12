@@ -120,9 +120,42 @@ export const FirebaseBridge = {
     if (!this.auth) return false;
     const user = this.getUser();
     if (!user) return false;
+    // Unlink any secondary providers (prioritizing email link or password) if multiple exist before account deletion
+    if (Array.isArray(user.providerData) && user.providerData.length > 1) {
+      const emailProvider = user.providerData.find(
+        p => p.providerId === 'password' || p.providerId === 'emailLink'
+      );
+      if (emailProvider) {
+        try {
+          await unlink(user, emailProvider.providerId);
+        } catch (_e) {
+          // Ignore if email provider cannot be unlinked
+        }
+      }
+      for (const p of user.providerData) {
+        try {
+          await unlink(user, p.providerId);
+        } catch (_e) {
+          // Ignore if provider cannot be unlinked
+        }
+      }
+    }
     await deleteUser(user);
     this.currentUser = null;
     return true;
+  },
+
+  async unlinkEmail() {
+    if (!this.auth) return false;
+    const user = this.getUser();
+    if (!user) throw new Error('No user is currently signed in');
+    const emailProvider = (user.providerData || []).find(
+      p => p.providerId === 'password' || p.providerId === 'emailLink'
+    );
+    if (!emailProvider) return false;
+    const updatedUser = await unlink(user, emailProvider.providerId);
+    this.currentUser = updatedUser;
+    return updatedUser;
   },
 
   async deleteUserData(userId) {
