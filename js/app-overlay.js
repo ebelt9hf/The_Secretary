@@ -428,16 +428,17 @@ if (typeof window !== 'undefined') {
   window.resolveNoteImagesSync = resolveNoteImagesSync;
 }
 
-function getDefaultNoteTemplateHTML(lang) {
+function getDefaultNoteTemplateHTML(lang, options = {}) {
   const l = lang || (typeof getWorkingLanguage === 'function' ? getWorkingLanguage() : (typeof getNoteLanguage === 'function' ? getNoteLanguage() : 'en'));
   const goalHeader = t('common.goal', { lang: l }) || 'Goal';
   const notesHeader = t('common.notes', { lang: l }) || 'Notes';
   const decisionsHeader = t('common.decisions', { lang: l }) || 'Decisions';
   const actionsHeader = t('common.actions', { lang: l }) || 'Action Items';
+  const context = (typeof options === 'string' ? options : (options?.context || options?.description || '')).trim();
 
   return `
 <h2>${escH(goalHeader)}</h2>
-<p></p>
+<p>${context ? escH(context) : ''}</p>
 <h2>${escH(notesHeader)}</h2>
 <p></p>
 <h2>${escH(decisionsHeader)}</h2>

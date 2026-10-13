@@ -2498,10 +2498,8 @@ const NoteTemplateManager = {
         icon: '👥',
         headers: [
           t('templates.1on1CheckIn', { lang: l }),
-          t('templates.1on1Agenda', { lang: l }),
           t('templates.1on1Feedback', { lang: l }),
-          t('templates.1on1Decisions', { lang: l }),
-          t('templates.1on1Actions', { lang: l })
+          t('common.actions', { lang: l })
         ]
       },
       {
@@ -2510,12 +2508,10 @@ const NoteTemplateManager = {
         description: t('templates.projectKickoffDesc', { lang: l }),
         icon: '🚀',
         headers: [
-          t('templates.kickoffObjectives', { lang: l }),
+          t('common.goal', { lang: l }),
           t('templates.kickoffScope', { lang: l }),
-          t('templates.kickoffRoles', { lang: l }),
-          t('templates.kickoffMilestones', { lang: l }),
-          t('templates.kickoffRisks', { lang: l }),
-          t('templates.kickoffNextSteps', { lang: l })
+          t('common.decisions', { lang: l }),
+          t('common.actions', { lang: l })
         ]
       },
       {
@@ -2525,10 +2521,9 @@ const NoteTemplateManager = {
         icon: '⚖️',
         headers: [
           t('templates.rfcContext', { lang: l }),
-          t('templates.rfcProblem', { lang: l }),
           t('templates.rfcOptions', { lang: l }),
-          t('templates.rfcDecision', { lang: l }),
-          t('templates.rfcConsequences', { lang: l })
+          t('common.decisions', { lang: l }),
+          t('common.actions', { lang: l })
         ]
       },
       {
@@ -2538,10 +2533,9 @@ const NoteTemplateManager = {
         icon: '🛠️',
         headers: [
           t('templates.postmortemSummary', { lang: l }),
-          t('templates.postmortemImpact', { lang: l }),
-          t('templates.postmortemTimeline', { lang: l }),
           t('templates.postmortemRootCause', { lang: l }),
-          t('templates.postmortemCorrective', { lang: l })
+          t('common.decisions', { lang: l }),
+          t('common.actions', { lang: l })
         ]
       },
       {
@@ -2550,110 +2544,86 @@ const NoteTemplateManager = {
         description: t('templates.dailyStandupDesc', { lang: l }),
         icon: '☀️',
         headers: [
-          t('templates.standupYesterday', { lang: l }),
-          t('templates.standupToday', { lang: l }),
+          t('common.goal', { lang: l }),
           t('templates.standupBlockers', { lang: l }),
-          t('templates.standupDecisions', { lang: l })
+          t('common.actions', { lang: l })
         ]
       }
     ];
   },
 
-  getTemplateHTML(templateId, lang) {
+  getTemplateHTML(templateId, lang, options = {}) {
     const l = lang || (typeof getWorkingLanguage === 'function' ? getWorkingLanguage() : (typeof getNoteLanguage === 'function' ? getNoteLanguage() : 'en'));
+    const context = (typeof options === 'string' ? options : (options?.context || options?.description || '')).trim();
+    const goalTitle = t('common.goal', { lang: l }) || 'Goal';
+    const goalSection = context ? `<h2>${escH(goalTitle)}</h2>\n<p>${escH(context)}</p>\n` : '';
+
     switch (templateId) {
       case 'meeting_1on1':
-        return `
-<h2>${escH(t('templates.1on1CheckIn', { lang: l }))}</h2>
+        return `${goalSection}<h2>${escH(t('templates.1on1CheckIn', { lang: l }))}</h2>
 <p></p>
-<h2>${escH(t('templates.1on1Agenda', { lang: l }))}</h2>
-<ul>
-  <li></li>
-</ul>
 <h2>${escH(t('templates.1on1Feedback', { lang: l }))}</h2>
 <p></p>
-<h2>${escH(t('templates.1on1Decisions', { lang: l }))}</h2>
-<p></p>
-<h2>${escH(t('templates.1on1Actions', { lang: l }))}</h2>
+<h2>${escH(t('common.actions', { lang: l }))}</h2>
 <ul>
   <li></li>
 </ul>`;
 
       case 'project_kickoff':
-        return `
-<h2>${escH(t('templates.kickoffObjectives', { lang: l }))}</h2>
-<p></p>
+        return `<h2>${escH(goalTitle)}</h2>
+<p>${context ? escH(context) : ''}</p>
 <h2>${escH(t('templates.kickoffScope', { lang: l }))}</h2>
 <ul>
   <li></li>
 </ul>
-<h2>${escH(t('templates.kickoffRoles', { lang: l }))}</h2>
+<h2>${escH(t('common.decisions', { lang: l }))}</h2>
 <p></p>
-<h2>${escH(t('templates.kickoffMilestones', { lang: l }))}</h2>
+<h2>${escH(t('common.actions', { lang: l }))}</h2>
 <ul>
   <li></li>
-</ul>
-<h2>${escH(t('templates.kickoffRisks', { lang: l }))}</h2>
-<ul>
-  <li></li>
-</ul>
-<h2>${escH(t('templates.kickoffNextSteps', { lang: l }))}</h2>
-<p></p>`;
+</ul>`;
 
       case 'decision_rfc':
-        return `
-<h2>${escH(t('templates.rfcContext', { lang: l }))}</h2>
-<p></p>
-<h2>${escH(t('templates.rfcProblem', { lang: l }))}</h2>
+        return `${goalSection}<h2>${escH(t('templates.rfcContext', { lang: l }))}</h2>
 <p></p>
 <h2>${escH(t('templates.rfcOptions', { lang: l }))}</h2>
 <ul>
   <li><strong>Option A:</strong> </li>
   <li><strong>Option B:</strong> </li>
 </ul>
-<h2>${escH(t('templates.rfcDecision', { lang: l }))}</h2>
+<h2>${escH(t('common.decisions', { lang: l }))}</h2>
 <p>!decision:active ""</p>
-<h2>${escH(t('templates.rfcConsequences', { lang: l }))}</h2>
+<h2>${escH(t('common.actions', { lang: l }))}</h2>
 <ul>
   <li></li>
 </ul>`;
 
       case 'postmortem':
-        return `
-<h2>${escH(t('templates.postmortemSummary', { lang: l }))}</h2>
+        return `${goalSection}<h2>${escH(t('templates.postmortemSummary', { lang: l }))}</h2>
 <p></p>
-<h2>${escH(t('templates.postmortemImpact', { lang: l }))}</h2>
-<p></p>
-<h2>${escH(t('templates.postmortemTimeline', { lang: l }))}</h2>
-<ul>
-  <li><strong>HH:MM:</strong> </li>
-</ul>
 <h2>${escH(t('templates.postmortemRootCause', { lang: l }))}</h2>
 <p></p>
-<h2>${escH(t('templates.postmortemCorrective', { lang: l }))}</h2>
+<h2>${escH(t('common.decisions', { lang: l }))}</h2>
+<p></p>
+<h2>${escH(t('common.actions', { lang: l }))}</h2>
 <ul>
   <li></li>
 </ul>`;
 
       case 'daily_standup':
-        return `
-<h2>${escH(t('templates.standupYesterday', { lang: l }))}</h2>
-<ul>
-  <li></li>
-</ul>
-<h2>${escH(t('templates.standupToday', { lang: l }))}</h2>
-<ul>
-  <li></li>
-</ul>
+        return `<h2>${escH(goalTitle)}</h2>
+<p>${context ? escH(context) : ''}</p>
 <h2>${escH(t('templates.standupBlockers', { lang: l }))}</h2>
 <p></p>
-<h2>${escH(t('templates.standupDecisions', { lang: l }))}</h2>
-<p></p>`;
+<h2>${escH(t('common.actions', { lang: l }))}</h2>
+<ul>
+  <li></li>
+</ul>`;
 
       default:
         return typeof getDefaultNoteTemplateHTML === 'function'
-          ? getDefaultNoteTemplateHTML(l)
-          : `<h2>${escH(t('common.goal', { lang: l }))}</h2><p></p><h2>${escH(t('common.notes', { lang: l }))}</h2><p></p><h2>${escH(t('common.decisions', { lang: l }))}</h2><p></p><h2>${escH(t('common.actions', { lang: l }))}</h2><p></p>`;
+          ? getDefaultNoteTemplateHTML(l, options)
+          : `<h2>${escH(goalTitle)}</h2><p>${context ? escH(context) : ''}</p><h2>${escH(t('common.notes', { lang: l }))}</h2><p></p><h2>${escH(t('common.decisions', { lang: l }))}</h2><p></p><h2>${escH(t('common.actions', { lang: l }))}</h2><p></p>`;
     }
   }
 };

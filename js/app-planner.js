@@ -6950,7 +6950,17 @@ function openPlanEventModal(prefill = {}) {
       const majorTags = readTagEditor('pe-major-tags') || [];
       const topicTags = readTagEditor('pe-topic-tags') || [];
 
-      const markdown = await generateEventNoteMarkdown(event, type);
+      const eventContext = (document.getElementById('pe-context')?.value || event.context || event.description || '').trim();
+      const workingLang = typeof getWorkingLanguage === 'function' ? getWorkingLanguage() : (typeof getNoteLanguage === 'function' ? getNoteLanguage() : 'en');
+      const effectiveTemplateId = (type === 'sync' ? 'meeting_1on1' : (event.noteTemplateId || null));
+      let mainHTML = '';
+      if (effectiveTemplateId && typeof NoteTemplateManager !== 'undefined' && typeof NoteTemplateManager.getTemplateHTML === 'function') {
+        mainHTML = NoteTemplateManager.getTemplateHTML(effectiveTemplateId, workingLang, { context: eventContext });
+      }
+      if (!mainHTML) {
+        const markdown = await generateEventNoteMarkdown(event, type, { lang: workingLang, context: eventContext });
+        mainHTML = mdToPreviewHTML(markdown);
+      }
 
       closeProgress.updateStage?.(t('planner.writingNoteContent') || 'Encrypting and saving note content...', '', 45);
       await new Promise(r => setTimeout(r, 16));
@@ -6964,7 +6974,7 @@ function openPlanEventModal(prefill = {}) {
         major_topic_tags: majorTags,
         topic_tags: topicTags,
         extra_tags: [],
-        mainHTML: mdToPreviewHTML(markdown)
+        mainHTML
       };
 
       await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
@@ -11638,17 +11648,19 @@ async function openNoteForEvent(event) {
     return parent ? parent.noteTemplateId : null;
   })()) || (event.type === 'sync' ? 'meeting_1on1' : null);
 
+  const blockContext = (event.context || event.description || '').trim();
+
   let mainHTML = '';
-  if (effectiveTemplateId && effectiveTemplateId !== 'standard' && typeof NoteTemplateManager !== 'undefined' && typeof NoteTemplateManager.getTemplateHTML === 'function') {
-    const templateContent = NoteTemplateManager.getTemplateHTML(effectiveTemplateId, workingLang);
+  if (effectiveTemplateId && typeof NoteTemplateManager !== 'undefined' && typeof NoteTemplateManager.getTemplateHTML === 'function') {
+    const templateContent = NoteTemplateManager.getTemplateHTML(effectiveTemplateId, workingLang, { context: blockContext });
     if (templateContent) {
       mainHTML = templateContent;
     } else {
-      const markdown = await generateEventNoteMarkdown(event, event.type, { lang: workingLang });
+      const markdown = await generateEventNoteMarkdown(event, event.type, { lang: workingLang, context: blockContext });
       mainHTML = mdToPreviewHTML(markdown);
     }
   } else {
-    const markdown = await generateEventNoteMarkdown(event, event.type, { lang: workingLang });
+    const markdown = await generateEventNoteMarkdown(event, event.type, { lang: workingLang, context: blockContext });
     mainHTML = mdToPreviewHTML(markdown);
   }
   const note = {
