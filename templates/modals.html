@@ -1066,7 +1066,7 @@
           </span>
           <span data-i18n="sync.unlockTitle">Unlock Encrypted Vault</span>
         </h2>
-        <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="closeModal('modal-cloud-sync-unlock')" title="Close dialog" data-i18n-title="common.close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <button type="button" class="btn btn-secondary modal-close-icon-btn" onclick="cancelCloudSyncUnlock()" title="Exit this locked vault and choose another workspace or local folder" data-i18n-title="sync.switchWorkspaceTooltip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <p style="margin: 0.2rem 0 1rem 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;" data-i18n="sync.unlockDesc">
         Please enter your master passphrase to unlock and synchronize your encrypted notes.
@@ -1086,7 +1086,7 @@
         </label>
       </div>
       <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-sync-unlock')" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Close this dialog without unlocking">Cancel</button>
+        <button type="button" class="btn btn-secondary" id="btn-sync-unlock-cancel" onclick="cancelCloudSyncUnlock()" data-i18n="sync.switchWorkspaceBtn" data-i18n-title="sync.switchWorkspaceTooltip" title="Exit this locked vault and choose another workspace or local folder">Switch Workspace</button>
         <button type="button" class="btn btn-secondary" id="btn-sync-unlock-save" onclick="submitCloudSyncUnlock(true)" data-i18n="sync.saveAndUnlockBtn" data-i18n-title="sync.saveAndUnlockTooltip" title="Unlock and remember passphrase on this device">Save & Unlock</button>
         <button type="submit" class="btn btn-primary" id="btn-sync-unlock-submit" data-i18n="sync.unlockBtn" data-i18n-title="sync.unlockBtnTooltip" title="Unlock your encrypted vault and sync notes">Unlock Vault</button>
       </div>

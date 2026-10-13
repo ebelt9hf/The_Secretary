@@ -709,7 +709,8 @@ function togglePassVisibility(inputId, btnEl) {
 window.togglePassVisibility = togglePassVisibility;
 
 function openCloudSyncModalOrPrefs() {
-  if (window.FirebaseSyncService?.state?.engine === 'firebase' && !window.FirebaseSyncService?.state?.isUnlocked) {
+  const isVirtual = Boolean(rootHandle?.isVirtual || rootHandle?.isDemo || rootHandle?.name === 'Demo Workspace (Sandbox)');
+  if (!isVirtual && window.FirebaseSyncService?.state?.engine === 'firebase' && !window.FirebaseSyncService?.state?.isUnlocked) {
     if (typeof openModal === 'function') {
       openModal('modal-cloud-sync-unlock');
       return;
@@ -2939,6 +2940,34 @@ async function submitCloudSyncUnlock(forceSave = false) {
 }
 window.submitCloudSyncUnlock = submitCloudSyncUnlock;
 
+async function cancelCloudSyncUnlock() {
+  if (typeof closeModal === 'function') {
+    closeModal('modal-cloud-sync-unlock');
+  }
+  // When the vault is locked and engine is firebase, the user cannot work in this instance without the passphrase.
+  // Take them back to the welcome/workspace selection screen so they can choose a local folder or another workspace.
+  if (window.FirebaseSyncService?.state?.engine === 'firebase' && !window.FirebaseSyncService?.state?.isUnlocked) {
+    if (typeof handleLogOffUI === 'function') {
+      await handleLogOffUI();
+    } else {
+      const sm = document.getElementById('screen-main');
+      if (sm) sm.classList.remove('active');
+      const sc = document.getElementById('screen-connect');
+      if (sc) {
+        sc.style.display = '';
+        sc.classList.remove('loading');
+      }
+      if (typeof showLandingStep === 'function') {
+        showLandingStep('welcome');
+      }
+      if (typeof updateCloudSyncUI === 'function') {
+        updateCloudSyncUI();
+      }
+    }
+  }
+}
+window.cancelCloudSyncUnlock = cancelCloudSyncUnlock;
+
 async function toggleRememberPassphraseUI(checked) {
   const svc = window.FirebaseSyncService;
   const cb = document.getElementById('prefs-sync-remember-pass');
@@ -4372,11 +4401,27 @@ async function mountFolder(handle) {
     if (typeof StorageAPI !== 'undefined' && StorageAPI && typeof StorageAPI.clearNoteCache === 'function') {
       StorageAPI.clearNoteCache();
     }
-    updateStartupProgress(5, t('landing.loadingWorkspace') || 'Loading workspace…');
+    const isVirtualWorkspace = Boolean(handle?.isVirtual || handle?.isDemo || handle?.name === 'Demo Workspace (Sandbox)');
+    if (isVirtualWorkspace) {
+      if (typeof settings === 'object' && settings) settings.storageEngine = 'filesystem';
+      if (window.StorageAPI) window.StorageAPI.setStorageEngine('filesystem');
+      if (window.FirebaseSyncService?.state) {
+        window.FirebaseSyncService.state.engine = 'filesystem';
+        window.FirebaseSyncService.state.status = window.FirebaseSyncService.STATUS?.DISCONNECTED || 'disconnected';
+      }
+    }
 
     // Critical path: settings & storageEngine first, then auto-unlock if firebase, then metadata/manifest.
     try { await loadSettingsFromFolder(); } catch (e) { /* ignore */ }
-    if (settings && settings.storageEngine === 'firebase') {
+    if (isVirtualWorkspace) {
+      if (typeof settings === 'object' && settings) settings.storageEngine = 'filesystem';
+      if (window.StorageAPI) window.StorageAPI.setStorageEngine('filesystem');
+      if (window.FirebaseSyncService?.state) {
+        window.FirebaseSyncService.state.engine = 'filesystem';
+        window.FirebaseSyncService.state.status = window.FirebaseSyncService.STATUS?.DISCONNECTED || 'disconnected';
+      }
+    }
+    if (!isVirtualWorkspace && settings && settings.storageEngine === 'firebase') {
       if (window.StorageAPI) window.StorageAPI.setStorageEngine('firebase');
       if (window.FirebaseSyncService) {
         try {
@@ -4598,7 +4643,10 @@ function queueBackgroundHydration(isNewWorkspaceFolder = false) {
           }
 
           // Check and handle storageEngine mode & startup prompts
-          if (typeof settings === 'object' && settings) {
+          if (isVirtualWorkspace) {
+            if (typeof settings === 'object' && settings) settings.storageEngine = 'filesystem';
+            if (window.StorageAPI) window.StorageAPI.setStorageEngine('filesystem');
+          } else if (typeof settings === 'object' && settings) {
             if (settings.storageEngine === 'firebase') {
               if (window.StorageAPI) window.StorageAPI.setStorageEngine('firebase');
               if (window.FirebaseSyncService && !window.FirebaseSyncService.state.isUnlocked) {
@@ -5273,6 +5321,7 @@ function createVirtualDirectoryHandle(rootName, initialFiles = {}) {
     return {
       name: dirName,
       kind: 'directory',
+      isVirtual: true,
       async getDirectoryHandle(subName, options = {}) {
         const subPath = prefix ? `${prefix}${subName}` : subName;
         return makeDirHandle(subPath, subName);
@@ -5352,32 +5401,38 @@ function createDemoVirtualDirectoryHandle() {
   const dateThu = getWeekDateStr(3);
   const dateFri = getWeekDateStr(4);
 
-  const initialFiles = {
-    'settings.json': {
-      version: 1,
-      username: 'Alex Demo',
-      theme: 'system',
-      ui: {
-        workStartTime: '08:30',
-        workEndTime: '18:30',
-        workingDays: [1, 2, 3, 4, 5],
-        defaultPlannerDuration: 30,
-        laneSort: 'date',
-        weekCutoffWeeks: 8
-      },
-      collaborators: [
-        { id: 'collab-1', name: 'Etienne Beltzung', role: 'Lead Architect', color: '#4f46e5' },
-        { id: 'collab-2', name: 'Sarah Connor', role: 'Security Engineer', color: '#059669' },
-        { id: 'collab-3', name: 'Alex Martin', role: 'Product Designer', color: '#d97706' }
-      ],
-      workstreams: [
-        { id: 'ws-1', name: 'Product Launch', color: '#4f46e5', status: 'active' },
-        { id: 'ws-2', name: 'Architecture & Security', color: '#059669', status: 'active' },
-        { id: 'ws-3', name: 'Quality & Bug Fixes', color: '#ef4444', status: 'active' },
-        { id: 'ws-4', name: 'Personal / Strategy', color: '#d97706', status: 'active' }
-      ],
-      firstRunSetupDone: true
+  const demoSettingsObj = {
+    version: 1,
+    storageEngine: 'filesystem',
+    username: 'Alex Demo',
+    theme: 'system',
+    ui: {
+      workStartTime: '08:30',
+      workEndTime: '18:30',
+      workingDays: [1, 2, 3, 4, 5],
+      defaultPlannerDuration: 30,
+      laneSort: 'date',
+      weekCutoffWeeks: 8
     },
+    collaborators: [
+      { id: 'collab-1', name: 'Etienne Beltzung', role: 'Lead Architect', color: '#4f46e5' },
+      { id: 'collab-2', name: 'Sarah Connor', role: 'Security Engineer', color: '#059669' },
+      { id: 'collab-3', name: 'Alex Martin', role: 'Product Designer', color: '#d97706' }
+    ],
+    workstreams: [
+      { id: 'ws-1', name: 'Product Launch', color: '#4f46e5', status: 'active' },
+      { id: 'ws-2', name: 'Architecture & Security', color: '#059669', status: 'active' },
+      { id: 'ws-3', name: 'Quality & Bug Fixes', color: '#ef4444', status: 'active' },
+      { id: 'ws-4', name: 'Personal / Strategy', color: '#d97706', status: 'active' }
+    ],
+    firstRunSetupDone: true,
+    folderInitialized: true
+  };
+
+  const initialFiles = {
+    'settings.json': demoSettingsObj,
+    'secretary-settings.json': demoSettingsObj,
+    '.secretary/settings.json': demoSettingsObj,
     'notes/manifest.json': [
       {
         id: 'welcome-demo-note',
@@ -5593,12 +5648,26 @@ function createDemoVirtualDirectoryHandle() {
     }
   };
 
-  return createVirtualDirectoryHandle('Demo Workspace (Sandbox)', initialFiles);
+  const handle = createVirtualDirectoryHandle('Demo Workspace (Sandbox)', initialFiles);
+  handle.isVirtual = true;
+  handle.isDemo = true;
+  return handle;
 }
 window.createDemoVirtualDirectoryHandle = createDemoVirtualDirectoryHandle;
 
 window.startDemoWorkspaceFromLanding = async function() {
   try {
+    if (typeof settings === 'object' && settings) {
+      settings.storageEngine = 'filesystem';
+      try { saveLocalSettings(); } catch (e) {}
+    }
+    if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.setStorageEngine === 'function') {
+      StorageAPI.setStorageEngine('filesystem');
+    }
+    if (window.FirebaseSyncService?.state) {
+      window.FirebaseSyncService.state.engine = 'filesystem';
+      window.FirebaseSyncService.state.status = window.FirebaseSyncService.STATUS?.DISCONNECTED || 'disconnected';
+    }
     const demoHandle = createDemoVirtualDirectoryHandle();
     if (typeof mountFolder === 'function') {
       await mountFolder(demoHandle);

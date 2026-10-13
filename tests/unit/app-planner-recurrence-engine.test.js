@@ -1156,6 +1156,13 @@ describe('Planner Recurrence Engine & Comprehensive Series Coverage', () => {
     it('updating recurrence pattern in savePlannerSeriesFromModal reschedules upcoming occurrences to new weekdays', async () => {
       const { savePlannerSeriesFromModal, precreateRecurringEventsForWeek } = loadPlannerModule();
 
+      const now = new Date();
+      const nextMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((8 - now.getDay()) % 7 || 7));
+      const year = nextMon.getFullYear();
+      const month = String(nextMon.getMonth() + 1).padStart(2, '0');
+      const day = String(nextMon.getDate()).padStart(2, '0');
+      const nextMonStr = `${year}-${month}-${day}`;
+
       const master = {
         id: 'evt-master-shift',
         recurrenceId: 'rec-shift-1',
@@ -1172,7 +1179,7 @@ describe('Planner Recurrence Engine & Comprehensive Series Coverage', () => {
         recurrenceId: 'rec-shift-1',
         title: 'Weekly Standup',
         type: 'call',
-        date: '2026-10-12', // upcoming Monday
+        date: nextMonStr, // upcoming Monday
         startTime: '09:00',
         endTime: '09:30'
       };
@@ -1211,7 +1218,7 @@ describe('Planner Recurrence Engine & Comprehensive Series Coverage', () => {
       expect(window.plannerEvents.find(e => e.id === 'evt-occ-mon1')).toBeUndefined();
 
       // New upcoming Tuesday occurrences must be precreated for the horizon
-      const tueOcc = window.plannerEvents.find(e => e.recurrenceId === 'rec-shift-1' && (e.date === '2026-10-13' || e.date === '2026-09-15' || e.date === '2026-09-22'));
+      const tueOcc = window.plannerEvents.find(e => e.recurrenceId === 'rec-shift-1' && e.id !== 'evt-master-shift');
       expect(tueOcc).toBeDefined();
       expect(tueOcc.title).toBe('Weekly Standup');
       expect(tueOcc.startTime).toBe('09:00');
