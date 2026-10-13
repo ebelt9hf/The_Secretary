@@ -898,6 +898,32 @@ button:focus-visible {
 .landing-btn-secondary-demo:active {
   transform: translateY(0);
 }
+.landing-btn-install {
+  width: 100%;
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg-alt));
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--radius-md);
+  padding: clamp(0.5rem, 1vh, 0.65rem) 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: clamp(0.8rem, 1.3vw, 0.88rem);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.landing-btn-install:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--card-bg-alt));
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.landing-btn-install:active {
+  transform: translateY(0);
+}
 .landing-demo-banner {
   width: 100%;
   display: flex;

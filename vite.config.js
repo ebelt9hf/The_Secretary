@@ -27,6 +27,18 @@ function copyStaticAssets() {
       if (fs.existsSync('icon.svg')) {
         fs.copyFileSync('icon.svg', 'dist/icon.svg');
       }
+      if (fs.existsSync('icon-192.png')) {
+        fs.copyFileSync('icon-192.png', 'dist/icon-192.png');
+      }
+      if (fs.existsSync('icon-512.png')) {
+        fs.copyFileSync('icon-512.png', 'dist/icon-512.png');
+      }
+      if (fs.existsSync('manifest.webmanifest')) {
+        fs.copyFileSync('manifest.webmanifest', 'dist/manifest.webmanifest');
+      }
+      if (fs.existsSync('sw.js')) {
+        fs.copyFileSync('sw.js', 'dist/sw.js');
+      }
       if (fs.existsSync('dist/app.html')) {
         fs.copyFileSync('dist/app.html', 'dist/index.html');
       }

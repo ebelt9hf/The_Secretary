@@ -5,18 +5,21 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Secretary</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.33">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.33">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1e1b4b">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="css/app-base.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.34">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.34">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
@@ -208,7 +211,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.33" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.33</p>
+      <p id="connect-version-hint" data-version="4.0.34" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.34</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -264,6 +267,12 @@
         <button type="button" class="landing-btn-secondary-demo" id="btn-landing-welcome-demo" onclick="window.startDemoWorkspaceFromLanding()" title="Start an interactive tour and explore Secretary features" data-i18n-title="landing.sandboxOptionTooltip">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           <span data-i18n="landing.sandboxOptionBtn">Launch Demo Workspace</span>
+        </button>
+
+        <!-- Install App Button (shown in supported web browsers) -->
+        <button type="button" class="landing-btn-install" id="btn-landing-install" onclick="window.PwaManager?.promptInstall()" title="Install Secretary as a standalone desktop application" data-i18n-title="pwa.installTooltip" style="display:none;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span data-i18n="pwa.installApp">Install App</span>
         </button>
       </div>
 
@@ -396,6 +405,7 @@
       <button class="tab-btn" id="tab-daily-review-btn" onclick="startDailyReview()" title="Lancer la Daily Review (Nettoyage de fin de journée)" style="display: none;"><span class="tab-btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span><span class="tab-btn-label">Daily Review</span></button>
       <span class="spacer"></span>
       <button class="topbar-icon-btn" id="btn-tutorial-icon" onclick="startTutorial()" title="Tutorial"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+      <button class="topbar-icon-btn" id="btn-install-app" onclick="window.PwaManager?.promptInstall()" title="Install Secretary as a standalone desktop application" data-i18n-title="pwa.installTooltip" style="display:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
       <button class="topbar-icon-btn" id="btn-cloud-sync-status" onclick="openCloudSyncModalOrPrefs()" title="Cloud Sync & Storage Status" data-i18n-title="sync.statusTooltip"><span id="cloud-sync-icon-wrap" style="display:inline-flex; align-items:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span></button>
       <button class="topbar-icon-btn" id="btn-prefs-icon" onclick="switchTab('prefs')" title="Preferences"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="3" r="1"/><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <button class="topbar-icon-btn" id="btn-topbar-logoff" onclick="handleLogOffUI()" title="Log off from current session" data-i18n-title="sync.logOffTooltip"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
@@ -923,6 +933,14 @@
             <button class="btn" id="prefs-tutorial-btn" onclick="startTutorial()" title="Launch the interactive application tour" data-i18n-title="prefs.startTourTooltip" data-i18n="prefs.startTour">Start Tour</button>
           </div>
           <small id="prefs-tutorial-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="prefs.tutorialDesc">Launches the guided walkthrough introducing key views, keyboard shortcuts, and board features.</small>
+        </div>
+        <div class="prefs-row" id="prefs-row-pwa-install" style="flex-direction:column;align-items:flex-start;gap:6px;margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+            <label class="prefs-label" id="prefs-pwa-install-label" data-i18n="pwa.installApp">Install App</label>
+            <button class="btn" id="btn-prefs-pwa-install" onclick="window.PwaManager?.promptInstall()" title="Install Secretary as a standalone desktop application" data-i18n-title="pwa.installTooltip" data-i18n="pwa.installApp" style="display:none;">Install App</button>
+            <span id="prefs-pwa-installed-status" style="display:none;color:var(--success);font-size:0.85rem;" data-i18n="pwa.standaloneRunning">Running in standalone window</span>
+          </div>
+          <small id="prefs-pwa-install-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="pwa.installTooltip">Install Secretary as a standalone desktop application.</small>
         </div>
       </div>
 
@@ -1494,40 +1512,41 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.33"></script>
-<script src="js/app-utils.js?v=4.0.33"></script>
-<script src="js/app-icons.js?v=4.0.33"></script>
-<script src="js/app-popover-manager.js?v=4.0.33"></script>
-<script src="js/translations.js?v=4.0.33"></script>
-<script src="js/app-i18n.js?v=4.0.33"></script>
-<script src="js/app-bridge.js?v=4.0.33"></script>
-<script src="js/app-fs.js?v=4.0.33"></script>
-<script src="js/firebase-bundle.js?v=4.0.33"></script>
-<script src="js/firebase-config.js?v=4.0.33"></script>
-<script src="js/app-crypto.js?v=4.0.33"></script>
-<script src="js/app-image-optimizer.js?v=4.0.33"></script>
-<script src="js/app-idb.js?v=4.0.33"></script>
-<script src="js/app-firebase-sync.js?v=4.0.33"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.33"></script>
-<script src="js/app-storage.js?v=4.0.33"></script>
-<script src="js/storage-migration.js?v=4.0.33"></script>
-<script src="js/app-stash-service.js?v=4.0.33"></script>
-<script src="js/app-omnibar.js?v=4.0.33"></script>
-<script src="js/app-topic-memory.js?v=4.0.33"></script>
-<script src="js/app-prompts.js?v=4.0.33"></script>
-<script src="js/app-llm.js?v=4.0.33"></script>
-<script src="js/app-dailyreview.js?v=4.0.33"></script>
-<script src="js/app-notes.js?v=4.0.33"></script>
-<script src="js/app-todos-board.js?v=4.0.33"></script>
-<script src="js/app-board.js?v=4.0.33"></script>
-<script src="js/app-focus.js?v=4.0.33"></script>
-<script src="js/app-overlay.js?v=4.0.33"></script>
-<script src="js/app-planner.js?v=4.0.33"></script>
-<script src="js/app-collab.js?v=4.0.33"></script>
-<script src="js/app-retro.js?v=4.0.33"></script>
-<script src="js/app-tutorial.js?v=4.0.33"></script>
-<script src="js/app-graph-view.js?v=4.0.33"></script>
-<script src="js/app-chat.js?v=4.0.33"></script>
-<script src="js/app-init.js?v=4.0.33"></script>
+<script src="js/app-state.js?v=4.0.34"></script>
+<script src="js/app-utils.js?v=4.0.34"></script>
+<script src="js/app-icons.js?v=4.0.34"></script>
+<script src="js/app-popover-manager.js?v=4.0.34"></script>
+<script src="js/translations.js?v=4.0.34"></script>
+<script src="js/app-i18n.js?v=4.0.34"></script>
+<script src="js/app-bridge.js?v=4.0.34"></script>
+<script src="js/app-pwa.js?v=4.0.34"></script>
+<script src="js/app-fs.js?v=4.0.34"></script>
+<script src="js/firebase-bundle.js?v=4.0.34"></script>
+<script src="js/firebase-config.js?v=4.0.34"></script>
+<script src="js/app-crypto.js?v=4.0.34"></script>
+<script src="js/app-image-optimizer.js?v=4.0.34"></script>
+<script src="js/app-idb.js?v=4.0.34"></script>
+<script src="js/app-firebase-sync.js?v=4.0.34"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.34"></script>
+<script src="js/app-storage.js?v=4.0.34"></script>
+<script src="js/storage-migration.js?v=4.0.34"></script>
+<script src="js/app-stash-service.js?v=4.0.34"></script>
+<script src="js/app-omnibar.js?v=4.0.34"></script>
+<script src="js/app-topic-memory.js?v=4.0.34"></script>
+<script src="js/app-prompts.js?v=4.0.34"></script>
+<script src="js/app-llm.js?v=4.0.34"></script>
+<script src="js/app-dailyreview.js?v=4.0.34"></script>
+<script src="js/app-notes.js?v=4.0.34"></script>
+<script src="js/app-todos-board.js?v=4.0.34"></script>
+<script src="js/app-board.js?v=4.0.34"></script>
+<script src="js/app-focus.js?v=4.0.34"></script>
+<script src="js/app-overlay.js?v=4.0.34"></script>
+<script src="js/app-planner.js?v=4.0.34"></script>
+<script src="js/app-collab.js?v=4.0.34"></script>
+<script src="js/app-retro.js?v=4.0.34"></script>
+<script src="js/app-tutorial.js?v=4.0.34"></script>
+<script src="js/app-graph-view.js?v=4.0.34"></script>
+<script src="js/app-chat.js?v=4.0.34"></script>
+<script src="js/app-init.js?v=4.0.34"></script>
 </body>
 </html>
