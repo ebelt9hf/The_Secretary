@@ -25,7 +25,9 @@ const PRECACHE_ASSETS = [
   './js/translations.js',
   './js/app-utils.js',
   './js/app-bridge.js',
-  './js/app-pwa.js'
+  './js/app-pwa.js',
+  './js/vendor/turndown.js',
+  './js/vendor/turndown-plugin-gfm.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -125,7 +127,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 5. CDN static assets (KaTeX, Marked, Turndown): Cache-first fallback
+  // 5. CDN static assets (KaTeX, Marked): Cache-first fallback
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
