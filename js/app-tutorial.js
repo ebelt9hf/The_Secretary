@@ -11,70 +11,104 @@ const TutorialController = {
   resizeObserver: null,
 
   steps: [
+    // ── STAGE 1: Lead Through the Navigation Tabs ──
     {
+      id: 'welcome',
       titleKey: 'tutorial.step1Title',
       textKey: 'tutorial.step1Text',
       selector: null,
       tab: null
     },
     {
+      id: 'planner-tab',
       titleKey: 'tutorial.step2Title',
       textKey: 'tutorial.step2Text',
       selector: '#tab-planner',
       tab: 'planner'
     },
     {
-      titleKey: 'tutorial.step3Title',
-      textKey: 'tutorial.step3Text',
-      selector: '#tab-notes',
-      tab: 'notes'
-    },
-    {
-      titleKey: 'tutorial.step4Title',
-      textKey: 'tutorial.step4Text',
-      selector: '.topbar-title-wrap',
-      tab: null
-    },
-    {
+      id: 'todos-tab',
       titleKey: 'tutorial.step5Title',
       textKey: 'tutorial.step5Text',
       selector: '#tab-todos-mode',
       tab: 'todos'
     },
     {
-      titleKey: 'tutorial.step6Title',
-      textKey: 'tutorial.step6Text',
-      selector: '#tab-team',
-      tab: 'team'
-    },
-    {
+      id: 'retro-tab',
       titleKey: 'tutorial.step7Title',
       textKey: 'tutorial.step7Text',
       selector: '#tab-retro',
       tab: 'retro'
     },
     {
-      titleKey: 'tutorial.step8Title',
-      textKey: 'tutorial.step8Text',
-      selector: '#tab-daily-review-btn',
-      tab: null
+      id: 'notes-tab',
+      titleKey: 'tutorial.step3Title',
+      textKey: 'tutorial.step3Text',
+      selector: '#tab-notes',
+      tab: 'notes'
     },
     {
-      titleKey: 'tutorial.step9Title',
-      textKey: 'tutorial.step9Text',
-      selector: '#btn-topbar-ai',
-      tab: null
+      id: 'decisions-tab',
+      titleKey: 'tutorial.workstreamsTitle',
+      textKey: 'tutorial.workstreamsText',
+      selector: '#tab-decisions',
+      tab: 'decisions'
     },
     {
-      titleKey: 'tutorial.aiSetupTitle',
-      textKey: 'tutorial.aiSetupText',
-      selector: '#prefs-sec-ai',
-      tab: 'prefs',
-      onShow: () => {
-        if (typeof switchPrefsTab === 'function') switchPrefsTab('ai');
+      id: 'team-tab',
+      titleKey: 'tutorial.step6Title',
+      textKey: 'tutorial.step6Text',
+      selector: '#tab-team',
+      tab: 'team'
+    },
+
+    // ── STAGE 2: 15-Minute Block Creation, Opening & Interactive Note ──
+    {
+      id: 'create-block',
+      titleKey: 'tutorial.createBlocTitle',
+      textKey: 'tutorial.createBlocText',
+      selector: '.planner-empty-slot.tutorial-target-slot, #planner-grid-body',
+      tab: 'planner',
+      onShow: async () => {
+        TutorialController.closeIntroNote();
+        await TutorialController.ensureIntroNotePrepared();
+        TutorialController.setupCreateBlockTargetSlot();
       }
     },
     {
+      id: 'open-block',
+      titleKey: 'tutorial.openBlocTitle',
+      textKey: 'tutorial.openBlocText',
+      selector: '.planner-event-card[data-event-id="evt-intro-tutorial"], .planner-event-card',
+      tab: 'planner',
+      onShow: async () => {
+        TutorialController.closeIntroNote();
+        await TutorialController.ensureIntroBlockAndNote();
+        TutorialController.setupOpenBlockTargetCard();
+      }
+    },
+    {
+      id: 'note-todos',
+      titleKey: 'tutorial.noteTodosTitle',
+      textKey: 'tutorial.noteTodosText',
+      selector: '#edit-textarea',
+      tab: null,
+      onShow: async () => {
+        await TutorialController.ensureIntroNoteOpen();
+      }
+    },
+    {
+      id: 'note-decisions',
+      titleKey: 'tutorial.noteDecisionTitle',
+      textKey: 'tutorial.noteDecisionText',
+      selector: '#btn-insert-items, #edit-textarea',
+      tab: null,
+      onShow: async () => {
+        await TutorialController.ensureIntroNoteOpen();
+      }
+    },
+    {
+      id: 'finish',
       titleKey: 'tutorial.step11Title',
       textKey: 'tutorial.step11Text',
       selector: null,
@@ -146,9 +180,231 @@ const TutorialController = {
     this.overlayEl.classList.add('active');
   },
 
+  async ensureIntroNotePrepared() {
+    const todayStr = (typeof formatLocalDateValue === 'function')
+      ? formatLocalDateValue(new Date())
+      : new Date().toISOString().slice(0, 10);
+
+    const noteId = 'note-intro-tutorial';
+    const notePath = (typeof getCanonicalNotePath === 'function')
+      ? getCanonicalNotePath(noteId)
+      : `notes/${todayStr}_intro_tutorial.html`;
+
+    const noteTitle = (typeof t === 'function' ? t('tutorial.introBlockTitle') : '') || 'Introduction to Secretary';
+
+    let note = (typeof getNoteById === 'function') ? getNoteById(noteId) : null;
+    const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest))
+      ? manifest
+      : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : null);
+
+    if (!note && curManifest) {
+      note = curManifest.find(m => m && (m.id === noteId || m.path === notePath));
+    }
+
+    if (!note) {
+      const noteSummaryHTML = `<p>${(typeof t === 'function' ? t('tutorial.introNoteSummary') : '') || '15-minute orientation session introducing Secretary planning, tasks, and decisions.'}</p>`;
+      const noteMainHTML = `
+<h2>${(typeof t === 'function' ? t('tutorial.introNoteHeading') : '') || 'Welcome to Secretary'}</h2>
+<p>${(typeof t === 'function' ? t('tutorial.introNoteP1') : '') || 'This 15-minute introductory block helps you discover how time blocking, notes, actionable tasks, and strategic decisions connect together seamlessly.'}</p>
+
+<h3>${(typeof t === 'function' ? t('tutorial.introNoteTasksHeading') : '') || 'Tasks and Action Items'}</h3>
+<p>${(typeof t === 'function' ? t('tutorial.introNoteTasksDesc') : '') || 'Secretary turns notes into tracked items. Try selecting the text below with your cursor and clicking the Task button to convert it into a Todo:'}</p>
+<p><strong>${(typeof t === 'function' ? t('tutorial.introNoteSampleTodo') : '') || 'Select and create a todo: Review weekly priorities'}</strong></p>
+
+<h3>${(typeof t === 'function' ? t('tutorial.introNoteDecisionHeading') : '') || 'Strategic Decisions'}</h3>
+<p>${(typeof t === 'function' ? t('tutorial.introNoteDecisionDesc') : '') || 'Whenever an agreement or decision is reached, select the sentence and click the Decision button:'}</p>
+<p><strong>${(typeof t === 'function' ? t('tutorial.introNoteSampleDecision') : '') || 'Select and define a decision (I will use the secretary from now on)'}</strong></p>
+
+<h3>${(typeof t === 'function' ? t('tutorial.introNoteTipsHeading') : '') || 'Next Steps'}</h3>
+<p>${(typeof t === 'function' ? t('tutorial.introNoteTipsDesc') : '') || 'Keep taking notes during your focus blocks. All action items and decisions will automatically sync across the Planner, Todos, and Workstreams tabs.'}</p>
+      `.trim();
+
+      note = {
+        id: noteId,
+        path: notePath,
+        title: noteTitle,
+        date: todayStr,
+        group_tags: ['General'],
+        major_topic_tags: ['Secretary'],
+        topic_tags: ['Tutorial'],
+        extra_tags: [],
+        summaryHTML: noteSummaryHTML,
+        mainHTML: noteMainHTML
+      };
+
+      if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeNoteContent === 'function') {
+        try {
+          const fileContent = (typeof buildNewNoteHTML === 'function') ? buildNewNoteHTML(note) : noteMainHTML;
+          await StorageAPI.writeNoteContent(notePath, fileContent);
+        } catch (e) {
+          console.warn('Tutorial: Error writing note file:', e);
+        }
+      }
+      if (typeof upsertManifest === 'function') {
+        upsertManifest(note);
+      } else if (curManifest) {
+        curManifest.push(note);
+      }
+      if (typeof saveManifest === 'function') {
+        try { await saveManifest({ force: true }); } catch (e) {}
+      }
+    }
+
+    return note;
+  },
+
+  async ensureIntroBlockAndNote() {
+    const note = await this.ensureIntroNotePrepared();
+
+    const todayStr = (typeof formatLocalDateValue === 'function')
+      ? formatLocalDateValue(new Date())
+      : new Date().toISOString().slice(0, 10);
+
+    const noteId = 'note-intro-tutorial';
+    const noteTitle = (typeof t === 'function' ? t('tutorial.introBlockTitle') : '') || 'Introduction to Secretary';
+
+    // Ensure 15-minute block exists in plannerEvents
+    let eventsList = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents))
+      ? plannerEvents
+      : ((typeof window !== 'undefined' && Array.isArray(window.plannerEvents)) ? window.plannerEvents : null);
+
+    let introEvent = eventsList ? eventsList.find(e => e && (e.id === 'evt-intro-tutorial' || e.isIntroTutorial)) : null;
+
+    if (!introEvent && eventsList) {
+      let startTime = '09:00';
+      let endTime = '09:15';
+
+      if (typeof findNextAvailablePlannerSlot === 'function') {
+        try {
+          const slot = findNextAvailablePlannerSlot(15);
+          if (slot && slot.startTime && slot.endTime) {
+            startTime = slot.startTime;
+            endTime = slot.endTime;
+          }
+        } catch (e) {}
+      }
+
+      introEvent = {
+        id: 'evt-intro-tutorial',
+        isIntroTutorial: true,
+        title: noteTitle,
+        type: 'work',
+        date: todayStr,
+        startTime,
+        endTime,
+        duration: 15,
+        noteId: noteId,
+        linkedNoteIds: [noteId],
+        group_tags: ['General'],
+        major_topic_tags: ['Secretary'],
+        topic_tags: ['Tutorial'],
+        tags: ['General', 'Secretary', 'Tutorial']
+      };
+
+      eventsList.push(introEvent);
+      if (typeof savePlanner === 'function') {
+        try { await savePlanner(); } catch (e) {}
+      }
+      if (typeof renderPlanner === 'function') {
+        renderPlanner();
+      }
+    }
+
+    return { note, event: introEvent };
+  },
+
+  setupCreateBlockTargetSlot() {
+    document.querySelectorAll('.planner-empty-slot.tutorial-target-slot').forEach(el => el.classList.remove('tutorial-target-slot'));
+
+    const todayStr = (typeof formatLocalDateValue === 'function')
+      ? formatLocalDateValue(new Date())
+      : new Date().toISOString().slice(0, 10);
+
+    const dayCol = document.querySelector(`.planner-day-col[data-date="${todayStr}"]`) || document.querySelector('.planner-day-col.today');
+    let slotEl = null;
+
+    if (dayCol) {
+      const emptySlots = Array.from(dayCol.querySelectorAll('.planner-empty-slot'));
+      slotEl = emptySlots.find(s => {
+        const title = s.getAttribute('title') || '';
+        return title.includes('09:00') || title.includes('09:30') || title.includes('10:00');
+      }) || emptySlots[0];
+    }
+
+    if (!slotEl) {
+      slotEl = document.querySelector('.planner-empty-slot');
+    }
+
+    if (slotEl) {
+      slotEl.classList.add('tutorial-target-slot');
+      slotEl.onclick = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        TutorialController.scheduleIntroBlock();
+      };
+    }
+  },
+
+  setupOpenBlockTargetCard() {
+    const card = document.querySelector('.planner-event-card[data-event-id="evt-intro-tutorial"]') || document.querySelector('.planner-event-card');
+    if (card) {
+      card.onclick = (e) => {
+        e.stopPropagation();
+        TutorialController.openIntroBlock();
+      };
+      card.ondblclick = (e) => {
+        e.stopPropagation();
+        TutorialController.openIntroBlock();
+      };
+    }
+  },
+
+  async scheduleIntroBlock() {
+    await this.ensureIntroBlockAndNote();
+    document.querySelectorAll('.planner-empty-slot.tutorial-target-slot').forEach(el => el.classList.remove('tutorial-target-slot'));
+    await this.goToStep(8);
+  },
+
+  async openIntroBlock() {
+    await this.ensureIntroNoteOpen();
+    await this.goToStep(9);
+  },
+
+  async ensureIntroNoteOpen() {
+    await this.ensureIntroBlockAndNote();
+    const noteId = 'note-intro-tutorial';
+    const note = (typeof getNoteById === 'function') ? getNoteById(noteId) : null;
+    const todayStr = (typeof formatLocalDateValue === 'function')
+      ? formatLocalDateValue(new Date())
+      : new Date().toISOString().slice(0, 10);
+    const path = note ? note.path : ((typeof getCanonicalNotePath === 'function') ? getCanonicalNotePath(noteId) : `notes/${todayStr}_intro_tutorial.html`);
+    const eventsList = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents))
+      ? plannerEvents
+      : ((typeof window !== 'undefined' && Array.isArray(window.plannerEvents)) ? window.plannerEvents : []);
+    const ev = eventsList.find(e => e && (e.id === 'evt-intro-tutorial' || e.isIntroTutorial));
+
+    const overlay = document.getElementById('note-edit-overlay');
+    const isAlreadyOpen = overlay && overlay.style.display !== 'none' && typeof currentNote !== 'undefined' && currentNote && (currentNote.id === noteId || currentNote.path === path);
+
+    if (!isAlreadyOpen && typeof openNoteOverlay === 'function') {
+      await openNoteOverlay(path, null, null, false, null, { sameWindow: true, collapseMetadata: true, fromBloc: true, sourceEvent: ev });
+    }
+  },
+
+  closeIntroNote() {
+    const overlay = document.getElementById('note-edit-overlay');
+    if (overlay && overlay.style.display !== 'none' && typeof closeNoteOverlay === 'function') {
+      closeNoteOverlay(true);
+    }
+  },
+
   async goToStep(index) {
     if (index < 0 || index >= this.steps.length) return;
     this.currentStep = index;
+
+    if (this.overlayEl) {
+      this.overlayEl.classList.toggle('has-backdrop', index === 0 || index === this.steps.length - 1);
+    }
 
     const step = this.steps[index];
 
@@ -156,16 +412,19 @@ const TutorialController = {
     if (step.tab && typeof switchTab === 'function') {
       await switchTab(step.tab);
     }
+
     if (step.onShow && typeof step.onShow === 'function') {
-      step.onShow();
+      await step.onShow();
+    } else if (index < 9) {
+      this.closeIntroNote();
     }
 
     this.renderStepContent(step);
     
-    // Wait briefly for tab layout to render before positioning
+    // Wait briefly for tab layout or note overlay to render before positioning
     setTimeout(() => {
       this.updatePosition();
-    }, step.tab ? 150 : 0);
+    }, (step.tab || index >= 9) ? 180 : 50);
   },
 
   next() {
@@ -187,6 +446,7 @@ const TutorialController = {
   },
 
   skip() {
+    this.closeIntroNote();
     this.stop();
   },
 
@@ -211,6 +471,26 @@ const TutorialController = {
         <div class="tutorial-actions-row">
           <button class="tutorial-btn tutorial-btn-text" onclick="TutorialController.skip()" title="${t('tutorial.skipTooltip') || 'Skip this tutorial tour'}">${t('tutorial.skipBtn') || 'Skip'}</button>
           <button class="tutorial-btn tutorial-btn-primary" onclick="TutorialController.next()" title="${t('tutorial.startTooltip') || 'Begin the interactive tour'}">${t('tutorial.startBtn') || 'Start Tour'}</button>
+        </div>
+      `;
+    } else if (step.id === 'create-block') {
+      actionButtons = `
+        <div class="tutorial-actions-row">
+          <button class="tutorial-btn tutorial-btn-text" onclick="TutorialController.skip()" title="${t('tutorial.skipTooltip') || 'Skip this tutorial tour'}">${t('tutorial.skipBtn') || 'Skip'}</button>
+          <div class="tutorial-actions-right">
+            <button class="tutorial-btn" onclick="TutorialController.prev()" title="${t('tutorial.prevTooltip') || 'Return to the previous step'}">${t('tutorial.prevBtn') || 'Back'}</button>
+            <button class="tutorial-btn tutorial-btn-accent" onclick="TutorialController.scheduleIntroBlock()" title="${t('tutorial.scheduleBlockTooltip')}">${t('tutorial.scheduleBlockBtn')}</button>
+          </div>
+        </div>
+      `;
+    } else if (step.id === 'open-block') {
+      actionButtons = `
+        <div class="tutorial-actions-row">
+          <button class="tutorial-btn tutorial-btn-text" onclick="TutorialController.skip()" title="${t('tutorial.skipTooltip') || 'Skip this tutorial tour'}">${t('tutorial.skipBtn') || 'Skip'}</button>
+          <div class="tutorial-actions-right">
+            <button class="tutorial-btn" onclick="TutorialController.prev()" title="${t('tutorial.prevTooltip') || 'Return to the previous step'}">${t('tutorial.prevBtn') || 'Back'}</button>
+            <button class="tutorial-btn tutorial-btn-accent" onclick="TutorialController.openIntroBlock()" title="${t('tutorial.openBlockTooltip')}">${t('tutorial.openBlockBtn')}</button>
+          </div>
         </div>
       `;
     } else {
@@ -251,39 +531,45 @@ const TutorialController = {
     // Remove centered style from popover by default
     this.popoverEl.classList.remove('tutorial-popover-centered');
 
-    // Check if target element exists and is visible
-    const isVisible = targetEl && targetEl.getBoundingClientRect().width > 0 && targetEl.offsetParent !== null;
+    // Check if target element exists and has bounding geometry
+    const rect = targetEl ? targetEl.getBoundingClientRect() : null;
+    const isVisible = targetEl && rect && rect.width > 0 && rect.height > 0 &&
+      (typeof window.getComputedStyle !== 'function' ||
+        (window.getComputedStyle(targetEl).display !== 'none' && window.getComputedStyle(targetEl).visibility !== 'hidden'));
 
     if (isVisible) {
-      const rect = targetEl.getBoundingClientRect();
       const padding = 6;
+      const targetHeight = Math.min(rect.height, Math.max(120, window.innerHeight * 0.45));
 
       // Position the highlight ring
       this.focusRingEl.style.display = 'block';
       this.focusRingEl.style.top = `${rect.top - padding}px`;
       this.focusRingEl.style.left = `${rect.left - padding}px`;
       this.focusRingEl.style.width = `${rect.width + padding * 2}px`;
-      this.focusRingEl.style.height = `${rect.height + padding * 2}px`;
+      this.focusRingEl.style.height = `${targetHeight + padding * 2}px`;
 
       // Position the popover card
-      const popoverWidth = 320;
-      const popoverHeight = this.popoverEl.offsetHeight || 160;
+      const popoverWidth = 340;
+      const popoverHeight = this.popoverEl.offsetHeight || 180;
       let top, left;
 
       // Try placing it below the target
-      if (rect.bottom + popoverHeight + 15 < window.innerHeight) {
-        top = rect.bottom + 10;
-      } else {
+      if (rect.top + targetHeight + popoverHeight + 20 < window.innerHeight) {
+        top = rect.top + targetHeight + 12;
+      } else if (rect.top - popoverHeight - 12 > 0) {
         // Place it above target
-        top = rect.top - popoverHeight - 10;
+        top = rect.top - popoverHeight - 12;
+      } else {
+        // Center vertically if target is tall
+        top = Math.max(16, (window.innerHeight - popoverHeight) / 2);
       }
 
       // Horizontally center it relative to the target
       left = rect.left + rect.width / 2 - popoverWidth / 2;
 
       // Keep it within screen boundaries
-      left = Math.max(12, Math.min(left, window.innerWidth - popoverWidth - 12));
-      top = Math.max(12, Math.min(top, window.innerHeight - popoverHeight - 12));
+      left = Math.max(16, Math.min(left, window.innerWidth - popoverWidth - 16));
+      top = Math.max(16, Math.min(top, window.innerHeight - popoverHeight - 16));
 
       this.popoverEl.style.top = `${top}px`;
       this.popoverEl.style.left = `${left}px`;

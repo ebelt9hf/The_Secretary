@@ -4,17 +4,20 @@
   position: fixed;
   inset: 0;
   z-index: 9990;
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(1.5px);
-  -webkit-backdrop-filter: blur(1.5px);
+  background: transparent;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, background 0.3s ease;
   display: block;
 }
 
 .tutorial-overlay.active {
   opacity: 1;
+  pointer-events: none;
+}
+
+.tutorial-overlay.has-backdrop {
+  background: rgba(15, 23, 42, 0.4);
   pointer-events: auto;
 }
 
@@ -24,12 +27,35 @@
   pointer-events: none;
   z-index: 9995;
   border: 3px solid var(--accent);
-  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.45), 
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.4), 
               0 0 15px 3px var(--accent), 
               inset 0 0 10px rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   transition: top 0.3s cubic-bezier(0.16, 1, 0.3, 1), left 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
+}
+
+.planner-empty-slot.tutorial-target-slot {
+  border: 2px dashed var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 18%, transparent) !important;
+  cursor: pointer !important;
+  z-index: 50 !important;
+}
+
+.tutorial-btn-accent {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tutorial-btn-accent:hover {
+  background: color-mix(in srgb, var(--accent) 85%, black);
+  border-color: color-mix(in srgb, var(--accent) 85%, black);
+  color: #fff;
 }
 
 /* Tutorial Popover Box */
