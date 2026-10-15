@@ -4643,6 +4643,7 @@ function queueBackgroundHydration(isNewWorkspaceFolder = false) {
           }
 
           // Check and handle storageEngine mode & startup prompts
+          const isVirtualWorkspace = Boolean(rootHandle?.isVirtual || rootHandle?.isDemo || rootHandle?.name === 'Demo Workspace (Sandbox)');
           if (isVirtualWorkspace) {
             if (typeof settings === 'object' && settings) settings.storageEngine = 'filesystem';
             if (window.StorageAPI) window.StorageAPI.setStorageEngine('filesystem');
@@ -4719,6 +4720,25 @@ async function checkSavedFolder() {
     await mountFolder({ name: 'Firebase Cloud Vault' });
     return;
   }
+  // If opened as a popup or new tab from an active Secretary window, inherit the folder handle
+  if (window.opener && !window.opener.closed) {
+    try {
+      if (window.opener.rootHandle) {
+        if (window.opener.settings && typeof settings === 'object') {
+          if (typeof deepMerge === 'function') {
+            deepMerge(settings, window.opener.settings);
+          } else {
+            Object.assign(settings, window.opener.settings);
+          }
+        }
+        await mountFolder(window.opener.rootHandle);
+        return;
+      }
+    } catch (e) {
+      console.warn('Failed accessing opener rootHandle', e);
+    }
+  }
+
   let handle = null;
   try {
     handle = await loadHandleIDB();
@@ -4743,7 +4763,8 @@ async function checkSavedFolder() {
     const isCompanion = document.body.classList.contains('secretary-window-standalone') ||
                         document.body.classList.contains('chat-window-mode') ||
                         (location.hash && location.hash.includes('chat-window=true'));
-    if (perm === 'granted' || isElectronEnv || _isFocusedMode || isCompanion) {
+    const isVirtual = Boolean(handle?.isVirtual || handle?.isDemo || handle?.name === 'Demo Workspace (Sandbox)');
+    if (perm === 'granted' || isElectronEnv || isVirtual || ((_isFocusedMode || isCompanion) && perm === 'granted')) {
       await saveHandleIDB(handle);
       await mountFolder(handle);
       return;

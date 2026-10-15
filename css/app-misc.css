@@ -1223,20 +1223,23 @@ body.focused-note-mode {
   background: var(--bg) !important;
   overflow: hidden !important;
 }
-body.focused-note-mode #screen-connect,
+body.is-electron.focused-note-mode #screen-connect,
+body.focused-note-mode:has(#screen-main.active) #screen-connect,
+body.focused-note-mode.folder-mounted #screen-connect,
 body.focused-note-mode .app-layout-sidebar,
 body.focused-note-mode .app-layout-nav,
 body.focused-note-mode .topbar,
 body.focused-note-mode .app-body {
   display: none !important;
 }
-body.focused-note-mode #screen-main {
+body.focused-note-mode #screen-main.active {
   display: block !important;
   height: 100vh !important;
   width: 100vw !important;
   overflow: hidden !important;
 }
-body.focused-note-mode #note-edit-overlay {
+body.focused-note-mode #screen-main.active #note-edit-overlay,
+body.is-electron.focused-note-mode #note-edit-overlay {
   display: flex !important;
   position: fixed !important;
   inset: 0 !important;

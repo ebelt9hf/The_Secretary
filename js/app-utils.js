@@ -1692,6 +1692,16 @@ async function applyHashState() {
           if (ws) await mountFolder(ws);
         } catch (e) {}
       }
+      if (!rootHandle && window.opener && !window.opener.closed && window.opener.rootHandle) {
+        try {
+          await mountFolder(window.opener.rootHandle);
+        } catch (e) {}
+      }
+      if ((!manifest || manifest.length === 0) && window.opener && !window.opener.closed && Array.isArray(window.opener.manifest) && window.opener.manifest.length > 0) {
+        manifest = [...window.opener.manifest];
+        metadataBuffer = (window.opener.metadataBuffer && window.opener.metadataBuffer.length > 0) ? [...window.opener.metadataBuffer] : [...manifest];
+        if (typeof syncMetadataIndexes === 'function') syncMetadataIndexes();
+      }
       if ((!manifest || manifest.length === 0) && typeof metadataHydrationProgress !== 'undefined' && metadataHydrationProgress?.running) {
         let attempts = 0;
         while ((!manifest || manifest.length === 0) && metadataHydrationProgress.running && attempts < 20) {
@@ -1714,6 +1724,14 @@ async function applyHashState() {
 
       const resolvedPath = targetNote?.path || notePathParam || (noteId && noteId.includes('/') ? noteId : (noteId ? getCanonicalNotePath(noteId) : null));
       if (resolvedPath) {
+        if (window.opener && !window.opener.closed && window.opener.currentNote) {
+          const opNote = window.opener.currentNote;
+          if ((opNote.id && opNote.id === noteId) || (opNote.path && (opNote.path === resolvedPath || opNote.path === notePathParam))) {
+            if (typeof StorageAPI !== 'undefined' && StorageAPI && typeof StorageAPI.setNoteCache === 'function') {
+              StorageAPI.setNoteCache(resolvedPath, opNote.originalHTML || opNote.mainHTML || '');
+            }
+          }
+        }
         if (!currentNote || currentNote.path !== resolvedPath) {
           await openNoteOverlay(resolvedPath, null, null, false, null, { sameWindow: true });
         }
