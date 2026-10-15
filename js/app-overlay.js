@@ -4323,6 +4323,17 @@ function getCaretOffsetInLi(li) {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount || !li.contains(sel.anchorNode)) return null;
   const range = sel.getRangeAt(0);
+
+  if (range.startContainer === li) {
+    if (range.startOffset === 0) return 0;
+    let total = 0;
+    for (let i = 0; i < range.startOffset && i < li.childNodes.length; i++) {
+      const child = li.childNodes[i];
+      if (/^(UL|OL)$/.test(child.tagName)) break;
+      total += child.nodeType === Node.TEXT_NODE ? child.length : 1;
+    }
+    return Math.max(1, total);
+  }
   
   let offset = 0;
   const walker = document.createTreeWalker(li, NodeFilter.SHOW_TEXT, {
@@ -5245,6 +5256,92 @@ function handleRichTextInputShortcuts(e, editorEl) {
           return true;
         }
 
+        const img = li.querySelector('img');
+        if (img) {
+          const parentList = li.parentElement;
+          if (parentList && /^(UL|OL)$/.test(parentList.tagName)) {
+            // Check content before caret
+            let preText = '';
+            let preImgCount = 0;
+            try {
+              const preRange = document.createRange();
+              preRange.selectNodeContents(li);
+              preRange.setEnd(range.startContainer, range.startOffset);
+              preText = preRange.toString().replace(/[\s\u200B\u00A0]/g, '');
+              preImgCount = preRange.cloneContents().querySelectorAll('img').length;
+            } catch (_) {}
+
+            // Check content after caret (excluding nested sublists)
+            let postText = '';
+            let postImgCount = 0;
+            const sublists = Array.from(li.children).filter(c => /^(UL|OL)$/.test(c.tagName));
+            try {
+              const postRange = document.createRange();
+              postRange.selectNodeContents(li);
+              if (sublists.length > 0) {
+                try { postRange.setEndBefore(sublists[0]); } catch (_) {}
+              }
+              postRange.setStart(range.endContainer, range.endOffset);
+              postText = postRange.toString().replace(/[\s\u200B\u00A0]/g, '');
+              postImgCount = postRange.cloneContents().querySelectorAll('img').length;
+            } catch (_) {}
+
+            const isAtVeryStart = (preText === '' && preImgCount === 0);
+            const isAtOrAfterImage = (postText === '');
+
+            // Case A: Caret is at the very beginning of a bullet item that has substantive text before image
+            // -> User wants an empty bullet point ABOVE this item, leaving this item and its image intact.
+            if (isAtVeryStart && postText !== '') {
+              e.preventDefault();
+              const newLi = document.createElement('li');
+              if (isChecklistLi) {
+                newLi.style.listStyleType = 'none';
+                const chk = document.createElement('input');
+                chk.type = 'checkbox';
+                chk.style.marginRight = '6px';
+                chk.style.verticalAlign = 'middle';
+                newLi.appendChild(chk);
+                newLi.appendChild(document.createTextNode(' '));
+              } else {
+                newLi.innerHTML = '<br>';
+              }
+              parentList.insertBefore(newLi, li);
+              restoreCaretInLi(newLi, true);
+              normalizeListStructure(editorEl);
+              editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+              return true;
+            }
+
+            // Case B: Caret is on/after the image, or between text and image with no text following
+            // (e.g. user typed bullet text, pasted image, now presses Enter to create next bullet item)
+            // OR the bullet item only contains the image!
+            // -> Current item keeps the image and text intact.
+            // -> New empty bullet point is created below.
+            if (isAtOrAfterImage || (typeof _activeEditorImage !== 'undefined' && _activeEditorImage === img)) {
+              e.preventDefault();
+              if (typeof hideImageActiveOverlay === 'function') hideImageActiveOverlay();
+
+              const newLi = document.createElement('li');
+              if (isChecklistLi) {
+                newLi.style.listStyleType = 'none';
+                const chk = document.createElement('input');
+                chk.type = 'checkbox';
+                chk.style.marginRight = '6px';
+                chk.style.verticalAlign = 'middle';
+                newLi.appendChild(chk);
+                newLi.appendChild(document.createTextNode(' '));
+              } else {
+                newLi.innerHTML = '<br>';
+              }
+              parentList.insertBefore(newLi, li.nextSibling);
+              restoreCaretInLi(newLi, true);
+              normalizeListStructure(editorEl);
+              editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+              return true;
+            }
+          }
+        }
+
         if (isChecklistLi) {
           e.preventDefault();
           const parentList = li.parentElement;
@@ -5551,6 +5648,7 @@ function handleImagePaste(e) {
         img.dataset.id = id;
         img.dataset.assetPath = assetPath;
         img.src = dataUrl;
+        img.title = (typeof t === 'function' ? t('editor.imageDblClickFullscreen') : null) || 'Double-click to view fullscreen';
         img.style.maxWidth = '100%';
         img.style.width = '600px';
         img.style.display = 'block';
@@ -6151,6 +6249,9 @@ function selectEditorImage(imgEl, editorEl) {
   if (!imgEl.dataset.id) {
     imgEl.dataset.id = 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
   }
+  if (!imgEl.title) {
+    imgEl.title = (typeof t === 'function' ? t('editor.imageDblClickFullscreen') : null) || 'Double-click to view fullscreen';
+  }
   
   const targetEditor = editorEl || imgEl.closest('#edit-textarea, #edit-summary, [contenteditable="true"]') || document.getElementById('edit-textarea');
   
@@ -6466,9 +6567,12 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if (!_activeEditorImage) return;
+  if (e.target && e.target.closest && e.target.closest('.img-resize-toolbar, .editor-img-active-overlay')) return;
   if (e.key === 'Escape') {
     hideImageActiveOverlay();
-  } else if ((e.key === 'Delete' || e.key === 'Backspace') && !document.activeElement?.isContentEditable) {
+    return;
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !document.activeElement?.isContentEditable && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
     const img = _activeEditorImage;
     const parentEditor = img.closest('#edit-textarea, #edit-summary, [contenteditable="true"]');
     hideImageActiveOverlay();
@@ -6477,7 +6581,18 @@ document.addEventListener('keydown', (e) => {
       parentEditor.dispatchEvent(new Event('input', { bubbles: true }));
     }
     if (typeof syncImageStrip === 'function') syncImageStrip();
+    return;
   }
+  const isModifierOnly = /^(Shift|Control|Alt|Meta|CapsLock|NumLock|ScrollLock)$/.test(e.key);
+  if (!isModifierOnly) {
+    hideImageActiveOverlay();
+  }
+});
+
+document.addEventListener('beforeinput', (e) => {
+  if (!_activeEditorImage) return;
+  if (e.target && e.target.closest && e.target.closest('.img-resize-toolbar, .editor-img-active-overlay')) return;
+  hideImageActiveOverlay();
 });
 
 const editPreview = document.getElementById('edit-preview');
@@ -6487,6 +6602,94 @@ if (editPreview) {
 }
 document.getElementById('edit-textarea')?.addEventListener('click', handleImageClickForResize);
 document.getElementById('edit-summary')?.addEventListener('click', handleImageClickForResize);
+
+// ═══ Note Image Fullscreen Lightbox ═══
+function openNoteImageLightbox(src) {
+  if (!src) return;
+  const dialog = document.getElementById('note-image-lightbox');
+  const img = document.getElementById('note-image-lightbox-img');
+  if (!dialog || !img) return;
+
+  if (typeof hideImageActiveOverlay === 'function') {
+    hideImageActiveOverlay();
+  }
+
+  img.src = src;
+  _initNoteImageLightbox(dialog);
+
+  try {
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+      dialog.style.display = 'flex';
+    }
+  } catch (_) {
+    dialog.setAttribute('open', '');
+    dialog.style.display = 'flex';
+  }
+}
+window.openNoteImageLightbox = openNoteImageLightbox;
+
+function closeNoteImageLightbox() {
+  const dialog = document.getElementById('note-image-lightbox');
+  const img = document.getElementById('note-image-lightbox-img');
+  if (!dialog) return;
+
+  try {
+    if (typeof dialog.close === 'function' && dialog.open) {
+      dialog.close();
+    } else {
+      dialog.removeAttribute('open');
+      dialog.style.display = 'none';
+    }
+  } catch (_) {
+    dialog.removeAttribute('open');
+    dialog.style.display = 'none';
+  }
+  if (img) img.src = '';
+}
+window.closeNoteImageLightbox = closeNoteImageLightbox;
+
+function _initNoteImageLightbox(dialog) {
+  if (!dialog || dialog._lightboxInit) return;
+  dialog._lightboxInit = true;
+
+  // Fallback light-dismiss for browsers without native closedby support
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) {
+      closeNoteImageLightbox();
+      return;
+    }
+    const container = dialog.querySelector('.note-image-lightbox-container');
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const inContent = (
+        rect.top <= event.clientY &&
+        event.clientY <= rect.bottom &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.right
+      );
+      if (!inContent) closeNoteImageLightbox();
+    }
+  });
+}
+
+// Global double-click on any note image to open in fullscreen lightbox
+document.addEventListener('dblclick', (e) => {
+  const img = e.target.closest('img');
+  if (!img) return;
+  if (img.closest('#note-image-lightbox')) {
+    closeNoteImageLightbox();
+    return;
+  }
+  if (img.closest('#edit-textarea, #edit-summary, #nested-note-body, #overlay-images-strip, .edit-img-strip, .note-view-body, .fl-note-card-body, .note-editor-rich, #note-edit-overlay, .nested-note-overlay')) {
+    e.preventDefault();
+    e.stopPropagation();
+    openNoteImageLightbox(img.src);
+  }
+});
+
 
 document.getElementById('edit-textarea')?.addEventListener('input', () => { scheduleEditorInputRefresh(); scheduleAutoSave(); });
 document.getElementById('edit-title')?.addEventListener('input', () => {

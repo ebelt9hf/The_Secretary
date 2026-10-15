@@ -1787,7 +1787,11 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
     padding: .42rem .72rem;
   }
 }
-.edit-body-right img {
+.edit-body-right img,
+#edit-textarea img,
+#edit-summary img,
+.nested-note-body img,
+.note-view-body img {
   max-width: 100%;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -1795,15 +1799,23 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
   margin: .6rem 0;
   transition: all var(--transition);
 }
-.edit-body-right img:hover {
+.edit-body-right img:hover,
+#edit-textarea img:hover,
+#edit-summary img:hover,
+.nested-note-body img:hover,
+.note-view-body img:hover {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .edit-body-right li img,
-.note-view-body li img {
-  display: inline-block;
-  vertical-align: top;
-  margin: .3rem 0;
+.note-view-body li img,
+#edit-textarea li img,
+#edit-summary li img,
+.nested-note-body li img {
+  display: block;
+  max-width: 100%;
+  margin: .35rem 0;
+  clear: both;
 }
 .edit-body-right strong {
   font-weight: 700;
@@ -6094,7 +6106,91 @@ body[data-theme='dark'] .note-editor-ai-progress-thinking .chat-thinking-accordi
   word-break: break-word;
 }
 
+/* ── Note Image Fullscreen Lightbox ── */
+dialog.note-image-lightbox {
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
 
+dialog.note-image-lightbox[open] {
+  display: flex;
+}
 
+dialog.note-image-lightbox::backdrop {
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.note-image-lightbox-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 95vw;
+  max-height: 95vh;
+  pointer-events: auto;
+}
+
+.note-image-lightbox-img {
+  max-width: calc(100vw - 64px);
+  max-height: calc(100vh - 64px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+  user-select: none;
+  -webkit-user-select: none;
+  animation: noteLightboxZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes noteLightboxZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.note-image-lightbox-close {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(30, 30, 30, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.note-image-lightbox-close:hover {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: rgba(239, 68, 68, 1);
+  transform: scale(1.08);
+}
 
 } /* end @layer views */
+

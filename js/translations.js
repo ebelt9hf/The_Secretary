@@ -14182,6 +14182,23 @@ window.APP_TRANSLATIONS_BUNDLE = {
       "tr": "Görsel zaten notta mevcut",
       "uk": "Зображення вже є в нотатці"
     },
+    "editor.imageDblClickFullscreen": {
+      "cs": "Dvojitým kliknutím zobrazit na celou obrazovku",
+      "de": "Doppelklicken für Vollbildansicht",
+      "en": "Double-click to view fullscreen",
+      "es": "Hacer doble clic para ver en pantalla completa",
+      "fr": "Double-cliquer pour agrandir en plein écran",
+      "hu": "Kattintson duplán a teljes képernyős nézethez",
+      "it": "Fai doppio clic per visualizzare a schermo intero",
+      "nl": "Dubbelklik voor schermvullende weergave",
+      "pl": "Kliknij dwukrotnie, aby wyświetlić na pełnym ekranie",
+      "pt": "Clique duas vezes para ver em tela cheia",
+      "ro": "Faceți dublu clic pentru a vizualiza pe tot ecranul",
+      "ru": "Дважды щелкните для полноэкранного просмотра",
+      "sv": "Dubbelklicka för helskärmsläge",
+      "tr": "Tam ekranda görüntülemek için çift tıklayın",
+      "uk": "Двічі клацніть для повноекранного перегляду"
+    },
     "editor.imagePreview": {
       "cs": "Náhled obrázku",
       "de": "Bildvorschau",

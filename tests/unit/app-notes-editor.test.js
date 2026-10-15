@@ -944,6 +944,74 @@ describe('Note Editor Engine Functions (app-notes.js & app-overlay.js)', () => {
       editor.remove();
     });
 
+    it('unselects image and hides resize toolbar automatically when user types', () => {
+      const editor = document.createElement('div');
+      editor.id = 'edit-textarea';
+      editor.contentEditable = 'true';
+      editor.getBoundingClientRect = () => ({
+        top: 50,
+        left: 20,
+        bottom: 600,
+        right: 820,
+        width: 800,
+        height: 550
+      });
+      const img = document.createElement('img');
+      img.src = 'notes/_assets/photo.png';
+      img.getBoundingClientRect = () => ({
+        top: 100,
+        left: 50,
+        bottom: 300,
+        right: 450,
+        width: 400,
+        height: 200
+      });
+      editor.appendChild(img);
+      document.body.appendChild(editor);
+
+      try {
+        selectEditorImage(img, editor);
+        expect(document.querySelector('.editor-img-active-overlay')).not.toBeNull();
+        expect(document.querySelector('.img-resize-toolbar')).not.toBeNull();
+        expect(img.classList.contains('editor-img-selected')).toBe(true);
+
+        // Standalone modifier keys (Shift, Meta, Alt, Ctrl) should NOT unselect or hide toolbar
+        const shiftEvent = new KeyboardEvent('keydown', { key: 'Shift', bubbles: true, cancelable: true });
+        editor.dispatchEvent(shiftEvent);
+        expect(document.querySelector('.editor-img-active-overlay')).not.toBeNull();
+        expect(document.querySelector('.img-resize-toolbar')).not.toBeNull();
+
+        // Typing inside the resize toolbar number input should NOT unselect or hide toolbar
+        const numInput = document.querySelector('.img-resize-toolbar input[type=number]');
+        expect(numInput).not.toBeNull();
+        const inputKeyEv = new KeyboardEvent('keydown', { key: '5', bubbles: true, cancelable: true });
+        numInput.dispatchEvent(inputKeyEv);
+        expect(document.querySelector('.editor-img-active-overlay')).not.toBeNull();
+        expect(document.querySelector('.img-resize-toolbar')).not.toBeNull();
+
+        // Typing in the editor (e.g. keydown 'a') should unselect image and hide resize toolbar
+        const keyEvent = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true });
+        editor.dispatchEvent(keyEvent);
+
+        expect(document.querySelector('.editor-img-active-overlay')).toBeNull();
+        expect(document.querySelector('.img-resize-toolbar')).toBeNull();
+        expect(img.classList.contains('editor-img-selected')).toBe(false);
+
+        // Re-select and verify beforeinput also unselects
+        selectEditorImage(img, editor);
+        expect(document.querySelector('.editor-img-active-overlay')).not.toBeNull();
+        const beforeInputEv = new Event('beforeinput', { bubbles: true, cancelable: true });
+        editor.dispatchEvent(beforeInputEv);
+
+        expect(document.querySelector('.editor-img-active-overlay')).toBeNull();
+        expect(document.querySelector('.img-resize-toolbar')).toBeNull();
+        expect(img.classList.contains('editor-img-selected')).toBe(false);
+      } finally {
+        hideImageActiveOverlay();
+        editor.remove();
+      }
+    });
+
     it('clicking image strip thumbnail scrolls to and selects the image in the note editor', () => {
       const noteEdit = document.createElement('div');
       noteEdit.id = 'note-edit';
@@ -1375,9 +1443,204 @@ describe('Note Editor Engine Functions (app-notes.js & app-overlay.js)', () => {
         expect(editor.querySelector('ul')).toBeNull();
         expect(editor.querySelector('p')).not.toBeNull();
       });
+
+      it('handles Enter in a list item containing only an image without shifting image down or creating empty bullet above', () => {
+        editor.innerHTML = '<ul><li><img src="notes/_assets/test.png" style="max-width:100%;width:600px"></li></ul>';
+        const li = editor.querySelector('li');
+        const img = li.querySelector('img');
+
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(li);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        const enterEv = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        handleRichTextInputShortcuts(enterEv, editor);
+
+        expect(enterEv.defaultPrevented).toBe(true);
+        const lis = editor.querySelectorAll('ul li');
+        expect(lis.length).toBe(2);
+        // First li must STILL contain the image!
+        expect(lis[0].querySelector('img')).toBe(img);
+        // Second li is the newly generated empty item below
+        expect(lis[1].querySelector('img')).toBeNull();
+        expect(lis[1].innerHTML).toContain('<br>');
+      });
+
+      it('handles Enter in a list item containing text followed by an image without shifting image down', () => {
+        editor.innerHTML = '<ul><li>Screenshot 1: <img src="notes/_assets/test.png"></li></ul>';
+        const li = editor.querySelector('li');
+        const img = li.querySelector('img');
+
+        // Cursor positioned on the text right before the image or after the image
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNode(img);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        const enterEv = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        handleRichTextInputShortcuts(enterEv, editor);
+
+        expect(enterEv.defaultPrevented).toBe(true);
+        const lis = editor.querySelectorAll('ul li');
+        expect(lis.length).toBe(2);
+        // First li retains its text AND image
+        expect(lis[0].textContent).toContain('Screenshot 1:');
+        expect(lis[0].querySelector('img')).toBe(img);
+        // Second li is empty
+        expect(lis[1].querySelector('img')).toBeNull();
+      });
+
+      it('handles Enter in a checklist item containing an image without shifting image down', () => {
+        editor.innerHTML = '<ul><li><input type="checkbox"> Review mockup <img src="notes/_assets/test.png"></li></ul>';
+        const li = editor.querySelector('li');
+        const img = li.querySelector('img');
+
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNode(img);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        const enterEv = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        handleRichTextInputShortcuts(enterEv, editor);
+
+        expect(enterEv.defaultPrevented).toBe(true);
+        const lis = editor.querySelectorAll('ul li');
+        expect(lis.length).toBe(2);
+        expect(lis[0].textContent).toContain('Review mockup');
+        expect(lis[0].querySelector('img')).toBe(img);
+        // Second item is a new checklist item below
+        expect(lis[1].querySelector('input[type="checkbox"]')).not.toBeNull();
+        expect(lis[1].querySelector('img')).toBeNull();
+      });
+
+      it('handles Enter at the very start of a bullet item before text by inserting an empty bullet above', () => {
+        editor.innerHTML = '<ul><li>Important chart: <img src="notes/_assets/test.png"></li></ul>';
+        const li = editor.querySelector('li');
+        const img = li.querySelector('img');
+        const textNode = li.firstChild;
+
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.setStart(textNode, 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        const enterEv = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        handleRichTextInputShortcuts(enterEv, editor);
+
+        expect(enterEv.defaultPrevented).toBe(true);
+        const lis = editor.querySelectorAll('ul li');
+        expect(lis.length).toBe(2);
+        // New empty bullet point was created ABOVE
+        expect(lis[0].querySelector('img')).toBeNull();
+        expect(lis[0].innerHTML).toContain('<br>');
+        // Current item with text and image remains intact BELOW
+        expect(lis[1].textContent).toContain('Important chart:');
+        expect(lis[1].querySelector('img')).toBe(img);
+      });
+
+      it('handles Enter in the middle of text before an image by cleanly splitting text', () => {
+        editor.innerHTML = '<ul><li>Heading text: details text <img src="notes/_assets/test.png"></li></ul>';
+        const li = editor.querySelector('li');
+        const textNode = li.firstChild;
+
+        // Position caret after "Heading text: " (offset 14)
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.setStart(textNode, 14);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        const enterEv = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+        handleRichTextInputShortcuts(enterEv, editor);
+
+        expect(enterEv.defaultPrevented).toBe(true);
+        const lis = editor.querySelectorAll('ul li');
+        expect(lis.length).toBe(2);
+        expect(lis[0].textContent.trim()).toBe('Heading text:');
+        expect(lis[1].textContent.trim()).toBe('details text');
+        expect(lis[1].querySelector('img')).not.toBeNull();
+      });
+    });
+
+    describe('Note Image Fullscreen Lightbox', () => {
+      it('opens fullscreen lightbox when openNoteImageLightbox is called, and closes gracefully', () => {
+        let dialog = document.getElementById('note-image-lightbox');
+        if (!dialog) {
+          dialog = document.createElement('dialog');
+          dialog.id = 'note-image-lightbox';
+          dialog.className = 'note-image-lightbox';
+          dialog.innerHTML = `
+            <div class="note-image-lightbox-container">
+              <button type="button" class="note-image-lightbox-close" onclick="closeNoteImageLightbox()">✕</button>
+              <img id="note-image-lightbox-img" class="note-image-lightbox-img" src="" alt="Full preview">
+            </div>
+          `;
+          document.body.appendChild(dialog);
+        }
+
+        // Mock showModal and close if jsdom doesn't support dialog natively
+        if (typeof dialog.showModal !== 'function') {
+          dialog.showModal = function() { dialog.setAttribute('open', ''); dialog.open = true; };
+        }
+        if (typeof dialog.close !== 'function') {
+          dialog.close = function() { dialog.removeAttribute('open'); dialog.open = false; };
+        }
+
+        openNoteImageLightbox('notes/_assets/full-diagram.png');
+        const img = document.getElementById('note-image-lightbox-img');
+        expect(img.getAttribute('src')).toBe('notes/_assets/full-diagram.png');
+        expect(dialog.hasAttribute('open') || dialog.open).toBe(true);
+
+        closeNoteImageLightbox();
+        expect(dialog.hasAttribute('open') && dialog.open).toBe(false);
+      });
+
+      it('triggers openNoteImageLightbox on dblclick on note image', () => {
+        let dialog = document.getElementById('note-image-lightbox');
+        if (!dialog) {
+          dialog = document.createElement('dialog');
+          dialog.id = 'note-image-lightbox';
+          dialog.innerHTML = '<div class="note-image-lightbox-container"><img id="note-image-lightbox-img" src=""></div>';
+          document.body.appendChild(dialog);
+        }
+        if (typeof dialog.showModal !== 'function') {
+          dialog.showModal = function() { dialog.setAttribute('open', ''); dialog.open = true; };
+        }
+        if (typeof dialog.close !== 'function') {
+          dialog.close = function() { dialog.removeAttribute('open'); dialog.open = false; };
+        }
+
+        const editor = document.createElement('div');
+        editor.id = 'edit-textarea';
+        document.body.appendChild(editor);
+
+        const noteImg = document.createElement('img');
+        noteImg.src = 'notes/_assets/screenshot.png';
+        editor.appendChild(noteImg);
+
+        const dblClickEv = new MouseEvent('dblclick', { bubbles: true, cancelable: true });
+        noteImg.dispatchEvent(dblClickEv);
+
+        const lightboxImg = document.getElementById('note-image-lightbox-img');
+        expect(lightboxImg.getAttribute('src')).toContain('notes/_assets/screenshot.png');
+        expect(dialog.hasAttribute('open') || dialog.open).toBe(true);
+
+        closeNoteImageLightbox();
+      });
     });
   });
 });
+
 
 
 
