@@ -2077,8 +2077,10 @@ html.is-electron-linux:not(.is-fullscreen) body .topbar-main-row{margin-right:va
 .save-indicator{font-size:var(--font-size-caption);color: var(--text-muted);margin-right:auto}
 .save-indicator.saving{color:var(--color-medium-text)}
 .save-indicator.closing{color:var(--color-wip-text)}
-.save-indicator.saved{color:var(--color-low-text)}
-.save-indicator.error{color:var(--color-high-text)}
+.save-indicator.error{color:var(--color-high-text);display:inline-flex;align-items:center;gap:6px}
+.save-indicator-retry-btn{display:inline-flex;align-items:center;gap:4px;background:rgba(239,68,68,0.18);color:var(--color-high-text,#f87171);border:1px solid rgba(239,68,68,0.45);border-radius:4px;padding:1px 7px;font-size:0.72rem;font-weight:500;cursor:pointer;transition:all 0.15s ease-in-out;line-height:1.4}
+.save-indicator-retry-btn:hover{background:rgba(239,68,68,0.35);color:#ffffff;border-color:rgba(239,68,68,0.7)}
+.save-indicator-retry-btn:active{transform:scale(0.96)}
 .overlay-panel.overlay-busy{cursor:progress;opacity:.96}
 .overlay-panel.overlay-busy *{cursor:progress!important}
 .overlay-close-btn{background:none;border:none;color: var(--text-muted);cursor:pointer;font-size:1.15rem;padding:.2rem .5rem;border-radius:4px;transition:all var(--transition)}

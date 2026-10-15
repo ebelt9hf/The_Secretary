@@ -134,12 +134,21 @@ function scheduleAutoSave() {
 function clearAutoSave() {
   if (_autoSaveTimer) { clearTimeout(_autoSaveTimer); _autoSaveTimer = null; }
   if (_autoSaveMaxWaitTimer) { clearTimeout(_autoSaveMaxWaitTimer); _autoSaveMaxWaitTimer = null; }
+  if (typeof _noteSaveRetryTimer !== 'undefined' && _noteSaveRetryTimer) {
+    clearTimeout(_noteSaveRetryTimer);
+    _noteSaveRetryTimer = null;
+  }
+  _noteSaveRetryCount = 0;
+  _lastNoteSaveError = null;
 }
 
 if (typeof window !== 'undefined') {
   window.scheduleAutoSave = scheduleAutoSave;
   window.scheduleAutosave = scheduleAutoSave;
   window.clearAutoSave = clearAutoSave;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis.clearAutoSave = clearAutoSave;
 }
 
 function scheduleEditorInputRefresh() {
@@ -280,14 +289,148 @@ function toggleMetadataCollapse() {
   }
 }
 
-function setSaveIndicator(state) {
+let _noteSaveRetryCount = 0;
+let _noteSaveRetryTimer = null;
+let _lastNoteSaveError = null;
+
+function classifySaveError(err) {
+  if (!err) {
+    return {
+      type: 'file',
+      message: '',
+      isNetwork: false
+    };
+  }
+
+  const msg = String(err.message || err || '');
+  const lowerMsg = msg.toLowerCase();
+  const name = String(err.name || '').toLowerCase();
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+
+  const isNetwork = isOffline ||
+    name === 'networkerror' ||
+    lowerMsg.includes('network') ||
+    lowerMsg.includes('failed to fetch') ||
+    lowerMsg.includes('offline') ||
+    lowerMsg.includes('internet') ||
+    lowerMsg.includes('econnrefused') ||
+    lowerMsg.includes('enotfound') ||
+    lowerMsg.includes('etimedout') ||
+    lowerMsg.includes('timeout') ||
+    lowerMsg.includes('unavailable') ||
+    lowerMsg.includes('connection');
+
+  if (isNetwork) {
+    return {
+      type: 'network',
+      message: msg,
+      isNetwork: true
+    };
+  }
+
+  return {
+    type: 'file',
+    message: msg,
+    isNetwork: false
+  };
+}
+
+function getNextRetryDelayMs(retryCount) {
+  const delays = [1000, 2000, 4000, 8000, 16000, 30000];
+  const idx = Math.max(0, Math.min(retryCount - 1, delays.length - 1));
+  return delays[idx];
+}
+
+function setSaveIndicator(state, options = {}) {
   const el = document.getElementById('overlay-save-indicator');
   if (!el) return;
   el.className = 'save-indicator' + (state ? ' '+state : '');
-  if (state === 'saving') { el.textContent = t('common.saveIndicatorSaving'); }
-  else if (state === 'saved') { el.textContent = t('common.saveIndicatorSaved'); setTimeout(() => { if (el.textContent === t('common.saveIndicatorSaved')) { el.textContent = ''; el.className = 'save-indicator'; }}, 2000); }
-  else if (state === 'error') { el.textContent = t('common.saveIndicatorError'); }
-  else { el.textContent = ''; }
+  if (state === 'saving') {
+    el.title = '';
+    el.textContent = typeof t === 'function' ? t('common.saveIndicatorSaving') : 'Saving...';
+  } else if (state === 'saved') {
+    el.title = '';
+    el.textContent = typeof t === 'function' ? t('common.saveIndicatorSaved') : 'Saved ✓';
+    setTimeout(() => {
+      if (el.textContent === (typeof t === 'function' ? t('common.saveIndicatorSaved') : 'Saved ✓')) {
+        el.textContent = '';
+        el.className = 'save-indicator';
+      }
+    }, 2000);
+  } else if (state === 'error') {
+    el.innerHTML = '';
+    const errorInfo = options?.errorInfo || _lastNoteSaveError || { type: 'file', message: '' };
+    const retryCount = options?.retryCount || _noteSaveRetryCount || 1;
+    const delayMs = options?.delayMs || getNextRetryDelayMs(retryCount);
+    const seconds = Math.max(1, Math.round(delayMs / 1000));
+
+    const isNetwork = errorInfo.type === 'network';
+
+    let primaryLabel = isNetwork
+      ? (typeof t === 'function' ? t('common.saveErrorNetwork') : 'Network issue')
+      : (typeof t === 'function' ? t('common.saveErrorFile') : 'File issue');
+
+    let detailMessage = errorInfo.message || '';
+    if (!isNetwork && retryCount >= 3 && detailMessage) {
+      primaryLabel = `${primaryLabel}: ${detailMessage}`;
+    }
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'save-indicator-text';
+    textSpan.textContent = primaryLabel;
+
+    const intervalHint = document.createElement('span');
+    intervalHint.className = 'save-indicator-interval';
+    intervalHint.style.marginLeft = '4px';
+    intervalHint.textContent = typeof t === 'function'
+      ? t('common.saveRetryingInterval', { seconds: String(seconds) })
+      : `(${seconds}s)`;
+
+    let tooltipText = isNetwork
+      ? (typeof t === 'function' ? t('common.saveErrorNetworkTooltip', { seconds: String(seconds) }) : `Network connectivity issue detected. Retrying automatically in ${seconds}s...`)
+      : (detailMessage ? `${typeof t === 'function' ? t('common.saveErrorFileTooltip', { seconds: String(seconds) }) : 'File storage issue'}: ${detailMessage}` : (typeof t === 'function' ? t('common.saveErrorFileTooltip', { seconds: String(seconds) }) : `File storage issue detected. Retrying automatically in ${seconds}s...`));
+
+    el.title = tooltipText;
+
+    const retryBtn = document.createElement('button');
+    retryBtn.type = 'button';
+    retryBtn.id = 'overlay-save-retry-btn';
+    retryBtn.className = 'save-indicator-retry-btn';
+
+    try {
+      const retryIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      retryIcon.setAttribute('width', '11');
+      retryIcon.setAttribute('height', '11');
+      retryIcon.setAttribute('viewBox', '0 0 24 24');
+      retryIcon.setAttribute('fill', 'none');
+      retryIcon.setAttribute('stroke', 'currentColor');
+      retryIcon.setAttribute('stroke-width', '2.2');
+      retryIcon.setAttribute('stroke-linecap', 'round');
+      retryIcon.setAttribute('stroke-linejoin', 'round');
+      retryIcon.setAttribute('aria-hidden', 'true');
+      retryIcon.innerHTML = '<polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>';
+      retryBtn.appendChild(retryIcon);
+    } catch (iconErr) {}
+
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = typeof t === 'function' ? t('common.saveIndicatorRetry') : 'Retry';
+    retryBtn.appendChild(labelSpan);
+
+    retryBtn.title = typeof t === 'function' ? t('common.saveIndicatorRetryTooltip') : 'Retry saving the note now';
+    retryBtn.setAttribute('data-i18n-title', 'common.saveIndicatorRetryTooltip');
+    retryBtn.onclick = (e) => {
+      if (typeof retrySaveNote === 'function') {
+        retrySaveNote(e);
+      }
+    };
+
+    el.appendChild(textSpan);
+    el.appendChild(intervalHint);
+    el.appendChild(retryBtn);
+  } else {
+    el.title = '';
+    el.textContent = '';
+  }
 }
 
 function flushTagEditorInputs() {
@@ -550,6 +693,13 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
     } else {
       await _doFullNoteSave(changes, activeNote);
     }
+    _noteSaveRetryCount = 0;
+    _lastNoteSaveError = null;
+    if (_noteSaveRetryTimer) {
+      clearTimeout(_noteSaveRetryTimer);
+      _noteSaveRetryTimer = null;
+    }
+    delete activeNote._lastSavedErrorSnapshotContent;
     if (!silent) setSaveIndicator('saved');
     if (isFinal) {
       try {
@@ -612,7 +762,52 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
     updateNoteWindowTitle(activeNote);
     return true;
   } catch(e) {
-    setSaveIndicator('error');
+    _noteSaveRetryCount++;
+    const errorInfo = classifySaveError(e);
+    _lastNoteSaveError = errorInfo;
+
+    try {
+      const resolvedNoteId = activeNote.id || (typeof generateNoteId === 'function' ? generateNoteId() : ('note-' + Date.now()));
+      if (!activeNote.id) activeNote.id = resolvedNoteId;
+      const notePath = activeNote.path || (typeof getCanonicalNotePath === 'function' ? getCanonicalNotePath(resolvedNoteId) : `notes/${resolvedNoteId}.html`);
+
+      let fullHTML = '';
+      if (typeof applyNoteEdits === 'function' && activeNote.originalHTML) {
+        fullHTML = applyNoteEdits(activeNote.originalHTML, changes);
+      } else if (typeof buildNewNoteHTML === 'function') {
+        fullHTML = buildNewNoteHTML({ id: resolvedNoteId, path: notePath, ...changes });
+      } else {
+        fullHTML = changes.mainHTML || activeNote.mainHTML || '';
+      }
+
+      if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.saveSnapshot === 'function' && notePath && fullHTML) {
+        if (activeNote._lastSavedErrorSnapshotContent !== fullHTML) {
+          await StorageAPI.saveSnapshot(notePath, fullHTML, 'save-error');
+          activeNote._lastSavedErrorSnapshotContent = fullHTML;
+        }
+      }
+    } catch (historyErr) {
+      console.warn('Failed to automatically save note snapshot to history:', historyErr);
+    }
+
+    const delayMs = getNextRetryDelayMs(_noteSaveRetryCount);
+
+    setSaveIndicator('error', {
+      errorInfo,
+      retryCount: _noteSaveRetryCount,
+      delayMs
+    });
+
+    if (_noteSaveRetryTimer) clearTimeout(_noteSaveRetryTimer);
+    _noteSaveRetryTimer = setTimeout(async () => {
+      _noteSaveRetryTimer = null;
+      try {
+        await autoSaveNote({ silent: false, isFinal: isFinal });
+      } catch (retryErr) {
+        console.warn('Background auto-save retry failed:', retryErr);
+      }
+    }, delayMs);
+
     if (e && !e.message?.includes('No root folder handle loaded')) {
       console.error('Auto-save failed:', e);
     }
@@ -622,6 +817,47 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
 
 async function saveCurrentNote() {
   return await autoSaveNote({ silent: false, isFinal: true });
+}
+
+async function retrySaveNote(e) {
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
+  if (_noteSaveRetryTimer) {
+    clearTimeout(_noteSaveRetryTimer);
+    _noteSaveRetryTimer = null;
+  }
+  const ok = await autoSaveNote({ silent: false, isFinal: true });
+  if (ok) {
+    if (typeof toast === 'function') {
+      toast(typeof t === 'function' ? (t('common.noteSaved') || 'Saved ✓') : 'Saved ✓');
+    }
+  } else {
+    if (typeof toast === 'function') {
+      const err = _lastNoteSaveError;
+      const isNet = err?.type === 'network';
+      const detail = err?.message || '';
+      const msg = isNet
+        ? (typeof t === 'function' ? t('common.saveErrorNetwork') : 'Network issue')
+        : (_noteSaveRetryCount >= 3 && detail ? `${typeof t === 'function' ? t('common.saveErrorFile') : 'File issue'}: ${detail}` : (typeof t === 'function' ? t('common.saveErrorFile') : 'File storage issue'));
+      toast(msg, true);
+    }
+  }
+  return ok;
+}
+window.retrySaveNote = retrySaveNote;
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('online', () => {
+    if (_noteSaveRetryTimer || _lastNoteSaveError?.type === 'network') {
+      if (_noteSaveRetryTimer) {
+        clearTimeout(_noteSaveRetryTimer);
+        _noteSaveRetryTimer = null;
+      }
+      autoSaveNote({ silent: false, isFinal: false }).catch(() => {});
+    }
+  });
 }
 
 async function _doFullNoteSave(changes, targetNote = null) {
@@ -1215,6 +1451,8 @@ async function renderNoteHistoryList() {
       localizedReason = (typeof t === 'function' ? t('sync.historyDeclinedRemote') : null) || 'Conflict: Declined Remote';
     } else if (snap.reason === 'conflict-declined-local') {
       localizedReason = (typeof t === 'function' ? t('sync.historyDeclinedLocal') : null) || 'Conflict: Declined Local';
+    } else if (snap.reason === 'save-error' || snap.reason === 'save-failed') {
+      localizedReason = (typeof t === 'function' ? t('history.reasonSaveError') : null) || 'Automatic backup (Save failed)';
     }
     title.textContent = `${dateStr} (${localizedReason})`;
 

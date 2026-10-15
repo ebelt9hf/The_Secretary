@@ -2531,6 +2531,19 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
 }
 .overlay-header-container .save-indicator.error {
   color: #f87171 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.overlay-header-container .save-indicator-retry-btn {
+  background: rgba(239, 68, 68, 0.25) !important;
+  color: #fca5a5 !important;
+  border: 1px solid rgba(239, 68, 68, 0.5) !important;
+}
+.overlay-header-container .save-indicator-retry-btn:hover {
+  background: rgba(239, 68, 68, 0.45) !important;
+  color: #ffffff !important;
+  border-color: rgba(239, 68, 68, 0.8) !important;
 }
 .overlay-header-container .overlay-icon-btn,
 .overlay-header-container .topbar-icon-btn {

@@ -275,6 +275,16 @@ const FirebaseSyncService = {
           }
         }, 200);
       });
+      window.addEventListener('online', () => {
+        if (this.state.isUnlocked && this.hasPendingCloudWrites()) {
+          if (this.state.cloudRetryTimer) {
+            clearTimeout(this.state.cloudRetryTimer);
+            this.state.cloudRetryTimer = null;
+          }
+          this.state.cloudRetryCount = 0;
+          this.flushQueue();
+        }
+      });
     }
   },
 
@@ -3154,11 +3164,27 @@ const FirebaseSyncService = {
       this.state.lastSyncTimestamp = Date.now();
       this.state.status = this.STATUS.SYNCED;
       this.state.lastError = null;
+      this.state.cloudRetryCount = 0;
+      if (this.state.cloudRetryTimer) {
+        clearTimeout(this.state.cloudRetryTimer);
+        this.state.cloudRetryTimer = null;
+      }
       this._notifyStatus('Synced with cloud');
     } catch (err) {
       this.state.status = this.STATUS.ERROR;
       this.state.lastError = err.message;
       this._notifyStatus(err.message);
+
+      // Background exponential retry for cloud sync (1s, 2s, 4s, 8s, 16s, 30s)
+      this.state.cloudRetryCount = (this.state.cloudRetryCount || 0) + 1;
+      const delays = [1000, 2000, 4000, 8000, 16000, 30000];
+      const delayMs = delays[Math.min(this.state.cloudRetryCount - 1, delays.length - 1)];
+
+      if (this.state.cloudRetryTimer) clearTimeout(this.state.cloudRetryTimer);
+      this.state.cloudRetryTimer = setTimeout(() => {
+        this.state.cloudRetryTimer = null;
+        this.flushQueue();
+      }, delayMs);
     }
   },
 

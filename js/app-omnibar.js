@@ -1122,12 +1122,20 @@ const OmnibarController = {
     this.renderSegmentedBar();
     this.renderLivePreview();
 
-    setTimeout(() => {
-      this.focusSection(1);
+    if (this._segmentedFocusTimer) clearTimeout(this._segmentedFocusTimer);
+    this._segmentedFocusTimer = setTimeout(() => {
+      this._segmentedFocusTimer = null;
+      if (typeof document !== 'undefined') {
+        this.focusSection(1);
+      }
     }, 40);
   },
 
   exitSegmentedMode() {
+    if (this._segmentedFocusTimer) {
+      clearTimeout(this._segmentedFocusTimer);
+      this._segmentedFocusTimer = null;
+    }
     this.close();
   },
 
@@ -1410,6 +1418,7 @@ const OmnibarController = {
   },
 
   renderSegmentedBar() {
+    if (typeof document === 'undefined') return;
     const segmentedBar = document.getElementById('omnibar-segmented-bar');
     if (!segmentedBar) return;
 
