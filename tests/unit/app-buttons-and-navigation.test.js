@@ -1048,12 +1048,15 @@ describe('UI Buttons - Daily Review, Companion Chat & Omnibar', () => {
       expect(globalThis.toggleFloatingChat).toHaveBeenCalledTimes(1);
     });
 
-    it('handles omnibar AI button trigger', () => {
-      const omnibarAiBtn = document.getElementById('omnibar-ai-btn');
-      globalThis.openFloatingChatFromOmnibar = vi.fn();
+    it('handles omnibar close button trigger', () => {
+      const closeBtn = document.getElementById('omnibar-footer-close-btn');
+      expect(closeBtn).not.toBeNull();
+      globalThis.OmnibarController = {
+        close: vi.fn()
+      };
 
-      triggerClick(omnibarAiBtn);
-      expect(globalThis.openFloatingChatFromOmnibar).toHaveBeenCalledTimes(1);
+      triggerClick(closeBtn);
+      expect(globalThis.OmnibarController.close).toHaveBeenCalledTimes(1);
     });
   });
 });

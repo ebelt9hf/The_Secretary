@@ -8,6 +8,14 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
       <div id="omnibar-overlay" class="omnibar-overlay">
         <div id="omnibar-container" class="omnibar-container">
           <div class="omnibar-input-wrapper">
+            <div id="omnibar-type-selector-wrapper" class="omnibar-type-selector-wrapper">
+              <button type="button" id="omnibar-type-btn" class="omnibar-type-btn" aria-haspopup="listbox" aria-expanded="false">
+                <span id="omnibar-type-btn-icon" class="omnibar-type-btn-icon">📥</span>
+                <span id="omnibar-type-btn-label" class="omnibar-type-btn-label">Stash</span>
+                <span class="omnibar-type-btn-arrow">▾</span>
+              </button>
+              <div id="omnibar-type-menu" class="omnibar-type-menu" role="listbox" style="display: none;"></div>
+            </div>
             <div id="omnibar-input-area" class="omnibar-input-area">
               <div id="omnibar-ghost-layer" class="omnibar-ghost-layer"></div>
               <input id="omnibar-input" class="omnibar-input" type="text" />
@@ -16,7 +24,9 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
           </div>
           <div id="omnibar-param-indicator" class="omnibar-param-indicator"></div>
           <div id="omnibar-results" class="omnibar-results-container"></div>
-          <div class="omnibar-hints"></div>
+          <div class="omnibar-footer">
+            <button type="button" id="omnibar-footer-close-btn" class="omnibar-footer-close-btn" onclick="OmnibarController.close()"></button>
+          </div>
         </div>
       </div>
     `;
@@ -24,6 +34,22 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
     // Global helper mocks
     globalThis.t = (key) => {
       const map = {
+        'omnibar.labelStash': 'Stash',
+        'omnibar.labelBlock': 'Block',
+        'omnibar.labelNote': 'Note',
+        'omnibar.labelTodo': 'Task',
+        'omnibar.labelCall': 'Call',
+        'omnibar.labelDec': 'Decision',
+        'omnibar.labelSearch': 'Search',
+        'omnibar.placeholderStash': 'Capture quick thought into stash...',
+        'omnibar.placeholderBlock': 'Event title...',
+        'omnibar.placeholderNote': 'Note title...',
+        'omnibar.placeholderTask': 'What needs to be done?',
+        'omnibar.placeholderCall': 'Participant or call subject...',
+        'omnibar.placeholderDecision': 'Decision summary...',
+        'omnibar.typeSelectorTooltip': 'Select entry type',
+        'omnibar.closeTooltip': 'Close omnibar',
+        'omnibar.previewStash': 'Capture thought',
         'omnibar.paramUrgency': '<urgency>',
         'omnibar.paramLabel': '<label>',
         'omnibar.paramDate': '<date>',
@@ -792,13 +818,55 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
       expect(input.getAttribute('aria-activedescendant')).toBeNull();
     });
 
-    it('renders hint pills with localized tooltips (title attribute)', () => {
+    it('opens with default type stash, removes tips below, and renders type selector with localized tooltips', () => {
       OmnibarController.open();
+      
+      // Default type is stash
+      expect(OmnibarController.selectedType).toBe('stash');
+      const typeBtn = document.getElementById('omnibar-type-btn');
+      expect(typeBtn).not.toBeNull();
+      expect(typeBtn.getAttribute('title')).toBe('Select entry type');
+      expect(document.getElementById('omnibar-type-btn-label').textContent).toBe('Stash');
+
+      // Tips below are removed
       const hintPills = document.querySelectorAll('.omnibar-hint-pill');
-      expect(hintPills.length).toBeGreaterThan(0);
-      hintPills.forEach(pill => {
-        expect(pill.getAttribute('title')).toBeTruthy();
-      });
+      expect(hintPills.length).toBe(0);
+
+      // Preview below is shown for stash
+      const results = document.getElementById('omnibar-results');
+      expect(results.style.display).toBe('block');
+      expect(results.innerHTML).toContain('Stash');
+    });
+
+    it('renders preview below when changing entry type and keeps text box on same height', () => {
+      OmnibarController.open();
+      const inputArea = document.getElementById('omnibar-input-area');
+      const input = document.getElementById('omnibar-input');
+      expect(input.style.display).not.toBe('none');
+
+      // Change type to block
+      OmnibarController.setType('block');
+      expect(OmnibarController.selectedType).toBe('block');
+      expect(document.getElementById('omnibar-type-btn-label').textContent).toBe('Block');
+      expect(input.placeholder).toBe('Event title...');
+      // Text box remains visible and active
+      expect(input.style.display).not.toBe('none');
+
+      // Preview below is shown for block
+      const results = document.getElementById('omnibar-results');
+      expect(results.style.display).toBe('block');
+      expect(results.innerHTML).toContain('Schedule Block');
+    });
+
+    it('handles clicking the bottom-right close button to dismiss omnibar', () => {
+      OmnibarController.open();
+      expect(OmnibarController.isOpen).toBe(true);
+
+      const closeBtn = document.getElementById('omnibar-footer-close-btn');
+      expect(closeBtn).not.toBeNull();
+      closeBtn.click();
+
+      expect(OmnibarController.isOpen).toBe(false);
     });
   });
 

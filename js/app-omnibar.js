@@ -14,6 +14,8 @@
  */
 const OmnibarController = {
   isOpen: false,
+  selectedType: 'stash',
+  typeMenuOpen: false,
   results: [],
   selectedIndex: 0,
   history: [],
@@ -62,6 +64,28 @@ const OmnibarController = {
       });
     }
 
+    const typeBtn = document.getElementById('omnibar-type-btn');
+    if (typeBtn) {
+      typeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleTypeMenu();
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (this.typeMenuOpen && !e.target.closest('#omnibar-type-selector-wrapper')) {
+        this.toggleTypeMenu(false);
+      }
+    });
+
+    const closeBtn = document.getElementById('omnibar-footer-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.close();
+      });
+    }
+
     const input = document.getElementById('omnibar-input');
     const container = document.getElementById('omnibar-container');
     const ghostLayer = document.getElementById('omnibar-ghost-layer');
@@ -80,8 +104,21 @@ const OmnibarController = {
         }
         this.tabCycle.active = false;
         this.historyIndex = -1;
+
+        const val = input.value;
+        const match = this.matchCommandType(val);
+        if (match && ['todo', 'dec', 'block', 'note', 'call', 'stash'].includes(match.type)) {
+          if (this.selectedType !== match.type) {
+            this.setType(match.type);
+          }
+        }
+
         this.updateGhostSuggestion();
-        this.scheduleLiveSearch();
+        if (this.selectedType === 'search') {
+          this.scheduleLiveSearch();
+        } else {
+          this.renderLivePreview();
+        }
       });
 
       // Track cursor position changes (arrow keys, click, selection)
@@ -104,7 +141,11 @@ const OmnibarController = {
           }
         } else if (e.key === 'Enter') {
           e.preventDefault();
-          this.executeSelected(e.metaKey || e.ctrlKey);
+          if (this.selectedType === 'search' && this.results.length > 0) {
+            this.executeSelected(e.metaKey || e.ctrlKey);
+          } else {
+            this.submit();
+          }
         } else if (e.key === 'Tab') {
           e.preventDefault();
           this.handleTabCompletion(e.shiftKey);
@@ -130,18 +171,18 @@ const OmnibarController = {
     return false;
   },
 
-  open() {
+  open(initialType = 'stash') {
     const isStorageReady = Boolean((typeof rootHandle !== 'undefined' && rootHandle) || (typeof StorageAPI !== 'undefined' && typeof StorageAPI.getStorageEngine === 'function' && StorageAPI.getStorageEngine() === 'firebase'));
     if (!isStorageReady) {
       toast(t('omnibar.openFolderFirst'), true);
       return;
     }
     const overlay = document.getElementById('omnibar-overlay');
-    const input = document.getElementById('omnibar-input');
     const container = document.getElementById('omnibar-container');
     const results = document.getElementById('omnibar-results');
+    const segmentedBar = document.getElementById('omnibar-segmented-bar');
 
-    if (overlay && input) {
+    if (overlay) {
       if (overlay._closeTimer) {
         clearTimeout(overlay._closeTimer);
         overlay._closeTimer = null;
@@ -149,32 +190,20 @@ const OmnibarController = {
       overlay.classList.remove('closing');
       overlay.classList.add('active');
       overlay.style.display = 'flex';
-      input.value = '';
-      input.placeholder = (typeof t === 'function' && t('omnibar.inputPlaceholder')) ? t('omnibar.inputPlaceholder') : 'What do you want to do?';
-      const aiBtn = document.getElementById('omnibar-ai-btn');
-      if (aiBtn) {
-        aiBtn.setAttribute('title', (typeof t === 'function' && t('omnibar.aiChatTitle')) ? t('omnibar.aiChatTitle') : 'Open Secretary Chat');
-      }
-      if (container) container.classList.remove('wide');
-      if (results) results.style.display = 'none';
-      
+      if (segmentedBar) segmentedBar.style.display = 'flex';
+
       this.isOpen = true;
+      this.selectedType = initialType || 'stash';
+      this.renderTypeSelector();
       this.results = [];
       this.selectedIndex = 0;
       this.tabCycle.active = false;
       this.historyIndex = -1;
-      
+
       // Prevent background scrolling while modal is open
       document.body.style.overflow = 'hidden';
 
-      this.updateGhostSuggestion();
-      this.renderDefaultHints();
-
-      setTimeout(() => {
-        input.focus();
-        input.setAttribute('aria-expanded', 'false');
-        input.removeAttribute('aria-activedescendant');
-      }, 50);
+      this.initSegmentedMode(this.selectedType);
     }
   },
 
@@ -184,6 +213,11 @@ const OmnibarController = {
     const results = document.getElementById('omnibar-results');
     const input = document.getElementById('omnibar-input');
 
+    this.closeCombo();
+    if (input) {
+      input.removeAttribute('aria-activedescendant');
+    }
+
     if (overlay) {
       if (overlay.classList.contains('closing')) return;
       if (overlay._closeTimer) clearTimeout(overlay._closeTimer);
@@ -192,23 +226,20 @@ const OmnibarController = {
         overlay.style.display = 'none';
         overlay.classList.remove('active', 'closing');
         overlay._closeTimer = null;
-        if (container) container.classList.remove('wide');
+        if (container) {
+          container.classList.remove('wide', 'theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call');
+          container.removeAttribute('data-urgency');
+        }
         if (results) results.style.display = 'none';
+        this.isOpen = false;
+        document.body.style.overflow = '';
       }, 150);
-      
-      if (input) {
-        input.setAttribute('aria-expanded', 'false');
-        input.removeAttribute('aria-activedescendant');
-      }
       
       this.isOpen = false;
       this.results = [];
       this.tabCycle.active = false;
       this.clearGhostSuggestion();
       this.clearParamIndicator();
-      
-      // Restore background scrolling
-      document.body.style.overflow = '';
     }
   },
 
@@ -217,6 +248,88 @@ const OmnibarController = {
       this.close();
     } else {
       this.open();
+    }
+  },
+
+  getSupportedTypes() {
+    return [
+      { id: 'stash', icon: '📥', label: (typeof t === 'function' && t('omnibar.labelStash')) || 'Stash', shortcut: '/stash', preview: (typeof t === 'function' && t('omnibar.previewStash')) || 'Stash' },
+      { id: 'block', icon: '📅', label: (typeof t === 'function' && t('omnibar.labelBlock')) || 'Block', shortcut: '/block', preview: (typeof t === 'function' && t('omnibar.previewBlock')) || 'Schedule Block' },
+      { id: 'note', icon: '📝', label: (typeof t === 'function' && t('omnibar.labelNote')) || 'Note', shortcut: '/note', preview: (typeof t === 'function' && t('omnibar.previewNote')) || 'Create Note' },
+      { id: 'todo', icon: '✅', label: (typeof t === 'function' && t('omnibar.labelTodo')) || 'Task', shortcut: '/todo', preview: (typeof t === 'function' && t('omnibar.previewTodo')) || 'New Task' },
+      { id: 'call', icon: '📞', label: (typeof t === 'function' && t('omnibar.labelCall')) || 'Call', shortcut: '/call', preview: (typeof t === 'function' && t('omnibar.previewCall')) || 'Call & Note' },
+      { id: 'dec', icon: '⚖️', label: (typeof t === 'function' && t('omnibar.labelDec')) || 'Decision', shortcut: '/dec', preview: (typeof t === 'function' && t('omnibar.previewDec')) || 'Record Decision' },
+      { id: 'search', icon: '🔍', label: (typeof t === 'function' && t('omnibar.labelSearch')) || 'Search', shortcut: '/search', preview: (typeof t === 'function' && t('omnibar.sectionNavigation')) || 'Search' }
+    ];
+  },
+
+  renderTypeSelector() {
+    const btn = document.getElementById('omnibar-type-btn');
+    const menu = document.getElementById('omnibar-type-menu');
+    const labelSpan = document.getElementById('omnibar-type-btn-label');
+    const iconSpan = document.getElementById('omnibar-type-btn-icon');
+    if (!btn || !menu) return;
+
+    const types = this.getSupportedTypes();
+    const current = types.find(t => t.id === this.selectedType) || types[0];
+
+    if (labelSpan) labelSpan.textContent = current.label;
+    if (iconSpan) iconSpan.textContent = current.icon;
+    btn.setAttribute('title', (typeof t === 'function' && t('omnibar.typeSelectorTooltip')) || 'Select entry type');
+
+    let html = '';
+    types.forEach(item => {
+      const isSelected = item.id === this.selectedType;
+      html += `
+        <div class="omnibar-type-item${isSelected ? ' selected' : ''}" role="option" aria-selected="${isSelected}" data-type="${item.id}" onclick="OmnibarController.setType('${item.id}')">
+          <span class="omnibar-type-item-icon">${item.icon}</span>
+          <span class="omnibar-type-item-label">${escH(item.label)}</span>
+          <span class="omnibar-type-item-shortcut">${escH(item.shortcut)}</span>
+        </div>
+      `;
+    });
+    menu.innerHTML = html;
+  },
+
+  toggleTypeMenu(forceState) {
+    const menu = document.getElementById('omnibar-type-menu');
+    const btn = document.getElementById('omnibar-type-btn');
+    if (!menu || !btn) return;
+
+    const isOpen = typeof forceState === 'boolean' ? forceState : !this.typeMenuOpen;
+    this.typeMenuOpen = isOpen;
+    btn.setAttribute('aria-expanded', String(isOpen));
+    menu.style.display = isOpen ? 'flex' : 'none';
+  },
+
+  setType(typeId) {
+    this.selectedType = typeId;
+    this.segmentedState.active = (typeId !== 'search');
+    this.segmentedState.action = typeId;
+    this.segmentedState.data.action = typeId;
+    this.toggleTypeMenu(false);
+    this.renderTypeSelector();
+    this.applyTheme();
+
+    const input = document.getElementById('omnibar-input');
+    if (input) {
+      const placeholders = {
+        stash: (typeof t === 'function' && t('omnibar.placeholderStash')) || 'Capture quick thought into stash...',
+        block: (typeof t === 'function' && t('omnibar.placeholderBlock')) || 'Event title...',
+        note: (typeof t === 'function' && t('omnibar.placeholderNote')) || 'Note title...',
+        todo: (typeof t === 'function' && t('omnibar.placeholderTask')) || 'What needs to be done?',
+        call: (typeof t === 'function' && t('omnibar.placeholderCall')) || 'Participant or call subject...',
+        dec: (typeof t === 'function' && t('omnibar.placeholderDecision')) || 'Decision summary...',
+        search: (typeof t === 'function' && t('omnibar.inputPlaceholder')) || 'What do you want to do?'
+      };
+      input.placeholder = placeholders[typeId] || placeholders.stash;
+      input.focus();
+    }
+
+    if (typeId === 'search') {
+      this.performLiveSearch();
+    } else {
+      this.renderLivePreview();
     }
   },
 
@@ -245,15 +358,12 @@ const OmnibarController = {
   setCommandPrefix(prefix) {
     const input = document.getElementById('omnibar-input');
     const locCmd = this.getLocalizedCommand(prefix);
+    const match = this.matchCommandType(prefix.startsWith('/') ? prefix : '/' + prefix);
+    if (match && ['todo', 'dec', 'block', 'note', 'call', 'stash'].includes(match.type)) {
+      this.setType(match.type);
+    }
     if (input) {
       input.value = locCmd + ' ';
-    }
-    const match = this.matchCommandType(prefix.startsWith('/') ? prefix : '/' + prefix);
-    if (match && ['todo', 'dec', 'block', 'note', 'call'].includes(match.type)) {
-      this.initSegmentedMode(match.type);
-      return;
-    }
-    if (input) {
       input.focus();
       this.tabCycle.active = false;
       this.updateGhostSuggestion();
@@ -945,8 +1055,8 @@ const OmnibarController = {
 
   // ── Segmented Sectional Omnibar Architecture ──
   segmentedState: {
-    active: false,
-    action: 'todo',
+    active: true,
+    action: 'stash',
     activeSectionIndex: 1,
     comboOpen: false,
     comboSectionIndex: -1,
@@ -955,45 +1065,58 @@ const OmnibarController = {
     calYear: new Date().getFullYear(),
     comboSelectedIndex: 0,
     data: {
-      action: 'todo',
+      action: 'stash',
       priority: 'plan',
       workstream: 'General',
       status: 'active',
       type: 'work',
       date: 'today',
-      time: '14:00',
+      time: '15:30',
       duration: '30m',
       title: '',
-      colleague: ''
+      colleague: 'Team'
     }
   },
 
-  initSegmentedMode(action = 'todo', initialText = '') {
+  initSegmentedMode(action = 'stash', initialText = '') {
     const segmentedBar = document.getElementById('omnibar-segmented-bar');
-    const input = document.getElementById('omnibar-input');
-    const ghost = document.getElementById('omnibar-ghost-layer');
     const container = document.getElementById('omnibar-container');
-    if (!segmentedBar) return;
 
+    this.selectedType = action;
     this.segmentedState.active = true;
     this.segmentedState.action = action;
     this.segmentedState.data.action = action;
-    if (initialText) this.segmentedState.data.title = initialText;
+    this.segmentedState.comboOpen = false;
+    this.segmentedState.comboSectionIndex = -1;
+    this.segmentedState.data.title = initialText || '';
+
     if (!this.segmentedState.data.workstream) {
       const known = this.getKnownWorkstreams();
       this.segmentedState.data.workstream = known[0] || 'General';
     }
-    if (!this.segmentedState.data.time) {
-      this.segmentedState.data.time = this.getNextRoundHour();
-    }
+    this.segmentedState.data.date = 'today';
+    this.segmentedState.data.time = this.getSmartDefaultTime();
     if (!this.segmentedState.data.duration) {
       this.segmentedState.data.duration = (typeof settings !== 'undefined' && settings?.plannerDefaultDuration) ? `${settings.plannerDefaultDuration}m` : '30m';
     }
+    if (!this.segmentedState.data.priority) {
+      this.segmentedState.data.priority = 'plan';
+    }
+    if (!this.segmentedState.data.status) {
+      this.segmentedState.data.status = 'active';
+    }
+    if (!this.segmentedState.data.colleague) {
+      this.segmentedState.data.colleague = 'Team';
+    }
 
-    if (input) input.style.display = 'none';
-    if (ghost) ghost.style.display = 'none';
-    segmentedBar.style.display = 'flex';
-    if (container) container.classList.add('wide');
+    if (segmentedBar) segmentedBar.style.display = 'flex';
+    if (container) {
+      if (['block', 'call'].includes(action)) {
+        container.classList.add('wide');
+      } else {
+        container.classList.remove('wide');
+      }
+    }
 
     this.applyTheme();
     this.renderSegmentedBar();
@@ -1005,37 +1128,12 @@ const OmnibarController = {
   },
 
   exitSegmentedMode() {
-    const segmentedBar = document.getElementById('omnibar-segmented-bar');
-    const input = document.getElementById('omnibar-input');
-    const ghost = document.getElementById('omnibar-ghost-layer');
-    const container = document.getElementById('omnibar-container');
-    const results = document.getElementById('omnibar-results');
-
-    this.segmentedState.active = false;
-    this.segmentedState.comboOpen = false;
-    this.segmentedState.calOpen = false;
-
-    if (segmentedBar) segmentedBar.style.display = 'none';
-    if (input) {
-      input.style.display = '';
-      input.value = '';
-      input.focus();
-    }
-    if (ghost) ghost.style.display = '';
-    if (container) {
-      container.classList.remove('theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call', 'wide');
-      container.removeAttribute('data-urgency');
-    }
-    if (results) results.style.display = 'none';
-
-    this.updateGhostSuggestion();
-    this.renderDefaultHints();
+    this.close();
   },
 
   translateSectionState(newAction) {
-    const oldAction = this.segmentedState.action;
-    if (oldAction === newAction) return;
-
+    if (!newAction) return;
+    this.selectedType = newAction;
     const data = this.segmentedState.data;
     data.action = newAction;
     this.segmentedState.action = newAction;
@@ -1048,11 +1146,21 @@ const OmnibarController = {
     } else if (newAction === 'block') {
       if (!data.type) data.type = 'work';
       if (!data.date) data.date = 'today';
-      if (!data.time) data.time = this.getNextRoundHour();
+      if (!data.time) data.time = this.getSmartDefaultTime();
       if (!data.duration) data.duration = (typeof settings !== 'undefined' && settings?.plannerDefaultDuration) ? `${settings.plannerDefaultDuration}m` : '30m';
     } else if (newAction === 'call') {
       if (!data.date) data.date = 'today';
-      if (!data.time) data.time = this.getNextRoundHour();
+      if (!data.time) data.time = this.getSmartDefaultTime();
+      if (!data.colleague) data.colleague = 'Team';
+    }
+
+    const container = document.getElementById('omnibar-container');
+    if (container) {
+      if (['block', 'call'].includes(newAction)) {
+        container.classList.add('wide');
+      } else {
+        container.classList.remove('wide');
+      }
     }
 
     this.segmentedState.comboOpen = false;
@@ -1061,6 +1169,10 @@ const OmnibarController = {
     this.applyTheme();
     this.renderSegmentedBar();
     this.renderLivePreview();
+
+    setTimeout(() => {
+      this.focusSection(1);
+    }, 40);
   },
 
   applyTheme() {
@@ -1087,27 +1199,129 @@ const OmnibarController = {
     }
   },
 
+  getKnownColleagues() {
+    const list = new Set(['Team']);
+    if (typeof manifest !== 'undefined' && Array.isArray(manifest)) {
+      manifest.forEach(n => {
+        if (Array.isArray(n.collaborators)) {
+          n.collaborators.forEach(c => c && list.add(c.trim()));
+        }
+      });
+    }
+    return Array.from(list);
+  },
+
   getSectionDefinitions() {
-    const action = this.segmentedState.action;
+    const action = this.segmentedState.action || this.selectedType || 'stash';
     const data = this.segmentedState.data;
 
     // Section 0 is always Action
     const actionSec = {
       type: 'action',
       label: t('omnibar.sectionAction') || 'Action',
-      value: '/' + action,
-      icon: { todo: '✅', dec: '⚖️', block: '📅', note: '📝', call: '📞' }[action] || '⚡',
+      value: action,
+      displayValue: { stash: t('omnibar.labelStash') || 'Stash', todo: t('omnibar.labelTodo') || 'Task', dec: t('omnibar.labelDec') || 'Decision', block: t('omnibar.labelBlock') || 'Block', note: t('omnibar.labelNote') || 'Note', call: t('omnibar.labelCall') || 'Call' }[action] || '⚡',
+      icon: { stash: '📥', todo: '✅', dec: '⚖️', block: '📅', note: '📝', call: '📞' }[action] || '⚡',
       isSelective: true,
       options: [
-        { id: 'todo', label: t('omnibar.cmdTodo') || '/todo', meta: t('omnibar.previewTodo') || 'Task', icon: '✅' },
-        { id: 'dec', label: t('omnibar.cmdDec') || '/dec', meta: t('omnibar.previewDec') || 'Decision', icon: '⚖️' },
-        { id: 'block', label: t('omnibar.cmdBlock') || '/block', meta: t('omnibar.previewBlock') || 'Block', icon: '📅' },
-        { id: 'note', label: t('omnibar.cmdNote') || '/note', meta: t('omnibar.previewNote') || 'Note', icon: '📝' },
-        { id: 'call', label: t('omnibar.cmdCall') || '/call', meta: t('omnibar.previewCall') || 'Call', icon: '📞' }
+        { id: 'stash', label: t('omnibar.labelStash') || 'Stash', meta: t('omnibar.hintStash') || 'Thought', icon: '📥' },
+        { id: 'call', label: t('omnibar.labelCall') || 'Call', meta: t('omnibar.previewCall') || 'Call & Note', icon: '📞' },
+        { id: 'block', label: t('omnibar.labelBlock') || 'Block', meta: t('omnibar.previewBlock') || 'Planner', icon: '📅' },
+        { id: 'todo', label: t('omnibar.labelTodo') || 'Task', meta: t('omnibar.previewTodo') || 'Todo', icon: '✅' },
+        { id: 'note', label: t('omnibar.labelNote') || 'Note', meta: t('omnibar.previewNote') || 'Document', icon: '📝' },
+        { id: 'dec', label: t('omnibar.labelDec') || 'Decision', meta: t('omnibar.previewDec') || 'Record', icon: '⚖️' }
       ]
     };
 
-    if (action === 'todo') {
+    if (action === 'stash') {
+      return [
+        actionSec,
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Thought',
+          value: data.title,
+          placeholder: t('omnibar.placeholderStash') || 'Capture quick thought into stash...',
+          isSelective: false
+        }
+      ];
+    } else if (action === 'call') {
+      const dateDisplay = data.date === 'today' ? (t('omnibar.calToday') || 'Today') : data.date === 'tomorrow' ? (t('omnibar.calTomorrow') || 'Tomorrow') : data.date;
+      return [
+        actionSec,
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Subject',
+          value: data.title,
+          placeholder: t('omnibar.placeholderCall') || 'Subject or participant...',
+          isSelective: false
+        },
+        {
+          type: 'datetime',
+          label: t('omnibar.sectionDateTime') || 'Date & Time',
+          value: `${dateDisplay} ${data.time}`,
+          icon: '🕒',
+          isSelective: true
+        },
+        {
+          type: 'workstream',
+          label: t('omnibar.sectionWorkstream') || 'Workstream',
+          value: data.workstream,
+          icon: '📁',
+          isSelective: true,
+          options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
+        },
+        {
+          type: 'colleague',
+          label: t('omnibar.sectionContact') || 'Contact',
+          value: data.colleague || 'Team',
+          icon: '👤',
+          isSelective: true,
+          options: this.getKnownColleagues().map(c => ({ id: c, label: c, icon: '👤' }))
+        }
+      ];
+    } else if (action === 'block') {
+      const dateDisplay = data.date === 'today' ? (t('omnibar.calToday') || 'Today') : data.date === 'tomorrow' ? (t('omnibar.calTomorrow') || 'Tomorrow') : data.date;
+      return [
+        actionSec,
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Title',
+          value: data.title,
+          placeholder: t('omnibar.placeholderBlock') || 'Event title...',
+          isSelective: false
+        },
+        {
+          type: 'datetime',
+          label: t('omnibar.sectionDateTime') || 'Date & Time',
+          value: `${dateDisplay} ${data.time}`,
+          icon: '🕒',
+          isSelective: true
+        },
+        {
+          type: 'duration',
+          label: t('omnibar.sectionDuration') || 'Duration',
+          value: data.duration || '30m',
+          icon: '⏱️',
+          isSelective: true,
+          options: [
+            { id: '15m', label: t('omnibar.dur15m'), icon: '⏱️' },
+            { id: '30m', label: t('omnibar.token30m'), icon: '⏱️' },
+            { id: '45m', label: t('omnibar.dur45m'), icon: '⏱️' },
+            { id: '1h', label: t('omnibar.token1h'), icon: '⏱️' },
+            { id: '1h30', label: t('omnibar.token1h30m'), icon: '⏱️' },
+            { id: '2h', label: t('omnibar.token2h'), icon: '⏱️' }
+          ]
+        },
+        {
+          type: 'workstream',
+          label: t('omnibar.sectionWorkstream') || 'Workstream',
+          value: data.workstream,
+          icon: '📁',
+          isSelective: true,
+          options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
+        }
+      ];
+    } else if (action === 'todo') {
       return [
         actionSec,
         {
@@ -1128,6 +1342,7 @@ const OmnibarController = {
           type: 'workstream',
           label: t('omnibar.sectionWorkstream') || 'Workstream',
           value: data.workstream,
+          icon: '📁',
           isSelective: true,
           options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
         },
@@ -1139,15 +1354,34 @@ const OmnibarController = {
           isSelective: false
         }
       ];
-    } else if (action === 'dec') {
+    } else if (action === 'note') {
       return [
         actionSec,
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Title',
+          value: data.title,
+          placeholder: t('omnibar.placeholderNote') || 'Note title...',
+          isSelective: false
+        },
         {
           type: 'workstream',
           label: t('omnibar.sectionWorkstream') || 'Workstream',
           value: data.workstream,
+          icon: '📁',
           isSelective: true,
           options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
+        }
+      ];
+    } else if (action === 'dec') {
+      return [
+        actionSec,
+        {
+          type: 'text',
+          label: t('omnibar.sectionTitle') || 'Summary',
+          value: data.title,
+          placeholder: t('omnibar.placeholderDecision') || 'Decision summary...',
+          isSelective: false
         },
         {
           type: 'status',
@@ -1162,104 +1396,12 @@ const OmnibarController = {
           ]
         },
         {
-          type: 'text',
-          label: t('omnibar.sectionTitle') || 'Summary',
-          value: data.title,
-          placeholder: t('omnibar.placeholderDecision') || 'Decision summary...',
-          isSelective: false
-        }
-      ];
-    } else if (action === 'block') {
-      return [
-        actionSec,
-        {
-          type: 'type',
-          label: t('omnibar.sectionType') || 'Type',
-          value: data.type,
-          displayValue: { work: t('omnibar.typeWork') || 'Deep Work', sync: t('omnibar.typeSync') || 'Team Sync', call: t('omnibar.typeCall') || 'Call', prep: t('omnibar.typePrep') || 'Preparation', personal: t('omnibar.typePersonal') || 'Personal' }[data.type] || data.type,
-          isSelective: true,
-          options: [
-            { id: 'work', label: t('omnibar.typeWork') || 'Deep Work', icon: '🔷' },
-            { id: 'sync', label: t('omnibar.typeSync') || 'Team Sync', icon: '🟣' },
-            { id: 'call', label: t('omnibar.typeCall') || 'Call', icon: '🟢' },
-            { id: 'prep', label: t('omnibar.typePrep') || 'Preparation', icon: '🟠' },
-            { id: 'personal', label: t('omnibar.typePersonal') || 'Personal', icon: '🟡' }
-          ]
-        },
-        {
           type: 'workstream',
           label: t('omnibar.sectionWorkstream') || 'Workstream',
           value: data.workstream,
+          icon: '📁',
           isSelective: true,
           options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
-        },
-        {
-          type: 'text',
-          label: t('omnibar.sectionTitle') || 'Title',
-          value: data.title,
-          placeholder: t('omnibar.placeholderBlock') || 'Event title...',
-          isSelective: false
-        },
-        {
-          type: 'date',
-          label: t('omnibar.sectionDate') || 'Date',
-          value: data.date,
-          displayValue: data.date === 'today' ? (t('omnibar.calToday') || 'Today') : data.date === 'tomorrow' ? (t('omnibar.calTomorrow') || 'Tomorrow') : data.date,
-          isSelective: true,
-          options: [
-            { id: 'today', label: t('omnibar.calToday') || 'Today', icon: '📅' },
-            { id: 'tomorrow', label: t('omnibar.calTomorrow') || 'Tomorrow', icon: '📅' },
-            { id: 'calendar', label: t('omnibar.calPickDate') || 'Pick date...', icon: '🗓️' }
-          ]
-        },
-        {
-          type: 'time',
-          label: t('omnibar.sectionTime') || 'Time & Dur',
-          value: `${data.time} (${data.duration})`,
-          isSelective: true,
-          options: [
-            { id: '15m', label: t('omnibar.dur15m') || '15 min', icon: '⏱️' },
-            { id: '30m', label: t('omnibar.token30m') || '30 min', icon: '⏱️' },
-            { id: '45m', label: t('omnibar.dur45m') || '45 min', icon: '⏱️' },
-            { id: '1h', label: t('omnibar.token1h') || '1 hour', icon: '⏱️' },
-            { id: '2h', label: t('omnibar.token2h') || '2 hours', icon: '⏱️' }
-          ]
-        }
-      ];
-    } else if (action === 'note') {
-      return [
-        actionSec,
-        {
-          type: 'workstream',
-          label: t('omnibar.sectionWorkstream') || 'Workstream',
-          value: data.workstream,
-          isSelective: true,
-          options: this.getKnownWorkstreams().map(ws => ({ id: ws, label: ws, icon: '📁' }))
-        },
-        {
-          type: 'text',
-          label: t('omnibar.sectionTitle') || 'Title',
-          value: data.title,
-          placeholder: t('omnibar.placeholderNote') || 'Note title...',
-          isSelective: false
-        }
-      ];
-    } else if (action === 'call') {
-      return [
-        actionSec,
-        {
-          type: 'colleague',
-          label: t('omnibar.sectionContact') || 'Contact',
-          value: data.colleague || 'Team',
-          isSelective: true,
-          options: ['Team', 'Alice', 'Bob', 'Client'].map(c => ({ id: c, label: c, icon: '👤' }))
-        },
-        {
-          type: 'text',
-          label: t('omnibar.sectionTitle') || 'Subject',
-          value: data.title,
-          placeholder: t('omnibar.placeholderCall') || 'Subject or participant...',
-          isSelective: false
         }
       ];
     }
@@ -1278,13 +1420,12 @@ const OmnibarController = {
     defs.forEach((sec, idx) => {
       const isActive = idx === activeIdx;
       const isComboOpen = this.segmentedState.comboOpen && this.segmentedState.comboSectionIndex === idx;
-      const isCalOpen = this.segmentedState.calOpen && this.segmentedState.comboSectionIndex === idx;
 
       if (!sec.isSelective) {
         // Free-text section
         html += `
           <div class="omnibar-section omnibar-section-freetext${isActive ? ' active' : ''}" data-section-index="${idx}" onclick="OmnibarController.onSectionClick(${idx})" role="textbox">
-            <input type="text" class="omnibar-section-input" id="omnibar-section-input-text" value="${escH(sec.value || '')}" placeholder="${escH(sec.placeholder || '')}" autocomplete="off" spellcheck="false" oninput="OmnibarController.onFreeTextInput(this.value)" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})">
+            <input type="text" class="omnibar-section-input" id="omnibar-input" value="${escH(sec.value || '')}" placeholder="${escH(sec.placeholder || '')}" autocomplete="off" spellcheck="false" oninput="OmnibarController.onFreeTextInput(this.value)" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})">
           </div>
         `;
       } else {
@@ -1300,32 +1441,32 @@ const OmnibarController = {
         // Dropdown HTML if active
         let dropdownHtml = '';
         if (isComboOpen) {
-          const items = sec.options || [];
-          dropdownHtml = `
-            <div class="omnibar-section-combo" id="omnibar-combo-${idx}">
-              ${items.map((opt, oIdx) => `
-                <div class="omnibar-combo-item${oIdx === this.segmentedState.comboSelectedIndex ? ' selected' : ''}" onclick="event.stopPropagation(); OmnibarController.selectComboOption(${idx}, '${escH(opt.id)}')">
-                  <span>${opt.icon || '•'}</span>
-                  <span>${escH(opt.label)}</span>
-                  ${opt.meta ? `<span class="omnibar-combo-item-meta">${escH(opt.meta)}</span>` : ''}
-                </div>
-              `).join('')}
-              ${idx === 0 ? `
-                <div class="omnibar-combo-item" style="border-top: 1px solid var(--card-border); margin-top: 4px;" onclick="event.stopPropagation(); OmnibarController.exitSegmentedMode()">
-                  <span>🔍</span>
-                  <span>${escH(t('omnibar.backToSearch') || 'Back to search')}</span>
-                </div>
-              ` : ''}
-            </div>
-          `;
-        } else if (isCalOpen) {
-          dropdownHtml = this.renderCalendarPopoverHtml(idx);
+          if (sec.type === 'datetime') {
+            dropdownHtml = this.renderDateTimePopoverHtml(idx);
+          } else {
+            const items = sec.options || [];
+            dropdownHtml = `
+              <div class="omnibar-section-combo" id="${idx === 0 ? 'omnibar-type-menu' : `omnibar-combo-${idx}`}" role="listbox">
+                ${items.map((opt, oIdx) => `
+                  <div class="omnibar-combo-item${oIdx === this.segmentedState.comboSelectedIndex ? ' selected' : ''}" onclick="event.stopPropagation(); OmnibarController.selectComboOption(${idx}, '${escH(opt.id)}')">
+                    <span>${opt.icon || '•'}</span>
+                    <span>${escH(opt.label)}</span>
+                    ${opt.meta ? `<span class="omnibar-combo-item-meta">${escH(opt.meta)}</span>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }
         }
 
+        const idAttr = idx === 0 ? ' id="omnibar-type-btn"' : '';
+        const labelIdAttr = idx === 0 ? ' id="omnibar-type-btn-label"' : '';
+        const titleTooltip = sec.type === 'action' ? (t('omnibar.typeSelectorTooltip') || 'Select entry type') : `${sec.label}: ${sec.displayValue || sec.value || ''}`;
+
         html += `
-          <div class="omnibar-section${isActive ? ' active' : ''}" data-section-index="${idx}" data-section-type="${sec.type}" onclick="OmnibarController.onSectionClick(${idx})" tabindex="0" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})">
+          <div class="omnibar-section${isActive ? ' active' : ''}"${idAttr} data-section-index="${idx}" data-section-type="${sec.type}" onclick="OmnibarController.onSectionClick(${idx})" tabindex="0" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})" title="${escH(titleTooltip)}" role="button" aria-haspopup="listbox" aria-expanded="${isComboOpen ? 'true' : 'false'}">
             ${sec.type !== 'action' ? `<span class="omnibar-section-label">${escH(sec.label)}:</span>` : ''}
-            <span class="omnibar-section-value">${valDisplay}</span>
+            <span class="omnibar-section-value"${labelIdAttr}>${valDisplay}</span>
             <span class="omnibar-section-arrow">▾</span>
             ${dropdownHtml}
           </div>
@@ -1336,7 +1477,8 @@ const OmnibarController = {
     segmentedBar.innerHTML = html;
   },
 
-  renderCalendarPopoverHtml(secIndex) {
+  renderDateTimePopoverHtml(secIndex) {
+    const data = this.segmentedState.data;
     const year = this.segmentedState.calYear;
     const month = this.segmentedState.calMonth;
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -1346,6 +1488,9 @@ const OmnibarController = {
 
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const tom = new Date();
+    tom.setDate(tom.getDate() + 1);
+    const tomStr = `${tom.getFullYear()}-${String(tom.getMonth() + 1).padStart(2, '0')}-${String(tom.getDate()).padStart(2, '0')}`;
 
     let cellsHtml = '';
     for (let i = 0; i < startOffset; i++) {
@@ -1354,20 +1499,44 @@ const OmnibarController = {
     for (let d = 1; d <= daysInMonth; d++) {
       const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const isToday = dStr === todayStr;
-      const isSelected = this.segmentedState.data.date === dStr;
+      const isSelected = (data.date === 'today' && isToday) || (data.date === 'tomorrow' && dStr === tomStr) || data.date === dStr;
       cellsHtml += `
-        <div class="omnibar-cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}" onclick="event.stopPropagation(); OmnibarController.selectCalDate('${dStr}')">
+        <div class="omnibar-cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}" onclick="event.stopPropagation(); OmnibarController.setDateTimeDate('${dStr}')">
           ${d}
         </div>
       `;
     }
 
+    const quickTimes = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '15:30', '16:00', '17:00'];
+
     return `
-      <div class="omnibar-calendar-popover" id="omnibar-cal-${secIndex}">
-        <div class="omnibar-cal-header">
-          <button class="omnibar-cal-btn" onclick="event.stopPropagation(); OmnibarController.changeCalMonth(-1)">‹</button>
+      <div class="omnibar-datetime-popover" id="omnibar-datetime-${secIndex}" onclick="event.stopPropagation()">
+        <div class="omnibar-dt-quick-dates">
+          <button type="button" class="omnibar-dt-chip${data.date === 'today' ? ' active' : ''}" onclick="event.stopPropagation(); OmnibarController.setDateTimeDate('today')">
+            📅 ${escH(t('omnibar.calToday') || 'Today')}
+          </button>
+          <button type="button" class="omnibar-dt-chip${data.date === 'tomorrow' ? ' active' : ''}" onclick="event.stopPropagation(); OmnibarController.setDateTimeDate('tomorrow')">
+            📅 ${escH(t('omnibar.calTomorrow') || 'Tomorrow')}
+          </button>
+        </div>
+
+        <div class="omnibar-dt-time-row">
+          <span class="omnibar-dt-time-label">🕒 ${escH(t('omnibar.sectionTime') || 'Time')}:</span>
+          <input type="time" class="omnibar-time-input" value="${escH(data.time || '15:30')}" onchange="OmnibarController.setDateTimeTime(this.value)" oninput="OmnibarController.setDateTimeTime(this.value)">
+        </div>
+
+        <div class="omnibar-dt-quick-times">
+          ${quickTimes.map(qt => `
+            <button type="button" class="omnibar-dt-time-pill${data.time === qt ? ' active' : ''}" onclick="event.stopPropagation(); OmnibarController.setDateTimeTime('${qt}')">
+              ${qt}
+            </button>
+          `).join('')}
+        </div>
+
+        <div class="omnibar-cal-header" style="margin-top: 6px;">
+          <button type="button" class="omnibar-cal-btn" onclick="event.stopPropagation(); OmnibarController.changeCalMonth(-1)">‹</button>
           <span>${monthNames[month]} ${year}</span>
-          <button class="omnibar-cal-btn" onclick="event.stopPropagation(); OmnibarController.changeCalMonth(1)">›</button>
+          <button type="button" class="omnibar-cal-btn" onclick="event.stopPropagation(); OmnibarController.changeCalMonth(1)">›</button>
         </div>
         <div class="omnibar-cal-grid">
           <div class="omnibar-cal-day-label">Mo</div>
@@ -1383,6 +1552,19 @@ const OmnibarController = {
     `;
   },
 
+  setDateTimeDate(dateStr) {
+    this.segmentedState.data.date = dateStr;
+    this.renderSegmentedBar();
+    this.renderLivePreview();
+  },
+
+  setDateTimeTime(timeStr) {
+    if (!timeStr) return;
+    this.segmentedState.data.time = timeStr;
+    this.renderSegmentedBar();
+    this.renderLivePreview();
+  },
+
   changeCalMonth(delta) {
     let m = this.segmentedState.calMonth + delta;
     let y = this.segmentedState.calYear;
@@ -1393,15 +1575,6 @@ const OmnibarController = {
     this.renderSegmentedBar();
   },
 
-  selectCalDate(dateStr) {
-    this.segmentedState.data.date = dateStr;
-    this.segmentedState.calOpen = false;
-    this.segmentedState.comboOpen = false;
-    this.renderSegmentedBar();
-    this.renderLivePreview();
-    this.focusSection(this.segmentedState.activeSectionIndex + 1);
-  },
-
   onSectionClick(index) {
     const defs = this.getSectionDefinitions();
     const sec = defs[index];
@@ -1409,9 +1582,7 @@ const OmnibarController = {
 
     this.segmentedState.activeSectionIndex = index;
     if (sec.isSelective) {
-      if (sec.type === 'date' && this.segmentedState.calOpen) {
-        this.segmentedState.calOpen = false;
-      } else if (this.segmentedState.comboOpen && this.segmentedState.comboSectionIndex === index) {
+      if (this.segmentedState.comboOpen && this.segmentedState.comboSectionIndex === index) {
         this.closeCombo();
       } else {
         this.openCombo(index);
@@ -1419,7 +1590,7 @@ const OmnibarController = {
     } else {
       this.closeCombo();
       this.renderSegmentedBar();
-      const inputEl = document.getElementById('omnibar-section-input-text');
+      const inputEl = document.getElementById('omnibar-input');
       if (inputEl) inputEl.focus();
     }
   },
@@ -1430,7 +1601,6 @@ const OmnibarController = {
     if (!sec || !sec.isSelective) return;
 
     this.segmentedState.comboOpen = true;
-    this.segmentedState.calOpen = false;
     this.segmentedState.comboSectionIndex = index;
     this.segmentedState.comboSelectedIndex = 0;
     this.renderSegmentedBar();
@@ -1438,7 +1608,6 @@ const OmnibarController = {
 
   closeCombo() {
     this.segmentedState.comboOpen = false;
-    this.segmentedState.calOpen = false;
     this.segmentedState.comboSectionIndex = -1;
     this.renderSegmentedBar();
   },
@@ -1481,25 +1650,13 @@ const OmnibarController = {
       this.segmentedState.data.workstream = value;
     } else if (sec.type === 'status') {
       this.segmentedState.data.status = value;
-    } else if (sec.type === 'type') {
-      this.segmentedState.data.type = value;
-    } else if (sec.type === 'date') {
-      if (value === 'calendar') {
-        this.segmentedState.calOpen = true;
-        this.segmentedState.comboOpen = false;
-        this.renderSegmentedBar();
-        return;
-      } else {
-        this.segmentedState.data.date = value;
-      }
-    } else if (sec.type === 'time') {
+    } else if (sec.type === 'duration') {
       this.segmentedState.data.duration = value;
     } else if (sec.type === 'colleague') {
       this.segmentedState.data.colleague = value;
     }
 
     this.segmentedState.comboOpen = false;
-    this.segmentedState.calOpen = false;
     this.renderSegmentedBar();
     this.renderLivePreview();
 
@@ -1534,10 +1691,10 @@ const OmnibarController = {
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      if (this.segmentedState.comboOpen || this.segmentedState.calOpen) {
+      if (this.segmentedState.comboOpen) {
         this.closeCombo();
       } else {
-        this.exitSegmentedMode();
+        this.close();
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -1564,7 +1721,7 @@ const OmnibarController = {
     if (!sec.isSelective) {
       this.closeCombo();
       this.renderSegmentedBar();
-      const inputEl = document.getElementById('omnibar-section-input-text');
+      const inputEl = document.getElementById('omnibar-input');
       if (inputEl) {
         inputEl.focus();
         inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
@@ -1579,27 +1736,55 @@ const OmnibarController = {
     const input = document.getElementById('omnibar-input');
     if (!resultsContainer) return;
 
-    if (!this.segmentedState.active) return;
-
-    const action = this.segmentedState.action;
-    const data = this.segmentedState.data;
-    const title = (data.title || '').trim();
+    const action = this.selectedType || this.segmentedState.action || 'stash';
+    if (action === 'search') {
+      const q = (input?.value || '').trim();
+      if (!q) {
+        resultsContainer.style.display = 'none';
+        if (input) input.setAttribute('aria-expanded', 'false');
+      } else {
+        this.performLiveSearch();
+      }
+      return;
+    }
 
     resultsContainer.style.display = 'block';
     if (input) input.setAttribute('aria-expanded', 'true');
 
+    const rawVal = (input ? input.value : '').trim();
+    let content = rawVal;
+    const match = this.matchCommandType(rawVal);
+    if (match && match.cmdLen) {
+      content = rawVal.substring(match.cmdLen).trim();
+    }
+
+    const data = this.segmentedState.data;
     let previewHtml = '';
 
     if (action === 'todo') {
-      const fallbackPlan = { label: t('omnibar.tokenPlan'), badge: 'badge-plan', text: 'PLAN' };
+      const prioMatch = content.match(/^(now|plan|delegate|del|later|q1|q2|q3|q4|high|medium|med|low)\s+(.+)$/i);
+      let pKey = data.priority || 'plan';
+      let taskTitle = content;
+      if (prioMatch) {
+        const rawTag = prioMatch[1].toLowerCase();
+        if (['now', 'q1', 'high'].includes(rawTag)) pKey = 'now';
+        else if (['plan', 'q2', 'medium', 'med'].includes(rawTag)) pKey = 'plan';
+        else if (['delegate', 'del', 'q3', 'low'].includes(rawTag)) pKey = 'delegate';
+        else if (['later', 'q4'].includes(rawTag)) pKey = 'later';
+        taskTitle = prioMatch[2].trim();
+      }
+      data.priority = pKey;
+      this.applyTheme();
+
+      const fallbackPlan = { label: t('omnibar.tokenPlan') || 'Schedule', badge: 'badge-plan', text: 'PLAN' };
       const qMeta = {
         now: { label: t('omnibar.tokenNow') || 'Do Now (Urgent & Important)', badge: 'badge-now', text: 'NOW' },
         plan: { label: t('omnibar.tokenPlan') || 'Schedule (Important)', badge: 'badge-plan', text: 'PLAN' },
         delegate: { label: t('omnibar.tokenDelegate') || 'Delegate (Urgent)', badge: 'badge-delegate', text: 'DELEGATE' },
         later: { label: t('omnibar.tokenLater') || 'Later (Low priority)', badge: 'badge-later', text: 'LATER' }
-      }[data.priority] || fallbackPlan;
+      }[pKey] || fallbackPlan;
 
-      const displayTitle = title || t('omnibar.placeholderTask') || 'What needs to be done?';
+      const displayTitle = taskTitle || data.title || t('omnibar.placeholderTask') || 'What needs to be done?';
       const ws = data.workstream || 'General';
 
       previewHtml = `
@@ -1611,22 +1796,29 @@ const OmnibarController = {
           <div class="omnibar-preview-title">${escH(displayTitle)}</div>
           <div class="omnibar-preview-meta">
             <span class="omnibar-preview-tag">📁 ${escH(ws)}</span>
-            <span class="omnibar-preview-tag">👤 ${escH(data.assignee || 'Me')}</span>
             <span>${escH(qMeta.label)}</span>
             <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
           </div>
         </div>
       `;
     } else if (action === 'dec') {
-      const fallbackActive = { icon: '🟢', label: t('omnibar.statusActive') };
+      const topMatch = content.match(/^\[([^\]]+)\]\s*(.+)$/);
+      let ws = data.workstream || 'General';
+      let decTitle = content;
+      if (topMatch) {
+        ws = topMatch[1].trim();
+        decTitle = topMatch[2].trim();
+      }
+      this.applyTheme();
+
+      const fallbackActive = { icon: '🟢', label: t('omnibar.statusActive') || 'Active' };
       const statusMeta = {
         active: { icon: '🟢', label: t('omnibar.statusActive') || 'Active' },
         draft: { icon: '🟡', label: t('omnibar.statusDraft') || 'Draft' },
         blocked: { icon: '🔴', label: t('omnibar.statusBlocked') || 'Blocked' }
       }[data.status] || fallbackActive;
 
-      const displayTitle = title || t('omnibar.placeholderDecision') || 'Decision summary...';
-      const ws = data.workstream || 'General';
+      const displayTitle = decTitle || data.title || t('omnibar.placeholderDecision') || 'Decision summary...';
       const inheritedTags = this.getMostUsedTagsForWorkstream(ws);
       const tagsStr = inheritedTags.length > 0 ? inheritedTags.map(tg => `<span class="omnibar-preview-tag">#${escH(tg)}</span>`).join(' ') : '';
 
@@ -1646,27 +1838,60 @@ const OmnibarController = {
         </div>
       `;
     } else if (action === 'block') {
+      this.applyTheme();
+      let blockContent = content;
+      let durStr = data.duration || (typeof settings !== 'undefined' && settings?.plannerDefaultDuration ? `${settings.plannerDefaultDuration}m` : '30m');
+      let timeStr = data.time || this.getNextRoundHour();
+      let dateStr = data.date || t('omnibar.calToday') || 'Today';
+
+      const durMatch = blockContent.match(/\b(\d+)\s*(h|hr|hrs|heures?|m|min|mins|minutes?)\s*(\d+)?\b/i);
+      if (durMatch) {
+        durStr = durMatch[0];
+        blockContent = blockContent.replace(durMatch[0], '').trim();
+      }
+
+      const timeMatch = blockContent.match(/\b([01]?\d|2[0-3])[:h]([0-5]\d)?\b/i) || blockContent.match(/\b([1-9]|1[0-2])\s*(am|pm)\b/i);
+      if (timeMatch) {
+        timeStr = timeMatch[0];
+        blockContent = blockContent.replace(timeMatch[0], '').trim();
+      }
+
+      if (/\b(today|aujourd'hui|heute|hoy|oggi)\b/i.test(blockContent)) {
+        dateStr = t('omnibar.calToday') || 'Today';
+        blockContent = blockContent.replace(/\b(today|aujourd'hui|heute|hoy|oggi)\b/gi, '').trim();
+      } else if (/\b(tomorrow|demain|morgen|mañana|domani)\b/i.test(blockContent)) {
+        dateStr = t('omnibar.tokenTomorrow') || 'Tomorrow';
+        blockContent = blockContent.replace(/\b(tomorrow|demain|morgen|mañana|domani)\b/gi, '').trim();
+      }
+
+      const displayTitle = blockContent || data.title || t('omnibar.placeholderBlock') || 'Event title...';
       const typeIcons = { work: '🔷', sync: '🟣', call: '🟢', prep: '🟠', personal: '🟡' };
-      const displayTitle = title || t('omnibar.placeholderBlock') || 'Event title...';
-      const dur = data.duration || '30m';
-      const time = data.time || this.getNextRoundHour();
 
       previewHtml = `
         <div class="omnibar-preview-card">
           <div class="omnibar-preview-header">
             <span class="omnibar-preview-type">📅 ${escH(t('omnibar.previewBlock') || 'Schedule Block')}</span>
-            <span class="omnibar-preview-tag">${typeIcons[data.type] || '🔷'} ${escH(data.type)}</span>
+            <span class="omnibar-preview-tag">${typeIcons[data.type] || '🔷'} ${escH(data.type || 'work')}</span>
           </div>
           <div class="omnibar-preview-title">${escH(displayTitle)}</div>
           <div class="omnibar-preview-meta">
             <span class="omnibar-preview-tag">📁 ${escH(data.workstream || 'General')}</span>
-            <span>🕒 ${escH(data.date)} · ${escH(time)} (${escH(dur)})</span>
+            <span>🕒 ${escH(dateStr)} · ${escH(timeStr)} (${escH(durStr)})</span>
             <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
           </div>
         </div>
       `;
     } else if (action === 'note') {
-      const displayTitle = title || t('omnibar.placeholderNote') || 'Note title...';
+      this.applyTheme();
+      const grpMatch = content.match(/^\[([^\]]+)\]\s*(.+)$/);
+      let group = 'Inbox';
+      let noteTitle = content;
+      if (grpMatch) {
+        group = grpMatch[1].trim();
+        noteTitle = grpMatch[2].trim();
+      }
+      const displayTitle = noteTitle || data.title || t('omnibar.placeholderNote') || 'Note title...';
+
       previewHtml = `
         <div class="omnibar-preview-card">
           <div class="omnibar-preview-header">
@@ -1674,14 +1899,17 @@ const OmnibarController = {
           </div>
           <div class="omnibar-preview-title">${escH(displayTitle)}</div>
           <div class="omnibar-preview-meta">
-            <span class="omnibar-preview-tag">📁 ${escH(data.workstream || 'General')}</span>
-            <span>${escH(t('omnibar.calToday') || 'Today')}</span>
+            <span class="omnibar-preview-tag">📁 ${escH(data.workstream || group)}</span>
+            <span>→ ${escH(t('omnibar.calToday') || 'Today')}</span>
             <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
           </div>
         </div>
       `;
     } else if (action === 'call') {
-      const displayTitle = title || t('omnibar.placeholderCall') || 'Subject or participant...';
+      this.applyTheme();
+      const timeStr = data.time || this.getSmartDefaultTime();
+      const dateStr = data.date === 'today' ? (t('omnibar.calToday') || 'Today') : data.date === 'tomorrow' ? (t('omnibar.calTomorrow') || 'Tomorrow') : data.date;
+      const displayTitle = content || data.title || t('omnibar.placeholderCall') || 'Subject or participant...';
       previewHtml = `
         <div class="omnibar-preview-card">
           <div class="omnibar-preview-header">
@@ -1690,7 +1918,23 @@ const OmnibarController = {
           <div class="omnibar-preview-title">${escH(displayTitle)}</div>
           <div class="omnibar-preview-meta">
             <span class="omnibar-preview-tag">👤 ${escH(data.colleague || 'Team')}</span>
-            <span>${escH(data.date || 'today')} · ${escH(data.time || this.getNextRoundHour())}</span>
+            <span class="omnibar-preview-tag">📁 ${escH(data.workstream || 'General')}</span>
+            <span>🕒 ${escH(dateStr)} · ${escH(timeStr)}</span>
+            <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
+          </div>
+        </div>
+      `;
+    } else {
+      // Default: stash
+      this.applyTheme();
+      const displayTitle = content || data.title || t('omnibar.placeholderStash') || 'Capture quick thought into stash...';
+      previewHtml = `
+        <div class="omnibar-preview-card">
+          <div class="omnibar-preview-header">
+            <span class="omnibar-preview-type">📥 ${escH(t('omnibar.labelStash') || 'Stash')}</span>
+          </div>
+          <div class="omnibar-preview-title">${escH(displayTitle)}</div>
+          <div class="omnibar-preview-meta">
             <span class="omnibar-preview-kbd"><kbd>↵</kbd> ${escH(t('omnibar.enterToCreate') || 'Press Enter to create')}</span>
           </div>
         </div>
@@ -1812,23 +2056,57 @@ const OmnibarController = {
 
   async submitSegmented() {
     const data = this.segmentedState.data;
-    const action = this.segmentedState.action;
+    const action = this.segmentedState.action || this.selectedType || 'stash';
     this.close();
 
     try {
       if (action === 'todo') {
-        await this.handleTodoCommand(`/todo ${data.priority} ${data.title}`);
+        const title = data.title || t('omnibar.placeholderTask') || 'Task';
+        await this.handleTodoCommand(`/todo ${data.priority} [${data.workstream}] ${title}`);
       } else if (action === 'dec') {
-        await this.handleDecisionCommand(`/dec [${data.workstream}] ${data.title}`);
+        const title = data.title || t('omnibar.placeholderDecision') || 'Decision';
+        await this.handleDecisionCommand(`/dec [${data.workstream}] ${title}`);
       } else if (action === 'block') {
         const dur = data.duration || '30m';
-        const date = data.date || 'today';
-        const time = data.time || this.getNextRoundHour();
-        await this.handleBlockCommand(`/block ${data.title} ${date} ${time} ${dur}`);
+        let dateVal = data.date || 'today';
+        if (dateVal === 'today') {
+          const now = new Date();
+          dateVal = typeof formatLocalDateValue === 'function' ? formatLocalDateValue(now) : now.toISOString().slice(0, 10);
+        } else if (dateVal === 'tomorrow') {
+          const tom = new Date();
+          tom.setDate(tom.getDate() + 1);
+          dateVal = typeof formatLocalDateValue === 'function' ? formatLocalDateValue(tom) : tom.toISOString().slice(0, 10);
+        }
+        const timeVal = data.time || this.getSmartDefaultTime();
+        const title = data.title || t('omnibar.placeholderBlock') || 'Block';
+        await this.handleBlockCommand(`/block ${title} ${dateVal} ${timeVal} ${dur}`);
       } else if (action === 'note') {
-        await this.handleNoteCommand(`/note [${data.workstream}] ${data.title}`);
+        const title = data.title || t('omnibar.placeholderNote') || 'Note';
+        await this.handleNoteCommand(`/note [${data.workstream}] ${title}`);
       } else if (action === 'call') {
-        await this.handleCallCommand(data.title);
+        const title = data.title || t('omnibar.placeholderCall') || 'Call';
+        let dateVal = data.date || 'today';
+        if (dateVal === 'today') {
+          const now = new Date();
+          dateVal = typeof formatLocalDateValue === 'function' ? formatLocalDateValue(now) : now.toISOString().slice(0, 10);
+        } else if (dateVal === 'tomorrow') {
+          const tom = new Date();
+          tom.setDate(tom.getDate() + 1);
+          dateVal = typeof formatLocalDateValue === 'function' ? formatLocalDateValue(tom) : tom.toISOString().slice(0, 10);
+        }
+        const timeVal = data.time || this.getSmartDefaultTime();
+        if (typeof window.quickCreateCallAndOpenNote === 'function') {
+          await window.quickCreateCallAndOpenNote(title, dateVal, timeVal);
+        } else {
+          await this.handleCallCommand(`/call ${title}`);
+        }
+      } else {
+        // stash
+        const text = data.title || '';
+        if (text) {
+          await StashService.add(text);
+          toast(t('omnibar.stashSuccess'));
+        }
       }
     } catch (err) {
       console.error('Segmented submit failed', err);
@@ -1836,11 +2114,29 @@ const OmnibarController = {
     }
   },
 
+  getSmartDefaultTime(now = new Date()) {
+    let h = now.getHours();
+    const m = now.getMinutes();
+    let targetM = 0;
+    if (m === 0) {
+      targetM = 0;
+    } else if (m <= 5) {
+      targetM = 5;
+    } else if (m <= 15) {
+      targetM = 15;
+    } else if (m <= 30) {
+      targetM = 30;
+    } else if (m <= 45) {
+      targetM = 45;
+    } else {
+      targetM = 0;
+      h = (h + 1) % 24;
+    }
+    return `${String(h).padStart(2, '0')}:${String(targetM).padStart(2, '0')}`;
+  },
 
   getNextRoundHour() {
-    const now = new Date();
-    const nextH = (now.getHours() + 1) % 24;
-    return `${String(nextH).padStart(2, '0')}:00`;
+    return this.getSmartDefaultTime();
   },
 
   updateGhostSuggestion() {
@@ -2350,95 +2646,24 @@ const OmnibarController = {
   },
 
   renderDefaultHints() {
-    const hintsContainer = document.querySelector('.omnibar-hints');
-    if (!hintsContainer) return;
-
-    const cmdTodo = t('omnibar.cmdTodo') || '/todo';
-    const cmdBlock = t('omnibar.cmdBlock') || '/block';
-    const cmdCall = t('omnibar.cmdCall') || '/call';
-    const cmdDec = t('omnibar.cmdDec') || '/dec';
-    const cmdNote = t('omnibar.cmdNote') || '/note';
-    const cmdStash = t('omnibar.cmdStash') || '/stash';
-    const cmdSec = t('omnibar.cmdSecretary') || '/secretary';
-
-    const hTodo = t('omnibar.hintTodo') || 'Create a task';
-    const hBlock = t('omnibar.hintBlock') || 'Create planner block';
-    const hCall = t('omnibar.hintCall') || 'Create call & note';
-    const hDec = t('omnibar.hintDec') || 'Record decision';
-    const hNote = t('omnibar.hintNote') || 'New note';
-    const hStash = t('omnibar.hintStash') || 'Capture thought';
-    const hSec = t('omnibar.hintSecretary') || 'Ask assistant';
-
-    hintsContainer.innerHTML = `
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdTodo}')" title="${escH(hTodo)}"><code>${cmdTodo}</code> ${hTodo}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdBlock}')" title="${escH(hBlock)}"><code>${cmdBlock}</code> ${hBlock}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdCall}')" title="${escH(hCall)}"><code>${cmdCall}</code> ${hCall}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdDec}')" title="${escH(hDec)}"><code>${cmdDec}</code> ${hDec}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdNote}')" title="${escH(hNote)}"><code>${cmdNote}</code> ${hNote}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdStash}')" title="${escH(hStash)}"><code>${cmdStash}</code> ${hStash}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdSec}')" title="${escH(hSec)}"><code>${cmdSec}</code> ${hSec}</span>
-    `;
+    // Hints below have been removed per user specification
   },
 
   renderDynamicHints(val, info) {
-    const hintsContainer = document.querySelector('.omnibar-hints');
-    if (!hintsContainer) return;
-
-    const match = this.matchCommandType(val);
-    if (!match) {
-      if (val === '/' || !val.includes(' ')) {
-        this.renderDefaultHints();
-      }
-      return;
-    }
-
-    if (match.type === 'todo') {
-      const tNow = t('omnibar.tokenNow') || 'Do Now (Urgent & Important)';
-      const tPlan = t('omnibar.tokenPlan') || 'Schedule (Important)';
-      const tDel = t('omnibar.tokenDelegate') || 'Delegate (Urgent)';
-      const tLater = t('omnibar.tokenLater') || 'Later (Low priority)';
-      hintsContainer.innerHTML = `
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('now')" title="${escH(tNow)}"><span class="badge-urgency badge-now">now</span> ${tNow}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('plan')" title="${escH(tPlan)}"><span class="badge-urgency badge-plan">plan</span> ${tPlan}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('delegate')" title="${escH(tDel)}"><span class="badge-urgency badge-delegate">del</span> ${tDel}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('later')" title="${escH(tLater)}"><span class="badge-urgency badge-later">later</span> ${tLater}</span>
-      `;
-    } else if (match.type === 'block') {
-      const nextHour = this.getNextRoundHour();
-      const tToday = t('omnibar.tokenToday') || 'Today';
-      const tTomorrow = t('omnibar.tokenTomorrow') || 'Tomorrow';
-      const tHour = t('omnibar.tokenHour') || 'Time';
-      const t30m = t('omnibar.token30m') || '30 min';
-      const t1h = t('omnibar.token1h') || '1 hour';
-      const t2h = t('omnibar.token2h') || '2 hours';
-      hintsContainer.innerHTML = `
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('today')" title="${escH(tToday)}"><code>today</code> ${tToday}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('tomorrow')" title="${escH(tTomorrow)}"><code>tomorrow</code> ${tTomorrow}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('${nextHour}')" title="${escH(tHour)}"><code>${nextHour}</code> ${tHour}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('30m')" title="${escH(t30m)}"><code>30m</code> ${t30m}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('1h')" title="${escH(t1h)}"><code>1h</code> ${t1h}</span>
-        <span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('2h')" title="${escH(t2h)}"><code>2h</code> ${t2h}</span>
-      `;
-    } else if (match.type === 'note') {
-      const groups = this.getExistingGroups().slice(0, 5);
-      const tGrp = t('omnibar.tokenGroup') || 'Group';
-      hintsContainer.innerHTML = groups.map(g => 
-        `<span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('[${escH(g)}]')" title="${escH(g)}"><code>[${escH(g)}]</code> ${tGrp}</span>`
-      ).join('');
-    } else if (match.type === 'dec') {
-      const topics = this.getExistingTopics().slice(0, 5);
-      const tTop = t('omnibar.tokenTopic') || 'Topic';
-      hintsContainer.innerHTML = topics.map(tp => 
-        `<span class="omnibar-hint-pill" onclick="OmnibarController.appendToken('[${escH(tp)}]')" title="${escH(tp)}"><code>[${escH(tp)}]</code> ${tTop}</span>`
-      ).join('');
-    }
+    // Hints below have been removed per user specification
   },
 
   async submit() {
     const input = document.getElementById('omnibar-input');
-    if (!input) return;
-    const value = input.value.trim();
-    if (!value) return;
+    const value = (input ? input.value : (this.segmentedState.data.title || '')).trim();
+
+    if (this.segmentedState.active && (!value || !value.startsWith('/'))) {
+      if (input) this.segmentedState.data.title = value;
+      await this.submitSegmented();
+      return;
+    }
+
+    if (!value && this.selectedType !== 'note') return;
 
     this.recordHistory(value);
     this.close();
@@ -2458,22 +2683,30 @@ const OmnibarController = {
         } else {
           await switchTab('chat');
         }
-      } else if (match?.type === 'todo') {
+        return;
+      }
+
+      const action = match?.type || this.selectedType || 'stash';
+
+      if (action === 'todo') {
         await this.handleTodoCommand(value);
-      } else if (match?.type === 'block') {
+      } else if (action === 'block') {
         await this.handleBlockCommand(value);
-      } else if (match?.type === 'dec') {
+      } else if (action === 'dec') {
         await this.handleDecisionCommand(value);
-      } else if (match?.type === 'note') {
+      } else if (action === 'note') {
         await this.handleNoteCommand(value);
-      } else if (match?.type === 'call') {
+      } else if (action === 'call') {
         await this.handleCallCommand(value);
-      } else {
-        // Raw captures (Saisie Libre)
-        let stashText = value;
-        if (match?.type === 'stash') {
-          stashText = value.replace(/^\/\S+\s*/i, '');
+      } else if (action === 'search') {
+        if (this.results.length > 0) {
+          this.executeSelected();
+        } else if (typeof performGlobalSearch === 'function') {
+          performGlobalSearch(value);
         }
+      } else {
+        // Raw captures / Stash
+        const stashText = value.replace(/^\/\S+\s*/i, '').trim() || value;
         await StashService.add(stashText);
         toast(t('omnibar.stashSuccess'));
       }

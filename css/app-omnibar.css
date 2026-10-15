@@ -40,7 +40,7 @@
   padding: 16px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--font-sans);
   transition: max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -75,6 +75,8 @@
   border: 1.5px solid var(--field-border);
   border-radius: var(--radius-lg);
   padding: 6px 14px;
+  min-height: 50px;
+  box-sizing: border-box;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -102,6 +104,121 @@
   transform: scale(1.06);
 }
 
+/* ── Omnibar Type Selector ── */
+.omnibar-type-selector-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.omnibar-type-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--card-bg-alt) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-border) 80%, transparent);
+  color: var(--field-text);
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.omnibar-type-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg-alt));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--card-border));
+  color: var(--accent);
+}
+
+.omnibar-type-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.omnibar-type-btn-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.omnibar-type-btn-label {
+  font-weight: 600;
+}
+
+.omnibar-type-btn-arrow {
+  font-size: 0.65rem;
+  opacity: 0.65;
+  transition: transform 0.18s ease;
+}
+
+.omnibar-type-btn[aria-expanded="true"] .omnibar-type-btn-arrow {
+  transform: rotate(180deg);
+}
+
+.omnibar-type-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 175px;
+  background: color-mix(in srgb, var(--card-bg) 96%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--card-border) 85%, transparent);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: slideFadeResults 0.14s ease;
+  box-sizing: border-box;
+}
+
+.omnibar-type-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  color: var(--field-text);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.omnibar-type-item:hover,
+.omnibar-type-item.selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.omnibar-type-item-icon {
+  font-size: 1rem;
+  width: 20px;
+  text-align: center;
+}
+
+.omnibar-type-item-label {
+  flex: 1;
+}
+
+.omnibar-type-item-shortcut {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  opacity: 0.8;
+}
+
 .omnibar-input-area {
   position: relative;
   flex: 1;
@@ -109,6 +226,7 @@
   align-items: center;
   overflow: hidden;
   min-height: 38px;
+  height: 38px;
 }
 
 .omnibar-param-indicator {
@@ -570,6 +688,31 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.omnibar-footer-close-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.omnibar-footer-close-btn:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.omnibar-footer-close-btn:active {
+  transform: translateY(0);
+}
+
 /* ── Hint Pills ── */
 .omnibar-hints {
   display: flex;
@@ -1008,4 +1151,109 @@
   color: #fff;
   font-weight: 600;
 }
+
+/* ── Combined Date & Time Popover ── */
+.omnibar-datetime-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 290px;
+  background: color-mix(in srgb, var(--card-bg) 98%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--card-border) 80%, transparent);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding: 12px;
+  animation: slideFadeResults 0.16s ease;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.omnibar-dt-quick-dates {
+  display: flex;
+  gap: 6px;
+}
+
+.omnibar-dt-chip {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
+  background: color-mix(in srgb, var(--card-bg-alt) 85%, transparent);
+  color: var(--field-text);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  text-align: center;
+  user-select: none;
+}
+
+.omnibar-dt-chip:hover,
+.omnibar-dt-chip.active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.omnibar-dt-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--card-border) 40%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 40%, transparent);
+}
+
+.omnibar-dt-time-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.omnibar-time-input {
+  border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
+  background: var(--field-bg);
+  color: var(--field-text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  border-radius: 6px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.omnibar-time-input:focus {
+  border-color: var(--accent);
+}
+
+.omnibar-dt-quick-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.omnibar-dt-time-pill {
+  padding: 3px 6px;
+  font-size: 0.74rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--card-bg-alt) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-border) 60%, transparent);
+  color: var(--field-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.omnibar-dt-time-pill:hover,
+.omnibar-dt-time-pill.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 

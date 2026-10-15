@@ -908,31 +908,15 @@ function applyLocalizedUI() {
   setElementText('#nt-schedule option[value="none"]', t('todo.scheduleNone'));
 
   // Omnibar
-  setElementPlaceholder('#omnibar-input', t('omnibar.inputPlaceholder'));
-  setElementTitle('#omnibar-ai-btn', t('omnibar.hintSecretary') || "Appeler l'assistant");
+  setElementPlaceholder('#omnibar-input', t('omnibar.placeholderStash') || t('omnibar.inputPlaceholder'));
+  setElementTitle('#omnibar-type-btn', t('omnibar.typeSelectorTooltip') || 'Select entry type');
+  setElementTitle('#omnibar-footer-close-btn', t('omnibar.closeTooltip') || 'Close command palette (Esc)');
   setElementText('#omnibar-lbl-select', t('omnibar.footerSelect') || 'Sélectionner');
   setElementText('#omnibar-lbl-nav', t('omnibar.footerNavigate') || 'Naviguer');
   setElementText('#omnibar-lbl-auto', t('omnibar.footerAutocomplete') || 'Compléter');
   setElementText('#omnibar-lbl-close', t('omnibar.footerClose') || 'Fermer');
-  const hintsContainer = document.querySelector('.omnibar-hints');
-  if (hintsContainer) {
-    const cmdTodo = t('omnibar.cmdTodo') || '/todo';
-    const cmdBlock = t('omnibar.cmdBlock') || '/block';
-    const cmdCall = t('omnibar.cmdCall') || '/call';
-    const cmdDec = t('omnibar.cmdDec') || '/dec';
-    const cmdNote = t('omnibar.cmdNote') || '/note';
-    const cmdStash = t('omnibar.cmdStash') || '/stash';
-    const cmdSec = t('omnibar.cmdSecretary') || '/secretary';
-
-    hintsContainer.innerHTML = `
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdTodo}')"><code>${cmdTodo}</code> ${t('omnibar.hintTodo') || 'Create a task'}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdBlock}')"><code>${cmdBlock}</code> ${t('omnibar.hintBlock') || 'Create planner block'}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdCall}')"><code>${cmdCall}</code> ${t('omnibar.hintCall') || 'Create call & note'}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdDec}')"><code>${cmdDec}</code> ${t('omnibar.hintDec') || 'Record decision'}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdNote}')"><code>${cmdNote}</code> ${t('omnibar.hintNote') || 'New note'}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdStash}')"><code>${cmdStash}</code> ${t('omnibar.hintStash') || 'Capture thought'}</span>
-      <span class="omnibar-hint-pill" onclick="OmnibarController.setCommandPrefix('${cmdSec}')"><code>${cmdSec}</code> ${t('omnibar.hintSecretary') || 'Ask assistant'}</span>
-    `;
+  if (typeof OmnibarController !== 'undefined' && typeof OmnibarController.renderTypeSelector === 'function') {
+    OmnibarController.renderTypeSelector();
   }
 
   initLocalizedHoverObserver();
