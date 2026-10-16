@@ -583,6 +583,52 @@
           </select>
         </div>
         <small style="display:block;color:#6b7280;margin-top:.3rem">Used by the Planner to show unplanned time during work hours</small>
+
+        <!-- Calendar Synchronization & Subscribed Feeds -->
+        <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--card-border);">
+          <h4 style="margin:0 0 6px 0; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span data-i18n="prefs.calendarSyncTitle">Calendar Synchronization</span>
+          </h4>
+          <p class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem; margin:0 0 10px 0;" data-i18n="prefs.calendarSyncDesc">
+            Subscribe to external calendar feeds (Google, Apple, Outlook) or extract local calendar events into Planner proposals.
+          </p>
+
+          <!-- Feeds List Container -->
+          <div id="prefs-calendar-feeds-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
+
+          <!-- Add Feed Form -->
+          <div style="background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-weight:600; font-size:0.82rem;" data-i18n="prefs.addCalendarFeedTitle">Add Subscribed Calendar Feed</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <input type="text" id="prefs-feed-name-input" class="prefs-input" placeholder="e.g. Work Calendar" style="flex:1; min-width:140px;" title="Display name for this calendar feed" data-i18n-placeholder="prefs.feedNamePlaceholder" data-i18n-title="prefs.feedNameTooltip">
+              <input type="url" id="prefs-feed-url-input" class="prefs-input" placeholder="webcal:// or https://.../basic.ics" style="flex:2; min-width:220px;" title="Direct iCal or WebCal subscription URL" data-i18n-placeholder="prefs.feedUrlPlaceholder" data-i18n-title="prefs.feedUrlTooltip">
+              <button type="button" class="btn btn-primary" onclick="addCalendarFeedFromPrefs()" title="Subscribe to feed and fetch initial events into Planner proposals" data-i18n-title="prefs.addFeedTooltip">
+                <span data-i18n="prefs.addFeedBtn">Add &amp; Sync</span>
+              </button>
+            </div>
+            <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="prefs.feedUrlHint">
+              Paste the private iCal or WebCal address from Google Calendar, Outlook Web, or iCloud Calendar.
+            </small>
+          </div>
+
+          <!-- Local macOS Calendar & Corporate Outlook Helper -->
+          <div style="margin-top:12px; background:var(--card-bg-alt); border:1px dashed var(--card-border); border-radius:6px; padding:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span style="font-weight:600; font-size:0.82rem;" data-i18n="prefs.localCalendarHelperTitle">Local macOS / Corporate Outlook Helper</span>
+              <span id="prefs-local-proposals-status" class="badge" style="font-size:0.72rem; padding:2px 6px; border-radius:4px; background:var(--bg-tag); color:var(--text-muted);" title="Status of planner-proposals.json" data-i18n-title="prefs.proposalsWaiting">0 proposals</span>
+            </div>
+            <p style="margin:0 0 8px 0; font-size:0.78rem; color:var(--text-muted);" data-i18n="prefs.localCalendarHelperDesc">
+              If corporate IT blocks cloud calendar feeds, run the local sync script directly on macOS to extract Outlook Desktop &amp; Apple Calendar meetings into Secretary proposals.
+            </p>
+            <div style="position:relative; width:100%;">
+              <input type="text" id="prefs-local-sync-cmd" readonly value="python3 development/sync_local_calendar.py" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="Command to run local calendar sync in Terminal" data-i18n-title="prefs.localSyncCmdTooltip">
+              <button type="button" class="btn" onclick="copyLocalCalendarSyncCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="Copy terminal command to clipboard" data-i18n-title="prefs.localSyncCmdTooltip">
+                <span data-i18n="common.copy">Copy</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── User Information & Multi-Provider Authentication Section (Promoted into User Settings) ── -->
@@ -1541,6 +1587,7 @@
 <script src="js/app-board.js?v=4.0.40"></script>
 <script src="js/app-focus.js?v=4.0.40"></script>
 <script src="js/app-overlay.js?v=4.0.40"></script>
+<script src="js/app-calendar-sync.js?v=4.0.40"></script>
 <script src="js/app-planner.js?v=4.0.40"></script>
 <script src="js/app-collab.js?v=4.0.40"></script>
 <script src="js/app-retro.js?v=4.0.40"></script>

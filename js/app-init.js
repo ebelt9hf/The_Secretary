@@ -3943,6 +3943,7 @@ function renderPrefs() {
   renderPrefsAiProviderCards();
   if (typeof updateAiJsonSchemaDisplay === 'function') updateAiJsonSchemaDisplay();
   if (typeof updateExternalAgentPromptDisplay === 'function') updateExternalAgentPromptDisplay();
+  if (typeof renderCalendarSyncPrefs === 'function') renderCalendarSyncPrefs();
   if (typeof updateLLMToolbarVisibility === 'function') updateLLMToolbarVisibility();
   if (typeof switchPrefsTab === 'function') switchPrefsTab(activePrefsTab);
 }
@@ -4063,6 +4064,140 @@ window.updateAiJsonSchemaDisplay = updateAiJsonSchemaDisplay;
 window.copyAiJsonSchema = copyAiJsonSchema;
 window.updateExternalAgentPromptDisplay = updateExternalAgentPromptDisplay;
 window.copyExternalAgentPrompt = copyExternalAgentPrompt;
+
+// ── Calendar Sync Helpers ──
+function renderCalendarSyncPrefs() {
+  const container = document.getElementById('prefs-calendar-feeds-list');
+  if (!container) return;
+
+  const statusEl = document.getElementById('prefs-local-proposals-status');
+  if (statusEl) {
+    const pendingCount = (typeof plannerProposals !== 'undefined' && Array.isArray(plannerProposals))
+      ? plannerProposals.filter(p => p && p.status === 'pending').length
+      : 0;
+    const txtTemplate = (typeof t === 'function' ? t('prefs.proposalsWaiting') : '{count} proposal(s) waiting for review');
+    statusEl.textContent = txtTemplate.replace('{count}', pendingCount);
+  }
+
+  if (typeof CalendarSyncService === 'undefined') return;
+  const config = CalendarSyncService.getConfig();
+  const feeds = config.feeds || [];
+
+  if (!feeds.length) {
+    const noFeedsMsg = (typeof t === 'function' ? t('prefs.noFeedsConfigured') : 'No subscribed calendar feeds configured yet.');
+    container.innerHTML = `<div style="font-size:0.8rem; color:var(--text-muted); font-style:italic; padding:6px 0;">${typeof escH === 'function' ? escH(noFeedsMsg) : noFeedsMsg}</div>`;
+    return;
+  }
+
+  let html = '';
+  feeds.forEach(f => {
+    const syncTimeStr = f.lastSynced
+      ? new Date(f.lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : (typeof t === 'function' ? t('prefs.feedNeverSynced') : 'Never synced');
+    const syncLabelTemplate = (typeof t === 'function' ? t('prefs.feedLastSynced') : 'Last synced: {time}');
+    const lastSyncLabel = syncLabelTemplate.replace('{time}', syncTimeStr);
+    const syncNowTooltip = (typeof t === 'function' ? t('prefs.syncNowTooltip') : 'Sync this calendar feed now');
+    const removeTooltip = (typeof t === 'function' ? t('prefs.removeFeedTooltip') : 'Remove this calendar feed');
+    const toggleTooltip = (typeof t === 'function' ? t('prefs.toggleFeedTooltip') : 'Toggle auto-sync for this feed');
+    const fId = (typeof escA === 'function') ? escA(f.id) : f.id;
+    const fName = (typeof escH === 'function') ? escH(f.name) : f.name;
+
+    html += `
+      <div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; padding:8px 12px; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+          <input type="checkbox" ${f.enabled ? 'checked' : ''} onchange="toggleCalendarFeedFromPrefs('${fId}', this.checked)" title="${typeof escA === 'function' ? escA(toggleTooltip) : toggleTooltip}" style="cursor:pointer;">
+          <div style="min-width:0; flex:1;">
+            <div style="font-weight:600; font-size:0.83rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${fName}</div>
+            <div style="font-size:0.73rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${typeof escH === 'function' ? escH(lastSyncLabel) : lastSyncLabel} • ${f.eventCount || 0} events ${f.lastError ? `<span style="color:var(--danger); margin-left:4px;">⚠ ${typeof escH === 'function' ? escH(f.lastError) : f.lastError}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="btn btn-sm" onclick="syncCalendarFeedFromPrefs('${fId}')" title="${typeof escA === 'function' ? escA(syncNowTooltip) : syncNowTooltip}" style="padding:3px 8px; font-size:0.75rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="removeCalendarFeedFromPrefs('${fId}')" title="${typeof escA === 'function' ? escA(removeTooltip) : removeTooltip}" style="padding:3px 8px; font-size:0.75rem; color:var(--danger);">
+            ✕
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+async function addCalendarFeedFromPrefs() {
+  const nameInput = document.getElementById('prefs-feed-name-input');
+  const urlInput = document.getElementById('prefs-feed-url-input');
+  if (!urlInput || !nameInput) return;
+
+  const url = (urlInput.value || '').trim();
+  const name = (nameInput.value || '').trim() || 'Work Calendar';
+
+  if (!url) {
+    if (typeof toast === 'function') toast('Please enter a valid calendar URL', true);
+    return;
+  }
+
+  try {
+    if (typeof CalendarSyncService !== 'undefined') {
+      await CalendarSyncService.addFeed({ name, url });
+      nameInput.value = '';
+      urlInput.value = '';
+      renderCalendarSyncPrefs();
+      if (typeof toast === 'function') toast(t('prefs.feedSyncSuccess', { count: 'all', name }) || `Calendar feed "${name}" added and synced!`);
+    }
+  } catch (err) {
+    console.error('Failed to add calendar feed:', err);
+    if (typeof toast === 'function') toast(err.message || 'Failed to add calendar feed', true);
+  }
+}
+
+async function removeCalendarFeedFromPrefs(feedId) {
+  if (typeof CalendarSyncService === 'undefined') return;
+  await CalendarSyncService.removeFeed(feedId);
+  renderCalendarSyncPrefs();
+}
+
+async function toggleCalendarFeedFromPrefs(feedId, enabled) {
+  if (typeof CalendarSyncService === 'undefined') return;
+  await CalendarSyncService.toggleFeed(feedId, enabled);
+  renderCalendarSyncPrefs();
+}
+
+async function syncCalendarFeedFromPrefs(feedId) {
+  if (typeof CalendarSyncService === 'undefined') return;
+  try {
+    const res = await CalendarSyncService.syncFeed(feedId);
+    renderCalendarSyncPrefs();
+    const msg = (typeof t === 'function' ? t('prefs.feedSyncSuccess', { count: res.totalEvents, name: res.feedName }) : `Synced ${res.totalEvents} events!`);
+    if (typeof toast === 'function') toast(msg);
+  } catch (err) {
+    renderCalendarSyncPrefs();
+    if (typeof toast === 'function') toast(err.message || 'Sync failed', true);
+  }
+}
+
+async function copyLocalCalendarSyncCmd() {
+  const cmdInput = document.getElementById('prefs-local-sync-cmd');
+  if (!cmdInput) return;
+  try {
+    await navigator.clipboard.writeText(cmdInput.value);
+    if (typeof toast === 'function') toast(t('prefs.localScriptCopied') || 'Command copied to clipboard!');
+  } catch (err) {
+    if (typeof toast === 'function') toast(t('common.copyFailed', { message: err.message }), true);
+  }
+}
+
+window.renderCalendarSyncPrefs = renderCalendarSyncPrefs;
+window.addCalendarFeedFromPrefs = addCalendarFeedFromPrefs;
+window.removeCalendarFeedFromPrefs = removeCalendarFeedFromPrefs;
+window.toggleCalendarFeedFromPrefs = toggleCalendarFeedFromPrefs;
+window.syncCalendarFeedFromPrefs = syncCalendarFeedFromPrefs;
+window.copyLocalCalendarSyncCmd = copyLocalCalendarSyncCmd;
+
 // ═══ Cross-window sync ═══
 function broadcastSync(msg) {
   if (!msg || typeof msg !== 'object') return;
@@ -4620,6 +4755,10 @@ function queueBackgroundHydration(isNewWorkspaceFolder = false) {
         perfTelemetry.startup.hydrationDurationMs = Math.round(performance.now() - (perfTelemetry.startup.hydrationStartedAt || performance.now()));
       }
       setStartupState('BOOT_READY');
+
+      if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.init === 'function') {
+        try { CalendarSyncService.init(); } catch (calErr) { console.warn('Failed to init CalendarSyncService:', calErr); }
+      }
 
       // Trigger start-of-day onboarding wizard ONLY if a NEW folder is opened (or if folder is unknown/uninitialized)
       setTimeout(() => {

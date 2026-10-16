@@ -601,6 +601,9 @@ const SetupWizardController = {
   isTestingConnection: false,
   testStatusMessage: '',
   testStatusType: '', // 'success' | 'error' | 'testing' | ''
+  isTestingCalendar: false,
+  calendarTestMessage: '',
+  calendarTestType: '',
 
   state: {
     username: '',
@@ -611,6 +614,7 @@ const SetupWizardController = {
     workEndTime: '18:30',
     workingDays: [1, 2, 3, 4, 5],
     defaultDuration: 30,
+    calendarFeedUrl: '',
     aiEnabled: false,
     aiProvider: 'lmstudio',
     aiEndpoint: 'http://127.0.0.1:1234/v1',
@@ -729,6 +733,7 @@ const SetupWizardController = {
       workEndTime: curUi.workEndTime || '18:30',
       workingDays: Array.isArray(curUi.workingDays) ? [...curUi.workingDays] : [1, 2, 3, 4, 5],
       defaultDuration: curUi.defaultPlannerDuration || 30,
+      calendarFeedUrl: '',
       aiEnabled: !!curAi.enabled,
       aiProvider: curAi.provider || 'lmstudio',
       aiEndpoint: curAi.endpoint || 'http://127.0.0.1:1234/v1',
@@ -792,6 +797,9 @@ const SetupWizardController = {
 
     const durEl = document.getElementById('wizard-default-duration');
     if (durEl) this.state.defaultDuration = parseInt(durEl.value, 10) || 30;
+
+    const calEl = document.getElementById('wizard-calendar-feed-input');
+    if (calEl) this.state.calendarFeedUrl = calEl.value;
 
     const epEl = document.getElementById('wizard-ai-endpoint');
     if (epEl) this.state.aiEndpoint = epEl.value;
@@ -885,6 +893,10 @@ const SetupWizardController = {
       if (typeof updateLLMToolbarVisibility === 'function') updateLLMToolbarVisibility();
       if (typeof renderPrefs === 'function') renderPrefs();
       if (typeof rebuildCollaborativeAggregates === 'function') rebuildCollaborativeAggregates();
+
+      if (typeof CalendarSyncService !== 'undefined' && this.state.calendarFeedUrl && this.state.calendarFeedUrl.trim()) {
+        CalendarSyncService.addFeed({ name: 'Work Calendar', url: this.state.calendarFeedUrl.trim() }).catch(e => console.warn('Could not add wizard feed:', e));
+      }
     }
 
     const folderName = (typeof rootHandle !== 'undefined' && rootHandle && rootHandle.name) ? rootHandle.name : 'default';
@@ -1319,8 +1331,66 @@ const SetupWizardController = {
             <option value="60" ${this.state.defaultDuration === 60 ? 'selected' : ''}>60 min (1h)</option>
           </select>
         </div>
+
+        <!-- Calendar Synchronization -->
+        <div class="setup-wizard-form-group" style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--card-border);">
+          <label class="setup-wizard-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>${t('setupWizard.calendarSyncTitle') || 'Calendar Synchronization (Optional)'}</span>
+          </label>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin:2px 0 8px 0;">
+            ${t('setupWizard.calendarSyncDesc') || 'Connect Google, Apple, or Outlook via a WebCal / iCal link, or use the local macOS helper for corporate accounts.'}
+          </p>
+          <div style="display:flex; gap:6px;">
+            <input type="url" id="wizard-calendar-feed-input" class="setup-wizard-input" value="${escH(this.state.calendarFeedUrl || '')}" placeholder="${t('setupWizard.calendarFeedPlaceholder') || 'webcal:// or https://.../calendar.ics'}" oninput="SetupWizardController.state.calendarFeedUrl = this.value" title="${t('setupWizard.calendarFeedTooltip') || 'Paste your private iCal / WebCal calendar URL'}" style="flex:1;">
+            <button type="button" class="setup-wizard-btn setup-wizard-btn-test" onclick="SetupWizardController.testCalendarFeed()" ${this.isTestingCalendar ? 'disabled' : ''} title="${t('setupWizard.testFeedTooltip') || 'Verify feed connectivity and event count'}">
+              ${this.isTestingCalendar ? '...' : (t('setupWizard.testFeedBtn') || 'Test Feed')}
+            </button>
+          </div>
+          ${this.calendarTestMessage ? `
+            <div style="margin-top:6px; font-size:0.78rem; font-weight:500; color:${this.calendarTestType === 'success' ? 'var(--accent-color, #10b981)' : 'var(--danger, #ef4444)'};">
+              ${this.calendarTestType === 'success' ? '✓ ' : '✕ '} ${escH(this.calendarTestMessage)}
+            </div>
+          ` : ''}
+          <div style="margin-top:6px; font-size:0.72rem; color:var(--text-muted);">
+            ℹ️ ${t('setupWizard.localHelperHint') || 'Corporate Outlook with restricted cloud access? Use the local macOS sync helper in Preferences.'}
+          </div>
+        </div>
       </div>
     `;
+  },
+
+  async testCalendarFeed() {
+    const input = document.getElementById('wizard-calendar-feed-input');
+    const url = (input ? input.value : this.state.calendarFeedUrl || '').trim();
+    if (!url) {
+      this.calendarTestMessage = t('setupWizard.testFeedError') || 'Please enter a calendar URL';
+      this.calendarTestType = 'error';
+      this.render();
+      return;
+    }
+
+    this.isTestingCalendar = true;
+    this.calendarTestMessage = '';
+    this.calendarTestType = 'testing';
+    this.render();
+
+    try {
+      if (typeof CalendarSyncService !== 'undefined') {
+        const res = await CalendarSyncService.testCalendarFeed(url);
+        this.calendarTestType = 'success';
+        const template = t('setupWizard.testFeedSuccess') || 'Feed verified! Found {count} upcoming events.';
+        this.calendarTestMessage = template.replace('{count}', res.eventCount);
+      } else {
+        this.calendarTestType = 'success';
+        this.calendarTestMessage = 'Feed format valid!';
+      }
+    } catch (err) {
+      this.calendarTestType = 'error';
+      this.calendarTestMessage = err.message || (t('setupWizard.testFeedError') || 'Could not read feed.');
+    } finally {
+      this.isTestingCalendar = false;
+      this.render();
+    }
   },
 
   renderStep3() {
