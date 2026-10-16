@@ -315,6 +315,7 @@ function getColleagueManagerId(colleagueId) {
   const team = colleaguesDb.teams.find(t => t.id === rec.teamId);
   if (team) {
     if (team.managerId && team.managerId !== id) return team.managerId;
+    if (team.managerId === id) return '';
     if (team.id === 'team-other-bucket') return '';
     return 'virtual-manager-' + team.id;
   }
@@ -362,23 +363,27 @@ function getColleagueDirects(colleagueId) {
   if (typeof id === 'string' && id.startsWith('virtual-manager-')) {
     const teamId = id.substring('virtual-manager-'.length);
     const directs = [];
-    if (colleaguesDb.me.teamId === teamId) directs.push(colleaguesDb.me);
+    if (colleaguesDb.me.teamId === teamId && colleaguesDb.me.id !== id) {
+      if (getColleagueManagerId('me') === id) directs.push(colleaguesDb.me);
+    }
     colleaguesDb.colleagues.forEach(c => {
-      if (c.teamId === teamId) directs.push(c);
+      if (c.teamId === teamId && c.id !== id) {
+        if (getColleagueManagerId(c.id) === id) directs.push(c);
+      }
     });
     return directs;
   }
   
-  const managedTeams = colleaguesDb.teams.filter(t => t.managerId === id);
-  if (managedTeams.length === 0) return [];
-  const managedTeamIds = new Set(managedTeams.map(t => t.id));
-  
   const directs = [];
-  if (managedTeamIds.has(colleaguesDb.me.teamId)) directs.push(colleaguesDb.me);
+  if (id !== 'me' && getColleagueManagerId('me') === id) {
+    directs.push(colleaguesDb.me);
+  }
   colleaguesDb.colleagues.forEach(c => {
-    if (managedTeamIds.has(c.teamId)) directs.push(c);
+    if (c.id !== id && getColleagueManagerId(c.id) === id) {
+      directs.push(c);
+    }
   });
-  return directs.filter(d => d.id !== id);
+  return directs;
 }
 
 function isColleagueImportant(colleagueId) {
@@ -1472,6 +1477,274 @@ function onTeamGroupTabContextMenu(e, groupId) {
   }, 0);
 }
 
+function highlightTextMatch(text, query) {
+  if (!text) return '';
+  if (!query) return escH(text);
+  const cleanQ = String(query).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (!cleanQ) return escH(text);
+  const regex = new RegExp(`(${cleanQ})`, 'gi');
+  return escH(text).replace(regex, '<strong style="font-weight:700; color:var(--accent, #3b82f6); text-decoration:underline;">$1</strong>');
+}
+
+function getTeamBossInfo(team) {
+  if (!team || !team.managerId) {
+    return { id: '', label: '', hasBoss: false };
+  }
+  const managerId = team.managerId;
+  if (managerId === 'me') {
+    const meLabel = (colleaguesDb && colleaguesDb.me && colleaguesDb.me.label) ? colleaguesDb.me.label : 'Me';
+    return { id: 'me', label: meLabel + ' (Me)', hasBoss: true };
+  }
+  const rec = colleaguesById ? colleaguesById.get(managerId) : null;
+  const label = rec ? rec.label : managerId;
+  return { id: managerId, label, hasBoss: true };
+}
+
+function createTeamCombobox(options = {}) {
+  const currentTeamId = options.currentTeamId || 'team-other-bucket';
+  const onSelect = typeof options.onSelect === 'function' ? options.onSelect : () => {};
+  const allowCreate = options.allowCreate !== false;
+  const onCreateTeam = typeof options.onCreateTeam === 'function' ? options.onCreateTeam : null;
+  const inputId = options.inputId || ('team-combo-' + Math.random().toString(36).slice(2, 9));
+  const placeholder = options.placeholder || t('team.selectTeamPlaceholder') || 'Select or search a team...';
+
+  let selectedId = currentTeamId;
+  let isOpen = false;
+  let activeIndex = -1;
+
+  const container = document.createElement('div');
+  container.className = 'team-combobox-wrap';
+  container.style.cssText = 'position:relative; width:100%; display:flex; flex-direction:column;';
+
+  const inputRow = document.createElement('div');
+  inputRow.style.cssText = 'display:flex; align-items:center; gap:6px; position:relative; width:100%;';
+
+  const inputWrap = document.createElement('div');
+  inputWrap.style.cssText = 'position:relative; flex:1; display:flex; align-items:center;';
+
+  const teamIcon = document.createElement('span');
+  teamIcon.style.cssText = 'position:absolute; left:10px; color:var(--text-muted); font-size:0.9rem; pointer-events:none; z-index:2;';
+  teamIcon.textContent = '👥';
+  inputWrap.appendChild(teamIcon);
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = inputId;
+  input.className = 'dialog-input team-combobox-input';
+  input.placeholder = placeholder;
+  input.title = t('team.selectTeamTooltip') || 'Select a team for this colleague';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.style.cssText = 'width:100%; box-sizing:border-box; padding:8px 32px 8px 32px; background:var(--card-bg); color:var(--text); border:1px solid var(--card-border); border-radius:6px; font-size:0.88rem; outline:none; transition:border-color 0.15s ease, box-shadow 0.15s ease;';
+
+  const getTeamName = (id) => {
+    const tRec = (colleaguesDb && colleaguesDb.teams) ? colleaguesDb.teams.find(t => t.id === id) : null;
+    return tRec ? getTeamDisplayName(tRec) : '';
+  };
+
+  input.value = getTeamName(selectedId);
+  inputWrap.appendChild(input);
+
+  const chevron = document.createElement('span');
+  chevron.style.cssText = 'position:absolute; right:10px; color:var(--text-muted); font-size:0.75rem; cursor:pointer; user-select:none; z-index:2;';
+  chevron.textContent = '▾';
+  chevron.title = t('team.selectTeamTooltip') || 'Select team';
+  chevron.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (isOpen) closeDropdown();
+    else { openDropdown(); input.focus(); }
+  });
+  inputWrap.appendChild(chevron);
+  inputRow.appendChild(inputWrap);
+
+  if (allowCreate && onCreateTeam) {
+    const createBtn = document.createElement('button');
+    createBtn.type = 'button';
+    createBtn.className = 'btn btn-secondary';
+    createBtn.textContent = '+';
+    createBtn.style.cssText = 'padding:2px 10px; font-size:0.95rem; font-weight:bold; height:34px;';
+    createBtn.title = t('team.createNewTeamTooltip') || t('team.newTeamNamePrompt') || 'Create new team';
+    createBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await onCreateTeam();
+    });
+    inputRow.appendChild(createBtn);
+  }
+
+  container.appendChild(inputRow);
+
+  // Dropdown
+  const dropdown = document.createElement('div');
+  dropdown.className = 'team-combobox-dropdown';
+  dropdown.style.cssText = 'position:absolute; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.18); z-index:3200; display:none; padding:4px 0;';
+  container.appendChild(dropdown);
+
+  let filteredTeams = [];
+
+  function renderList(query = '') {
+    dropdown.innerHTML = '';
+    const cleanQ = query.trim().toLowerCase();
+    const teams = (colleaguesDb && Array.isArray(colleaguesDb.teams)) ? colleaguesDb.teams : [];
+
+    filteredTeams = teams.filter(t => {
+      if (!cleanQ) return true;
+      const tName = getTeamDisplayName(t).toLowerCase();
+      const boss = getTeamBossInfo(t);
+      const bName = boss.label.toLowerCase();
+      return tName.includes(cleanQ) || bName.includes(cleanQ);
+    });
+
+    if (filteredTeams.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.style.cssText = 'padding:12px; font-size:0.82rem; color:var(--text-muted); text-align:center; font-style:italic;';
+      emptyItem.textContent = t('team.noMatchingTeams') || 'No matching teams found';
+      dropdown.appendChild(emptyItem);
+      return;
+    }
+
+    filteredTeams.forEach((tRec, idx) => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'team-combobox-item' + (tRec.id === selectedId ? ' selected' : '') + (idx === activeIndex ? ' active' : '');
+      itemEl.style.cssText = `padding:8px 12px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px solid rgba(0,0,0,0.04); ${tRec.id === selectedId ? 'background:rgba(var(--accent-rgb, 59, 130, 246), 0.1);' : ''}`;
+      
+      const leftCol = document.createElement('div');
+      leftCol.style.cssText = 'display:flex; flex-direction:column; gap:2px; flex:1; min-width:0;';
+
+      const nameRow = document.createElement('div');
+      nameRow.style.cssText = 'display:flex; align-items:center; gap:6px;';
+      
+      const teamDisplayName = getTeamDisplayName(tRec);
+      nameRow.innerHTML = `<span style="font-weight:600; font-size:0.85rem; color:var(--text);">${highlightTextMatch(teamDisplayName, cleanQ)}</span>`;
+      leftCol.appendChild(nameRow);
+
+      const boss = getTeamBossInfo(tRec);
+      const bossRow = document.createElement('div');
+      bossRow.style.cssText = 'font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;';
+      if (boss.hasBoss) {
+        bossRow.innerHTML = `<span>👑</span> <span>${escH(t('team.bossPrefix', { name: '' }) || 'Boss: ')}${highlightTextMatch(boss.label, cleanQ)}</span>`;
+      } else {
+        bossRow.innerHTML = `<span style="opacity:0.65; font-style:italic;">${escH(t('team.noLeaderAssigned') || 'No leader assigned')}</span>`;
+      }
+      leftCol.appendChild(bossRow);
+      itemEl.appendChild(leftCol);
+
+      if (tRec.id === selectedId) {
+        const check = document.createElement('span');
+        check.style.cssText = 'color:var(--accent, #3b82f6); font-weight:bold; font-size:0.9rem;';
+        check.textContent = '✓';
+        itemEl.appendChild(check);
+      }
+
+      itemEl.title = `${teamDisplayName} (${boss.hasBoss ? boss.label : (t('team.noLeaderAssigned') || 'No leader')})`;
+
+      itemEl.addEventListener('mouseenter', () => {
+        itemEl.style.background = 'var(--card-bg-alt, rgba(0,0,0,0.05))';
+        activeIndex = idx;
+      });
+      itemEl.addEventListener('mouseleave', () => {
+        itemEl.style.background = tRec.id === selectedId ? 'rgba(var(--accent-rgb, 59, 130, 246), 0.1)' : 'transparent';
+      });
+
+      itemEl.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        selectTeam(tRec);
+      });
+
+      dropdown.appendChild(itemEl);
+    });
+  }
+
+  function selectTeam(tRec) {
+    selectedId = tRec.id;
+    input.value = getTeamDisplayName(tRec);
+    closeDropdown();
+    onSelect(tRec.id, tRec);
+  }
+
+  function openDropdown() {
+    isOpen = true;
+    activeIndex = -1;
+    renderList(input.value);
+    dropdown.style.display = 'block';
+    chevron.textContent = '▴';
+  }
+
+  function closeDropdown() {
+    isOpen = false;
+    dropdown.style.display = 'none';
+    chevron.textContent = '▾';
+    input.value = getTeamName(selectedId);
+  }
+
+  input.addEventListener('focus', () => {
+    openDropdown();
+    input.select();
+  });
+
+  input.addEventListener('input', () => {
+    if (!isOpen) {
+      isOpen = true;
+      dropdown.style.display = 'block';
+      chevron.textContent = '▴';
+    }
+    activeIndex = 0;
+    renderList(input.value);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isOpen) { openDropdown(); return; }
+      activeIndex = Math.min(activeIndex + 1, filteredTeams.length - 1);
+      updateActiveVisual();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) { openDropdown(); return; }
+      activeIndex = Math.max(activeIndex - 1, 0);
+      updateActiveVisual();
+    } else if (e.key === 'Enter') {
+      if (isOpen && activeIndex >= 0 && activeIndex < filteredTeams.length) {
+        e.preventDefault();
+        selectTeam(filteredTeams[activeIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      closeDropdown();
+    }
+  });
+
+  function updateActiveVisual() {
+    const items = dropdown.querySelectorAll('.team-combobox-item');
+    items.forEach((it, i) => {
+      if (i === activeIndex) {
+        it.style.background = 'var(--card-bg-alt, rgba(0,0,0,0.05))';
+        it.scrollIntoView({ block: 'nearest' });
+      } else {
+        const isSel = filteredTeams[i] && filteredTeams[i].id === selectedId;
+        it.style.background = isSel ? 'rgba(var(--accent-rgb, 59, 130, 246), 0.1)' : 'transparent';
+      }
+    });
+  }
+
+  const onDocClick = (e) => {
+    if (!container.contains(e.target)) {
+      if (isOpen) closeDropdown();
+    }
+  };
+  document.addEventListener('pointerdown', onDocClick);
+
+  container.setValue = (id) => {
+    selectedId = id;
+    input.value = getTeamName(id);
+  };
+  container.getValue = () => selectedId;
+  container.destroy = () => {
+    document.removeEventListener('pointerdown', onDocClick);
+  };
+
+  return container;
+}
+window.createTeamCombobox = createTeamCombobox;
+
 function showTeamAssignDialog(colleagueName) {
   return new Promise(async (resolve) => {
     const cleanName = colleagueName.trim();
@@ -1487,29 +1760,64 @@ function showTeamAssignDialog(colleagueName) {
       return;
     }
     const rec = colleaguesById.get(targetId);
-    const currentTeamId = rec ? rec.teamId : 'team-other-bucket';
-    const select = el('select', {
-      className: 'dialog-input',
-      style: { flex: '1', padding: '8px', background: 'var(--card-bg)', color: 'var(--text)', border: '1px solid var(--card-border)', borderRadius: '4px' }
-    });
+    let currentTeamId = rec ? rec.teamId : (targetId === 'me' ? (colleaguesDb.me.teamId || 'team-my-own-team') : 'team-other-bucket');
+    const color = colorForGroup(cleanName);
 
-    const populateTeams = () => {
-      select.innerHTML = '';
-      colleaguesDb.teams.forEach(t => {
-        const displayTeamName = getTeamDisplayName(t);
-        const opt = el('option', { value: t.id }, displayTeamName);
-        if (t.id === currentTeamId) opt.selected = true;
-        select.appendChild(opt);
-      });
+    // Modal Body with modern styling
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex; flex-direction:column; gap:16px; padding:4px 0;';
+
+    // Colleague Card Header
+    const colCard = document.createElement('div');
+    colCard.style.cssText = 'display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:8px;';
+    colCard.innerHTML = `
+      <span class="swatch" style="background:${color.bg}; color:${color.text}; width:40px; height:40px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:1.1rem; flex-shrink:0;">${cleanName.slice(0, 2).toUpperCase()}</span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:1rem; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escH(cleanName)}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+          <span>${escH(t('team.teamRole') || 'Team')}: </span>
+          <span style="font-weight:600; color:var(--accent);">${escH(getTeamDisplayName(currentTeamId) || t('team.otherColleagues') || 'Other')}</span>
+        </div>
+      </div>
+    `;
+    body.appendChild(colCard);
+
+    // Team selection label
+    const label = document.createElement('label');
+    label.style.cssText = 'font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:-8px;';
+    label.textContent = t('team.teamRole') || 'Team / Équipe';
+    body.appendChild(label);
+
+    // Selected Team Preview Card
+    const previewBox = document.createElement('div');
+    previewBox.style.cssText = 'padding:10px 14px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; font-size:0.82rem; line-height:1.4; display:flex; flex-direction:column; gap:4px;';
+
+    const updatePreview = (teamId) => {
+      const team = colleaguesDb.teams.find(t => t.id === teamId);
+      const teamName = team ? getTeamDisplayName(team) : '';
+      const boss = getTeamBossInfo(team);
+      const memberCount = (teamId === 'team-other-bucket' || !teamId)
+        ? colleaguesDb.colleagues.filter(c => c.teamId === 'team-other-bucket' || !c.teamId).length
+        : (colleaguesDb.colleagues.filter(c => c.teamId === teamId).length + (colleaguesDb.me.teamId === teamId ? 1 : 0));
+      
+      previewBox.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:700; color:var(--text); font-size:0.88rem;">👥 ${escH(teamName)}</span>
+          <span style="font-size:0.75rem; color:var(--text-muted); background:var(--card-bg-alt); padding:2px 6px; border-radius:4px;">${memberCount} member${memberCount !== 1 ? 's' : ''}</span>
+        </div>
+        <div style="font-size:0.78rem; color:var(--text-muted); display:flex; align-items:center; gap:4px;">
+          <span>👑 ${escH(t('team.bossPrefix', { name: '' }) || 'Boss: ')}</span>
+          <span style="font-weight:600; color:${boss.hasBoss ? 'var(--text)' : 'var(--text-muted)'};">${escH(boss.hasBoss ? boss.label : (t('team.noLeaderAssigned') || 'No leader assigned'))}</span>
+        </div>
+      `;
     };
-    populateTeams();
 
-    const createTeamBtn = el('button', {
-      className: 'btn btn-secondary',
-      textContent: '+',
-      style: { padding: '2px 10px' },
-      title: t('team.createNewTeamTooltip') || t('team.newTeamNamePrompt') || 'Create new team',
-      onClick: async () => {
+    let selectedTeamId = currentTeamId;
+
+    const combobox = createTeamCombobox({
+      currentTeamId,
+      allowCreate: true,
+      onCreateTeam: async () => {
         const teamName = await showPromptDialog(t('team.newTeamNamePrompt') || "Nom de la nouvelle équipe / New team name:");
         if (!teamName || !teamName.trim()) return;
 
@@ -1517,17 +1825,24 @@ function showTeamAssignDialog(colleagueName) {
         colleaguesDb.teams.push(newTeam);
         await saveColleaguesDb();
         reindexColleaguesDb();
-        populateTeams();
-        select.value = newTeam.id;
+        selectedTeamId = newTeam.id;
+        combobox.setValue(newTeam.id);
+        updatePreview(newTeam.id);
+      },
+      onSelect: (newId) => {
+        selectedTeamId = newId;
+        updatePreview(newId);
       }
     });
 
-    const selectRow = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '15px' } }, [select, createTeamBtn]);
+    body.appendChild(combobox);
+    body.appendChild(previewBox);
+    updatePreview(currentTeamId);
 
     const modalResult = await showCustomModal({
       title: t('team.assignToTeamTitle', { name: cleanName }) || `Assign ${cleanName} to a team`,
-      body: selectRow,
-      width: '320px',
+      body,
+      width: '380px',
       actions: [
         { label: window.t('editor.cancel') || 'Cancel', title: window.t('common.cancelTooltip') || 'Cancel', value: false },
         {
@@ -1535,7 +1850,7 @@ function showTeamAssignDialog(colleagueName) {
           title: window.t('common.saveTooltip') || 'Save',
           isPrimary: true,
           onClick: async () => {
-            const newTeamId = select.value;
+            const newTeamId = selectedTeamId;
             if (targetId === 'me') {
               colleaguesDb.me.teamId = newTeamId;
             } else {
@@ -1551,6 +1866,7 @@ function showTeamAssignDialog(colleagueName) {
 
             await saveColleaguesDb();
             reindexColleaguesDb();
+            combobox.destroy();
             if (typeof renderTeamPanel === 'function') renderTeamPanel();
             if (typeof renderBoard === 'function') renderBoard();
             return true;
@@ -1558,7 +1874,7 @@ function showTeamAssignDialog(colleagueName) {
         }
       ]
     });
-
+    combobox.destroy();
     resolve(modalResult);
   });
 }
@@ -2893,10 +3209,11 @@ function renderOrgView(container) {
   }
 
   // 3. Render trees
+  const globalRenderedIds = new Set();
   const mainRootId = getUltimateManagerId('me');
   
   const allRoots = new Set();
-  allRoots.add(mainRootId);
+  if (mainRootId) allRoots.add(mainRootId);
   
   colleaguesDb.teams.forEach(t => {
     if (t.id === 'team-other-bucket') return;
@@ -2907,14 +3224,19 @@ function renderOrgView(container) {
     }
   });
 
-  // Render the main tree
-  const mainTreeEl = renderNodeTree(mainRootId);
-  if (mainTreeEl) treesWrapper.appendChild(mainTreeEl);
+  // Sort roots to place primary root first, followed by largest trees
+  const rootList = Array.from(allRoots);
+  rootList.sort((a, b) => {
+    if (a === mainRootId) return -1;
+    if (b === mainRootId) return 1;
+    const aDirects = getColleagueDirects(a).length;
+    const bDirects = getColleagueDirects(b).length;
+    return bDirects - aDirects;
+  });
 
-  // Render other unconnected trees
-  allRoots.forEach(rootId => {
-    if (rootId === mainRootId) return;
-    const treeEl = renderNodeTree(rootId);
+  rootList.forEach(rootId => {
+    if (globalRenderedIds.has(rootId)) return;
+    const treeEl = renderNodeTree(rootId, new Set(), globalRenderedIds);
     if (treeEl) treesWrapper.appendChild(treeEl);
   });
 
@@ -3010,15 +3332,17 @@ function renderOrgView(container) {
 
 function getTeamManagedBy(nodeId) {
   if (!colleaguesDb) return null;
-  if (nodeId === 'me') {
-    return colleaguesDb.teams.find(t => t.id === 'team-my-team');
-  }
   if (typeof nodeId === 'string' && nodeId.startsWith('virtual-manager-')) {
     const teamId = nodeId.substring('virtual-manager-'.length);
-    return colleaguesDb.teams.find(t => t.id === teamId);
+    return colleaguesDb.teams.find(t => t.id === teamId) || null;
   }
-  // Check if this colleague is a manager of any team
-  return colleaguesDb.teams.find(t => t.managerId === nodeId);
+  const managedTeam = colleaguesDb.teams.find(t => t.managerId === nodeId);
+  if (managedTeam) return managedTeam;
+  if (nodeId === 'me') {
+    const myTeam = colleaguesDb.teams.find(t => t.id === 'team-my-team');
+    if (myTeam && myTeam.managerId === 'me') return myTeam;
+  }
+  return null;
 }
 
 function showTeamSettingsModal(teamId) {
@@ -3170,7 +3494,12 @@ function showTeamSettingsModal(teamId) {
   document.body.appendChild(overlay);
 }
 
-function renderNodeTree(nodeId) {
+function renderNodeTree(nodeId, visited = new Set(), globalRendered = null) {
+  if (!nodeId || visited.has(nodeId)) return null;
+  if (globalRendered && globalRendered.has(nodeId)) return null;
+  visited.add(nodeId);
+  if (globalRendered) globalRendered.add(nodeId);
+
   const isMe = nodeId === 'me';
   const isVirtualManager = typeof nodeId === 'string' && nodeId.startsWith('virtual-manager-');
   const rec = colleaguesById.get(nodeId);
@@ -3188,9 +3517,11 @@ function renderNodeTree(nodeId) {
     teamBox.style.cssText = 'border: 2px dashed var(--card-border); border-radius: 12px; padding: 24px; background: var(--card-bg-alt); display: flex; flex-direction: column; align-items: center; gap: 20px; position: relative; margin: 15px; transition: border-color 0.2s;';
     
     const teamLabel = document.createElement('div');
-    teamLabel.style.cssText = 'position:absolute; top:-10px; left:20px; background:var(--bg); padding:2px 8px; font-size:0.75rem; font-weight:bold; color:var(--text-muted); border:1px solid var(--card-border); border-radius:4px; cursor:pointer; user-select:none;';
+    teamLabel.style.cssText = 'position:absolute; top:-10px; left:20px; background:var(--bg); padding:2px 8px; font-size:0.75rem; font-weight:bold; color:var(--text-muted); border:1px solid var(--card-border); border-radius:4px; cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;';
     const displayTeamName = getTeamDisplayName(managedTeam);
-    teamLabel.textContent = displayTeamName;
+    const leaderLabel = isMe ? (colleaguesDb.me.label || 'Me') : (rec ? rec.label : '');
+    teamLabel.innerHTML = `<span>👥 ${escH(displayTeamName)}</span>${leaderLabel ? `<span style="font-size:0.68rem; font-weight:normal; opacity:0.85;">• 👑 ${escH(leaderLabel)}</span>` : ''}`;
+    teamLabel.title = `${displayTeamName}${leaderLabel ? ' (' + (t('team.leaderLabel') || 'Leader') + ': ' + leaderLabel + ')' : ''}`;
     
     teamLabel.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -3222,6 +3553,7 @@ function renderNodeTree(nodeId) {
     toggleBtn.className = 'org-node-expand-btn';
     toggleBtn.style.cssText = 'position:absolute; bottom:-12px; left:50%; transform:translateX(-50%); width:20px; height:20px; border-radius:50%; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text); display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:bold; cursor:pointer; line-height:1; padding:0; z-index:10;';
     toggleBtn.textContent = isCollapsed ? '+' : '−';
+    toggleBtn.title = isCollapsed ? (t('common.expand') || 'Expand') : (t('common.collapse') || 'Collapse');
     toggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (isCollapsed) orgCollapsedNodes.delete(nodeId);
@@ -3240,7 +3572,8 @@ function renderNodeTree(nodeId) {
     childrenContainer.style.cssText = `display:grid; grid-template-columns: repeat(${cols}, auto); gap:40px; margin-top:20px; position:relative; justify-content:center; align-items:start;`;
     
     directs.forEach(child => {
-      const childTree = renderNodeTree(child.id);
+      if (visited.has(child.id) || (globalRendered && globalRendered.has(child.id))) return;
+      const childTree = renderNodeTree(child.id, visited, globalRendered);
       if (childTree) {
         const childWrapper = document.createElement('div');
         childWrapper.className = 'org-node-wrapper';
@@ -3324,8 +3657,16 @@ function renderCompactNodeCard(nodeId) {
 
   const managerChain = getColleagueManagerChain('me');
   const chainIndex = managerChain.indexOf(nodeId);
+  const manages = colleaguesDb.teams.filter(t => t.managerId === nodeId);
+  const isTopBoss = manages.length > 0 && getColleagueManagerId(nodeId) === '';
   
-  if (chainIndex === 0) {
+  if (isTopBoss) {
+    const titleEl = document.createElement('div');
+    titleEl.className = 'org-node-title org-node-top-boss';
+    titleEl.style.cssText = 'font-size:0.75rem; color:var(--accent, #3b82f6); font-weight:800; margin-top:2px; display:flex; align-items:center; justify-content:center; gap:4px;';
+    titleEl.textContent = `👑 ${t('team.topBossBadge') || 'Top Leader'}`;
+    nodeEl.appendChild(titleEl);
+  } else if (chainIndex === 0) {
     const titleEl = document.createElement('div');
     titleEl.className = 'org-node-title';
     titleEl.style.cssText = 'font-size:0.75rem; color:var(--accent); font-weight:bold; margin-top:2px;';
@@ -3338,12 +3679,11 @@ function renderCompactNodeCard(nodeId) {
     titleEl.textContent = `⭐ Director (${chainIndex + 1}x)`;
     nodeEl.appendChild(titleEl);
   } else {
-    const manages = colleaguesDb.teams.filter(t => t.managerId === nodeId);
     if (manages.length > 0) {
       const titleEl = document.createElement('div');
       titleEl.className = 'org-node-title';
-      titleEl.style.cssText = 'font-size:0.75rem; color:var(--text-muted); margin-top:2px;';
-      titleEl.textContent = t('team.managerBadge') || 'Manager';
+      titleEl.style.cssText = 'font-size:0.75rem; color:var(--text-muted); font-weight:600; margin-top:2px;';
+      titleEl.textContent = `⭐ ${t('team.managerBadge') || 'Manager'}`;
       nodeEl.appendChild(titleEl);
     }
   }
@@ -3451,21 +3791,13 @@ function renderMeView(container) {
     <!-- Team & Role Settings -->
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; border-bottom:1px solid var(--card-border); padding-bottom:1.5rem;">
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Team / Équipe</label>
-        <div style="display:flex; gap:6px;">
-          <select id="me-team-select" style="flex:1; padding:8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.9rem;">
-            ${colleaguesDb.teams.map(team => {
-              const displayTeamName = getTeamDisplayName(team);
-              return `<option value="${team.id}" ${team.id === currentTeamId ? 'selected' : ''}>${escH(displayTeamName)}</option>`;
-            }).join('')}
-          </select>
-          <button class="btn btn-secondary" id="me-create-team-btn" style="padding: 2px 10px; font-size: 0.95rem;" title="Create new team">+</button>
-        </div>
+        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">${escH(t('team.teamRole') || 'Team / Équipe')}</label>
+        <div id="me-team-combobox-mount" style="position:relative;"></div>
       </div>
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Role / Rôle</label>
+        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">${escH(t('team.role') || 'Role / Rôle')}</label>
         <label id="me-is-manager-label" style="display:flex; align-items:center; gap:8px; cursor:${currentTeamId === 'team-other-bucket' ? 'default' : 'pointer'}; margin-top:10px; font-size:0.9rem; color:var(--text); opacity:${currentTeamId === 'team-other-bucket' ? 0.5 : 1}; pointer-events:${currentTeamId === 'team-other-bucket' ? 'none' : 'auto'};">
-          <input type="checkbox" id="me-is-manager" ${isManagerOfCurrentTeam ? 'checked' : ''} ${currentTeamId === 'team-other-bucket' ? 'disabled' : ''} style="width:18px; height:18px;">
+          <input type="checkbox" id="me-is-manager" ${isManagerOfCurrentTeam ? 'checked' : ''} ${currentTeamId === 'team-other-bucket' ? 'disabled' : ''} style="width:18px; height:18px;" title="${escA(t('team.managerLabel') || 'Manager')}">
           <span>${escH(t('team.managerLabel') || 'Manager')}</span>
         </label>
       </div>
@@ -3474,7 +3806,7 @@ function renderMeView(container) {
     <!-- Tags Editor -->
     <div style="border-bottom:1px solid var(--card-border); padding-bottom:1.5rem;">
       <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Tags (VIP, Important, Vite...)</label>
-      <input type="text" id="me-tags-input" value="${escA(collabTags.join(', '))}" placeholder="Enter tags separated by commas..." style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.9rem;">
+      <input type="text" id="me-tags-input" value="${escA(collabTags.join(', '))}" placeholder="Enter tags separated by commas..." style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.9rem;" title="Tags">
     </div>
 
     <!-- Reporting Hierarchy -->
@@ -3506,50 +3838,72 @@ function renderMeView(container) {
   container.appendChild(div);
 
   // Attach Event Listeners
-  const teamSelect = document.getElementById('me-team-select');
   const managerCheckbox = document.getElementById('me-is-manager');
   const tagsInput = document.getElementById('me-tags-input');
-  const createTeamBtn = document.getElementById('me-create-team-btn');
 
-  if (teamSelect) {
-    teamSelect.addEventListener('change', async () => {
-      const newTeamId = teamSelect.value;
-      colleaguesDb.me.teamId = newTeamId;
+  const meTeamMount = document.getElementById('me-team-combobox-mount');
+  if (meTeamMount) {
+    const teamCombo = createTeamCombobox({
+      currentTeamId,
+      allowCreate: true,
+      onCreateTeam: async () => {
+        const teamName = await showPromptDialog(t('team.newTeamNamePrompt') || "Nom de la nouvelle équipe / New team name:");
+        if (!teamName || !teamName.trim()) return;
 
-      if (managerCheckbox) {
-        const labelEl = document.getElementById('me-is-manager-label');
-        if (newTeamId === 'team-other-bucket') {
-          managerCheckbox.checked = false;
-          managerCheckbox.disabled = true;
-          if (labelEl) {
-            labelEl.style.opacity = '0.5';
-            labelEl.style.pointerEvents = 'none';
-            labelEl.style.cursor = 'default';
+        const newTeam = {
+          id: 'team-' + Date.now(),
+          name: teamName.trim(),
+          managerId: ''
+        };
+        colleaguesDb.teams.push(newTeam);
+        colleaguesDb.me.teamId = newTeam.id;
+
+        await saveColleaguesDb();
+        reindexColleaguesDb();
+        if (typeof renderTeamPanel === 'function') renderTeamPanel();
+        if (typeof renderBoard === 'function') renderBoard();
+        renderMeView(container);
+      },
+      onSelect: async (newTeamId) => {
+        colleaguesDb.me.teamId = newTeamId;
+
+        if (managerCheckbox) {
+          const labelEl = document.getElementById('me-is-manager-label');
+          if (newTeamId === 'team-other-bucket') {
+            managerCheckbox.checked = false;
+            managerCheckbox.disabled = true;
+            if (labelEl) {
+              labelEl.style.opacity = '0.5';
+              labelEl.style.pointerEvents = 'none';
+              labelEl.style.cursor = 'default';
+            }
+            const team = colleaguesDb.teams.find(t => t.id === newTeamId);
+            if (team && team.managerId === 'me') team.managerId = '';
+          } else {
+            managerCheckbox.disabled = false;
+            if (labelEl) {
+              labelEl.style.opacity = '1';
+              labelEl.style.pointerEvents = 'auto';
+              labelEl.style.cursor = 'pointer';
+            }
+            const team = colleaguesDb.teams.find(t => t.id === newTeamId);
+            managerCheckbox.checked = team ? team.managerId === 'me' : false;
           }
-          const team = colleaguesDb.teams.find(t => t.id === newTeamId);
-          if (team && team.managerId === 'me') team.managerId = '';
-        } else {
-          managerCheckbox.disabled = false;
-          if (labelEl) {
-            labelEl.style.opacity = '1';
-            labelEl.style.pointerEvents = 'auto';
-            labelEl.style.cursor = 'pointer';
-          }
-          const team = colleaguesDb.teams.find(t => t.id === newTeamId);
-          managerCheckbox.checked = team ? team.managerId === 'me' : false;
         }
-      }
 
-      await saveColleaguesDb();
-      reindexColleaguesDb();
-      if (typeof renderTeamPanel === 'function') renderTeamPanel();
-      if (typeof renderBoard === 'function') renderBoard();
+        await saveColleaguesDb();
+        reindexColleaguesDb();
+        if (typeof renderTeamPanel === 'function') renderTeamPanel();
+        if (typeof renderBoard === 'function') renderBoard();
+        renderMeView(container);
+      }
     });
+    meTeamMount.appendChild(teamCombo);
   }
 
   if (managerCheckbox) {
     managerCheckbox.addEventListener('change', async () => {
-      const activeTeamId = teamSelect ? teamSelect.value : '';
+      const activeTeamId = colleaguesDb.me.teamId;
       if (!activeTeamId || activeTeamId === 'team-other-bucket') return;
 
       const team = colleaguesDb.teams.find(t => t.id === activeTeamId);
@@ -3576,23 +3930,6 @@ function renderMeView(container) {
       setCollaboratorLabels(cleanName, tags);
       if (typeof renderTeamPanel === 'function') renderTeamPanel();
       if (typeof renderBoard === 'function') renderBoard();
-    });
-  }
-
-  if (createTeamBtn) {
-    createTeamBtn.addEventListener('click', async () => {
-      const teamName = await showPromptDialog("Nom de la nouvelle équipe / New team name:");
-      if (!teamName || !teamName.trim()) return;
-
-      const newTeam = {
-        id: 'team-' + Date.now(),
-        name: teamName.trim(),
-        managerId: ''
-      };
-      colleaguesDb.teams.push(newTeam);
-      await saveColleaguesDb();
-      reindexColleaguesDb();
-      if (typeof renderTeamPanel === 'function') renderTeamPanel();
     });
   }
 }
@@ -12566,15 +12903,7 @@ function showCollaboratorModal(name) {
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem; margin-bottom:1rem; border-bottom:1px solid var(--card-border); padding-bottom:1rem;">
       <div>
         <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Team / Équipe</label>
-        <div style="display:flex; gap:6px;">
-          <select id="collab-details-team-select" style="flex:1; padding:6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.85rem;">
-            ${colleaguesDb.teams.map(team => {
-              const displayTeamName = getTeamDisplayName(team);
-              return `<option value="${team.id}" ${team.id === currentTeamId ? 'selected' : ''}>${escH(displayTeamName)}</option>`;
-            }).join('')}
-          </select>
-          <button class="btn btn-secondary" id="collab-details-create-team-btn" style="padding: 2px 8px; font-size: 0.85rem;" title="Create new team">+</button>
-        </div>
+        <div id="collab-details-team-combobox-mount" style="position:relative;"></div>
       </div>
       <div>
         <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Role / Rôle</label>
@@ -12632,63 +12961,92 @@ function showCollaboratorModal(name) {
   openModal('modal-collab-details');
 
   // Attach Event Listeners for Colleague Details Panel
-  const teamSelect = document.getElementById('collab-details-team-select');
   const managerCheckbox = document.getElementById('collab-details-is-manager');
   const tagsInput = document.getElementById('collab-details-tags-input');
 
-  if (teamSelect) {
-    teamSelect.addEventListener('change', async () => {
-      const newTeamId = teamSelect.value;
-      if (targetId === 'me') {
-        colleaguesDb.me.teamId = newTeamId;
-      } else {
-        const colRecord = colleaguesDb.colleagues.find(c => c.id === targetId);
-        if (colRecord) colRecord.teamId = newTeamId;
-      }
+  let activeTeamId = currentTeamId;
 
-      if (managerCheckbox) {
-        const labelEl = document.getElementById('collab-details-is-manager-label');
-        if (newTeamId === 'team-other-bucket') {
-          managerCheckbox.checked = false;
-          managerCheckbox.disabled = true;
-          if (labelEl) {
-            labelEl.style.opacity = '0.5';
-            labelEl.style.pointerEvents = 'none';
-            labelEl.style.cursor = 'default';
-          }
-          // Clear if they were manager
-          const team = colleaguesDb.teams.find(t => t.id === newTeamId);
-          if (team && team.managerId === targetId) team.managerId = '';
+  const collabTeamMount = document.getElementById('collab-details-team-combobox-mount');
+  if (collabTeamMount) {
+    const teamCombo = createTeamCombobox({
+      currentTeamId,
+      allowCreate: true,
+      onCreateTeam: async () => {
+        const teamName = await showPromptDialog(t('team.newTeamNamePrompt') || "Nom de la nouvelle équipe / New team name:");
+        if (!teamName || !teamName.trim()) return;
+
+        const newTeam = {
+          id: 'team-' + Date.now(),
+          name: teamName.trim(),
+          managerId: ''
+        };
+        colleaguesDb.teams.push(newTeam);
+
+        // Auto-assign the newly created team to this colleague
+        if (targetId === 'me') {
+          colleaguesDb.me.teamId = newTeam.id;
         } else {
-          managerCheckbox.disabled = false;
-          if (labelEl) {
-            labelEl.style.opacity = '1';
-            labelEl.style.pointerEvents = 'auto';
-            labelEl.style.cursor = 'pointer';
-          }
-          const team = colleaguesDb.teams.find(t => t.id === newTeamId);
-          managerCheckbox.checked = team ? team.managerId === targetId : false;
+          const colRecord = colleaguesDb.colleagues.find(c => c.id === targetId);
+          if (colRecord) colRecord.teamId = newTeam.id;
         }
-      }
 
-      await saveColleaguesDb();
-      reindexColleaguesDb();
-      if (typeof renderTeamPanel === 'function') renderTeamPanel();
-      if (typeof renderBoard === 'function') renderBoard();
-      showCollaboratorModal(name);
+        await saveColleaguesDb();
+        reindexColleaguesDb();
+        if (typeof renderTeamPanel === 'function') renderTeamPanel();
+        if (typeof renderBoard === 'function') renderBoard();
+        showCollaboratorModal(name);
+      },
+      onSelect: async (newTeamId) => {
+        activeTeamId = newTeamId;
+        if (targetId === 'me') {
+          colleaguesDb.me.teamId = newTeamId;
+        } else {
+          const colRecord = colleaguesDb.colleagues.find(c => c.id === targetId);
+          if (colRecord) colRecord.teamId = newTeamId;
+        }
+
+        if (managerCheckbox) {
+          const labelEl = document.getElementById('collab-details-is-manager-label');
+          if (newTeamId === 'team-other-bucket') {
+            managerCheckbox.checked = false;
+            managerCheckbox.disabled = true;
+            if (labelEl) {
+              labelEl.style.opacity = '0.5';
+              labelEl.style.pointerEvents = 'none';
+              labelEl.style.cursor = 'default';
+            }
+            // Clear if they were manager
+            const team = colleaguesDb.teams.find(t => t.id === newTeamId);
+            if (team && team.managerId === targetId) team.managerId = '';
+          } else {
+            managerCheckbox.disabled = false;
+            if (labelEl) {
+              labelEl.style.opacity = '1';
+              labelEl.style.pointerEvents = 'auto';
+              labelEl.style.cursor = 'pointer';
+            }
+            const team = colleaguesDb.teams.find(t => t.id === newTeamId);
+            managerCheckbox.checked = team ? team.managerId === targetId : false;
+          }
+        }
+
+        await saveColleaguesDb();
+        reindexColleaguesDb();
+        if (typeof renderTeamPanel === 'function') renderTeamPanel();
+        if (typeof renderBoard === 'function') renderBoard();
+        showCollaboratorModal(name);
+      }
     });
+    collabTeamMount.appendChild(teamCombo);
   }
 
   if (managerCheckbox) {
     managerCheckbox.addEventListener('change', async () => {
-      const activeTeamId = teamSelect ? teamSelect.value : '';
       if (!activeTeamId || activeTeamId === 'team-other-bucket') return;
 
       const team = colleaguesDb.teams.find(t => t.id === activeTeamId);
       if (team) {
         if (managerCheckbox.checked) {
-          // If another colleague is manager, they are replaced.
-          // Clear managers of this team
           colleaguesDb.teams.forEach(t => {
             if (t.id === activeTeamId) {
               t.managerId = targetId;
@@ -12715,25 +13073,6 @@ function showCollaboratorModal(name) {
       setCollaboratorLabels(dbLabel, tags);
       if (typeof renderTeamPanel === 'function') renderTeamPanel();
       if (typeof renderBoard === 'function') renderBoard();
-      showCollaboratorModal(name);
-    });
-  }
-
-  const createTeamBtn = document.getElementById('collab-details-create-team-btn');
-  if (createTeamBtn) {
-    createTeamBtn.addEventListener('click', async () => {
-      const teamName = await showPromptDialog("Nom de la nouvelle équipe / New team name:");
-      if (!teamName || !teamName.trim()) return;
-
-      const newTeam = {
-        id: 'team-' + Date.now(),
-        name: teamName.trim(),
-        managerId: ''
-      };
-      colleaguesDb.teams.push(newTeam);
-      await saveColleaguesDb();
-      reindexColleaguesDb();
-      if (typeof renderTeamPanel === 'function') renderTeamPanel();
       showCollaboratorModal(name);
     });
   }
