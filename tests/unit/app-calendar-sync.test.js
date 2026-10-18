@@ -231,7 +231,7 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
   });
 
   describe('Setup Wizard Calendar Integration', () => {
-    it('renders calendar sync input in Step 2 of SetupWizardController', () => {
+    it('renders dedicated Calendar Sync in Step 3 of SetupWizardController with provider guides and test button', () => {
       const tutorialCode = fs.readFileSync(path.resolve(__dirname, '../../js/app-tutorial.js'), 'utf8');
       const mockWindow = {
         settings: { ui: { colors: { accent: '#4f46e5' } }, ai: {} },
@@ -239,19 +239,36 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
         escH: (s) => s || '',
         localStorage: { getItem: vi.fn(), setItem: vi.fn() },
         addEventListener: vi.fn(),
-        removeEventListener: vi.fn()
+        removeEventListener: vi.fn(),
+        open: vi.fn()
       };
 
       const fn = new Function('window', 'document', 'settings', 't', 'escH', `${tutorialCode}; return window.SetupWizardController;`);
       const wizard = fn(mockWindow, document, mockWindow.settings, mockWindow.t, mockWindow.escH);
 
       expect(wizard).toBeDefined();
-      wizard.currentStep = 1; // Step 2 (Schedule)
-      const html = wizard.renderStep2();
+      wizard.currentStep = 2; // Step 3 (Calendar Sync)
+      const html = wizard.renderStepCalendar();
 
+      // Check input and test button
       expect(html).toContain('wizard-calendar-feed-input');
       expect(html).toContain('SetupWizardController.testCalendarFeed()');
-      expect(html).toContain('setupWizard.calendarSyncTitle');
+      expect(html).toContain('setupWizard.stepCalendarDesc');
+
+      // Check provider tabs and deep link buttons
+      expect(html).toContain('SetupWizardController.selectCalendarGuide(\'outlook\')');
+      expect(html).toContain('SetupWizardController.selectCalendarGuide(\'google\')');
+      expect(html).toContain('SetupWizardController.selectCalendarGuide(\'apple\')');
+      expect(html).toContain('SetupWizardController.selectCalendarGuide(\'corporate\')');
+      expect(html).toContain('SetupWizardController.openCalendarProviderPortal(\'outlook\')');
+
+      // Check portal opener
+      wizard.openCalendarProviderPortal('outlook');
+      expect(mockWindow.open).toHaveBeenCalledWith(
+        'https://outlook.office.com/mail/options/calendar/SharedCalendars',
+        '_blank',
+        'noopener,noreferrer'
+      );
     });
   });
 });

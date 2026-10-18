@@ -607,9 +607,30 @@
                 <span data-i18n="prefs.addFeedBtn">Add &amp; Sync</span>
               </button>
             </div>
-            <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="prefs.feedUrlHint">
-              Paste the private iCal or WebCal address from Google Calendar, Outlook Web, or iCloud Calendar.
-            </small>
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+              <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="prefs.feedUrlHint">
+                Paste the private iCal or WebCal address from Google Calendar, Outlook Web, or iCloud Calendar.
+              </small>
+              <button type="button" class="btn btn-subtle" id="btn-toggle-calendar-guide" onclick="toggleCalendarGuidePrefs()" style="font-size:0.75rem; padding:2px 8px;" title="Step-by-step instructions for finding your link" data-i18n-title="prefs.howToFindLinkTooltip">
+                <span data-i18n="prefs.howToFindLinkBtn">How to find your calendar link? ℹ️</span>
+              </button>
+            </div>
+
+            <!-- Collapsible Calendar Link Guide -->
+            <div id="prefs-calendar-guide-container" style="display:none; margin-top:8px; border-top:1px solid var(--card-border); padding-top:8px;">
+              <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+                <button type="button" class="setup-wizard-tab-btn active" id="prefs-guide-tab-outlook" onclick="switchPrefsCalendarGuide('outlook')" title="Outlook Web instructions" data-i18n-title="setupWizard.guideTabOutlookTooltip">
+                  📧 <span data-i18n="setupWizard.guideTabOutlook">Outlook</span>
+                </button>
+                <button type="button" class="setup-wizard-tab-btn" id="prefs-guide-tab-google" onclick="switchPrefsCalendarGuide('google')" title="Google Calendar instructions" data-i18n-title="setupWizard.guideTabGoogleTooltip">
+                  📅 <span data-i18n="setupWizard.guideTabGoogle">Google Calendar</span>
+                </button>
+                <button type="button" class="setup-wizard-tab-btn" id="prefs-guide-tab-apple" onclick="switchPrefsCalendarGuide('apple')" title="Apple Calendar instructions" data-i18n-title="setupWizard.guideTabAppleTooltip">
+                  🍏 <span data-i18n="setupWizard.guideTabApple">Apple Calendar</span>
+                </button>
+              </div>
+              <div id="prefs-calendar-guide-content" class="setup-wizard-guide-box"></div>
+            </div>
           </div>
 
           <!-- Local macOS Calendar & Corporate Outlook Helper -->

@@ -615,6 +615,7 @@ const SetupWizardController = {
     workingDays: [1, 2, 3, 4, 5],
     defaultDuration: 30,
     calendarFeedUrl: '',
+    activeCalendarGuideTab: 'outlook',
     aiEnabled: false,
     aiProvider: 'lmstudio',
     aiEndpoint: 'http://127.0.0.1:1234/v1',
@@ -734,6 +735,7 @@ const SetupWizardController = {
       workingDays: Array.isArray(curUi.workingDays) ? [...curUi.workingDays] : [1, 2, 3, 4, 5],
       defaultDuration: curUi.defaultPlannerDuration || 30,
       calendarFeedUrl: '',
+      activeCalendarGuideTab: 'outlook',
       aiEnabled: !!curAi.enabled,
       aiProvider: curAi.provider || 'lmstudio',
       aiEndpoint: curAi.endpoint || 'http://127.0.0.1:1234/v1',
@@ -812,21 +814,39 @@ const SetupWizardController = {
   },
 
   goToStep(index) {
-    if (index < 0 || index > 3) return;
+    if (index < 0 || index > 4) return;
     this.syncInputsToState();
     this.currentStep = index;
     this.testStatusMessage = '';
     this.testStatusType = '';
+    this.calendarTestMessage = '';
+    this.calendarTestType = '';
     this.render();
   },
 
   next() {
     this.syncInputsToState();
-    if (this.currentStep < 3) {
+    if (this.currentStep < 4) {
       this.goToStep(this.currentStep + 1);
     } else {
       this.finish(false);
     }
+  },
+
+  selectCalendarGuide(tabId) {
+    this.syncInputsToState();
+    this.state.activeCalendarGuideTab = tabId;
+    this.render();
+  },
+
+  openCalendarProviderPortal(providerId) {
+    const urls = {
+      outlook: 'https://outlook.office.com/mail/options/calendar/SharedCalendars',
+      google: 'https://calendar.google.com/calendar/r/settings',
+      apple: 'https://www.icloud.com/calendar/'
+    };
+    const targetUrl = urls[providerId] || 'https://outlook.office.com/mail/options/calendar/SharedCalendars';
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   },
 
   prev() {
@@ -1096,8 +1116,9 @@ const SetupWizardController = {
     const stepTitles = [
       { num: 1, label: t('setupWizard.step1Title') || 'Profile & Theme', icon: '👤' },
       { num: 2, label: t('setupWizard.step2Title') || 'Schedule', icon: '📅' },
-      { num: 3, label: t('setupWizard.step3Title') || 'AI Assistant', icon: '🤖' },
-      { num: 4, label: t('setupWizard.step4Title') || 'Ready!', icon: '✨' }
+      { num: 3, label: t('setupWizard.stepCalendarTitle') || 'Calendar Sync', icon: '🔄' },
+      { num: 4, label: t('setupWizard.step3Title') || 'AI Assistant', icon: '🤖' },
+      { num: 5, label: t('setupWizard.step4Title') || 'Ready!', icon: '✨' }
     ];
 
     let stepperHtml = '<div class="setup-wizard-stepper">';
@@ -1123,8 +1144,10 @@ const SetupWizardController = {
     } else if (this.currentStep === 1) {
       bodyHtml = this.renderStep2();
     } else if (this.currentStep === 2) {
-      bodyHtml = this.renderStep3();
+      bodyHtml = this.renderStepCalendar();
     } else if (this.currentStep === 3) {
+      bodyHtml = this.renderStep3();
+    } else if (this.currentStep === 4) {
       bodyHtml = this.renderStep4();
     }
 
@@ -1141,7 +1164,7 @@ const SetupWizardController = {
           <button class="setup-wizard-btn setup-wizard-btn-primary" onclick="SetupWizardController.next()" title="${t('setupWizard.nextTooltip') || 'Proceed to the next setup step'}">${t('setupWizard.nextBtn') || 'Next →'}</button>
         </div>
       `;
-    } else if (this.currentStep === 1 || this.currentStep === 2) {
+    } else if (this.currentStep >= 1 && this.currentStep <= 3) {
       footerActionsHtml = `
         <button class="setup-wizard-btn setup-wizard-btn-subtle" onclick="SetupWizardController.skip()" title="${t('setupWizard.skipTooltip') || 'Skip setup and use default settings'}">${t('setupWizard.skipBtn') || 'Skip Setup'}</button>
         <div class="setup-wizard-footer-right">
@@ -1331,19 +1354,118 @@ const SetupWizardController = {
             <option value="60" ${this.state.defaultDuration === 60 ? 'selected' : ''}>60 min (1h)</option>
           </select>
         </div>
+      </div>
+    `;
+  },
 
-        <!-- Calendar Synchronization -->
-        <div class="setup-wizard-form-group" style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--card-border);">
-          <label class="setup-wizard-label" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>${t('setupWizard.calendarSyncTitle') || 'Calendar Synchronization (Optional)'}</span>
-          </label>
-          <p style="font-size:0.75rem; color:var(--text-muted); margin:2px 0 8px 0;">
-            ${t('setupWizard.calendarSyncDesc') || 'Connect Google, Apple, or Outlook via a WebCal / iCal link, or use the local macOS helper for corporate accounts.'}
+  renderStepCalendar() {
+    const activeTab = this.state.activeCalendarGuideTab || 'outlook';
+
+    let guideContentHtml = '';
+    if (activeTab === 'outlook') {
+      guideContentHtml = `
+        <div class="setup-wizard-guide-box">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:10px;">
+            <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
+              ${t('setupWizard.outlookGuideIntro') || 'Outlook Web allows publishing an ICS link that Secretary can sync automatically:'}
+            </p>
+            <button type="button" class="setup-wizard-btn setup-wizard-btn-primary" style="font-size:0.75rem; padding:4px 10px; white-space:nowrap; flex-shrink:0;" onclick="SetupWizardController.openCalendarProviderPortal('outlook')" title="${t('setupWizard.openOutlookSettingsTooltip') || 'Open Microsoft Outlook Calendar Settings in a new tab'}">
+              ${t('setupWizard.openOutlookSettingsBtn') || 'Open Outlook Settings ↗'}
+            </button>
+          </div>
+          <ol class="setup-wizard-guide-steps">
+            <li>${t('setupWizard.outlookStep1') || 'Log in to Outlook on the web at outlook.office.com or outlook.live.com.'}</li>
+            <li>${t('setupWizard.outlookStep2') || 'Go to Settings ⚙️ > Calendar > Shared calendars > Publish a calendar.'}</li>
+            <li>${t('setupWizard.outlookStep3') || "Select your calendar, choose 'Can view all details', and click 'Publish'."}</li>
+            <li>${t('setupWizard.outlookStep4') || 'Copy the ICS link, paste it in the field below, and click Test Feed.'}</li>
+          </ol>
+          <div style="margin-top:0.75rem; padding:0.5rem 0.75rem; background:var(--bg-secondary); border-radius:6px; font-size:0.75rem; color:var(--text-muted); border-left:3px solid var(--accent-color);">
+            💡 ${t('setupWizard.outlookCorporateNote') || "If your IT organization disabled 'Publish a calendar', use the Corporate / Local tab above."}
+          </div>
+        </div>
+      `;
+    } else if (activeTab === 'google') {
+      guideContentHtml = `
+        <div class="setup-wizard-guide-box">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:10px;">
+            <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
+              ${t('setupWizard.googleGuideIntro') || 'Connect Google Calendar using your private secret iCal address:'}
+            </p>
+            <button type="button" class="setup-wizard-btn setup-wizard-btn-primary" style="font-size:0.75rem; padding:4px 10px; white-space:nowrap; flex-shrink:0;" onclick="SetupWizardController.openCalendarProviderPortal('google')" title="${t('setupWizard.openGoogleSettingsTooltip') || 'Open Google Calendar Settings in a new tab'}">
+              ${t('setupWizard.openGoogleSettingsBtn') || 'Open Google Calendar Settings ↗'}
+            </button>
+          </div>
+          <ol class="setup-wizard-guide-steps">
+            <li>${t('setupWizard.googleStep1') || 'Open Google Calendar on desktop and click Settings ⚙️.'}</li>
+            <li>${t('setupWizard.googleStep2') || "In the left sidebar, click on your calendar under 'Settings for my calendars'."}</li>
+            <li>${t('setupWizard.googleStep3') || "Scroll down to 'Integrate calendar' and find 'Secret address in iCal format'."}</li>
+            <li>${t('setupWizard.googleStep4') || 'Copy that secret URL, paste it below, and click Test Feed.'}</li>
+          </ol>
+        </div>
+      `;
+    } else if (activeTab === 'apple') {
+      guideContentHtml = `
+        <div class="setup-wizard-guide-box">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:10px;">
+            <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
+              ${t('setupWizard.appleGuideIntro') || 'Subscribe to your iCloud Calendar with WebCal:'}
+            </p>
+            <button type="button" class="setup-wizard-btn setup-wizard-btn-primary" style="font-size:0.75rem; padding:4px 10px; white-space:nowrap; flex-shrink:0;" onclick="SetupWizardController.openCalendarProviderPortal('apple')" title="${t('setupWizard.openAppleSettingsTooltip') || 'Open iCloud Calendar in a new tab'}">
+              ${t('setupWizard.openAppleCalendarBtn') || 'Open iCloud Calendar ↗'}
+            </button>
+          </div>
+          <ol class="setup-wizard-guide-steps">
+            <li>${t('setupWizard.appleStep1') || 'In Apple Calendar on Mac or iCloud.com, click the share icon next to your calendar.'}</li>
+            <li>${t('setupWizard.appleStep2') || "Check 'Public Calendar' to generate an iCal subscription URL."}</li>
+            <li>${t('setupWizard.appleStep3') || 'Copy the webcal:// link, paste it below, and click Test Feed.'}</li>
+          </ol>
+        </div>
+      `;
+    } else if (activeTab === 'corporate') {
+      guideContentHtml = `
+        <div class="setup-wizard-guide-box">
+          <p style="margin:0 0 0.75rem 0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
+            ${t('setupWizard.corporateGuideIntro') || 'For locked-down corporate laptops where public links are blocked:'}
           </p>
+          <ol class="setup-wizard-guide-steps">
+            <li>${t('setupWizard.corporateStep1') || 'Many enterprise Microsoft 365 tenants block public WebCal links. Secretary includes a 100% private local sync helper for macOS.'}</li>
+            <li>${t('setupWizard.corporateStep2') || 'Run in your terminal: <code>python3 development/sync_local_calendar.py --outlook</code> (or <code>--apple</code>).'}</li>
+            <li>${t('setupWizard.corporateStep3') || 'Events sync directly from your desktop app into Secretary planner proposals without any cloud exposure.'}</li>
+          </ol>
+          <div style="margin-top:0.75rem; font-size:0.75rem; color:var(--text-muted);">
+            ℹ️ ${t('setupWizard.corporateTip') || 'You can leave the link below blank and continue. The local helper works independently without requiring a WebCal URL.'}
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="setup-wizard-step-pane">
+        <p class="setup-wizard-step-intro">${t('setupWizard.stepCalendarDesc') || 'Connect your external calendars (Outlook, Google, Apple) or sync locally from macOS.'}</p>
+
+        <div style="display:flex; gap:6px; margin-bottom:0.75rem; border-bottom:1px solid var(--card-border); padding-bottom:6px; flex-wrap:wrap;">
+          <button type="button" class="setup-wizard-tab-btn ${activeTab === 'outlook' ? 'active' : ''}" onclick="SetupWizardController.selectCalendarGuide('outlook')" title="${t('setupWizard.guideTabOutlookTooltip') || 'Outlook Web instructions'}">
+            📧 ${t('setupWizard.guideTabOutlook') || 'Outlook'}
+          </button>
+          <button type="button" class="setup-wizard-tab-btn ${activeTab === 'google' ? 'active' : ''}" onclick="SetupWizardController.selectCalendarGuide('google')" title="${t('setupWizard.guideTabGoogleTooltip') || 'Google Calendar instructions'}">
+            📅 ${t('setupWizard.guideTabGoogle') || 'Google Calendar'}
+          </button>
+          <button type="button" class="setup-wizard-tab-btn ${activeTab === 'apple' ? 'active' : ''}" onclick="SetupWizardController.selectCalendarGuide('apple')" title="${t('setupWizard.guideTabAppleTooltip') || 'Apple Calendar instructions'}">
+            🍏 ${t('setupWizard.guideTabApple') || 'Apple Calendar'}
+          </button>
+          <button type="button" class="setup-wizard-tab-btn ${activeTab === 'corporate' ? 'active' : ''}" onclick="SetupWizardController.selectCalendarGuide('corporate')" title="${t('setupWizard.guideTabCorporateTooltip') || 'Corporate / Local macOS instructions'}">
+            🏢 ${t('setupWizard.guideTabCorporate') || 'Corporate / Local'}
+          </button>
+        </div>
+
+        ${guideContentHtml}
+
+        <div class="setup-wizard-form-group" style="margin-top:1rem;">
+          <label class="setup-wizard-label" for="wizard-calendar-feed-input">${t('setupWizard.calendarFeedLabel') || 'Calendar Subscription Link (iCal / WebCal)'}</label>
           <div style="display:flex; gap:6px;">
             <input type="url" id="wizard-calendar-feed-input" class="setup-wizard-input" value="${escH(this.state.calendarFeedUrl || '')}" placeholder="${t('setupWizard.calendarFeedPlaceholder') || 'webcal:// or https://.../calendar.ics'}" oninput="SetupWizardController.state.calendarFeedUrl = this.value" title="${t('setupWizard.calendarFeedTooltip') || 'Paste your private iCal / WebCal calendar URL'}" style="flex:1;">
             <button type="button" class="setup-wizard-btn setup-wizard-btn-test" onclick="SetupWizardController.testCalendarFeed()" ${this.isTestingCalendar ? 'disabled' : ''} title="${t('setupWizard.testFeedTooltip') || 'Verify feed connectivity and event count'}">
-              ${this.isTestingCalendar ? '...' : (t('setupWizard.testFeedBtn') || 'Test Feed')}
+              ${this.isTestingCalendar ? '⏳ ' + (t('setupWizard.testFeedTesting') || 'Testing…') : '⚡ ' + (t('setupWizard.testFeedBtn') || 'Test Feed')}
             </button>
           </div>
           ${this.calendarTestMessage ? `
@@ -1351,9 +1473,9 @@ const SetupWizardController = {
               ${this.calendarTestType === 'success' ? '✓ ' : '✕ '} ${escH(this.calendarTestMessage)}
             </div>
           ` : ''}
-          <div style="margin-top:6px; font-size:0.72rem; color:var(--text-muted);">
-            ℹ️ ${t('setupWizard.localHelperHint') || 'Corporate Outlook with restricted cloud access? Use the local macOS sync helper in Preferences.'}
-          </div>
+          <p style="margin:4px 0 0 0; font-size:0.72rem; color:var(--text-muted);">
+            ${t('setupWizard.calendarFeedHelpNote') || 'Leave empty to skip. You can always configure or change calendar feeds in Settings.'}
+          </p>
         </div>
       </div>
     `;
@@ -1362,6 +1484,7 @@ const SetupWizardController = {
   async testCalendarFeed() {
     const input = document.getElementById('wizard-calendar-feed-input');
     const url = (input ? input.value : this.state.calendarFeedUrl || '').trim();
+    this.state.calendarFeedUrl = url;
     if (!url) {
       this.calendarTestMessage = t('setupWizard.testFeedError') || 'Please enter a calendar URL';
       this.calendarTestType = 'error';
@@ -1503,6 +1626,14 @@ const SetupWizardController = {
             <div class="setup-wizard-summary-content">
               <span class="setup-wizard-summary-label">${t('setupWizard.summarySchedule') || 'Working Schedule'}</span>
               <span class="setup-wizard-summary-value">${scheduleSummary}</span>
+            </div>
+          </div>
+
+          <div class="setup-wizard-summary-card">
+            <div class="setup-wizard-summary-icon">🔄</div>
+            <div class="setup-wizard-summary-content">
+              <span class="setup-wizard-summary-label">${t('setupWizard.stepCalendarTitle') || 'Calendar Sync'}</span>
+              <span class="setup-wizard-summary-value">${this.state.calendarFeedUrl ? escH(this.state.calendarFeedUrl.length > 35 ? this.state.calendarFeedUrl.slice(0, 32) + '…' : this.state.calendarFeedUrl) : (t('setupWizard.summaryCalendarNone') || 'Not configured')}</span>
             </div>
           </div>
 

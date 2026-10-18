@@ -4191,12 +4191,115 @@ async function copyLocalCalendarSyncCmd() {
   }
 }
 
+let _currentPrefsGuideTab = 'outlook';
+
+function toggleCalendarGuidePrefs() {
+  const container = document.getElementById('prefs-calendar-guide-container');
+  const btn = document.getElementById('btn-toggle-calendar-guide');
+  if (!container) return;
+  const isHidden = container.style.display === 'none' || !container.style.display;
+  container.style.display = isHidden ? 'block' : 'none';
+  if (btn) {
+    btn.innerHTML = isHidden 
+      ? `<span>${t('prefs.closeGuideBtn') || 'Close Guide ✕'}</span>` 
+      : `<span>${t('prefs.howToFindLinkBtn') || 'How to find your calendar link? ℹ️'}</span>`;
+  }
+  if (isHidden) {
+    switchPrefsCalendarGuide(_currentPrefsGuideTab || 'outlook');
+  }
+}
+
+function switchPrefsCalendarGuide(providerId) {
+  _currentPrefsGuideTab = providerId;
+  const contentEl = document.getElementById('prefs-calendar-guide-content');
+  const tabs = ['outlook', 'google', 'apple'];
+  tabs.forEach(tab => {
+    const tabEl = document.getElementById(`prefs-guide-tab-${tab}`);
+    if (tabEl) {
+      if (tab === providerId) {
+        tabEl.classList.add('active');
+      } else {
+        tabEl.classList.remove('active');
+      }
+    }
+  });
+
+  if (!contentEl) return;
+
+  const openPortalFn = (pId) => {
+    const urls = {
+      outlook: 'https://outlook.office.com/mail/options/calendar/SharedCalendars',
+      google: 'https://calendar.google.com/calendar/r/settings',
+      apple: 'https://www.icloud.com/calendar/'
+    };
+    window.open(urls[pId] || urls.outlook, '_blank', 'noopener,noreferrer');
+  };
+  window.openCalendarProviderPortal = openPortalFn;
+
+  if (providerId === 'outlook') {
+    contentEl.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:10px;">
+        <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
+          ${t('setupWizard.outlookGuideIntro') || 'Outlook Web allows publishing an ICS link that Secretary can sync automatically:'}
+        </p>
+        <button type="button" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px; white-space:nowrap; flex-shrink:0;" onclick="openCalendarProviderPortal('outlook')" title="${t('setupWizard.openOutlookSettingsTooltip') || 'Open Microsoft Outlook Calendar Settings in a new tab'}">
+          ${t('setupWizard.openOutlookSettingsBtn') || 'Open Outlook Settings ↗'}
+        </button>
+      </div>
+      <ol class="setup-wizard-guide-steps">
+        <li>${t('setupWizard.outlookStep1') || 'Log in to Outlook on the web at outlook.office.com or outlook.live.com.'}</li>
+        <li>${t('setupWizard.outlookStep2') || 'Go to Settings ⚙️ > Calendar > Shared calendars > Publish a calendar.'}</li>
+        <li>${t('setupWizard.outlookStep3') || "Select your calendar, choose 'Can view all details', and click 'Publish'."}</li>
+        <li>${t('setupWizard.outlookStep4') || 'Copy the ICS link, paste it in the feed URL field above, and click Add & Sync.'}</li>
+      </ol>
+      <div style="margin-top:0.75rem; padding:0.5rem 0.75rem; background:var(--bg-secondary); border-radius:6px; font-size:0.75rem; color:var(--text-muted); border-left:3px solid var(--accent-color);">
+        💡 ${t('setupWizard.outlookCorporateNote') || "If your IT organization disabled 'Publish a calendar', use the Local macOS / Corporate Outlook Helper below."}
+      </div>
+    `;
+  } else if (providerId === 'google') {
+    contentEl.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:10px;">
+        <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
+          ${t('setupWizard.googleGuideIntro') || 'Connect Google Calendar using your private secret iCal address:'}
+        </p>
+        <button type="button" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px; white-space:nowrap; flex-shrink:0;" onclick="openCalendarProviderPortal('google')" title="${t('setupWizard.openGoogleSettingsTooltip') || 'Open Google Calendar Settings in a new tab'}">
+          ${t('setupWizard.openGoogleSettingsBtn') || 'Open Google Calendar Settings ↗'}
+        </button>
+      </div>
+      <ol class="setup-wizard-guide-steps">
+        <li>${t('setupWizard.googleStep1') || 'Open Google Calendar on desktop and click Settings ⚙️.'}</li>
+        <li>${t('setupWizard.googleStep2') || "In the left sidebar, click on your calendar under 'Settings for my calendars'."}</li>
+        <li>${t('setupWizard.googleStep3') || "Scroll down to 'Integrate calendar' and find 'Secret address in iCal format'."}</li>
+        <li>${t('setupWizard.googleStep4') || 'Copy that secret URL, paste it above, and click Add & Sync.'}</li>
+      </ol>
+    `;
+  } else if (providerId === 'apple') {
+    contentEl.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.75rem; gap:10px;">
+        <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
+          ${t('setupWizard.appleGuideIntro') || 'Subscribe to your iCloud Calendar with WebCal:'}
+        </p>
+        <button type="button" class="btn btn-primary" style="font-size:0.75rem; padding:4px 10px; white-space:nowrap; flex-shrink:0;" onclick="openCalendarProviderPortal('apple')" title="${t('setupWizard.openAppleSettingsTooltip') || 'Open iCloud Calendar in a new tab'}">
+          ${t('setupWizard.openAppleCalendarBtn') || 'Open iCloud Calendar ↗'}
+        </button>
+      </div>
+      <ol class="setup-wizard-guide-steps">
+        <li>${t('setupWizard.appleStep1') || 'In Apple Calendar on Mac or iCloud.com, click the share icon next to your calendar.'}</li>
+        <li>${t('setupWizard.appleStep2') || "Check 'Public Calendar' to generate an iCal subscription URL."}</li>
+        <li>${t('setupWizard.appleStep3') || 'Copy the webcal:// link, paste it into the field above, and click Add & Sync.'}</li>
+      </ol>
+    `;
+  }
+}
+
 window.renderCalendarSyncPrefs = renderCalendarSyncPrefs;
 window.addCalendarFeedFromPrefs = addCalendarFeedFromPrefs;
 window.removeCalendarFeedFromPrefs = removeCalendarFeedFromPrefs;
 window.toggleCalendarFeedFromPrefs = toggleCalendarFeedFromPrefs;
 window.syncCalendarFeedFromPrefs = syncCalendarFeedFromPrefs;
 window.copyLocalCalendarSyncCmd = copyLocalCalendarSyncCmd;
+window.toggleCalendarGuidePrefs = toggleCalendarGuidePrefs;
+window.switchPrefsCalendarGuide = switchPrefsCalendarGuide;
 
 // ═══ Cross-window sync ═══
 function broadcastSync(msg) {
