@@ -1025,35 +1025,49 @@ echo "✨ Sync complete!"
      */
     updateExternalStatusUI() {
       if (typeof document === 'undefined') return;
-      const statusEl = document.getElementById('prefs-local-proposals-status');
-      const linkedBox = document.getElementById('prefs-external-agent-linked-box');
-      const linkedLabel = document.getElementById('prefs-external-agent-linked-label');
+      const statusEls = [
+        document.getElementById('prefs-local-proposals-status'),
+        document.getElementById('wizard-local-proposals-status')
+      ].filter(Boolean);
+      const linkedBoxes = [
+        document.getElementById('prefs-external-agent-linked-box'),
+        document.getElementById('wizard-external-agent-linked-box')
+      ].filter(Boolean);
+      const linkedLabels = [
+        document.getElementById('prefs-external-agent-linked-label'),
+        document.getElementById('wizard-external-agent-linked-label')
+      ].filter(Boolean);
 
       if (this._externalFolderHandle) {
-        if (linkedBox) linkedBox.style.display = 'flex';
-        if (linkedLabel) linkedLabel.textContent = `📁 ${this._externalFolderHandle.name} (${this._externalLoadedInfo?.count || 0})`;
-        if (statusEl) {
-          const count = this._externalLoadedInfo?.count || 0;
-          statusEl.textContent = (typeof t === 'function') ? t('prefs.externalActiveBadge', { count }) : `${count} active`;
-          statusEl.style.background = 'var(--accent)';
-          statusEl.style.color = '#fff';
-        }
+        linkedBoxes.forEach(el => el.style.display = 'flex');
+        const labelText = `📁 ${this._externalFolderHandle.name} (${this._externalLoadedInfo?.count || 0})`;
+        linkedLabels.forEach(el => el.textContent = labelText);
+        const count = this._externalLoadedInfo?.count || 0;
+        const text = (typeof t === 'function') ? t('prefs.externalActiveBadge', { count }) : `${count} active`;
+        statusEls.forEach(el => {
+          el.textContent = text;
+          el.style.background = 'var(--accent)';
+          el.style.color = '#fff';
+        });
       } else if (this._externalLoadedInfo) {
-        if (linkedBox) linkedBox.style.display = 'flex';
-        if (linkedLabel) linkedLabel.textContent = `📄 ${this._externalLoadedInfo.name} (${this._externalLoadedInfo.count})`;
-        if (statusEl) {
-          const count = this._externalLoadedInfo.count;
-          statusEl.textContent = (typeof t === 'function') ? t('prefs.externalImportedBadge', { count }) : `${count} imported`;
-          statusEl.style.background = 'var(--accent)';
-          statusEl.style.color = '#fff';
-        }
+        linkedBoxes.forEach(el => el.style.display = 'flex');
+        const labelText = `📄 ${this._externalLoadedInfo.name} (${this._externalLoadedInfo.count})`;
+        linkedLabels.forEach(el => el.textContent = labelText);
+        const count = this._externalLoadedInfo.count;
+        const text = (typeof t === 'function') ? t('prefs.externalImportedBadge', { count }) : `${count} imported`;
+        statusEls.forEach(el => {
+          el.textContent = text;
+          el.style.background = 'var(--accent)';
+          el.style.color = '#fff';
+        });
       } else {
-        if (linkedBox) linkedBox.style.display = 'none';
-        if (statusEl) {
-          statusEl.textContent = (typeof t === 'function') ? t('prefs.externalZeroProposals') : '0 proposals';
-          statusEl.style.background = 'var(--bg-tag)';
-          statusEl.style.color = 'var(--text-muted)';
-        }
+        linkedBoxes.forEach(el => el.style.display = 'none');
+        const text = (typeof t === 'function') ? t('prefs.externalZeroProposals') : '0 proposals';
+        statusEls.forEach(el => {
+          el.textContent = text;
+          el.style.background = 'var(--bg-tag)';
+          el.style.color = 'var(--text-muted)';
+        });
       }
     },
 

@@ -849,6 +849,65 @@ const SetupWizardController = {
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
   },
 
+  openCloudSignIn() {
+    this.close();
+    if (typeof openModal === 'function') {
+      openModal('modal-cloud-sync-setup');
+    }
+    if (typeof switchSyncSetupTab === 'function') {
+      switchSyncSetupTab('signin');
+    }
+  },
+
+  downloadSyncScript() {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.downloadSyncScript === 'function') {
+      CalendarSyncService.downloadSyncScript();
+    }
+  },
+
+  async connectCorporateFolder() {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.linkExternalAgentFolder === 'function') {
+      await CalendarSyncService.linkExternalAgentFolder();
+      this.render();
+    }
+  },
+
+  selectCorporateFile() {
+    const input = document.getElementById('wizard-external-file-picker');
+    if (input) {
+      input.click();
+    } else if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.selectExternalAgentFile === 'function') {
+      CalendarSyncService.selectExternalAgentFile();
+    }
+  },
+
+  async handleCorporateFileInput(event) {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.handleFileInputChange === 'function') {
+      await CalendarSyncService.handleFileInputChange(event);
+      this.render();
+    }
+  },
+
+  disconnectCorporateFolder() {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.disconnectExternalAgentFolder === 'function') {
+      CalendarSyncService.disconnectExternalAgentFolder();
+      this.render();
+    }
+  },
+
+  copyCorporateCmd() {
+    const cmd = './development/sync_local_calendar.sh';
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cmd).then(() => {
+        if (typeof showToast === 'function') {
+          showToast((typeof t === 'function' ? t('common.copied') : '') || 'Copied to clipboard');
+        } else if (typeof toast === 'function') {
+          toast((typeof t === 'function' ? t('common.copied') : '') || 'Copied to clipboard');
+        }
+      }).catch(() => {});
+    }
+  },
+
   prev() {
     this.syncInputsToState();
     if (this.currentStep > 0) {
@@ -1201,7 +1260,10 @@ const SetupWizardController = {
             <p class="setup-wizard-subtitle">${stepTitles[this.currentStep].label}</p>
           </div>
         </div>
-        <button class="setup-wizard-close" onclick="SetupWizardController.skip()" title="${t('editor.closeTooltip') || 'Close'}" aria-label="Close">✕</button>
+        <div class="setup-wizard-header-actions">
+          <button type="button" class="setup-wizard-link-btn" onclick="SetupWizardController.openCloudSignIn()" title="${t('setupWizard.returningUserTooltip') || 'Sign in to restore your existing encrypted vault and notes from a previous version'}">${t('setupWizard.returningUserLink') || 'Already have an existing vault? Sign in'}</button>
+          <button class="setup-wizard-close" onclick="SetupWizardController.skip()" title="${t('editor.closeTooltip') || 'Close'}" aria-label="Close">✕</button>
+        </div>
       </div>
 
       ${stepperHtml}
@@ -1422,16 +1484,70 @@ const SetupWizardController = {
         </div>
       `;
     } else if (activeTab === 'corporate') {
+      const extInfo = (typeof CalendarSyncService !== 'undefined') ? CalendarSyncService._externalLoadedInfo : null;
+      const extFolder = (typeof CalendarSyncService !== 'undefined') ? CalendarSyncService._externalFolderHandle : null;
+      let linkedDisplay = 'none';
+      let linkedText = '';
+      let badgeText = (typeof t === 'function') ? t('prefs.externalZeroProposals') : '0 proposals';
+      let badgeBg = 'var(--bg-tag)';
+      let badgeColor = 'var(--text-muted)';
+
+      if (extFolder) {
+        linkedDisplay = 'flex';
+        linkedText = `📁 ${extFolder.name} (${extInfo?.count || 0})`;
+        badgeText = (typeof t === 'function') ? t('prefs.externalActiveBadge', { count: extInfo?.count || 0 }) : `${extInfo?.count || 0} active`;
+        badgeBg = 'var(--accent)';
+        badgeColor = '#fff';
+      } else if (extInfo) {
+        linkedDisplay = 'flex';
+        linkedText = `📄 ${extInfo.name} (${extInfo.count})`;
+        badgeText = (typeof t === 'function') ? t('prefs.externalImportedBadge', { count: extInfo.count }) : `${extInfo.count} imported`;
+        badgeBg = 'var(--accent)';
+        badgeColor = '#fff';
+      }
+
       guideContentHtml = `
         <div class="setup-wizard-guide-box">
-          <p style="margin:0 0 0.75rem 0; font-size:0.82rem; line-height:1.45; color:var(--text-normal);">
-            ${t('setupWizard.corporateGuideIntro') || 'For locked-down corporate laptops where public links are blocked:'}
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:6px;">
+            <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal); font-weight:600;">
+              ${t('setupWizard.corporateGuideIntro') || 'For locked-down corporate laptops where public links are blocked:'}
+            </p>
+            <span id="wizard-local-proposals-status" class="badge" style="font-size:0.72rem; padding:2px 6px; border-radius:4px; background:${badgeBg}; color:${badgeColor};" title="Status of planner-proposals.json">
+              ${badgeText}
+            </span>
+          </div>
+          <p style="margin:0 0 0.5rem 0; font-size:0.78rem; line-height:1.4; color:var(--text-muted);">
+            ${t('prefs.localCalendarHelperDesc') || 'If corporate IT blocks cloud calendar feeds, run the local sync script directly on macOS to extract Outlook Desktop & Apple Calendar meetings into Secretary proposals.'}
           </p>
-          <ol class="setup-wizard-guide-steps">
-            <li>${t('setupWizard.corporateStep1') || 'Many enterprise Microsoft 365 tenants block public WebCal links. Secretary includes a 100% private local sync helper for macOS.'}</li>
-            <li>${t('setupWizard.corporateStep2') || 'Run in your terminal: <code>python3 development/sync_local_calendar.py --outlook</code> (or <code>--apple</code>).'}</li>
-            <li>${t('setupWizard.corporateStep3') || 'Events sync directly from your desktop app into Secretary planner proposals without any cloud exposure.'}</li>
-          </ol>
+          <div style="position:relative; width:100%; margin-bottom:0.6rem;">
+            <input type="text" id="wizard-local-sync-cmd" readonly value="./development/sync_local_calendar.sh" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="${t('prefs.localSyncCmdTooltip') || 'Command to run local calendar sync in Terminal'}">
+            <button type="button" class="btn" onclick="SetupWizardController.copyCorporateCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="${t('prefs.localSyncCmdTooltip') || 'Copy terminal command to clipboard'}">
+              <span>${t('common.copy') || 'Copy'}</span>
+            </button>
+          </div>
+          <!-- Web Action Controls: Download Script, Connect Results Folder, Select File -->
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+            <button type="button" class="btn btn-sm" id="wizard-btn-download-sync-script" onclick="SetupWizardController.downloadSyncScript()" title="${t('prefs.downloadSyncScriptTooltip') || 'Download the local calendar sync script (.sh) to run on your Mac'}" style="font-size:0.73rem; padding:3px 8px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>${t('prefs.downloadSyncScriptBtn') || 'Download Script'}</span>
+            </button>
+            <button type="button" class="btn btn-sm" id="wizard-btn-connect-agent-folder" onclick="SetupWizardController.connectCorporateFolder()" title="${t('prefs.connectFolderTooltip') || 'Select the local folder containing the sync script and planner-proposals.json'}" style="font-size:0.73rem; padding:3px 8px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span>${t('prefs.connectFolderBtn') || 'Connect Results Folder'}</span>
+            </button>
+            <button type="button" class="btn btn-sm" id="wizard-btn-select-agent-file" onclick="SetupWizardController.selectCorporateFile()" title="${t('prefs.selectFileTooltip') || 'Select a planner-proposals.json or calendar .ics file directly'}" style="font-size:0.73rem; padding:3px 8px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>${t('prefs.selectFileBtn') || 'Select File'}</span>
+            </button>
+            <input type="file" id="wizard-external-file-picker" accept=".json,.ics" style="display:none;" onchange="SetupWizardController.handleCorporateFileInput(event)">
+          </div>
+          <!-- Linked Folder / File Active Indicator -->
+          <div id="wizard-external-agent-linked-box" style="display:${linkedDisplay}; align-items:center; justify-content:space-between; margin-top:8px; background:var(--card-bg); border:1px solid var(--accent); border-radius:4px; padding:4px 8px; font-size:0.73rem;">
+            <span id="wizard-external-agent-linked-label" style="font-family:'Fira Code',monospace; font-weight:500; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${linkedText}</span>
+            <button type="button" class="btn btn-sm" onclick="SetupWizardController.disconnectCorporateFolder()" title="${t('prefs.disconnectFolderTooltip') || 'Disconnect linked external results folder'}" style="padding:1px 6px; font-size:0.7rem; color:var(--danger); border:none; background:transparent; cursor:pointer;">
+              ✕
+            </button>
+          </div>
           <div style="margin-top:0.75rem; font-size:0.75rem; color:var(--text-muted);">
             ℹ️ ${t('setupWizard.corporateTip') || 'You can leave the link below blank and continue. The local helper works independently without requiring a WebCal URL.'}
           </div>

@@ -306,6 +306,93 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
         'noopener,noreferrer'
       );
     });
+
+    it('renders corporate local sync controls (download script, folder, file) when corporate guide is selected', () => {
+      const tutorialCode = fs.readFileSync(path.resolve(__dirname, '../../js/app-tutorial.js'), 'utf8');
+      const mockWindow = {
+        settings: { ui: { colors: { accent: '#4f46e5' } }, ai: {} },
+        t: (k) => k,
+        escH: (s) => s || '',
+        localStorage: { getItem: vi.fn(), setItem: vi.fn() },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        open: vi.fn()
+      };
+
+      const fn = new Function('window', 'document', 'settings', 't', 'escH', `${tutorialCode}; return window.SetupWizardController;`);
+      const wizard = fn(mockWindow, document, mockWindow.settings, mockWindow.t, mockWindow.escH);
+
+      wizard.currentStep = 2;
+      wizard.state.activeCalendarGuideTab = 'corporate';
+      const html = wizard.renderStepCalendar();
+
+      expect(html).toContain('wizard-btn-download-sync-script');
+      expect(html).toContain('SetupWizardController.downloadSyncScript()');
+      expect(html).toContain('wizard-btn-connect-agent-folder');
+      expect(html).toContain('SetupWizardController.connectCorporateFolder()');
+      expect(html).toContain('wizard-btn-select-agent-file');
+      expect(html).toContain('SetupWizardController.selectCorporateFile()');
+      expect(html).toContain('./development/sync_local_calendar.sh');
+      expect(html).toContain('wizard-local-proposals-status');
+      expect(html).toContain('wizard-external-agent-linked-box');
+    });
+
+    it('provides returning user sign-in entrypoint in modal header and opens cloud sync setup in signin tab', () => {
+      const tutorialCode = fs.readFileSync(path.resolve(__dirname, '../../js/app-tutorial.js'), 'utf8');
+      const mockOpenModal = vi.fn();
+      const mockSwitchSyncSetupTab = vi.fn();
+      const mockWindow = {
+        settings: { ui: { colors: { accent: '#4f46e5' } }, ai: {} },
+        t: (k) => k,
+        escH: (s) => s || '',
+        localStorage: { getItem: vi.fn(), setItem: vi.fn() },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        openModal: mockOpenModal,
+        switchSyncSetupTab: mockSwitchSyncSetupTab
+      };
+
+      const fn = new Function('window', 'document', 'settings', 't', 'escH', 'openModal', 'switchSyncSetupTab', `${tutorialCode}; return window.SetupWizardController;`);
+      const wizard = fn(mockWindow, document, mockWindow.settings, mockWindow.t, mockWindow.escH, mockOpenModal, mockSwitchSyncSetupTab);
+
+      const closeSpy = vi.spyOn(wizard, 'close').mockImplementation(() => {});
+      wizard.openCloudSignIn();
+
+      expect(closeSpy).toHaveBeenCalled();
+      expect(mockOpenModal).toHaveBeenCalledWith('modal-cloud-sync-setup');
+      expect(mockSwitchSyncSetupTab).toHaveBeenCalledWith('signin');
+    });
+
+    it('delegates wizard corporate calendar actions to CalendarSyncService', async () => {
+      const tutorialCode = fs.readFileSync(path.resolve(__dirname, '../../js/app-tutorial.js'), 'utf8');
+      const mockDownload = vi.spyOn(CalendarSyncService, 'downloadSyncScript').mockResolvedValue(true);
+      const mockLink = vi.spyOn(CalendarSyncService, 'linkExternalAgentFolder').mockResolvedValue(true);
+      const mockDisconnect = vi.spyOn(CalendarSyncService, 'disconnectExternalAgentFolder').mockImplementation(() => {});
+
+      const mockWindow = {
+        settings: { ui: { colors: { accent: '#4f46e5' } }, ai: {} },
+        t: (k) => k,
+        escH: (s) => s || '',
+        localStorage: { getItem: vi.fn(), setItem: vi.fn() },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        CalendarSyncService
+      };
+
+      const fn = new Function('window', 'document', 'settings', 't', 'escH', 'CalendarSyncService', `${tutorialCode}; return window.SetupWizardController;`);
+      const wizard = fn(mockWindow, document, mockWindow.settings, mockWindow.t, mockWindow.escH, CalendarSyncService);
+      wizard.render = vi.fn();
+
+      wizard.downloadSyncScript();
+      expect(mockDownload).toHaveBeenCalled();
+
+      await wizard.connectCorporateFolder();
+      expect(mockLink).toHaveBeenCalled();
+      expect(wizard.render).toHaveBeenCalled();
+
+      wizard.disconnectCorporateFolder();
+      expect(mockDisconnect).toHaveBeenCalled();
+    });
   });
 
   describe('External Agent File Access, Script Download & Session Cleanup', () => {

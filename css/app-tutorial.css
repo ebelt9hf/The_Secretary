@@ -350,6 +350,30 @@
   letter-spacing: 0.5px;
 }
 
+.setup-wizard-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-wizard-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all var(--transition);
+}
+
+.setup-wizard-link-btn:hover {
+  background: var(--card-bg-alt);
+  color: var(--text);
+}
+
 .setup-wizard-close {
   background: transparent;
   border: 1px solid transparent;
