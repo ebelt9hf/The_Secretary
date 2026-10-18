@@ -316,6 +316,21 @@ describe('App Utilities (app-utils.js)', () => {
       expect(event.topic_tags).toContain('TopicA');
     });
   });
+
+  describe('Non-DOM environment safety (toast, toastAction, safeToast)', () => {
+    it('safely handles toast calls when document is undefined without throwing ReferenceError', () => {
+      const origDoc = globalThis.document;
+      try {
+        delete globalThis.document;
+        expect(() => toast('Test notification', false)).not.toThrow();
+        expect(() => toastAction('Test notification', 'Action', () => {})).not.toThrow();
+        expect(() => safeToast('Test safe notification')).not.toThrow();
+        expect(() => refreshTodoViews()).not.toThrow();
+      } finally {
+        globalThis.document = origDoc;
+      }
+    });
+  });
 });
 
 

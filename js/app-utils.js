@@ -276,10 +276,11 @@ function getTodoDueDateInfo(todo) {
 
 function refreshTodoViews() {
   if (typeof renderBoard === 'function') renderBoard();
-  if (activeTab === 'planner' && typeof renderPlanner === 'function') renderPlanner();
-  if (activeTab === 'team' && typeof renderTeamPanel === 'function') renderTeamPanel();
-  if (activeTab === 'retro' && typeof renderRetroPanel === 'function') renderRetroPanel();
+  if (typeof activeTab !== 'undefined' && activeTab === 'planner' && typeof renderPlanner === 'function') renderPlanner();
+  if (typeof activeTab !== 'undefined' && activeTab === 'team' && typeof renderTeamPanel === 'function') renderTeamPanel();
+  if (typeof activeTab !== 'undefined' && activeTab === 'retro' && typeof renderRetroPanel === 'function') renderRetroPanel();
 
+  if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') return;
   const overlay = document.getElementById('todo-edit-overlay');
   if (overlay && overlay.style.display !== 'none' && typeof _todoOverlayFile !== 'undefined' && _todoOverlayFile) {
     if (typeof openTodoOverlay === 'function') {
@@ -344,6 +345,12 @@ function lruSet(cacheMap, key, value, limit) {
 // ═══ Toast ═══
 let _toastTimer;
 function toast(msg, isError = false) {
+  if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[Toast]', msg);
+    }
+    return;
+  }
   const el = document.getElementById('toast');
   if (!el) return;
   el.textContent = msg;
@@ -437,6 +444,12 @@ if (typeof window !== 'undefined') window.normalizeNotePath = normalizeNotePath;
 
 // Show a toast with an action button (e.g., Undo). actionFn may be async. duration in ms (default 7000).
 function toastAction(msg, actionLabel, actionFn, duration = 7000) {
+  if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[ToastAction]', msg);
+    }
+    return;
+  }
   const el = document.getElementById('toast');
   if (!el) return;
   el.innerHTML = '';
@@ -828,7 +841,7 @@ function colorForGroup(name) {
     h = h & h;
   }
   const hue = Math.abs(h) % 360;
-  const isDark = document.body && document.body.getAttribute('data-theme') === 'dark';
+  const isDark = (typeof document !== 'undefined' && document.body) ? document.body.getAttribute('data-theme') === 'dark' : false;
   if (isDark) {
     return {
       bg: `hsl(${hue}, 40%, 18%)`,

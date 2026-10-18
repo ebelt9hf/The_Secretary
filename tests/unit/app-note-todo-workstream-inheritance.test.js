@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { loadScriptsIntoGlobal } from '../helpers/load-globals.js';
 
 describe('Note Todo Workstream Inheritance', () => {
@@ -15,6 +15,11 @@ describe('Note Todo Workstream Inheritance', () => {
       'js/app-llm.js',
       'js/app-overlay.js'
     ]);
+  });
+
+  afterEach(async () => {
+    // Allow any scheduled short timers (such as openTodoOverlay 50ms) to settle cleanly before test context teardown
+    await new Promise(resolve => setTimeout(resolve, 60));
   });
 
   beforeEach(() => {

@@ -954,6 +954,7 @@ window.assignTodoToDirectReport = async function(todoId, directReportId) {
 };
 
 function closeTodoContextMenu() {
+  if (typeof document === 'undefined' || !document) return;
   if (todoContextMenuHandlers?.close) document.removeEventListener('click', todoContextMenuHandlers.close);
   if (todoContextMenuHandlers?.esc) document.removeEventListener('keydown', todoContextMenuHandlers.esc);
   todoContextMenuHandlers = null;
@@ -1796,6 +1797,7 @@ function handleTodoDependsSearchKeydown(e) {
 window.handleTodoDependsSearchKeydown = handleTodoDependsSearchKeydown;
 
 async function openTodoOverlay(todoId, maybeOptions = {}) {
+  if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') return;
   closeTodoContextMenu();
   const todo = getTodoById(todoId);
   if (!todo) { toast(t('common.todoNotFound'), true); return; }
