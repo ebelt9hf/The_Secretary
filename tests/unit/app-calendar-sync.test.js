@@ -46,17 +46,26 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       expect(normalized).toBe('https://p01-caldav.icloud.com/published/2/test.ics');
     });
 
-    it('validates calendar URLs correctly', () => {
+    it('validates calendar URLs and prevents SSRF / loopback addresses', () => {
       expect(CalendarSyncService.isValidCalendarUrl('webcal://example.com/cal.ics')).toBe(true);
       expect(CalendarSyncService.isValidCalendarUrl('https://example.com/cal.ics')).toBe(true);
+      expect(CalendarSyncService.isValidCalendarUrl('http://example.com/cal.ics')).toBe(false); // Insecure http rejected
+      expect(CalendarSyncService.isValidCalendarUrl('https://localhost/cal.ics')).toBe(false); // Loopback rejected
+      expect(CalendarSyncService.isValidCalendarUrl('https://127.0.0.1/cal.ics')).toBe(false); // Loopback rejected
+      expect(CalendarSyncService.isValidCalendarUrl('https://::1/cal.ics')).toBe(false); // IPv6 loopback rejected
       expect(CalendarSyncService.isValidCalendarUrl('not-a-url')).toBe(false);
       expect(CalendarSyncService.isValidCalendarUrl('')).toBe(false);
       expect(CalendarSyncService.isValidCalendarUrl(null)).toBe(false);
     });
+
+    it('sanitizes URLs for logging without leaking query params or tokens', () => {
+      const sanitized = CalendarSyncService.sanitizeUrlForLog('https://calendar.google.com/calendar/ical/user%40gmail.com/secret-12345/basic.ics?authuser=0&token=private-xyz#hash');
+      expect(sanitized).toBe('https://calendar.google.com/calendar/ical/user%40gmail.com/secret-12345/basic.ics');
+    });
   });
 
   describe('RFC 5545 ICS Parsing', () => {
-    it('parses timed events with start and end times', () => {
+    it('parses timed events with start and end times, converting UTC timestamps to local client time', () => {
       const ics = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
@@ -76,14 +85,41 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       expect(events).toHaveLength(1);
       const ev = events[0];
       expect(ev.title).toBe('Project Architecture Sync & Call');
-      expect(ev.date).toBe('2026-10-20');
-      expect(ev.startTime).toBe('14:30');
-      expect(ev.endTime).toBe('15:30');
+      
+      const expectedDate = new Date(Date.UTC(2026, 9, 20, 14, 30));
+      const expY = expectedDate.getFullYear();
+      const expM = String(expectedDate.getMonth() + 1).padStart(2, '0');
+      const expD = String(expectedDate.getDate()).padStart(2, '0');
+      const expH = String(expectedDate.getHours()).padStart(2, '0');
+      const expMin = String(expectedDate.getMinutes()).padStart(2, '0');
+      
+      expect(ev.date).toBe(`${expY}-${expM}-${expD}`);
+      expect(ev.startTime).toBe(`${expH}:${expMin}`);
       expect(ev.duration).toBe(60);
       expect(ev.type).toBe('call'); // Inferred from "Call"
       expect(ev.source).toBe('WebCal: Work');
       expect(ev.status).toBe('pending');
       expect(ev.allDay).toBe(false);
+    });
+
+    it('preserves floating wall-clock times when not marked with Z (UTC)', () => {
+      const ics = [
+        'BEGIN:VCALENDAR',
+        'BEGIN:VEVENT',
+        'UID:floating-local-time-999',
+        'DTSTART:20261020T091500',
+        'DTEND:20261020T104500',
+        'SUMMARY:Client Presentation & Strategy Call',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      const events = CalendarSyncService.parseICS(ics);
+      expect(events).toHaveLength(1);
+      expect(events[0].date).toBe('2026-10-20');
+      expect(events[0].startTime).toBe('09:15');
+      expect(events[0].endTime).toBe('10:45');
+      expect(events[0].duration).toBe(90);
     });
 
     it('parses all-day events correctly (YYYYMMDD)', () => {

@@ -41,14 +41,40 @@
 
     /**
      * Validate calendar URL structure.
+     * Enforces https:// protocol and blocks loopback/local addresses to protect against SSRF.
      */
     isValidCalendarUrl(url) {
       const normalized = this.normalizeCalendarUrl(url);
       try {
         const parsed = new URL(normalized);
-        return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+        if (parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname.toLowerCase();
+        if (
+          host === 'localhost' ||
+          host === '127.0.0.1' ||
+          host === '0.0.0.0' ||
+          host === '::1' ||
+          host.endsWith('.localhost') ||
+          host.endsWith('.local')
+        ) {
+          return false;
+        }
+        return true;
       } catch (e) {
         return false;
+      }
+    },
+
+    /**
+     * Sanitize URL for logs or user display by stripping sensitive query parameters and secret tokens.
+     */
+    sanitizeUrlForLog(url) {
+      if (!url || typeof url !== 'string') return '';
+      try {
+        const parsed = new URL(url);
+        return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+      } catch (e) {
+        return '[protected-url]';
       }
     },
 
@@ -111,7 +137,7 @@
         }
       } catch (directErr) {
         // Direct fetch failed (e.g. CORS block, network restriction in browser)
-        console.warn('Direct calendar fetch failed, trying CORS fallback...', directErr);
+        console.warn(`Direct calendar fetch failed for ${this.sanitizeUrlForLog(normalizedUrl)}, trying CORS fallback...`);
       }
 
       // Step 2: Fallback via CORS gateway proxy (allorigins)
@@ -129,7 +155,7 @@
           }
         }
       } catch (proxyErr) {
-        console.warn('CORS fallback calendar fetch failed:', proxyErr);
+        console.warn(`CORS fallback calendar fetch failed for ${this.sanitizeUrlForLog(normalizedUrl)}:`, proxyErr?.message || proxyErr);
       }
 
       throw new Error('Could not fetch calendar feed. Check URL access permissions or use the local macOS sync helper.');
@@ -167,16 +193,43 @@
           return {
             date: `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`,
             time: '00:00',
-            allDay: true
+            allDay: true,
+            isUtc: false
           };
         }
         // Timestamp: YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ
         const dtMatch = clean.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?/);
         if (dtMatch) {
+          const isUtc = dtMatch[7] === 'Z';
+          if (isUtc) {
+            const year = parseInt(dtMatch[1], 10);
+            const month = parseInt(dtMatch[2], 10) - 1;
+            const day = parseInt(dtMatch[3], 10);
+            const hours = parseInt(dtMatch[4], 10);
+            const minutes = parseInt(dtMatch[5], 10);
+            const seconds = parseInt(dtMatch[6] || '0', 10);
+            // Convert UTC timestamp into local client date and time
+            const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+            const localY = utcDate.getFullYear();
+            const localM = String(utcDate.getMonth() + 1).padStart(2, '0');
+            const localD = String(utcDate.getDate()).padStart(2, '0');
+            const localH = String(utcDate.getHours()).padStart(2, '0');
+            const localMin = String(utcDate.getMinutes()).padStart(2, '0');
+            return {
+              date: `${localY}-${localM}-${localD}`,
+              time: `${localH}:${localMin}`,
+              allDay: false,
+              isUtc: true,
+              timestamp: utcDate.getTime()
+            };
+          }
+
           return {
             date: `${dtMatch[1]}-${dtMatch[2]}-${dtMatch[3]}`,
             time: `${dtMatch[4]}:${dtMatch[5]}`,
-            allDay: false
+            allDay: false,
+            isUtc: false,
+            timestamp: new Date(`${dtMatch[1]}-${dtMatch[2]}-${dtMatch[3]}T${dtMatch[4]}:${dtMatch[5]}:00`).getTime()
           };
         }
         return null;
@@ -216,14 +269,17 @@
                 startTime = '00:00';
                 endTime = '23:59';
                 duration = 1440;
-              } else if (endParsed && endParsed.time && endParsed.time !== startTime) {
+              } else if (endParsed && endParsed.time) {
                 endTime = endParsed.time;
-                // Calculate duration in minutes if on same date
-                if (endParsed.date === startParsed.date) {
+                if (startParsed.timestamp && endParsed.timestamp && endParsed.timestamp > startParsed.timestamp) {
+                  duration = Math.round((endParsed.timestamp - startParsed.timestamp) / 60000);
+                } else if (endParsed.date === startParsed.date && endParsed.time !== startTime) {
                   const [sh, sm] = startTime.split(':').map(Number);
                   const [eh, em] = endTime.split(':').map(Number);
                   const diff = (eh * 60 + em) - (sh * 60 + sm);
                   duration = diff > 0 ? diff : 60;
+                } else {
+                  duration = 60;
                 }
               } else {
                 const [sh, sm] = startTime.split(':').map(Number);
