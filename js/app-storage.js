@@ -1273,6 +1273,9 @@ const StorageAPI = {
       if (typeof window.todosManifest !== 'undefined') window.todosManifest = [];
       if (typeof window.plannerEvents !== 'undefined') window.plannerEvents = [];
       window.rootHandle = null;
+      if (window.CalendarSyncService?.clearExternalAgentSession) {
+        window.CalendarSyncService.clearExternalAgentSession();
+      }
     }
 
     // 8. Reset UI to welcome screen

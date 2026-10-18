@@ -307,4 +307,147 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       );
     });
   });
+
+  describe('External Agent File Access, Script Download & Session Cleanup', () => {
+    it('provides valid sync shell script content containing JXA fallback', () => {
+      const script = CalendarSyncService.getSyncScriptContent();
+      expect(script).toContain('#!/usr/bin/env bash');
+      expect(script).toContain('planner-proposals.json');
+      expect(script).toContain('osascript -l JavaScript');
+      expect(script).toContain('inferType');
+    });
+
+    it('downloads the sync shell script via temporary blob URL and anchor trigger', async () => {
+      const createObjectURLMock = vi.fn().mockReturnValue('blob:http://localhost/mock-uuid');
+      const revokeObjectURLMock = vi.fn();
+      global.URL.createObjectURL = createObjectURLMock;
+      global.URL.revokeObjectURL = revokeObjectURLMock;
+
+      let clicked = false;
+      let downloadAttr = '';
+      const originalCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        const el = originalCreateElement(tag);
+        if (tag === 'a') {
+          el.click = () => {
+            clicked = true;
+            downloadAttr = el.download;
+          };
+        }
+        return el;
+      });
+
+      window.toast = vi.fn();
+      await CalendarSyncService.downloadSyncScript();
+
+      expect(createObjectURLMock).toHaveBeenCalled();
+      expect(clicked).toBe(true);
+      expect(downloadAttr).toBe('sync_local_calendar.sh');
+    });
+
+    it('handles direct upload of external agent proposals JSON file', async () => {
+      const mockMerge = vi.spyOn(CalendarSyncService, '_mergeIntoProposals').mockResolvedValue({ added: 2, skipped: 0 });
+      window.toast = vi.fn();
+
+      const jsonContent = JSON.stringify({
+        version: 1,
+        proposals: [
+          { id: 'p-ext-1', title: 'External Call', date: '2026-10-21', startTime: '10:00', duration: 45 },
+          { id: 'p-ext-2', title: 'External Sync', date: '2026-10-21', startTime: '11:00', duration: 30 }
+        ]
+      });
+
+      const mockFile = {
+        name: 'planner-proposals.json',
+        text: vi.fn().mockResolvedValue(jsonContent)
+      };
+
+      await CalendarSyncService.handleExternalFile(mockFile);
+
+      expect(mockMerge).toHaveBeenCalled();
+      expect(CalendarSyncService._externalLoadedInfo).toEqual({
+        type: 'file',
+        name: 'planner-proposals.json',
+        count: 2
+      });
+      expect(window.toast).toHaveBeenCalled();
+    });
+
+    it('handles direct upload of calendar ICS file as external input', async () => {
+      const mockMerge = vi.spyOn(CalendarSyncService, '_mergeIntoProposals').mockResolvedValue({ added: 1, skipped: 0 });
+      window.toast = vi.fn();
+
+      const icsContent = [
+        'BEGIN:VCALENDAR',
+        'BEGIN:VEVENT',
+        'UID:ext-ics-1',
+        'DTSTART:20261022T090000Z',
+        'DTEND:20261022T100000Z',
+        'SUMMARY:Client Roadmap Sync',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      const mockFile = {
+        name: 'export.ics',
+        text: vi.fn().mockResolvedValue(icsContent)
+      };
+
+      await CalendarSyncService.handleExternalFile(mockFile);
+
+      expect(mockMerge).toHaveBeenCalled();
+      expect(CalendarSyncService._externalLoadedInfo).toEqual({
+        type: 'file',
+        name: 'export.ics',
+        count: 1
+      });
+    });
+
+    it('links external results folder and syncs proposals from planner-proposals.json', async () => {
+      const mockFileContent = JSON.stringify({
+        proposals: [{ id: 'p-folder-1', title: 'Meeting from folder', date: '2026-10-22' }]
+      });
+      const mockFile = {
+        text: vi.fn().mockResolvedValue(mockFileContent)
+      };
+      const mockFileHandle = {
+        getFile: vi.fn().mockResolvedValue(mockFile)
+      };
+      const mockDirHandle = {
+        name: 'AgentResults',
+        getFileHandle: vi.fn().mockResolvedValue(mockFileHandle)
+      };
+
+      window.showDirectoryPicker = vi.fn().mockResolvedValue(mockDirHandle);
+      const mockMerge = vi.spyOn(CalendarSyncService, '_mergeIntoProposals').mockResolvedValue({ added: 1, skipped: 0 });
+
+      await CalendarSyncService.linkExternalAgentFolder();
+
+      expect(CalendarSyncService._externalFolderHandle).toBe(mockDirHandle);
+      expect(mockMerge).toHaveBeenCalled();
+      expect(CalendarSyncService._externalLoadedInfo).toEqual({
+        type: 'folder',
+        name: 'AgentResults',
+        count: 1
+      });
+
+      // Disconnect
+      CalendarSyncService.disconnectExternalAgentFolder();
+      expect(CalendarSyncService._externalFolderHandle).toBeNull();
+      expect(CalendarSyncService._externalLoadedInfo).toBeNull();
+    });
+
+    it('clears external agent session, folder handle, and timers on user logoff', () => {
+      CalendarSyncService._externalFolderHandle = { name: 'MyWorkspace' };
+      CalendarSyncService._externalLoadedInfo = { type: 'folder', name: 'MyWorkspace', count: 5 };
+      CalendarSyncService._externalFolderTimer = setInterval(() => {}, 10000);
+
+      CalendarSyncService.clearExternalAgentSession();
+
+      expect(CalendarSyncService._externalFolderHandle).toBeNull();
+      expect(CalendarSyncService._externalLoadedInfo).toBeNull();
+      expect(CalendarSyncService._externalFolderTimer).toBeNull();
+    });
+  });
 });
+

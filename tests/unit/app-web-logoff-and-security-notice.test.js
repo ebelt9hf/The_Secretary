@@ -118,10 +118,17 @@ describe('Web Log Off & Cloud Login Security Notice (tests/unit/app-web-logoff-a
     const evalFn = new Function(match[0] + '; return handleLogOffUI;');
     const handleLogOffUI = evalFn();
 
+    const clearExternalMock = vi.fn();
+    globalThis.CalendarSyncService = {
+      clearExternalAgentSession: clearExternalMock
+    };
+    globalThis.window.CalendarSyncService = globalThis.CalendarSyncService;
+
     const result = await handleLogOffUI();
     expect(result).toBe(true);
     expect(globalThis.FirebaseSyncService.signOut).toHaveBeenCalled();
     expect(globalThis.FirebaseSyncService.lockVault).toHaveBeenCalled();
+    expect(clearExternalMock).toHaveBeenCalled();
     expect(screenMain.classList.contains('active')).toBe(false);
     expect(screenConnect.style.display).toBe('');
     expect(globalThis.showLandingStep).toHaveBeenCalledWith('welcome');

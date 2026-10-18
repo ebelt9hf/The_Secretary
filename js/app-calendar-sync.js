@@ -598,12 +598,463 @@
       }
     },
 
+    _externalFolderHandle: null,
+    _externalFolderTimer: null,
+    _externalLoadedInfo: null,
+
     /**
      * Generates terminal command to execute zero-dependency local macOS sync script.
      */
     getLocalSyncCommand(workspacePath = '') {
       const wsArg = workspacePath ? ` "${workspacePath}"` : '';
       return `./development/sync_local_calendar.sh${wsArg}`;
+    },
+
+    /**
+     * Returns full content of the zero-dependency macOS sync shell script.
+     */
+    getSyncScriptContent() {
+      return `#!/usr/bin/env bash
+# ==============================================================================
+# Secretary Local Calendar Sync Helper (Zero-Dependency macOS Script)
+# ==============================================================================
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="\$(cd "\$SCRIPT_DIR/.." && pwd)"
+
+if [ -n "$1" ] && [ -d "$1" ]; then
+  WORKSPACE_DIR="\$(cd "\$1" && pwd)"
+fi
+
+PROPOSALS_FILE="\$WORKSPACE_DIR/planner-proposals.json"
+
+echo "🗓️ Secretary Calendar Sync Helper"
+echo "📂 Workspace: \$WORKSPACE_DIR"
+echo "📄 Target:    \$PROPOSALS_FILE"
+
+if command -v python3 >/dev/null 2>&1 && [ -f "\$SCRIPT_DIR/sync_local_calendar.py" ]; then
+  echo "🚀 Running via python3 sync helper..."
+  exec python3 "\$SCRIPT_DIR/sync_local_calendar.py" --workspace "\$WORKSPACE_DIR" "\$@"
+fi
+
+echo "⚡ Running via native macOS AppleScript/JXA (zero dependencies required)..."
+
+/usr/bin/osascript -l JavaScript - "\$WORKSPACE_DIR" << 'EOF'
+function run(argv) {
+  var wsDir = (argv && argv[0]) ? argv[0] : '.';
+  var targetPath = wsDir + '/planner-proposals.json';
+  
+  var app = Application.currentApplication();
+  app.includeStandardAdditions = true;
+
+  var existing = {
+    "_notice": "IMPORTANT FOR AGENTS: Do NOT delete or overwrite existing proposed events in this file. Only append new proposals. Secretary tracks processed/accepted proposals by their unique 'id'.",
+    "version": 1,
+    "proposals": []
+  };
+
+  try {
+    var rawExisting = app.read(Path(targetPath));
+    if (rawExisting) {
+      existing = JSON.parse(rawExisting);
+      if (!Array.isArray(existing.proposals)) existing.proposals = [];
+    }
+  } catch (e) {}
+
+  var existingIds = {};
+  for (var i = 0; i < existing.proposals.length; i++) {
+    if (existing.proposals[i] && existing.proposals[i].id) {
+      existingIds[existing.proposals[i].id] = true;
+    }
+  }
+
+  var now = new Date();
+  var lookahead = new Date();
+  lookahead.setDate(now.getDate() + 14);
+
+  var newEvents = [];
+
+  function inferType(title, desc) {
+    var c = (title + ' ' + (desc || '')).toLowerCase();
+    if (/\\b(prep|briefing|preparation|vorbereitung)\\b/.test(c)) return 'prep';
+    if (/\\b(call|meeting|zoom|teams|meet|webex|conference|huddle|1:1|1-on-1|interview|demo|client)\\b/.test(c)) return 'call';
+    if (/\\b(sync|standup|daily|retrospective|check-in)\\b/.test(c)) return 'sync';
+    if (/\\b(todo|task|action item)\\b/.test(c)) return 'todo';
+    if (/\\b(personal|lunch|gym|doctor|dentist|break|vacation|holiday|arzt)\\b/.test(c)) return 'personal';
+    if (/\\b(ooo|out of office|leave|urlaub|conges)\\b/.test(c)) return 'ooo';
+    return 'work';
+  }
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  try {
+    var calApp = Application('Calendar');
+    if (calApp) {
+      var cals = calApp.calendars();
+      for (var c = 0; c < cals.length; c++) {
+        try {
+          var evs = cals[c].events.which({
+            _and: [
+              { startDate: { _greaterThanEquals: now } },
+              { startDate: { _lessThanEquals: lookahead } }
+            ]
+          })();
+          for (var e = 0; e < evs.length; e++) {
+            var ev = evs[e];
+            var uid = ev.uid();
+            var propId = 'apple-cal-' + (uid ? uid.replace(/[^a-zA-Z0-9_-]/g, '_') : Math.random().toString(36).slice(2));
+            if (existingIds[propId]) continue;
+
+            var sDate = ev.startDate();
+            var eDate = ev.endDate();
+            var allDay = ev.alldayEvent();
+            var title = ev.summary() || 'Calendar Event';
+            var desc = ev.description() || '';
+
+            var y = sDate.getFullYear();
+            var m = pad(sDate.getMonth() + 1);
+            var d = pad(sDate.getDate());
+            var dateStr = y + '-' + m + '-' + d;
+
+            var startTime = allDay ? '00:00' : (pad(sDate.getHours()) + ':' + pad(sDate.getMinutes()));
+            var endTime = allDay ? '23:59' : (pad(eDate.getHours()) + ':' + pad(eDate.getMinutes()));
+            var duration = allDay ? 1440 : Math.max(15, Math.round((eDate.getTime() - sDate.getTime()) / 60000));
+
+            newEvents.push({
+              id: propId,
+              title: title.slice(0, 300),
+              date: dateStr,
+              startTime: startTime,
+              endTime: endTime,
+              duration: duration,
+              type: inferType(title, desc),
+              description: desc.slice(0, 1000),
+              source: 'Apple Calendar (Local)',
+              status: 'pending'
+            });
+            existingIds[propId] = true;
+          }
+        } catch(calErr) {}
+      }
+    }
+  } catch(e) {}
+
+  try {
+    var outlookApp = Application('Microsoft Outlook');
+    if (outlookApp) {
+      var oEvents = outlookApp.calendarEvents.which({
+        _and: [
+          { startTime: { _greaterThanEquals: now } },
+          { startTime: { _lessThanEquals: lookahead } }
+        ]
+      })();
+      for (var o = 0; o < oEvents.length; o++) {
+        var oEv = oEvents[o];
+        var oUid = oEv.id();
+        var oPropId = 'outlook-desktop-' + oUid;
+        if (existingIds[oPropId]) continue;
+
+        var oStart = oEv.startTime();
+        var oEnd = oEv.endTime();
+        var oAllDay = oEv.isAllDayEvent();
+        var oTitle = oEv.subject() || 'Outlook Meeting';
+        var oContent = oEv.plainTextContent() || '';
+
+        var oy = oStart.getFullYear();
+        var om = pad(oStart.getMonth() + 1);
+        var od = pad(oStart.getDate());
+        var oDateStr = oy + '-' + om + '-' + od;
+
+        var oStartTime = oAllDay ? '00:00' : (pad(oStart.getHours()) + ':' + pad(oStart.getMinutes()));
+        var oEndTime = oAllDay ? '23:59' : (pad(oEnd.getHours()) + ':' + pad(oEnd.getMinutes()));
+        var oDuration = oAllDay ? 1440 : Math.max(15, Math.round((oEnd.getTime() - oStart.getTime()) / 60000));
+
+        newEvents.push({
+          id: oPropId,
+          title: oTitle.slice(0, 300),
+          date: oDateStr,
+          startTime: oStartTime,
+          endTime: oEndTime,
+          duration: oDuration,
+          type: inferType(oTitle, oContent),
+          description: oContent.slice(0, 1000),
+          source: 'Outlook Desktop (Local)',
+          status: 'pending'
+        });
+        existingIds[oPropId] = true;
+      }
+    }
+  } catch(e) {}
+
+  if (newEvents.length > 0) {
+    existing.proposals = existing.proposals.concat(newEvents);
+    var updatedJson = JSON.stringify(existing, null, 2);
+    
+    var fileHandle = app.openForAccess(Path(targetPath), { writePermission: true });
+    app.setEof(fileHandle, { to: 0 });
+    app.write(updatedJson, { to: fileHandle, as: 'utf8' });
+    app.closeAccess(fileHandle);
+    
+    console.log('✓ Successfully synchronized ' + newEvents.length + ' new calendar events into planner-proposals.json');
+  } else {
+    console.log('✓ Calendar is up to date. No new proposals found.');
+  }
+}
+EOF
+
+echo "✨ Sync complete!"
+`;
+    },
+
+    /**
+     * Downloads sync_local_calendar.sh to user's computer via browser.
+     */
+    async downloadSyncScript() {
+      let content = this.getSyncScriptContent();
+      try {
+        if (typeof fetch === 'function') {
+          const resp = await fetch('development/sync_local_calendar.sh');
+          if (resp && resp.ok) {
+            content = await resp.text();
+          }
+        }
+      } catch (_e) {}
+
+      const blob = new Blob([content], { type: 'text/x-sh;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sync_local_calendar.sh';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (typeof toast === 'function') {
+        toast((typeof t === 'function' ? t('prefs.downloadSyncScriptTooltip') : 'Sync script downloaded'));
+      }
+    },
+
+    /**
+     * Lets user select an input file (.json or .ics) from their computer.
+     */
+    async selectExternalAgentFile() {
+      if (typeof window !== 'undefined' && typeof window.showOpenFilePicker === 'function') {
+        try {
+          const [fileHandle] = await window.showOpenFilePicker({
+            types: [{
+              description: 'Calendar & Agent Proposals',
+              accept: {
+                'application/json': ['.json'],
+                'text/calendar': ['.ics']
+              }
+            }]
+          });
+          if (fileHandle) {
+            const file = await fileHandle.getFile();
+            await this.handleExternalFile(file);
+          }
+          return;
+        } catch (err) {
+          if (err?.name === 'AbortError') return;
+        }
+      }
+      const picker = (typeof document !== 'undefined') ? document.getElementById('external-agent-file-picker') : null;
+      if (picker) {
+        picker.value = '';
+        picker.click();
+      }
+    },
+
+    /**
+     * Handles file input change from input element fallback.
+     */
+    async handleFileInputChange(e) {
+      const file = e?.target?.files?.[0];
+      if (file) {
+        await this.handleExternalFile(file);
+      }
+    },
+
+    /**
+     * Reads and parses external agent proposals or calendar file.
+     */
+    async handleExternalFile(file) {
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const fileName = file.name || 'input-file';
+        let items = [];
+
+        if (fileName.endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          const parsed = JSON.parse(text);
+          if (typeof window !== 'undefined' && typeof window.normalizePlannerProposals === 'function') {
+            items = window.normalizePlannerProposals(parsed);
+          } else if (Array.isArray(parsed)) {
+            items = parsed;
+          } else if (parsed && Array.isArray(parsed.proposals)) {
+            items = parsed.proposals;
+          }
+        } else if (fileName.endsWith('.ics') || text.includes('BEGIN:VCALENDAR')) {
+          items = this.parseICS(text, { name: fileName });
+        } else {
+          throw new Error('Unsupported format. Please select a .json or .ics file.');
+        }
+
+        if (items && items.length > 0) {
+          const res = await this._mergeIntoProposals(items);
+          this._externalLoadedInfo = { type: 'file', name: fileName, count: items.length };
+          this.updateExternalStatusUI();
+          if (typeof toast === 'function') {
+            const msg = (typeof t === 'function')
+              ? t('prefs.externalFileImported', { count: res?.added || items.length, name: fileName })
+              : `Imported ${res?.added || items.length} proposals from ${fileName}`;
+            toast(msg);
+          }
+        } else {
+          if (typeof toast === 'function') toast('No proposals found in file', true);
+        }
+      } catch (err) {
+        console.error('Failed reading external agent file:', err);
+        if (typeof toast === 'function') {
+          const msg = (typeof t === 'function')
+            ? t('prefs.externalFileError', { error: err.message || 'Parse error' })
+            : `Could not read proposals file: ${err.message || ''}`;
+          toast(msg, true);
+        }
+      }
+    },
+
+    /**
+     * Links local folder (via showDirectoryPicker) where script runs and writes planner-proposals.json.
+     */
+    async linkExternalAgentFolder() {
+      if (typeof window === 'undefined' || typeof window.showDirectoryPicker !== 'function') {
+        if (typeof toast === 'function') {
+          toast('Folder picker not supported in this browser. Please use "Select File" instead.', true);
+        }
+        return;
+      }
+
+      try {
+        const dirHandle = await window.showDirectoryPicker({
+          id: 'secretary-external-agent-folder',
+          mode: 'read'
+        });
+        if (!dirHandle) return;
+
+        this._externalFolderHandle = dirHandle;
+        await this._syncFromExternalFolderHandle();
+
+        if (this._externalFolderTimer) clearInterval(this._externalFolderTimer);
+        this._externalFolderTimer = setInterval(() => {
+          this._syncFromExternalFolderHandle().catch(() => {});
+        }, 15000);
+
+        this.updateExternalStatusUI();
+        if (typeof toast === 'function') {
+          const msg = (typeof t === 'function')
+            ? t('prefs.externalFolderConnected', { name: dirHandle.name })
+            : `Connected folder: ${dirHandle.name}`;
+          toast(msg);
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+        console.error('Failed linking external agent folder:', err);
+        if (typeof toast === 'function') toast(err.message || 'Could not link folder', true);
+      }
+    },
+
+    /**
+     * Reads planner-proposals.json from linked external folder.
+     */
+    async _syncFromExternalFolderHandle() {
+      if (!this._externalFolderHandle) return;
+      try {
+        const fileHandle = await this._externalFolderHandle.getFileHandle('planner-proposals.json');
+        if (!fileHandle) return;
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        if (!text) return;
+
+        const parsed = JSON.parse(text);
+        const items = (typeof window !== 'undefined' && typeof window.normalizePlannerProposals === 'function')
+          ? window.normalizePlannerProposals(parsed)
+          : (Array.isArray(parsed) ? parsed : (parsed.proposals || []));
+
+        if (items && items.length > 0) {
+          await this._mergeIntoProposals(items);
+          this._externalLoadedInfo = { type: 'folder', name: this._externalFolderHandle.name, count: items.length };
+          this.updateExternalStatusUI();
+        }
+      } catch (_e) {}
+    },
+
+    /**
+     * Disconnects linked external folder.
+     */
+    disconnectExternalAgentFolder() {
+      if (this._externalFolderTimer) {
+        clearInterval(this._externalFolderTimer);
+        this._externalFolderTimer = null;
+      }
+      this._externalFolderHandle = null;
+      this._externalLoadedInfo = null;
+      this.updateExternalStatusUI();
+    },
+
+    /**
+     * Clears external agent session on user logoff.
+     */
+    clearExternalAgentSession() {
+      if (this._externalFolderTimer) {
+        clearInterval(this._externalFolderTimer);
+        this._externalFolderTimer = null;
+      }
+      this._externalFolderHandle = null;
+      this._externalLoadedInfo = null;
+
+      const picker = (typeof document !== 'undefined') ? document.getElementById('external-agent-file-picker') : null;
+      if (picker) picker.value = '';
+
+      this.updateExternalStatusUI();
+    },
+
+    /**
+     * Updates UI badge and indicator for linked folder / loaded file.
+     */
+    updateExternalStatusUI() {
+      if (typeof document === 'undefined') return;
+      const statusEl = document.getElementById('prefs-local-proposals-status');
+      const linkedBox = document.getElementById('prefs-external-agent-linked-box');
+      const linkedLabel = document.getElementById('prefs-external-agent-linked-label');
+
+      if (this._externalFolderHandle) {
+        if (linkedBox) linkedBox.style.display = 'flex';
+        if (linkedLabel) linkedLabel.textContent = `📁 ${this._externalFolderHandle.name} (${this._externalLoadedInfo?.count || 0})`;
+        if (statusEl) {
+          const count = this._externalLoadedInfo?.count || 0;
+          statusEl.textContent = (typeof t === 'function') ? t('prefs.externalActiveBadge', { count }) : `${count} active`;
+          statusEl.style.background = 'var(--accent)';
+          statusEl.style.color = '#fff';
+        }
+      } else if (this._externalLoadedInfo) {
+        if (linkedBox) linkedBox.style.display = 'flex';
+        if (linkedLabel) linkedLabel.textContent = `📄 ${this._externalLoadedInfo.name} (${this._externalLoadedInfo.count})`;
+        if (statusEl) {
+          const count = this._externalLoadedInfo.count;
+          statusEl.textContent = (typeof t === 'function') ? t('prefs.externalImportedBadge', { count }) : `${count} imported`;
+          statusEl.style.background = 'var(--accent)';
+          statusEl.style.color = '#fff';
+        }
+      } else {
+        if (linkedBox) linkedBox.style.display = 'none';
+        if (statusEl) {
+          statusEl.textContent = (typeof t === 'function') ? t('prefs.externalZeroProposals') : '0 proposals';
+          statusEl.style.background = 'var(--bg-tag)';
+          statusEl.style.color = 'var(--text-muted)';
+        }
+      }
     },
 
     /**

@@ -2442,6 +2442,9 @@ async function handleLogOffUI() {
     if (typeof manifest !== 'undefined') manifest = [];
     if (typeof todosManifest !== 'undefined') todosManifest = [];
     if (typeof plannerEvents !== 'undefined') plannerEvents = [];
+    if (window.CalendarSyncService?.clearExternalAgentSession) {
+      window.CalendarSyncService.clearExternalAgentSession();
+    }
 
     const sm = document.getElementById('screen-main');
     if (sm) sm.classList.remove('active');
@@ -2485,6 +2488,9 @@ async function confirmStandardSignOutUI() {
     if (typeof manifest !== 'undefined') manifest = [];
     if (typeof todosManifest !== 'undefined') todosManifest = [];
     if (typeof plannerEvents !== 'undefined') plannerEvents = [];
+    if (window.CalendarSyncService?.clearExternalAgentSession) {
+      window.CalendarSyncService.clearExternalAgentSession();
+    }
 
     const sm = document.getElementById('screen-main');
     if (sm) sm.classList.remove('active');
