@@ -599,11 +599,11 @@
     },
 
     /**
-     * Generates terminal command to execute local macOS sync script.
+     * Generates terminal command to execute zero-dependency local macOS sync script.
      */
     getLocalSyncCommand(workspacePath = '') {
-      const wsArg = workspacePath ? ` --workspace "${workspacePath}"` : '';
-      return `python3 development/sync_local_calendar.py${wsArg}`;
+      const wsArg = workspacePath ? ` "${workspacePath}"` : '';
+      return `./development/sync_local_calendar.sh${wsArg}`;
     },
 
     /**

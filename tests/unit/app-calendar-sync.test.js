@@ -196,12 +196,12 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
   });
 
   describe('Local Helper & Commands', () => {
-    it('generates the correct local macOS sync script command', () => {
+    it('generates the correct zero-dependency local macOS sync script command', () => {
       const cmd = CalendarSyncService.getLocalSyncCommand('/Users/alice/MyWorkspace');
-      expect(cmd).toBe('python3 development/sync_local_calendar.py --workspace "/Users/alice/MyWorkspace"');
+      expect(cmd).toBe('./development/sync_local_calendar.sh "/Users/alice/MyWorkspace"');
 
       const defaultCmd = CalendarSyncService.getLocalSyncCommand();
-      expect(defaultCmd).toBe('python3 development/sync_local_calendar.py');
+      expect(defaultCmd).toBe('./development/sync_local_calendar.sh');
     });
   });
 

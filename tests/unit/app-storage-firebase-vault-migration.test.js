@@ -179,10 +179,14 @@ describe('Complete Secretary Data Migration to Firebase Vault', () => {
     expect(virtualFS.has('.secretary/chat-history.json')).toBe(false);
     expect(await window.StorageAPI.readChatHistory()).toEqual(chat);
 
-    // 8. Planner proposals MUST always be a local file on disk (AGENTS.md contract)
+    // 8. Planner proposals MUST always be written to disk when filesystem exists and synced to Firebase
     const proposals = { version: 1, proposals: [{ id: 'agent-1', title: 'Agent Proposed Event' }] };
     await window.StorageAPI.writePlannerProposals(proposals);
     expect(virtualFS.has('planner-proposals.json')).toBe(true);
+    expect(await window.StorageAPI.readPlannerProposals()).toEqual(proposals);
+
+    // Verify fallback to Firebase if local file is absent (e.g., pure web client)
+    virtualFS.delete('planner-proposals.json');
     expect(await window.StorageAPI.readPlannerProposals()).toEqual(proposals);
   });
 

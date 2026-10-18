@@ -643,7 +643,7 @@
               If corporate IT blocks cloud calendar feeds, run the local sync script directly on macOS to extract Outlook Desktop &amp; Apple Calendar meetings into Secretary proposals.
             </p>
             <div style="position:relative; width:100%;">
-              <input type="text" id="prefs-local-sync-cmd" readonly value="python3 development/sync_local_calendar.py" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="Command to run local calendar sync in Terminal" data-i18n-title="prefs.localSyncCmdTooltip">
+              <input type="text" id="prefs-local-sync-cmd" readonly value="./development/sync_local_calendar.sh" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="Command to run local calendar sync in Terminal" data-i18n-title="prefs.localSyncCmdTooltip">
               <button type="button" class="btn" onclick="copyLocalCalendarSyncCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="Copy terminal command to clipboard" data-i18n-title="prefs.localSyncCmdTooltip">
                 <span data-i18n="common.copy">Copy</span>
               </button>

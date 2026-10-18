@@ -182,10 +182,15 @@ const StorageAPI = {
     return await this.hasDocEntity('planner', 'events', 'planner.json');
   },
 
-  // ── Planner Proposals (External Agent Proposed Events - ALWAYS LOCAL FILE) ──
+  // ── Planner Proposals (External Agent Proposed Events & Subscribed Feeds) ──
   async readPlannerProposals() {
     try {
-      return await this._readJSON('planner-proposals.json', null);
+      const local = await this._readJSON('planner-proposals.json', null);
+      if (local && typeof local === 'object') return local;
+      if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+        return await window.FirebaseSyncService.getDoc('planner', 'proposals');
+      }
+      return local;
     } catch {
       return null;
     }
@@ -195,7 +200,14 @@ const StorageAPI = {
     try {
       await this._writeJSON('planner-proposals.json', proposalsData);
     } catch (e) {
-      console.warn('writePlannerProposals failed:', e);
+      // Expected in pure web mode when no local folder handle is loaded
+    }
+    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+      try {
+        await window.FirebaseSyncService.putDoc('planner', 'proposals', proposalsData);
+      } catch (e) {
+        console.warn('Firebase putDoc for proposals failed:', e);
+      }
     }
   },
 
