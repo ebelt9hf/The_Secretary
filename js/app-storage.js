@@ -412,6 +412,14 @@ const StorageAPI = {
           return content;
         }
       }
+      // Fallback: check local filesystem / backup if note not found in cloud vault
+      try {
+        const content = await readFile(path);
+        if (content && typeof content === 'string') {
+          this._noteCache.set(path, content);
+          return content;
+        }
+      } catch (e) {}
       return '';
     }
 

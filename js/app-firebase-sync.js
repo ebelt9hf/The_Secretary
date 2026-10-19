@@ -2791,7 +2791,8 @@ const FirebaseSyncService = {
     if (!assetId || !dataUrlOrBase64) return false;
     if (!this.state.isUnlocked || !this.state.masterKey) return false;
 
-    const normalizedId = String(assetId).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^assets\//, '');
+    const clean = String(assetId).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^(_assets|assets)\//, '');
+    const normalizedId = clean.split('/').pop() || clean;
     const now = Date.now();
     const assetRecord = {
       id: normalizedId,
@@ -2806,6 +2807,8 @@ const FirebaseSyncService = {
     if (!this.state.assetsCache) this.state.assetsCache = new Map();
     if (!this.state.pendingAssetsQueue) this.state.pendingAssetsQueue = new Map();
     this.state.assetsCache.set(normalizedId, dataUrlOrBase64);
+    this.state.assetsCache.set(`_assets/${normalizedId}`, dataUrlOrBase64);
+    this.state.assetsCache.set(`notes/_assets/${normalizedId}`, dataUrlOrBase64);
     this.state.pendingAssetsQueue.set(normalizedId, assetRecord);
 
     const walId = `wal_asset_${normalizedId}_${now}`;
@@ -2841,47 +2844,75 @@ const FirebaseSyncService = {
 
   async getAsset(assetId) {
     if (!assetId || !this.state.isUnlocked || !this.state.masterKey) return null;
-    const normalizedId = String(assetId).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^assets\//, '');
+    const clean = String(assetId).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^(_assets|assets)\//, '');
+    const fileName = clean.split('/').pop() || clean;
+    const candidateKeys = Array.from(new Set([fileName, clean, `_assets/${fileName}`, `notes/_assets/${fileName}`])).filter(Boolean);
 
     if (!this.state.assetsCache) this.state.assetsCache = new Map();
-    if (this.state.assetsCache.has(normalizedId)) {
-      return this.state.assetsCache.get(normalizedId);
+    for (const key of candidateKeys) {
+      if (this.state.assetsCache.has(key)) {
+        return this.state.assetsCache.get(key);
+      }
     }
 
     let rec = null;
-    try {
-      rec = await VaultIDBStorage.getRecord('assets', normalizedId);
-    } catch (e) {}
+    let anyDeleted = false;
+    for (const key of candidateKeys) {
+      try {
+        const found = await VaultIDBStorage.getRecord('assets', key);
+        if (found) {
+          if (found.deleted) {
+            anyDeleted = true;
+            break;
+          }
+          if (found.data !== undefined || found.ciphertext) {
+            rec = found;
+            break;
+          }
+        }
+      } catch (e) {}
+    }
+    if (anyDeleted || (rec && rec.deleted)) return null;
 
     if (!rec) {
       const bridge = this._getBridge();
       if (bridge && this.state.userId && this.state.userId !== 'default_user' && typeof bridge.getAsset === 'function') {
-        try {
-          const remoteRec = await bridge.getAsset(this.state.userId, normalizedId);
-          if (remoteRec && remoteRec.ciphertext) {
-            const decData = await CryptoEngine.decryptData(this.state.masterKey, {
-              iv: remoteRec.iv,
-              ciphertext: remoteRec.ciphertext
-            });
-            if (decData) {
-              rec = {
-                id: normalizedId,
-                data: decData,
-                mimeType: remoteRec.mimeType || 'image/webp',
-                updatedAt: remoteRec.updatedAt || Date.now(),
-                deleted: false
-              };
-              await VaultIDBStorage.putRecord('assets', rec);
+        for (const remoteKey of [fileName, clean, `_assets/${fileName}`]) {
+          try {
+            const remoteRec = await bridge.getAsset(this.state.userId, remoteKey);
+            if (remoteRec) {
+              if (remoteRec.deleted) {
+                return null;
+              }
+              if (remoteRec.ciphertext) {
+                const decData = await CryptoEngine.decryptData(this.state.masterKey, {
+                  iv: remoteRec.iv,
+                  ciphertext: remoteRec.ciphertext
+                });
+                if (decData) {
+                  rec = {
+                    id: fileName,
+                    data: decData,
+                    mimeType: remoteRec.mimeType || 'image/webp',
+                    updatedAt: remoteRec.updatedAt || Date.now(),
+                    deleted: false
+                  };
+                  await VaultIDBStorage.putRecord('assets', rec);
+                  break;
+                }
+              }
             }
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
       }
     }
 
     if (!rec || rec.deleted) return null;
 
     if (rec.data !== undefined) {
-      this.state.assetsCache.set(normalizedId, rec.data);
+      for (const k of candidateKeys) {
+        this.state.assetsCache.set(k, rec.data);
+      }
       return rec.data;
     }
 
@@ -2892,7 +2923,9 @@ const FirebaseSyncService = {
           ciphertext: rec.ciphertext
         });
         if (decrypted) {
-          this.state.assetsCache.set(normalizedId, decrypted);
+          for (const k of candidateKeys) {
+            this.state.assetsCache.set(k, decrypted);
+          }
           rec.data = decrypted;
           delete rec.ciphertext;
           delete rec.iv;
@@ -2900,7 +2933,7 @@ const FirebaseSyncService = {
           return decrypted;
         }
       } catch (e) {
-        console.warn(`Failed to decrypt asset ${normalizedId}`, e);
+        console.warn(`Failed to decrypt asset ${fileName}`, e);
       }
     }
     return null;
@@ -2908,39 +2941,45 @@ const FirebaseSyncService = {
 
   async deleteAsset(assetId, debounceMs = 5000) {
     if (!assetId || !this.state.isUnlocked || !this.state.masterKey) return false;
-    const normalizedId = String(assetId).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^assets\//, '');
+    const clean = String(assetId).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^(_assets|assets)\//, '');
+    const fileName = clean.split('/').pop() || clean;
+    const candidateKeys = Array.from(new Set([fileName, clean, `_assets/${fileName}`, `notes/_assets/${fileName}`, String(assetId)])).filter(Boolean);
 
     if (!this.state.assetsCache) this.state.assetsCache = new Map();
     if (!this.state.pendingAssetsQueue) this.state.pendingAssetsQueue = new Map();
-    this.state.assetsCache.delete(normalizedId);
+    for (const k of candidateKeys) {
+      this.state.assetsCache.delete(k);
+    }
     const now = Date.now();
     const assetRecord = {
-      id: normalizedId,
+      id: fileName,
       deleted: true,
       updatedAt: now,
       schemaVersion: this.SCHEMA_VERSION,
       appVersion: this.getCurrentVersion()
     };
-    this.state.pendingAssetsQueue.set(normalizedId, assetRecord);
+    this.state.pendingAssetsQueue.set(fileName, assetRecord);
 
-    const walId = `wal_delasset_${normalizedId}_${now}`;
+    const walId = `wal_delasset_${fileName}_${now}`;
     try {
       await VaultIDBStorage.appendWAL({
         id: walId,
         type: 'delete_asset',
-        targetId: normalizedId,
+        targetId: fileName,
         payload: {
-          normalizedId,
+          normalizedId: fileName,
           assetRecord
         },
         timestamp: now
       });
     } catch (e) {}
 
-    SyncBroadcastBus.broadcast('ASSET_DELETED', { assetId: normalizedId });
+    SyncBroadcastBus.broadcast('ASSET_DELETED', { assetId: fileName });
 
     try {
-      await VaultIDBStorage.putRecord('assets', assetRecord);
+      for (const k of candidateKeys) {
+        await VaultIDBStorage.putRecord('assets', { ...assetRecord, id: k });
+      }
     } catch (e) {}
 
     if (debounceMs <= 0) {

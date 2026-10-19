@@ -44,14 +44,31 @@ async function readFile(pathStr) {
   const parts = pathStr.split('/').filter(Boolean);
   const name  = parts.pop();
   if (!name) throw new Error(`Invalid file path: ${pathStr}`);
-  const dir   = parts.length ? await getDirHandle(parts.join('/')) : rootHandle;
-  if (!dir || typeof dir.getFileHandle !== 'function') {
-    const err = new Error(`FileSystemDirectoryHandle not available to get file: ${name}`);
-    err.name = 'NotFoundError';
-    throw err;
+  try {
+    const dir = parts.length ? await getDirHandle(parts.join('/')) : rootHandle;
+    if (dir && typeof dir.getFileHandle === 'function') {
+      const fh = await dir.getFileHandle(name);
+      return (await fh.getFile()).text();
+    }
+  } catch (e) {
+    // If not found at direct path, try fallback to _migrated_to_cloud_backup/ if file was archived
+    if (!pathStr.startsWith('_migrated_to_cloud_backup/')) {
+      try {
+        const backupPath = `_migrated_to_cloud_backup/${pathStr}`;
+        const bParts = backupPath.split('/').filter(Boolean);
+        const bName = bParts.pop();
+        const bDir = bParts.length ? await getDirHandle(bParts.join('/')) : rootHandle;
+        if (bDir && typeof bDir.getFileHandle === 'function') {
+          const bFh = await bDir.getFileHandle(bName);
+          return (await bFh.getFile()).text();
+        }
+      } catch (be) {}
+    }
   }
-  const fh    = await dir.getFileHandle(name);
-  return (await fh.getFile()).text();
+
+  const err = new Error(`File not found: ${pathStr}`);
+  err.name = 'NotFoundError';
+  throw err;
 }
 
 const _assetDataUrlCache = new Map();
@@ -98,24 +115,48 @@ async function readAssetAsDataUrl(pathStr) {
 
   if (!res) {
     // Web FileSystemAccess API fallback
-    try {
-      if (typeof rootHandle !== 'undefined' && rootHandle) {
-        const parts = normalized.split('/').filter(Boolean);
-        const name = parts.pop();
-        if (name) {
-          const dir = parts.length ? await getDirHandle(parts.join('/')) : rootHandle;
-          const fh = await dir.getFileHandle(name);
-          const file = await fh.getFile();
-          res = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(file);
-          });
+    const tryReadHandleAsDataUrl = async (targetPath) => {
+      try {
+        if (typeof rootHandle !== 'undefined' && rootHandle) {
+          const parts = targetPath.split('/').filter(Boolean);
+          const name = parts.pop();
+          if (name) {
+            const dir = parts.length ? await getDirHandle(parts.join('/')) : rootHandle;
+            const fh = await dir.getFileHandle(name);
+            const file = await fh.getFile();
+            return await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(file);
+            });
+          }
+        }
+      } catch (e) {}
+      return null;
+    };
+
+    // 1. Try normalized path
+    res = await tryReadHandleAsDataUrl(normalized);
+
+    // 2. Try candidate fallback paths (including _migrated_to_cloud_backup/)
+    if (!res) {
+      const candidates = [];
+      if (fileName && fileName !== normalized) {
+        candidates.push(`notes/_assets/${fileName}`);
+        candidates.push(`_assets/${fileName}`);
+      }
+      if (!normalized.startsWith('_migrated_to_cloud_backup/')) {
+        candidates.push(`_migrated_to_cloud_backup/${normalized}`);
+        if (fileName) {
+          candidates.push(`_migrated_to_cloud_backup/notes/_assets/${fileName}`);
+          candidates.push(`_migrated_to_cloud_backup/_assets/${fileName}`);
         }
       }
-    } catch (e) {
-      console.warn('Web FS readAssetAsDataUrl failed:', normalized, e);
+      for (const cand of candidates) {
+        res = await tryReadHandleAsDataUrl(cand);
+        if (res) break;
+      }
     }
   }
 

@@ -24,14 +24,21 @@ function copyStaticAssets() {
       if (fs.existsSync('css')) {
         fs.cpSync('css', 'dist/css', { recursive: true });
       }
+      const assetsDir = 'dist/assets';
+      if (!fs.existsSync(assetsDir)) {
+        fs.mkdirSync(assetsDir, { recursive: true });
+      }
       if (fs.existsSync('icon.svg')) {
         fs.copyFileSync('icon.svg', 'dist/icon.svg');
+        fs.copyFileSync('icon.svg', 'dist/assets/icon.svg');
       }
       if (fs.existsSync('icon-192.png')) {
         fs.copyFileSync('icon-192.png', 'dist/icon-192.png');
+        fs.copyFileSync('icon-192.png', 'dist/assets/icon-192.png');
       }
       if (fs.existsSync('icon-512.png')) {
         fs.copyFileSync('icon-512.png', 'dist/icon-512.png');
+        fs.copyFileSync('icon-512.png', 'dist/assets/icon-512.png');
       }
       if (fs.existsSync('manifest.webmanifest')) {
         fs.copyFileSync('manifest.webmanifest', 'dist/manifest.webmanifest');

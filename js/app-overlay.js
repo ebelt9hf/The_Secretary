@@ -557,6 +557,11 @@ async function resolveNoteImages(html) {
       if (dataUrl) {
         resolvedHtml = resolvedHtml.replaceAll(`src="${originalSrc}"`, `src="${dataUrl}" data-asset-path="${normalizedPath}"`);
         resolvedHtml = resolvedHtml.replaceAll(`src='${originalSrc}'`, `src="${dataUrl}" data-asset-path="${normalizedPath}"`);
+      } else if (typeof window !== 'undefined' && !window.AppBridge?.fs?.hasNativeFS() && typeof location !== 'undefined' && location.protocol.startsWith('http')) {
+        // Prevent web browsers (e.g. GitHub Pages) from issuing 404 HTTP requests for missing or locked local assets
+        const placeholderSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150" viewBox="0 0 300 150"><rect width="300" height="150" fill="%231e1b4b" rx="8"/><text x="150" y="75" fill="%23a5b4fc" font-family="sans-serif" font-size="13" text-anchor="middle" dominant-baseline="middle">🖼️ [Image not loaded or locked]</text></svg>`;
+        resolvedHtml = resolvedHtml.replaceAll(`src="${originalSrc}"`, `src="${placeholderSvg}" data-asset-path="${normalizedPath}" data-pending-asset="${normalizedPath}"`);
+        resolvedHtml = resolvedHtml.replaceAll(`src='${originalSrc}'`, `src="${placeholderSvg}" data-asset-path="${normalizedPath}" data-pending-asset="${normalizedPath}"`);
       }
     }
     return resolvedHtml;
@@ -566,9 +571,42 @@ async function resolveNoteImages(html) {
   }
 }
 
+async function reResolvePendingEditorImages() {
+  if (typeof document === 'undefined') return;
+  const editor = document.getElementById('edit-textarea');
+  if (!editor) return;
+  const pendingImgs = editor.querySelectorAll('img[data-pending-asset]');
+  if (!pendingImgs.length) return;
+  for (const img of pendingImgs) {
+    const assetPath = img.getAttribute('data-pending-asset');
+    if (!assetPath) continue;
+    const dataUrl = (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readAsset === 'function' ? await StorageAPI.readAsset(assetPath) : null)
+      || (typeof readAssetAsDataUrl === 'function' ? await readAssetAsDataUrl(assetPath) : null);
+    if (dataUrl) {
+      img.src = dataUrl;
+      img.removeAttribute('data-pending-asset');
+    }
+  }
+}
+
 if (typeof window !== 'undefined') {
   window.resolveNoteImages = resolveNoteImages;
   window.resolveNoteImagesSync = resolveNoteImagesSync;
+  window.reResolvePendingEditorImages = reResolvePendingEditorImages;
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.on === 'function') {
+    StorageAPI.on('storage:change', (e) => {
+      if (e?.entity === 'assets') {
+        reResolvePendingEditorImages().catch(() => {});
+      }
+    });
+  }
+  if (window.FirebaseSyncService && typeof window.FirebaseSyncService.onStatusChange === 'function') {
+    window.FirebaseSyncService.onStatusChange(() => {
+      if (window.FirebaseSyncService.state?.isUnlocked) {
+        reResolvePendingEditorImages().catch(() => {});
+      }
+    });
+  }
 }
 
 function getDefaultNoteTemplateHTML(lang, options = {}) {
