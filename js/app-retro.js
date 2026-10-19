@@ -1100,7 +1100,7 @@ function handleRetroItemActivation(e, isDblClick = false) {
     }
 
     const href = linkEl.getAttribute('href');
-    if (href && href !== '#' && !href.startsWith('javascript:')) {
+    if (href && href !== '#' && !/^(?:javascript|data|vbscript):/i.test(href.trim())) {
       if (isDblClick || e.metaKey || e.ctrlKey || linkEl.classList.contains('retro-open-link')) {
         e.preventDefault();
         e.stopPropagation();

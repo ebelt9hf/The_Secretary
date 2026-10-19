@@ -6309,13 +6309,13 @@ function openEditScratchpadModal(topicName, memory) {
     }
   }
 
-  if (visualEditor) visualEditor.innerHTML = initialHtml;
+  if (visualEditor) visualEditor.innerHTML = sanitizeHTML(initialHtml || '');
   if (textareaEl) textareaEl.value = initialHtml;
 
   const setMode = (mode) => {
     currentMode = mode;
     if (mode === 'visual') {
-      visualEditor.innerHTML = textareaEl.value;
+      visualEditor.innerHTML = sanitizeHTML(textareaEl.value || '');
       visualContainer.style.display = 'block';
       codeContainer.style.display = 'none';
       visualBtn.classList.add('active');
@@ -9976,11 +9976,17 @@ async function getMeetingLinkedNotes(meetingEvent, topicName = '') {
         if (typeof turndownService !== 'undefined') {
           plain = turndownService.turndown(rawHtml);
         } else if (rawHtml) {
-          plain = rawHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-                         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                         .replace(/<[^>]+>/g, ' ')
-                         .replace(/\s{2,}/g, ' ')
-                         .trim();
+          if (typeof stripHtmlTags === 'function') {
+            plain = stripHtmlTags(rawHtml).replace(/\s{2,}/g, ' ').trim();
+          } else {
+            let str = rawHtml;
+            let prev;
+            do {
+              prev = str;
+              str = str.replace(/<[^>]+>/g, ' ');
+            } while (str !== prev);
+            plain = str.replace(/[<>]/g, '').replace(/\s{2,}/g, ' ').trim();
+          }
         }
         if (plain) {
           noteTexts.push(`### Note: ${n.title || 'Untitled'} (${n.date || ''})\n${plain}`);
@@ -13650,7 +13656,8 @@ async function updateCollaboratorInAllNotes(oldName, newName) {
             const pattern = new RegExp(`showCollaboratorModal\\s*\\(\\s*['"]${oldNameRegexStr}['"]\\s*\\)`, 'i');
             if (pattern.test(onclick)) {
               if (newName) {
-                const newOnclick = onclick.replace(pattern, `showCollaboratorModal('${newName.replace(/'/g, "\\'")}')`);
+                const escapedName = newName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const newOnclick = onclick.replace(pattern, `showCollaboratorModal('${escapedName}')`);
                 el.setAttribute('onclick', newOnclick);
               } else {
                 el.removeAttribute('onclick');

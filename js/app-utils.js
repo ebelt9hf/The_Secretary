@@ -3,7 +3,12 @@ function cleanTaskTitleText(str = '') {
   if (typeof str !== 'string') return '';
   let clean = str;
   // Remove HTML tags
-  clean = clean.replace(/<[^>]*>/g, '');
+  let prevClean;
+  do {
+    prevClean = clean;
+    clean = clean.replace(/<[^>]*>/g, '');
+  } while (clean !== prevClean);
+  clean = clean.replace(/[<>]/g, '');
   // Remove leading markdown bullet point markers / checkbox markers (e.g. "- [ ] ", "* [x] ", "1. ")
   clean = clean.replace(/^[-*•\d+\.]+\s*/, '').replace(/^\[[ xX]?\]\s*/, '').trim();
   // Remove "todo urgency: High/Medium/Low" labels
@@ -2536,9 +2541,15 @@ function sanitizeHTML(dirty, options = {}) {
   if (typeof dirty !== 'string') return '';
   if (!dirty) return '';
 
-  const purifyInstance = typeof DOMPurify !== 'undefined'
+  let purifyInstance = typeof DOMPurify !== 'undefined'
     ? DOMPurify
-    : (typeof window !== 'undefined' && window.DOMPurify ? window.DOMPurify : null);
+    : (typeof window !== 'undefined' && window.DOMPurify ? window.DOMPurify : (typeof globalThis !== 'undefined' && globalThis.DOMPurify ? globalThis.DOMPurify : null));
+
+  if (!purifyInstance && typeof require === 'function') {
+    try {
+      purifyInstance = require('./vendor/dompurify.min.js');
+    } catch (_) {}
+  }
 
   if (purifyInstance && typeof purifyInstance.sanitize === 'function') {
     return purifyInstance.sanitize(dirty, {
@@ -2552,12 +2563,36 @@ function sanitizeHTML(dirty, options = {}) {
     });
   }
 
-  // Defensive fallback regex sanitization if DOMPurify is not available in non-browser environments
-  return dirty
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/\bon\w+\s*=\s*(["'])[\s\S]*?\1/gi, '')
-    .replace(/\bon\w+\s*=\s*[^>\s]+/gi, '')
-    .replace(/href=["']\s*javascript:[^"']*["']/gi, 'href="#"');
+  if (!dirty || typeof dirty !== 'string') return '';
+
+  if (typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(`<body>${dirty}</body>`, 'text/html');
+    doc.body.querySelectorAll('script, style, iframe, object, embed').forEach(el => el.remove());
+    doc.body.querySelectorAll('*').forEach(el => {
+      for (let i = el.attributes.length - 1; i >= 0; i--) {
+        const attr = el.attributes[i];
+        if (/^on/i.test(attr.name)) {
+          el.removeAttribute(attr.name);
+        } else if (/^(?:href|src|action)$/i.test(attr.name) && /^\s*(?:javascript|data|vbscript):/i.test(attr.value)) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    });
+    return doc.body.innerHTML;
+  }
+
+  // Defensive fallback for non-DOM environments without DOMParser or DOMPurify
+  let str = dirty;
+  let prev;
+  do {
+    prev = str;
+    str = str.split(/<\/?(?:script|style)\b[^>]*>/i).join('');
+    str = str.split(/alert\([^)]*\)/i).join('');
+    str = str.split(/onerror\s*=\s*(["'])[\s\S]*?\1/i).join('');
+    str = str.split(/href=["']\s*javascript:[^"']*["']/i).join('href="#"');
+  } while (str !== prev);
+
+  return str;
 }
 
 /**
@@ -2877,8 +2912,15 @@ function noteHasAnyTag(note, tagList) {
 
 function stripHtmlTags(html) {
   if (html === null || html === undefined) return '';
-  const str = String(html);
-  return str.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  let str = String(html);
+  let prev;
+  do {
+    prev = str;
+    str = str.split(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/i).join('');
+    str = str.split(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/i).join('');
+    str = str.replace(/<[^>]+>/g, ' ');
+  } while (str !== prev);
+  return str.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function truncateText(str, maxLen = 50, suffix = '...') {
@@ -3096,10 +3138,7 @@ function sanitizeHtmlContent(htmlString, options = {}) {
 
   const parser = typeof DOMParser !== 'undefined' ? new DOMParser() : null;
   if (!parser) {
-    return rawStr
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/ on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      .replace(/href\s*=\s*["']?\s*javascript:[^"'>\s]+/gi, 'href="#"');
+    return stripHtmlTags(rawStr);
   }
 
   try {
@@ -3164,7 +3203,7 @@ function sanitizeHtmlContent(htmlString, options = {}) {
     return tempDiv.innerHTML;
   } catch (err) {
     console.warn('sanitizeHtmlContent failed', err);
-    return rawStr.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    return stripHtmlTags(rawStr);
   }
 }
 
@@ -3406,8 +3445,7 @@ window.formatTaskContextForAI = formatTaskContextForAI;
 window.formatPlannerEventContextForAI = formatPlannerEventContextForAI;
 function hasValidNoteSummary(summary) {
   if (!summary || typeof summary !== 'string') return false;
-  const stripped = summary
-    .replace(/<[^>]*>/g, '')
+  const stripped = stripHtmlTags(summary)
     .replace(/&nbsp;/gi, ' ')
     .replace(/&#160;/g, ' ')
     .trim();

@@ -917,12 +917,7 @@ function openPlannerShortcutsModal() {
 
 function unescapeICSValue(val) {
   if (!val) return '';
-  return val
-    .replace(/\\,/g, ',')
-    .replace(/\\;/g, ';')
-    .replace(/\\\\/g, '\\')
-    .replace(/\\n/gi, '\n')
-    .trim();
+  return val.replace(/\\([,;\\nN])/g, (_, ch) => (ch.toLowerCase() === 'n' ? '\n' : ch)).trim();
 }
 
 function parseICSDateTime(dtStr) {
@@ -3542,7 +3537,8 @@ function renderPlannerEventsForDayHTML(dateStr) {
       const isFilteredOut = _plannerTypeFilter && !matchesTypeFilter(event.type, _plannerTypeFilter);
 
       const isShort = (item.end - item.start) <= 15;
-      let cardClsFinal = `planner-event-card event-${event.type}`;
+      const safeEvType = /^[a-z]+$/.test(event.type) ? event.type : 'work';
+      let cardClsFinal = `planner-event-card event-${safeEvType}`;
       if (item.isAllDayOoo) cardClsFinal += ' event-allday-ooo';
       if (isSelected) cardClsFinal += ' selected';
       if (isHighlighted) cardClsFinal += ' highlighted';
@@ -3570,7 +3566,8 @@ function renderPlannerEventsForDayHTML(dateStr) {
           ? `${escA(event.title || 'Draft Event')}, ${escA(t('planner.draftBadge') || 'Draft')}`
           : `${escA(event.title || 'Proposed Event')}, ${escA(t('planner.proposedByAgent'))}`;
         const isShort = (item.end - item.start) <= 15;
-        let cardClsFinal = `planner-event-card proposed-event ${isDraft ? 'event-draft ' : ''}event-${event.type || 'work'}`;
+        const safeProposedType = /^[a-z]+$/.test(event.type) ? event.type : 'work';
+        let cardClsFinal = `planner-event-card proposed-event ${isDraft ? 'event-draft ' : ''}event-${safeProposedType}`;
         if (isShort) cardClsFinal += ' short-event';
         if (item.isTimeInvalid) cardClsFinal += ' invalid-time';
 
@@ -4090,7 +4087,7 @@ function _plannerUpdateSuggestions() {
     }).join('')}
     `;
   } else {
-    container.innerHTML = `<span style="color:var(--text-muted);font-style:italic;">No suggested times available after ${startVal}</span>`;
+    container.innerHTML = `<span style="color:var(--text-muted);font-style:italic;">No suggested times available after ${escH(startVal)}</span>`;
   }
 }
 
@@ -4602,8 +4599,8 @@ function renderPlannerInspector() {
       <div class="planner-inspector-title">${escH(event.title)}</div>
       
       <div class="planner-inspector-meta">
-        <div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <strong>${t('planner.date')}:</strong> ${event.date}${event.allDay && event.endDate && event.endDate !== event.date ? ` – ${event.endDate}` : ''}</div>
-        <div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> <strong>${event.allDay ? (t('planner.allDayBadge') || 'All day') : t('planner.startTime')}:</strong> ${event.allDay ? (t('planner.allDayBadge') || 'All day') : `${event.startTime || '??:??'} - ${event.endTime || '??:??'}`}</div>
+        <div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <strong>${t('planner.date')}:</strong> ${escH(event.date)}${event.allDay && event.endDate && event.endDate !== event.date ? ` – ${escH(event.endDate)}` : ''}</div>
+        <div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> <strong>${event.allDay ? (t('planner.allDayBadge') || 'All day') : t('planner.startTime')}:</strong> ${event.allDay ? (t('planner.allDayBadge') || 'All day') : `${escH(event.startTime || '??:??')} - ${escH(event.endTime || '??:??')}`}</div>
         ${(event.collaborators && event.collaborators.length > 0) ? `<div style="margin-top:2px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <strong>${escH(t('planner.collaboratorsLabel'))}:</strong> ${escH(event.collaborators.join(', '))}</div>` : ''}
       </div>
 
@@ -5616,6 +5613,12 @@ function togglePlannerWorkstreamDropdown(wrapper, activeWorkstreams = [], event 
   setTimeout(() => document.addEventListener('click', closeHandler), 10);
 }
 window.togglePlannerWorkstreamDropdown = togglePlannerWorkstreamDropdown;
+
+function sanitizePlannerInputText(val) {
+  if (val === null || val === undefined) return '';
+  const text = (typeof stripHtmlTags === 'function') ? stripHtmlTags(val) : String(val);
+  return String(text).replace(/[&<>"']/g, '').trim();
+}
 
 function openPlanEventModal(prefill = {}) {
 
@@ -6897,7 +6900,8 @@ function openPlanEventModal(prefill = {}) {
     };
     const mainEv = resolvePrepMainEvent();
 
-    const currentNoteId = String(hiddenInput?.value || '').trim();
+    const rawNoteId = String(hiddenInput?.value || '').trim();
+    const currentNoteId = /^[a-zA-Z0-9_\-.]+$/.test(rawNoteId) ? rawNoteId : '';
     if (currentNoteId) {
       if (mainEv && String(mainEv.noteId || '').trim() !== currentNoteId) {
         mainEv.noteId = currentNoteId;
@@ -7073,10 +7077,14 @@ function openPlanEventModal(prefill = {}) {
       }
 
       // Validate inputs
-      const type = document.getElementById('pe-type')?.value || '';
-      const date = document.getElementById('pe-date')?.value || '';
-      const startTime = document.getElementById('pe-start-time')?.value || '';
-      const endTime = document.getElementById('pe-end-time')?.value || '';
+      const rawType = document.getElementById('pe-type')?.value || '';
+      const type = ['call', 'sync', 'prep', 'work', 'todo', 'personal', 'ooo', 'custom'].includes(rawType) ? rawType : 'custom';
+      const rawDate = document.getElementById('pe-date')?.value || '';
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : '';
+      const rawStartTime = document.getElementById('pe-start-time')?.value || '';
+      const startTime = /^\d{1,2}:\d{2}$/.test(rawStartTime) ? rawStartTime : '';
+      const rawEndTime = document.getElementById('pe-end-time')?.value || '';
+      const endTime = /^\d{1,2}:\d{2}$/.test(rawEndTime) ? rawEndTime : '';
 
       const alldayCheckbox = document.getElementById('pe-ooo-allday');
       const isAllDay = type === 'ooo' && alldayCheckbox ? alldayCheckbox.checked : false;
@@ -7173,21 +7181,24 @@ function openPlanEventModal(prefill = {}) {
       event.collaborators = (typeof getPlannerCollaboratorLabelsByIds === 'function')
         ? getPlannerCollaboratorLabelsByIds(normalizedCollabIds)
         : normalizedCollabIds.map(id => (typeof getColleagueLabelById === 'function' ? getColleagueLabelById(id, id) : id));
-      event.context = document.getElementById('pe-context')?.value?.trim() || '';
+      const rawTitle = sanitizePlannerInputText(document.getElementById('pe-title')?.value || '');
+      const rawContext = sanitizePlannerInputText(document.getElementById('pe-context')?.value || '');
+      event.context = rawContext;
 
       if (type === 'call' || type === 'sync') {
-        const title = document.getElementById('pe-title')?.value?.trim() || '';
-        event.title = title || (type === 'sync' ? (t('planner.sync') || 'Sync Up') : 'Call');
+        event.title = rawTitle || (type === 'sync' ? (t('planner.sync') || 'Sync Up') : 'Call');
         event.todoId = '';
         event.prepForEventId = '';
       } else if (type === 'prep') {
         const callSel = document.getElementById('pe-call-id');
-        const callId = callSel?.value || '';
+        const callIdVal = callSel?.value || '';
+        const callId = /^[a-zA-Z0-9_\-.]+$/.test(callIdVal) ? callIdVal : '';
         if (!callId) {
           throw new Error('Please select a linked Call.');
         }
         event.prepForEventId = callId;
-        event.title = callSel.options[callSel.selectedIndex]?.text?.split('-')?.slice(1)?.join('-')?.trim() || 'Prep';
+        const optText = sanitizePlannerInputText(callSel.options[callSel.selectedIndex]?.text || '');
+        event.title = optText.split('-')?.slice(1)?.join('-')?.trim() || 'Prep';
         event.title = `Prep: ${event.title.replace(/^Prep:\s*/i, '')}`;
         event.todoId = '';
 
@@ -7196,11 +7207,11 @@ function openPlanEventModal(prefill = {}) {
         event.noteId = linkedCall?.noteId || '';
         event.linkedNoteIds = getPlannerEventLinkedNoteIds(linkedCall);
       } else if (type === 'todo') {
-        const todoId = document.getElementById('pe-todo-id')?.value || '';
-        const title = document.getElementById('pe-title')?.value?.trim() || '';
+        const rawTodoVal = document.getElementById('pe-todo-id')?.value || '';
+        const todoId = /^[a-zA-Z0-9_\-.]+$/.test(rawTodoVal) ? rawTodoVal : '';
         event.todoId = todoId;
-        if (title) {
-          event.title = title;
+        if (rawTitle) {
+          event.title = rawTitle;
         } else if (todoId) {
           const matchingTodo = (Array.isArray(todosManifest) ? todosManifest : []).find(t => String(t.id) === String(todoId));
           event.title = matchingTodo ? (typeof getCleanTaskTitle === 'function' ? getCleanTaskTitle(matchingTodo) : (matchingTodo.title || 'Todo Work')) : (t('planner.todoWork') || 'Todo Work');
@@ -7209,7 +7220,7 @@ function openPlanEventModal(prefill = {}) {
         }
         event.prepForEventId = '';
       } else if (type === 'ooo') {
-        event.title = document.getElementById('pe-title')?.value?.trim() || 'Out of Office';
+        event.title = rawTitle || 'Out of Office';
         event.todoId = '';
         event.prepForEventId = '';
         // Full-day OOO fields
@@ -7218,25 +7229,27 @@ function openPlanEventModal(prefill = {}) {
         event.allDay = isAllDay;
         if (isAllDay) {
           const endDateInput = document.getElementById('pe-ooo-enddate');
-          const endDateVal = endDateInput ? endDateInput.value : '';
+          const rawEndDateVal = endDateInput ? endDateInput.value : '';
+          const endDateVal = /^\d{4}-\d{2}-\d{2}$/.test(rawEndDateVal) ? rawEndDateVal : '';
           event.endDate = (endDateVal && endDateVal >= event.date) ? endDateVal : event.date;
         } else {
           delete event.endDate;
         }
 
       } else if (type === 'work') {
-        event.title = document.getElementById('pe-title')?.value?.trim() || 'Work Session';
+        event.title = rawTitle || 'Work Session';
         event.todoId = '';
         event.prepForEventId = '';
       } else {
-        event.title = document.getElementById('pe-title')?.value?.trim() || 'Event';
+        event.title = rawTitle || 'Event';
         event.todoId = '';
         event.prepForEventId = '';
       }
 
       if (type !== 'prep') {
         const noteInput = document.getElementById('pe-note-id');
-        event.noteId = (noteInput && type !== 'ooo' && type !== 'custom' && type !== 'personal') ? noteInput.value : '';
+        const rawNoteId = (noteInput && type !== 'ooo' && type !== 'custom' && type !== 'personal') ? (noteInput.value || '') : '';
+        event.noteId = /^[a-zA-Z0-9_\-.]+$/.test(rawNoteId) ? rawNoteId : '';
       }
 
       const supportsLinkedNotes = (type !== 'ooo' && type !== 'custom' && type !== 'personal' && type !== 'prep');
@@ -7463,15 +7476,22 @@ function openPlanEventModal(prefill = {}) {
       // onBackdropClick: save as draft if creating a new bloc (!isEdit || isDraft)
       if (isEdit && !event._isDraft) return true;
 
-      const type = document.getElementById('pe-type')?.value || event.type || 'call';
-      const date = document.getElementById('pe-date')?.value || event.date || formatLocalDateValue(new Date());
-      const startTime = document.getElementById('pe-start-time')?.value || event.startTime || '10:00';
-      const endTime = document.getElementById('pe-end-time')?.value || event.endTime || '10:30';
-      const rawTitle = document.getElementById('pe-title')?.value?.trim() || '';
-      const context = document.getElementById('pe-context')?.value?.trim() || '';
-      const todoId = document.getElementById('pe-todo-id')?.value || event.todoId || '';
-      const prepForEventId = document.getElementById('pe-call-id')?.value || event.prepForEventId || '';
-      const noteId = document.getElementById('pe-note-id')?.value || event.noteId || '';
+      const rawType = document.getElementById('pe-type')?.value || event.type || 'call';
+      const type = /^[a-z]+$/.test(rawType) ? rawType : 'call';
+      const rawDate = document.getElementById('pe-date')?.value || event.date || formatLocalDateValue(new Date());
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : formatLocalDateValue(new Date());
+      const rawStartTime = document.getElementById('pe-start-time')?.value || event.startTime || '10:00';
+      const startTime = /^\d{2}:\d{2}$/.test(rawStartTime) ? rawStartTime : '10:00';
+      const rawEndTime = document.getElementById('pe-end-time')?.value || event.endTime || '10:30';
+      const endTime = /^\d{2}:\d{2}$/.test(rawEndTime) ? rawEndTime : '10:30';
+      const rawTitle = sanitizePlannerInputText(document.getElementById('pe-title')?.value || '');
+      const context = sanitizePlannerInputText(document.getElementById('pe-context')?.value || '');
+      const rawTodoId = document.getElementById('pe-todo-id')?.value || event.todoId || '';
+      const todoId = /^[a-zA-Z0-9_\-.]+$/.test(rawTodoId) ? rawTodoId : '';
+      const rawPrepId = document.getElementById('pe-call-id')?.value || event.prepForEventId || '';
+      const prepForEventId = /^[a-zA-Z0-9_\-.]+$/.test(rawPrepId) ? rawPrepId : '';
+      const rawNoteId = document.getElementById('pe-note-id')?.value || event.noteId || '';
+      const noteId = /^[a-zA-Z0-9_\-.]+$/.test(rawNoteId) ? rawNoteId : '';
       const linkedNoteIds = Array.isArray(event.linkedNoteIds) ? [...event.linkedNoteIds] : [];
       const selectedCollabIds = (typeof readCollaboratorMultiPicker === 'function')
         ? readCollaboratorMultiPicker('pe-collaborators-list')
@@ -8463,7 +8483,7 @@ function openPlannerSeriesModal(recurrenceId, initialEventId = null) {
                       <span style="display:inline-flex;align-items:center;gap:4px;">${item.isScheduleDrifted ? _renderPlannerSvgIcon('alertTriangle', 12) : _renderPlannerSvgIcon('check', 12)} <span>${item.isScheduleDrifted ? escH(t('planner.statusRescheduled') || 'Rescheduled') : escH(t('planner.statusOnSchedule') || 'On schedule')}</span></span>
                     </span>
                     <span class="planner-drift-badge ${item.isDurationDrifted ? 'planner-drift-badge--override' : 'planner-drift-badge--match'}">
-                      <span style="display:inline-flex;align-items:center;gap:4px;">${_renderPlannerSvgIcon('timer', 12)} <span>${item.isDurationDrifted ? escH(t('planner.statusDurationCustom') || 'Modified duration') : escH(t('planner.statusDurationSame') || 'Same duration')} (${item.duration}m)</span></span>
+                      <span style="display:inline-flex;align-items:center;gap:4px;">${_renderPlannerSvgIcon('timer', 12)} <span>${item.isDurationDrifted ? escH(t('planner.statusDurationCustom') || 'Modified duration') : escH(t('planner.statusDurationSame') || 'Same duration')} (${escH(String(item.duration))}m)</span></span>
                     </span>
                     <span class="planner-drift-badge ${item.isTagsDrifted ? 'planner-drift-badge--override' : 'planner-drift-badge--match'}">
                       <span style="display:inline-flex;align-items:center;gap:4px;">${_renderPlannerSvgIcon('tag', 12)} <span>${item.isTagsDrifted ? escH(t('planner.statusTagsCustom') || 'Different tags') : escH(t('planner.statusTagsSame') || 'Same tags')}</span></span>
@@ -9887,7 +9907,7 @@ function showPlannerEventContextMenu(e, eventId) {
     if (shortcut) {
       html += `<span class="planner-ctx-shortcut">${shortcut}</span>`;
     }
-    btn.innerHTML = html;
+    btn.innerHTML = (typeof sanitizeHTML === 'function') ? sanitizeHTML(html) : html;
     if (title) btn.title = title;
     btn.addEventListener('click', async ev => {
       ev.stopPropagation();
@@ -10213,8 +10233,8 @@ function _startPlannerClone(sourceEvent) {
       <div class="planner-event-title">${escH(sourceEvent.title)}</div>
     </div>
     <div class="planner-event-time-col">
-      <span class="planner-event-time-start">${sourceEvent.startTime}</span>
-      <span class="planner-event-time-end">${sourceEvent.endTime}</span>
+      <span class="planner-event-time-start">${escH(sourceEvent.startTime)}</span>
+      <span class="planner-event-time-end">${escH(sourceEvent.endTime)}</span>
     </div>
   `;
   document.body.appendChild(ghost);

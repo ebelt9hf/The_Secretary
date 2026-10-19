@@ -2439,7 +2439,7 @@ async function getUnlinkedMentionsForNote(note) {
 
   const escapeReg = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Safe cross-browser matching without lookbehind assertion
-  const titlePattern = new RegExp(`(^|[^[\w])(${escapeReg(title)})(?=[^\]\w]|$)`, 'gi');
+  const titlePattern = new RegExp(`(^|[^\\[\\w])(${escapeReg(title)})(?=[^\\]\\w]|$)`, 'gi');
   const unlinked = [];
 
   for (const otherNote of (manifest || [])) {
@@ -2646,15 +2646,17 @@ const NoteShareFormatter = {
       .replace(/<em>([\s\S]*?)<\/em>/gi, '_$1_')
       .replace(/<i>([\s\S]*?)<\/i>/gi, '_$1_')
       .replace(/!decision:(?:active|replaced|superseded)\s+"([^"]+)"/gi, '📜 *Decision:* $1')
-      .replace(/#todo:([a-zA-Z0-9_-]+)/gi, '✅ *Task:*')
-      .replace(/<[^>]+>/g, '');
+      .replace(/#todo:([a-zA-Z0-9_-]+)/gi, '✅ *Task:*');
 
+    let prevParsed;
+    do {
+      prevParsed = parsed;
+      parsed = parsed.replace(/<[^>]+>/g, '');
+    } while (parsed !== prevParsed);
+
+    const shareEntityMap = { '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&amp;': '&' };
     parsed = parsed
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
+      .replace(/&(?:amp|lt|gt|quot|#39);/g, m => shareEntityMap[m] || m)
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
@@ -2683,19 +2685,23 @@ const NoteShareFormatter = {
     if (typeof turndownService !== 'undefined' && typeof turndownService.turndown === 'function') {
       md += turndownService.turndown(html || '');
     } else {
-      md += String(html || '')
+      let clean = String(html || '')
         .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n')
         .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n')
         .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n')
         .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n')
         .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n')
         .replace(/<strong>([\s\S]*?)<\/strong>/gi, '**$1**')
-        .replace(/<em>([\s\S]*?)<\/em>/gi, '*$1*')
-        .replace(/<[^>]+>/g, '')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .trim();
+        .replace(/<em>([\s\S]*?)<\/em>/gi, '*$1*');
+
+      let prevClean;
+      do {
+        prevClean = clean;
+        clean = clean.replace(/<[^>]+>/g, '');
+      } while (clean !== prevClean);
+
+      const mdEntityMap = { '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&amp;': '&' };
+      md += clean.replace(/&(?:amp|lt|gt|quot|#39);/g, m => mdEntityMap[m] || m).trim();
     }
     return md;
   }

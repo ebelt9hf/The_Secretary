@@ -168,6 +168,20 @@ describe('Note Image Captions & AI Perfect Note Integration', () => {
       const textForLLM = LLMService.prepareNoteContentForLLM(noteHtml);
       expect(textForLLM).toContain('[IMAGE_1: figure image with caption: "Microservices architecture topology" (see attached vision payload)]');
     });
+
+    it('safely sanitizes nested HTML injection payloads (e.g. <<script>script>) and unclosed tags from figure captions', () => {
+      const noteHtml = `
+        <figure class="note-image-figure">
+          <img src="notes/_assets/img_123.png" alt="Service Mesh">
+          <figcaption class="note-image-caption"><<script>script>alert(1)</script><img src=x onerror=alert(2)>Safe topology <script</figcaption>
+        </figure>
+      `;
+
+      const textForLLM = LLMService.prepareNoteContentForLLM(noteHtml);
+      expect(textForLLM).not.toContain('<script');
+      expect(textForLLM).not.toContain('alert');
+      expect(textForLLM).toContain('Safe topology');
+    });
   });
 
   describe('Proposal Image & Caption Restoration (restoreOriginalImagesToProposal)', () => {
@@ -197,6 +211,21 @@ describe('Note Image Captions & AI Perfect Note Integration', () => {
       expect(restored).toContain('note-embedded-image-wrap');
       expect(restored).toContain('src="notes/_assets/img_def.png"');
       expect(restored).toContain('Kubernetes cluster layout');
+    });
+
+    it('safely sanitizes nested HTML injection payloads from original figure captions', () => {
+      const origHtml = `
+        <figure class="note-image-figure">
+          <img src="notes/_assets/img_def.png" alt="Topology">
+          <figcaption class="note-image-caption"><<script>script>alert(1)</script><img src=x onerror=alert(2)>Clean cluster layout <script</figcaption>
+        </figure>
+      `;
+      const proposalHtml = '<h2>Infrastructure</h2>\n[IMAGE_1]\n<p>Summary</p>';
+
+      const restored = restoreOriginalImagesToProposal(origHtml, proposalHtml);
+      expect(restored).not.toContain('<script');
+      expect(restored).not.toContain('alert');
+      expect(restored).toContain('Clean cluster layout');
     });
 
     it('preserves semantic figure and figcaption written directly by LLM', () => {

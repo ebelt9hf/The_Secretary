@@ -102,6 +102,38 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Safely strips HTML markup and script/style tags from a caption string using a fixed-point loop.
+ * Resolves CodeQL CWE-116 (Incomplete multi-character sanitization) by ensuring nested or
+ * malformed tags are completely removed and no residual angle brackets remain.
+ *
+ * @param {string} html - HTML string (e.g., figcaption inner HTML).
+ * @returns {string} Sanitized plain text without HTML tags.
+ */
+function stripCaptionHtml(html) {
+  if (typeof stripHtmlTags === 'function') {
+    return stripHtmlTags(html);
+  }
+  if (!html) return '';
+  let str = String(html);
+  let prev;
+
+  do {
+    prev = str;
+    str = str.split(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/i).join('');
+    str = str.split(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/i).join('');
+    str = str.replace(/<[^>]+>/g, ' ');
+  } while (str !== prev);
+
+  return str.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
+}
+if (typeof window !== 'undefined') {
+  window.stripCaptionHtml = stripCaptionHtml;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis.stripCaptionHtml = stripCaptionHtml;
+}
+
+/**
  * Secretary - Local LLM & Mini-RAG Service Layer
  */
 const LLMService = {
@@ -478,7 +510,7 @@ const LLMService = {
       const imgMatch = figHtml.match(/<img\b[^>]*>/i);
       if (!imgMatch) return figHtml;
       const captionMatch = figHtml.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i);
-      const rawCaption = captionMatch ? captionMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+      const rawCaption = captionMatch ? stripCaptionHtml(captionMatch[1]) : '';
       const altMatch = imgMatch[0].match(/\balt\s*=\s*(["'])(.*?)\1/i);
       const cleanAlt = altMatch ? String(altMatch[2] || '').trim() : '';
 
@@ -3652,18 +3684,18 @@ function cleanSummaryHtml(html) {
 
     let cleanHtml = wrapper.innerHTML;
     // Regex cleaning for plain text or markdown headers
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*(?:call\s+|meeting\s+)?summary\s*:\s*/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*(?:call\s+|meeting\s+)?summary\s*$/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*résumé\s*:\s*/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*résumé\s*$/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*zusammenfassung\s*:\s*/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*zusammenfassung\s*$/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*main\s+points\s*:\s*/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*main\s+points\s*$/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*décisions?\s*:\s*/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*décisions?\s*$/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*decisions?\s*:\s*/gim, '');
-    cleanHtml = cleanHtml.replace(/^(?:\s*|\*|#|-)*decisions?\s*$/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*(?:call\s+|meeting\s+)?summary\s*:\s*/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*(?:call\s+|meeting\s+)?summary\s*$/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*résumé\s*:\s*/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*résumé\s*$/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*zusammenfassung\s*:\s*/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*zusammenfassung\s*$/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*main\s+points\s*:\s*/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*main\s+points\s*$/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*décisions?\s*:\s*/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*décisions?\s*$/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*decisions?\s*:\s*/gim, '');
+    cleanHtml = cleanHtml.replace(/^[\s*#-]*decisions?\s*$/gim, '');
     return cleanHtml.trim();
   } catch (e) {
     console.warn('Failed to clean summary HTML:', e);
@@ -4266,7 +4298,7 @@ function formatSuggestionCardBody(card) {
   }
   if (card.action === 'log_decision') {
     const text = String(props.text || '').trim();
-    const quoted = text.replace(/\"/g, '\\\"');
+    const quoted = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     return [
       `Decision: !decision:active "${quoted}"`,
       String(props.major_topic || '').trim() ? `Major topic: ${String(props.major_topic || '').trim()}` : '',
@@ -4389,7 +4421,7 @@ function sanitizeLLMHTML(html) {
   } catch (e) {
     // If DOMParser fails (e.g., in a non-browser context), strip all tags as a hard fallback
     console.warn('sanitizeLLMHTML: DOMParser failed, stripping all tags', e);
-    return String(html).replace(/<[^>]*>/g, '');
+    return stripCaptionHtml(html);
   }
 }
 
@@ -5878,7 +5910,7 @@ async function testLocalLLMConnection() {
               <span>✕</span>
               <span>${failedTitle}</span>
             </div>
-            ${err?.status ? `<span class="prefs-ai-test-card-badge">HTTP ${err.status}</span>` : ''}
+            ${err?.status ? `<span class="prefs-ai-test-card-badge">HTTP ${escH(String(err.status))}</span>` : ''}
           </div>
           <div class="prefs-ai-test-error-box">${escH(errorMsg)}</div>
           <div class="prefs-ai-test-card-grid">
@@ -7991,7 +8023,7 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
         tag = imgMatch[0];
         const capMatch = fullMatch.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i);
         if (capMatch) {
-          origCaption = capMatch[1].replace(/<[^>]*>/g, '').trim();
+          origCaption = stripCaptionHtml(capMatch[1]);
         }
         const styleMatch = fullMatch.match(/\bstyle\s*=\s*(["'])(.*?)\1/i);
         if (styleMatch) {
@@ -8071,6 +8103,8 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
       .replace(/^(?:figure image|html image|markdown image|embedded image)(?:\s*with caption:\s*)?/i, '')
       .replace(/^["']|["']$/g, '')
       .trim();
+
+    finalCaption = stripCaptionHtml(finalCaption);
 
     const placeholder = (typeof t === 'function' ? t('editor.imageCaptionPlaceholder') : null) || 'Add image caption...';
 
@@ -8403,7 +8437,7 @@ function extractProposedActionsFromProposal(proposalHtml, rawProps = {}) {
       const liMatches = decSectionMatch[1].match(/<li[^>]*>(.*?)<\/li>/gi);
       if (liMatches) {
         liMatches.forEach(li => {
-          const text = li.replace(/<[^>]+>/g, '').trim();
+          const text = stripCaptionHtml(li);
           if (text) {
             decisions.push({ text, status: 'active', major_topic: '', context: '' });
           }
@@ -8419,7 +8453,7 @@ function extractProposedActionsFromProposal(proposalHtml, rawProps = {}) {
       const liMatches = actionSectionMatch[1].match(/<li[^>]*>(.*?)<\/li>/gi);
       if (liMatches) {
         liMatches.forEach(li => {
-          const text = li.replace(/<[^>]+>/g, '').trim();
+          const text = stripCaptionHtml(li);
           if (text) {
             const ownerMatch = text.match(/@([A-Z][a-zA-Z0-9_\-]+)/);
             const owner = ownerMatch ? ownerMatch[1] : '';
@@ -9775,7 +9809,7 @@ const RefactorModalController = {
       const htmlContainer = document.getElementById('refactor-proposal-html');
       if (htmlContainer) {
         const syncResolved = (typeof resolveNoteImagesSync === 'function') ? resolveNoteImagesSync(html) : html;
-        htmlContainer.innerHTML = syncResolved;
+        htmlContainer.innerHTML = (typeof sanitizeHTML === 'function') ? sanitizeHTML(syncResolved) : syncResolved;
 
         // If user hasn't edited this tab, establish exact DOM baseline
         if (!this.hasUserEditedTab?.[tabKey] && this.tabBaselineHtml) {
@@ -10036,7 +10070,7 @@ const RefactorModalController = {
 
     if (navigator.clipboard && navigator.clipboard.write) {
       const blob = new Blob([html], { type: 'text/html' });
-      const textBlob = new Blob([html.replace(/<[^>]*>/g, '')], { type: 'text/plain' });
+      const textBlob = new Blob([stripCaptionHtml(html)], { type: 'text/plain' });
       const item = new ClipboardItem({ 'text/html': blob, 'text/plain': textBlob });
       navigator.clipboard.write([item]).then(() => {
         toast(t('common.copied') || '📋 Proposal copied to clipboard!');
@@ -10258,7 +10292,7 @@ const RefactorModalController = {
       }
 
       if (this.activeTab === 'original') {
-        editor.innerHTML = chosenHtml;
+        editor.innerHTML = sanitizeHTML(chosenHtml);
         editor.dispatchEvent(new Event('input', { bubbles: true }));
 
         if (typeof autoSaveNote === 'function') {
@@ -10277,8 +10311,9 @@ const RefactorModalController = {
       }
 
       // Convert decisions and todos into interactive DOM elements inside chosenHtml
+      const safeChosenHtml = sanitizeHTML(chosenHtml);
       const parser = new DOMParser();
-      const doc = parser.parseFromString(`<div>${chosenHtml}</div>`, 'text/html');
+      const doc = parser.parseFromString(`<div>${safeChosenHtml}</div>`, 'text/html');
       const rootDiv = doc.body.firstElementChild || doc.body;
 
       // Process user-reviewed Decisions and Todos from current proposal tab
@@ -10450,7 +10485,7 @@ const RefactorModalController = {
       // Unroll any lingering uncertainty spans before saving so note stays clean
       chosenHtml = rootDiv.innerHTML.replace(/<span class="inline-uncertain-text"[^>]*>(.*?)<\/span>/gi, '$1');
 
-      editor.innerHTML = chosenHtml;
+      editor.innerHTML = sanitizeHTML(chosenHtml);
       editor.dispatchEvent(new Event('input', { bubbles: true }));
 
       // Populate meeting summary in the respective field directly from the perfect note agent
@@ -10461,7 +10496,7 @@ const RefactorModalController = {
         } else {
           const summaryEl = document.getElementById('edit-summary');
           if (summaryEl) {
-            summaryEl.innerHTML = chosenSummary;
+            summaryEl.innerHTML = sanitizeHTML(chosenSummary);
             summaryEl.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }

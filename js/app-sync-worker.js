@@ -394,7 +394,7 @@ const SyncWorkerEngine = {
           await bridge.saveNote(this.state.userId, cleanId, fullDoc);
         }
       } catch (err) {
-        console.warn(`[SyncWorker] Cloud push error for note ${cleanId}:`, err);
+        console.warn('[SyncWorker] Cloud push error for note:', cleanId, err);
       }
     }
 
@@ -467,7 +467,7 @@ const SyncWorkerEngine = {
       try {
         await bridge.deleteNote(this.state.userId, cleanId, '4.0.0');
       } catch (err) {
-        console.warn(`[SyncWorker] Cloud delete error for note ${cleanId}:`, err);
+        console.warn('[SyncWorker] Cloud delete error for note:', cleanId, err);
       }
     }
     return { id: cleanId, deleted: true };

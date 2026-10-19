@@ -4,6 +4,18 @@
  * Secretary - Daily Review Wizard Controller
  * Manages the 4-step end-of-day cleanup workflow.
  */
+function _stripHtml(html) {
+  if (typeof stripHtmlTags === 'function') return stripHtmlTags(html);
+  if (!html || typeof html !== 'string') return '';
+  let str = html;
+  let prev;
+  do {
+    prev = str;
+    str = str.replace(/<[^>]*>/g, '');
+  } while (str !== prev);
+  return str.replace(/[<>]/g, '');
+}
+
 const DailyReviewController = {
   currentStep: 0,
   stashItems: [],
@@ -512,7 +524,7 @@ const DailyReviewController = {
 
   updateNoteSummaryBadge(notePath, summaryText = '') {
     if (!notePath) return;
-    const cleanText = (summaryText || '').replace(/<[^>]*>/g, '').trim();
+    const cleanText = _stripHtml(summaryText).trim();
     const hasSummary = cleanText.length > 0;
 
     if (Array.isArray(this.todayNotes)) {
@@ -816,16 +828,16 @@ const DailyReviewController = {
     } else {
       html += `<ul>\n`;
       for (const n of notes) {
-        let plainSummary = (n.summary || '').replace(/<[^>]*>/g, '').trim();
+        let plainSummary = _stripHtml(n.summary).trim();
         if (!plainSummary && n.path && typeof StorageAPI !== 'undefined' && typeof StorageAPI.readNoteContent === 'function') {
           try {
             const rawHtml = await StorageAPI.readNoteContent(n.path);
             const parsed = (typeof parseNoteHTML === 'function') ? parseNoteHTML(rawHtml) : null;
             if (parsed && parsed.summary) {
-              plainSummary = parsed.summary.replace(/<[^>]*>/g, '').trim();
+              plainSummary = _stripHtml(parsed.summary).trim();
             }
             if (!plainSummary && parsed && parsed.mainHTML) {
-              const text = parsed.mainHTML.replace(/<[^>]*>/g, '').trim();
+              const text = _stripHtml(parsed.mainHTML).trim();
               if (text) plainSummary = text.slice(0, 300) + (text.length > 300 ? '...' : '');
             }
           } catch (e) {
@@ -997,14 +1009,14 @@ const DailyReviewController = {
       (typeof manifest !== 'undefined' && Array.isArray(manifest) ? manifest.find(n => n.path === notePath) : null);
     if (!note) return;
 
-    let summaryText = (note.summary || '').replace(/<[^>]*>/g, '').trim();
+    let summaryText = _stripHtml(note.summary).trim();
     if (!summaryText && note.path && typeof StorageAPI !== 'undefined' && typeof StorageAPI.readNoteContent === 'function') {
       try {
         const raw = await StorageAPI.readNoteContent(note.path);
         const parsed = (typeof parseNoteHTML === 'function') ? parseNoteHTML(raw) : null;
-        if (parsed?.summary) summaryText = parsed.summary.replace(/<[^>]*>/g, '').trim();
+        if (parsed?.summary) summaryText = _stripHtml(parsed.summary).trim();
         else if (parsed?.mainHTML) {
-          const t = parsed.mainHTML.replace(/<[^>]*>/g, '').trim();
+          const t = _stripHtml(parsed.mainHTML).trim();
           if (t) summaryText = t.slice(0, 300) + (t.length > 300 ? '...' : '');
         }
       } catch (e) {}
@@ -2778,7 +2790,7 @@ const DailyReviewController = {
       this.mountStep3NoteEditor();
 
       this.todayNotes.forEach(note => {
-        const summaryText = (note.summary || '').replace(/<[^>]*>/g, '').trim();
+        const summaryText = _stripHtml(note.summary).trim();
         const hasSummary = summaryText.length > 0;
 
         const btn = document.createElement('button');
@@ -4230,14 +4242,14 @@ const DailyReviewController = {
     // First, sync any existing summaries from the HTML files into todayNotes.
     for (const n of this.todayNotes) {
       if (signal && signal.aborted) return;
-      const summaryPlaintext = (n.summary || '').replace(/<[^>]*>/g, '').trim();
+      const summaryPlaintext = _stripHtml(n.summary).trim();
       const summaryIsEmpty = !summaryPlaintext || n.summary === '<p></p>' || n.summary === '<p><br></p>';
       if (summaryIsEmpty) {
         try {
           const html = await StorageAPI.readNoteContent(n.path);
           const parsed = (typeof parseNoteHTML === 'function') ? parseNoteHTML(html) : null;
           if (parsed && parsed.summary) {
-            const parsedPlain = parsed.summary.replace(/<[^>]*>/g, '').trim();
+            const parsedPlain = _stripHtml(parsed.summary).trim();
             if (parsedPlain) {
               n.summary = parsed.summary;
               const mfIdx = (typeof manifest !== 'undefined' ? manifest : []).findIndex(item => item.path === n.path);
@@ -4282,12 +4294,12 @@ const DailyReviewController = {
 
     // Only after AI summarization, fall back to mainHTML excerpt for any remaining notes that still have no summary
     for (const n of this.todayNotes) {
-      if (!n.summary || !n.summary.replace(/<[^>]*>/g, '').trim()) {
+      if (!n.summary || !_stripHtml(n.summary).trim()) {
         try {
           const html = await StorageAPI.readNoteContent(n.path);
           const parsed = (typeof parseNoteHTML === 'function') ? parseNoteHTML(html) : null;
           if (parsed && parsed.mainHTML) {
-            const plain = parsed.mainHTML.replace(/<[^>]*>/g, '').trim();
+            const plain = _stripHtml(parsed.mainHTML).trim();
             if (plain) {
               n.summary = `<p>${plain.slice(0, 500)}</p>`;
             }
@@ -4914,7 +4926,7 @@ Directives de priorité :
           const noteWsList = (typeof getNoteWorkstreams === 'function') ? getNoteWorkstreams(n) : (n.workstream ? [n.workstream] : []);
           const wsTagStr = noteWsList.join(', ');
           const wsTagInfo = wsTagStr ? ` [Workstream: "${wsTagStr}"]` : ' [Untagged Workstream]';
-          return `[${idx}] Titel/Title: "${n.title}"${wsTagInfo}${timeTag}\n    Preview/Summary: ${(n.summary || n.preview || 'No summary.').replace(/<[^>]*>/g, '').trim()}`;
+          return `[${idx}] Titel/Title: "${n.title}"${wsTagInfo}${timeTag}\n    Preview/Summary: ${_stripHtml(n.summary || n.preview || 'No summary.').trim()}`;
         }).join('\n\n');
 
         const calendarEventsFormatted = _evToday.map(ev => {
@@ -5755,7 +5767,7 @@ Réponds UNIQUEMENT avec :
         topic_tags: [],
         extra_tags: [],
         summary: contentHTML.slice(0, 500),
-        preview: (typeof htmlToPlainText === 'function' ? htmlToPlainText(contentHTML) : contentHTML.replace(/<[^>]*>/g, '')).slice(0, 300),
+        preview: (typeof htmlToPlainText === 'function' ? htmlToPlainText(contentHTML) : _stripHtml(contentHTML)).slice(0, 300),
         reviewed: true,
         modified: new Date().toISOString()
       };
@@ -5884,7 +5896,7 @@ Réponds UNIQUEMENT avec :
         topic_tags: [],
         extra_tags: [],
         summary: contentHTML.slice(0, 500),
-        preview: (typeof htmlToPlainText === 'function' ? htmlToPlainText(contentHTML) : contentHTML.replace(/<[^>]*>/g, '')).slice(0, 300),
+        preview: (typeof htmlToPlainText === 'function' ? htmlToPlainText(contentHTML) : _stripHtml(contentHTML)).slice(0, 300),
         reviewed: true,
         modified: new Date().toISOString()
       };

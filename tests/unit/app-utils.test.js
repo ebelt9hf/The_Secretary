@@ -175,6 +175,8 @@ describe('App Utilities (app-utils.js)', () => {
       expect(stripHtmlTags('<p>Hello <b>World</b>!</p>')).toBe('Hello World !');
       expect(stripHtmlTags(null)).toBe('');
       expect(stripHtmlTags(undefined)).toBe('');
+      expect(stripHtmlTags('<<script>script>alert(1)</script>Clean Text')).toBe('Clean Text');
+      expect(stripHtmlTags('Hello <script')).toBe('Hello script');
     });
 
     it('truncates text safely with truncateText', () => {

@@ -389,12 +389,32 @@ async function showSecretaryFolderPicker(startInHandle = null) {
   }
 }
 
+function _sanitizeSettingsForStorage(s) {
+  if (!s || typeof s !== 'object') return {};
+  const safe = {};
+  for (const [key, val] of Object.entries(s)) {
+    if (key === 'ai') {
+      const safeAi = {};
+      if (val && typeof val === 'object') {
+        for (const [aiKey, aiVal] of Object.entries(val)) {
+          if (aiKey !== 'apiKey' && aiKey !== 'apiKeyEnc') {
+            safeAi[aiKey] = aiVal;
+          }
+        }
+      }
+      safe.ai = safeAi;
+    } else {
+      safe[key] = val;
+    }
+  }
+  return safe;
+}
+
 function loadLocalSettings() {
   try {
     const raw = localStorage.getItem('secretaryLocalSettings');
     if (raw) {
-      const parsed = JSON.parse(raw);
-      deepMerge(settings, parsed);
+      deepMerge(settings, JSON.parse(raw));
     }
     const defaultLang = (typeof getBrowserLanguageCode === 'function' ? getBrowserLanguageCode() : 'en');
     settings.language = normalizeLanguageCode(settings.language || appLanguage || defaultLang);
@@ -407,7 +427,8 @@ function saveLocalSettings() {
   try {
     if (!settings.ui) settings.ui = {};
     settings.ui.workingDays = plannerWorkingDays;
-    localStorage.setItem('secretaryLocalSettings', JSON.stringify(settings));
+    const sanitized = _sanitizeSettingsForStorage(settings);
+    localStorage.setItem('secretaryLocalSettings', JSON.stringify(sanitized));
   } catch (e) { console.warn('Could not save local settings', e); }
 }
 
@@ -2335,8 +2356,11 @@ async function submitCloudSyncMagicLink() {
   }
 
   const passInput = document.getElementById('sync-setup-passphrase');
-  if (passInput?.value && typeof localStorage !== 'undefined') {
-    try { localStorage.setItem('secretary_magic_link_pending_pass', passInput.value); } catch (e) {}
+  if (passInput?.value && typeof sessionStorage !== 'undefined') {
+    try {
+      const encPass = btoa(encodeURIComponent(passInput.value));
+      sessionStorage.setItem('secretary_magic_link_pending_pass', encPass);
+    } catch (e) {}
   }
 
   try {
@@ -2365,11 +2389,21 @@ async function checkPendingEmailLinkAuth() {
       }
       if (email) {
         await window.FirebaseSyncService.signInWithEmailLink(email, window.location.href);
-        const pendingPass = typeof localStorage !== 'undefined' ? localStorage.getItem('secretary_magic_link_pending_pass') : null;
+        const rawPendingPass = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('secretary_magic_link_pending_pass') : null) ||
+                            (typeof localStorage !== 'undefined' ? localStorage.getItem('secretary_magic_link_pending_pass') : null);
+        let pendingPass = rawPendingPass;
+        if (rawPendingPass) {
+          try {
+            pendingPass = decodeURIComponent(atob(rawPendingPass));
+          } catch (_) {
+            pendingPass = rawPendingPass;
+          }
+        }
         if (pendingPass) {
           if (typeof rememberPassphraseAfterSetup === 'function') await rememberPassphraseAfterSetup(pendingPass);
           if (window.FirebaseSyncService?.unlockVault) await window.FirebaseSyncService.unlockVault(pendingPass, true);
-          try { localStorage.removeItem('secretary_magic_link_pending_pass'); } catch (e) {}
+          try { sessionStorage?.removeItem('secretary_magic_link_pending_pass'); } catch (e) {}
+          try { localStorage?.removeItem('secretary_magic_link_pending_pass'); } catch (e) {}
         }
         if (window.history?.replaceState) {
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -3469,16 +3503,23 @@ function detectAiProviderFromEndpoint(endpoint) {
   if (raw.includes('127.0.0.1:11434') || raw.includes('localhost:11434') || raw.includes('ollama')) {
     return 'ollama';
   }
-  if (raw.includes('api.openai.com')) {
+  let hostname = '';
+  try {
+    const urlStr = raw.includes('://') ? raw : `https://${raw}`;
+    hostname = new URL(urlStr).hostname.toLowerCase();
+  } catch (_) {
+    hostname = '';
+  }
+  if (hostname === 'api.openai.com' || hostname.endsWith('.openai.com')) {
     return 'openai';
   }
-  if (raw.includes('api.anthropic.com')) {
+  if (hostname === 'api.anthropic.com' || hostname.endsWith('.anthropic.com')) {
     return 'anthropic';
   }
-  if (raw.includes('api.groq.com')) {
+  if (hostname === 'api.groq.com' || hostname.endsWith('.groq.com')) {
     return 'groq';
   }
-  if (raw.includes('generativelanguage.googleapis.com')) {
+  if (hostname === 'generativelanguage.googleapis.com' || hostname.endsWith('.googleapis.com')) {
     return 'google';
   }
   return 'custom';

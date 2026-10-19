@@ -1279,7 +1279,7 @@ function openNoteTemplatePicker(defaultLang) {
   let hasExistingContent = false;
   if (ta) {
     const rawContent = ta.contentEditable === 'true' ? ta.innerHTML : (currentNote?.mainHTML || ta.value || '');
-    const cleanText = rawContent.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+    const cleanText = (typeof stripHtmlTags === 'function' ? stripHtmlTags(rawContent) : rawContent).replace(/&nbsp;/g, ' ').trim();
     hasExistingContent = cleanText.length > 0;
   }
 
@@ -1410,7 +1410,7 @@ function applyTemplateToCurrentNote(templateId, lang, options = {}) {
   if (!ta) return;
 
   const currentContent = ta.contentEditable === 'true' ? ta.innerHTML : (currentNote?.mainHTML || ta.value || '');
-  const cleanExisting = currentContent.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+  const cleanExisting = (typeof stripHtmlTags === 'function' ? stripHtmlTags(currentContent) : currentContent).replace(/&nbsp;/g, ' ').trim();
   const shouldMerge = Boolean(options.merge && cleanExisting.length > 0);
 
   // Auto-save pre-template snapshot
@@ -1423,11 +1423,8 @@ function applyTemplateToCurrentNote(templateId, lang, options = {}) {
   }
 
   if (ta.contentEditable === 'true') {
-    if (shouldMerge) {
-      ta.innerHTML = currentContent.trim() + '<p><br></p>' + tplHTML;
-    } else {
-      ta.innerHTML = tplHTML;
-    }
+    const rawApplied = shouldMerge ? currentContent.trim() + '<p><br></p>' + tplHTML : tplHTML;
+    ta.innerHTML = (typeof sanitizeHTML === 'function') ? sanitizeHTML(rawApplied) : rawApplied;
   } else {
     if (shouldMerge) {
       ta.value = currentContent.trim() + '\n\n' + tplHTML;
@@ -3863,8 +3860,8 @@ function openMathFormulaEditor(targetNode = null, editorEl = null) {
       previewBox.innerHTML = `<span style="color:var(--text-muted);font-size:0.8rem;font-style:italic;">${escH(placeholderText)}</span>`;
       return;
     }
-    const rendered = typeof renderLatexToString === 'function' ? renderLatexToString(val, currentMode === 'block') : val;
-    previewBox.innerHTML = rendered || `<span style="color:var(--danger,#ef4444);font-size:0.8rem;">${escH(typeof t === 'function' ? t('editor.mathInvalid') || 'Syntax error' : 'Syntax error')}</span>`;
+    const rendered = typeof renderLatexToString === 'function' ? renderLatexToString(val, currentMode === 'block') : escH(val);
+    previewBox.innerHTML = (typeof sanitizeHTML === 'function' ? sanitizeHTML(rendered) : rendered) || `<span style="color:var(--danger,#ef4444);font-size:0.8rem;">${escH(typeof t === 'function' ? t('editor.mathInvalid') || 'Syntax error' : 'Syntax error')}</span>`;
   }
 
   typeBtns.forEach(btn => {
@@ -3920,7 +3917,8 @@ function openMathFormulaEditor(targetNode = null, editorEl = null) {
     }
 
     const isBlockMode = currentMode === 'block';
-    const rendered = typeof renderLatexToString === 'function' ? renderLatexToString(rawLatex, isBlockMode) : rawLatex;
+    const rawRendered = typeof renderLatexToString === 'function' ? renderLatexToString(rawLatex, isBlockMode) : escH(rawLatex);
+    const rendered = (typeof sanitizeHTML === 'function') ? sanitizeHTML(rawRendered) : rawRendered;
     const safeLatex = typeof escA === 'function' ? escA(rawLatex) : rawLatex.replace(/"/g, '&quot;');
 
     if (_editingMathNode) {
@@ -7645,7 +7643,7 @@ document.getElementById('edit-textarea')?.addEventListener('click', e => {
       return;
     }
     const href = linkEl.getAttribute('href');
-    if (href && href !== '#' && !href.startsWith('javascript:')) {
+    if (href && href !== '#' && !/^(?:javascript|data|vbscript):/i.test(href.trim())) {
       if (e.metaKey || e.ctrlKey) {
         e.preventDefault();
         e.stopPropagation();
@@ -7705,7 +7703,7 @@ document.getElementById('edit-summary')?.addEventListener('click', e => {
       return;
     }
     const href = linkEl.getAttribute('href');
-    if (href && href !== '#' && !href.startsWith('javascript:')) {
+    if (href && href !== '#' && !/^(?:javascript|data|vbscript):/i.test(href.trim())) {
       if (e.metaKey || e.ctrlKey) {
         e.preventDefault();
         e.stopPropagation();
@@ -13817,7 +13815,8 @@ function acceptInlineCorrection(wrapper) {
 
     const isInsideList = parent.tagName === 'UL' || parent.tagName === 'OL';
     const containerEl = document.createElement(isInsideList ? 'li' : 'p');
-    containerEl.innerHTML = convertMentionsToPills(`<span class="note-decision-wrapper note-decision-draft" data-decision-status="${status}" data-decision-text="${escH(title)}" contenteditable="false"><strong class="pill-decision pill-decision-${status}" contenteditable="false">${escH(badgeText)}</strong> <span class="note-decision-text" contenteditable="true">${escH(title)}</span></span>`);
+    const decisionContent = convertMentionsToPills(`<span class="note-decision-wrapper note-decision-draft" data-decision-status="${status}" data-decision-text="${escH(title)}" contenteditable="false"><strong class="pill-decision pill-decision-${status}" contenteditable="false">${escH(badgeText)}</strong> <span class="note-decision-text" contenteditable="true">${escH(title)}</span></span>`);
+    containerEl.innerHTML = (typeof sanitizeHTML === 'function') ? sanitizeHTML(decisionContent) : decisionContent;
 
     parent.replaceChild(containerEl, wrapper);
   } else if (proposalType === 'colleague') {
@@ -13830,7 +13829,8 @@ function acceptInlineCorrection(wrapper) {
 
     const isInsideList = parent.tagName === 'UL' || parent.tagName === 'OL';
     const containerEl = document.createElement(isInsideList ? 'li' : 'p');
-    containerEl.innerHTML = convertMentionsToPills(`<span class="pill-delegation" data-owner="${escH(name)}" contenteditable="false">@${escH(name)}</span> ${escH(task)}`);
+    const colleagueContent = convertMentionsToPills(`<span class="pill-delegation" data-owner="${escH(name)}" contenteditable="false">@${escH(name)}</span> ${escH(task)}`);
+    containerEl.innerHTML = (typeof sanitizeHTML === 'function') ? sanitizeHTML(colleagueContent) : colleagueContent;
 
     parent.replaceChild(containerEl, wrapper);
   } else if (proposalType === 'note') {
@@ -13852,7 +13852,7 @@ function acceptInlineCorrection(wrapper) {
 
     const isInsideList = parent.tagName === 'UL' || parent.tagName === 'OL';
     const containerEl = document.createElement(isInsideList ? 'li' : 'p');
-    containerEl.innerHTML = linkHtml;
+    containerEl.innerHTML = (typeof sanitizeHTML === 'function') ? sanitizeHTML(linkHtml) : linkHtml;
 
     parent.replaceChild(containerEl, wrapper);
 
@@ -13878,13 +13878,16 @@ function acceptInlineCorrection(wrapper) {
       });
 
       const origTag = wrapper.getAttribute('data-original-tag');
-      if (origTag) {
-        const elem = document.createElement(origTag);
-        elem.innerHTML = convertMentionsToPills(temp.innerHTML);
+      const safeTag = origTag && /^[a-z0-9]+$/i.test(origTag) && ['p', 'div', 'span', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'].includes(origTag.toLowerCase()) ? origTag.toLowerCase() : null;
+      const mentionsPilled = convertMentionsToPills(temp.innerHTML);
+      const safePills = (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) ? DOMPurify.sanitize(mentionsPilled) : sanitizeHTML(mentionsPilled);
+      if (safeTag) {
+        const elem = document.createElement(safeTag);
+        elem.innerHTML = safePills;
         parent.replaceChild(elem, wrapper);
       } else {
         const span = document.createElement('span');
-        span.innerHTML = convertMentionsToPills(temp.innerHTML);
+        span.innerHTML = safePills;
         const frag = document.createDocumentFragment();
         while (span.firstChild) {
           frag.appendChild(span.firstChild);
@@ -13948,13 +13951,16 @@ function rejectInlineCorrection(wrapper) {
       });
 
       const origTag = wrapper.getAttribute('data-original-tag');
-      if (origTag) {
-        const elem = document.createElement(origTag);
-        elem.innerHTML = convertMentionsToPills(temp.innerHTML);
+      const safeTag = origTag && /^[a-z0-9]+$/i.test(origTag) && ['p', 'div', 'span', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'].includes(origTag.toLowerCase()) ? origTag.toLowerCase() : null;
+      const mentionsPilled = convertMentionsToPills(temp.innerHTML);
+      const safePills = (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) ? DOMPurify.sanitize(mentionsPilled) : sanitizeHTML(mentionsPilled);
+      if (safeTag) {
+        const elem = document.createElement(safeTag);
+        elem.innerHTML = safePills;
         parent.replaceChild(elem, wrapper);
       } else {
         const span = document.createElement('span');
-        span.innerHTML = convertMentionsToPills(temp.innerHTML);
+        span.innerHTML = safePills;
         const frag = document.createDocumentFragment();
         while (span.firstChild) {
           frag.appendChild(span.firstChild);

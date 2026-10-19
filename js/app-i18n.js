@@ -9,16 +9,24 @@ const APP_LANGUAGE_PACKS = {};
 let _translationsLoaded = false;
 
 function setNestedValue(obj, compositeKey, value) {
+  if (!obj || typeof obj !== 'object') return;
   const parts = compositeKey.split('.');
   let curr = obj;
   for (let i = 0; i < parts.length - 1; i++) {
     const part = parts[i];
+    if (part === '__proto__' || part === 'constructor' || part === 'prototype') {
+      return;
+    }
     if (!curr[part] || typeof curr[part] !== 'object') {
       curr[part] = {};
     }
     curr = curr[part];
   }
-  curr[parts[parts.length - 1]] = value;
+  const lastPart = parts[parts.length - 1];
+  if (lastPart === '__proto__' || lastPart === 'constructor' || lastPart === 'prototype') {
+    return;
+  }
+  curr[lastPart] = value;
 }
 
 function processTranslationsBundle(bundle) {
