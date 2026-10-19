@@ -3562,16 +3562,26 @@ function sanitizePastedHTML(htmlString) {
           const alt = node.getAttribute('alt');
           const width = node.getAttribute('width');
           const height = node.getAttribute('height');
-          const dataId = node.getAttribute('data-id');
           const dataAssetPath = node.getAttribute('data-asset-path');
           const style = node.getAttribute('style');
-          if (src) cleanEl.setAttribute('src', src);
+          const newId = 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+          cleanEl.setAttribute('data-id', newId);
           if (alt) cleanEl.setAttribute('alt', alt);
           if (width) cleanEl.setAttribute('width', width);
           if (height) cleanEl.setAttribute('height', height);
-          if (dataId) cleanEl.setAttribute('data-id', dataId);
           if (dataAssetPath) cleanEl.setAttribute('data-asset-path', dataAssetPath);
           if (style) cleanEl.setAttribute('style', style);
+
+          let resolvedSrc = src;
+          if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+            const cache = (typeof _assetDataUrlCache !== 'undefined' ? _assetDataUrlCache : null) || (typeof window !== 'undefined' && window._assetDataUrlCache ? window._assetDataUrlCache : null);
+            if (cache) {
+              const cached = cache.get(dataAssetPath) || cache.get(src) || cache.get(src.replace(/^(\.\/|\.\.\/)+/, ''));
+              if (cached) resolvedSrc = cached;
+            }
+          }
+          if (resolvedSrc) cleanEl.setAttribute('src', resolvedSrc);
+          cleanEl.setAttribute('title', (typeof t === 'function' ? t('editor.imageDblClickFullscreen') : null) || 'Double-click to view fullscreen');
         } else if (tagName === 'input') {
           const type = node.getAttribute('type');
           if (type === 'checkbox') {
@@ -5778,6 +5788,47 @@ function _resolveActiveNoteEditor(e) {
   return document.getElementById('edit-textarea') || document.getElementById('nn-content') || summaryEl;
 }
 
+function _findExistingAssetForDataUrl(editorEl, dataUrl) {
+  if (!dataUrl) return null;
+  if (editorEl) {
+    if (typeof editorEl.querySelectorAll === 'function') {
+      const imgs = Array.from(editorEl.querySelectorAll('img'));
+      for (const img of imgs) {
+        const path = img.dataset?.assetPath || img.getAttribute?.('data-asset-path');
+        if (path) {
+          if (img.src === dataUrl) return path;
+          if (typeof _assetDataUrlCache !== 'undefined' && _assetDataUrlCache.get(path) === dataUrl) {
+            return path;
+          }
+        }
+        const srcAttr = img.getAttribute?.('src');
+        if (srcAttr && srcAttr.includes('_assets/')) {
+          if (typeof _assetDataUrlCache !== 'undefined' && _assetDataUrlCache.get(srcAttr) === dataUrl) {
+            return srcAttr;
+          }
+        }
+      }
+    } else if (typeof editorEl.value === 'string' && typeof _assetDataUrlCache !== 'undefined') {
+      for (const [path, cachedUrl] of _assetDataUrlCache.entries()) {
+        if (cachedUrl === dataUrl && editorEl.value.includes(path)) return path;
+      }
+    }
+  }
+
+  if (typeof _assetDataUrlCache !== 'undefined') {
+    for (const [path, cachedUrl] of _assetDataUrlCache.entries()) {
+      if (cachedUrl === dataUrl && path.startsWith('notes/_assets/')) {
+        return path;
+      }
+    }
+  }
+
+  return null;
+}
+if (typeof window !== 'undefined') {
+  window._findExistingAssetForDataUrl = _findExistingAssetForDataUrl;
+}
+
 function _findDuplicateImageInEditor(editorEl, dataUrl) {
   if (!editorEl || !dataUrl) return null;
   if (editorEl.tagName === 'TEXTAREA' || typeof editorEl.value === 'string') {
@@ -5830,7 +5881,7 @@ function handleImagePaste(e) {
     reader.onload = async () => {
       const ext = (file.type.split('/')[1] || 'png').replace('+xml', '');
       const id  = 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-      const assetPath = `notes/_assets/${id}.${ext}`;
+      let assetPath = `notes/_assets/${id}.${ext}`;
       let dataUrl = reader.result;
       if (typeof window !== 'undefined' && window.ImageOptimizer?.compressImage) {
         try {
@@ -5840,23 +5891,11 @@ function handleImagePaste(e) {
         }
       }
 
-      // Duplicate detection: prevent adding identical image if already present
-      const duplicate = _findDuplicateImageInEditor(rootEditor, dataUrl);
-      if (duplicate) {
-        if (typeof duplicate === 'object' && duplicate.nodeType === Node.ELEMENT_NODE) {
-          try {
-            duplicate.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          } catch (_) {
-            duplicate.scrollIntoView();
-          }
-          if (typeof selectEditorImage === 'function') {
-            selectEditorImage(duplicate, rootEditor);
-          }
-        }
-        if (typeof toast === 'function') {
-          toast((typeof t === 'function' ? t('editor.imageAlreadyExists') : null) || 'Image is already in the note');
-        }
-        return;
+      // Check if identical image asset already exists to avoid duplicate upload
+      const existingAssetPath = _findExistingAssetForDataUrl(rootEditor, dataUrl);
+      const alreadyUploaded = !!existingAssetPath || (assetPath && typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths.has(assetPath));
+      if (existingAssetPath) {
+        assetPath = existingAssetPath;
       }
       
       if (typeof _assetDataUrlCache !== 'undefined') {
@@ -5865,20 +5904,24 @@ function handleImagePaste(e) {
         _assetDataUrlCache.set(assetPath.replace(/^notes\//, ''), dataUrl);
       }
       
-      try {
-        if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
-          await StorageAPI.writeAsset(assetPath, dataUrl);
-        } else {
-          if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
-            await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+      if (!alreadyUploaded) {
+        try {
+          if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
+            await StorageAPI.writeAsset(assetPath, dataUrl);
+          } else {
+            if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
+              await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+            }
+            if (typeof writeFile === 'function') {
+              await writeFile(assetPath, dataUrl);
+            }
           }
-          if (typeof writeFile === 'function') {
-            await writeFile(assetPath, dataUrl);
+          if (typeof _savedAssetPaths !== 'undefined') {
+            _savedAssetPaths.add(assetPath);
           }
+        } catch (err) {
+          console.warn('Failed to write pasted image asset:', err);
         }
-        _savedAssetPaths.add(assetPath);
-      } catch (err) {
-        console.warn('Failed to write pasted image asset:', err);
       }
       
       if (isRich && rootEditor) {
@@ -6073,26 +6116,14 @@ function handleImageDrop(e) {
     reader.onload = async () => {
       const ext = (imgFile.type.split('/')[1] || 'png').replace('+xml', '');
       const id  = 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-      const assetPath = `notes/_assets/${id}.${ext}`;
+      let assetPath = `notes/_assets/${id}.${ext}`;
       const dataUrl = reader.result;
 
-      // Duplicate detection
-      const duplicate = _findDuplicateImageInEditor(rootEditor, dataUrl);
-      if (duplicate) {
-        if (typeof duplicate === 'object' && duplicate.nodeType === Node.ELEMENT_NODE) {
-          try {
-            duplicate.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          } catch (_) {
-            duplicate.scrollIntoView();
-          }
-          if (typeof selectEditorImage === 'function') {
-            selectEditorImage(duplicate, rootEditor);
-          }
-        }
-        if (typeof toast === 'function') {
-          toast((typeof t === 'function' ? t('editor.imageAlreadyExists') : null) || 'Image is already in the note');
-        }
-        return;
+      // Check if identical image asset already exists to avoid duplicate upload
+      const existingAssetPath = _findExistingAssetForDataUrl(rootEditor, dataUrl);
+      const alreadyUploaded = !!existingAssetPath || (assetPath && typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths.has(assetPath));
+      if (existingAssetPath) {
+        assetPath = existingAssetPath;
       }
       
       if (typeof _assetDataUrlCache !== 'undefined') {
@@ -6101,20 +6132,24 @@ function handleImageDrop(e) {
         _assetDataUrlCache.set(assetPath.replace(/^notes\//, ''), dataUrl);
       }
       
-      try {
-        if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
-          await StorageAPI.writeAsset(assetPath, dataUrl);
-        } else {
-          if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
-            await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+      if (!alreadyUploaded) {
+        try {
+          if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
+            await StorageAPI.writeAsset(assetPath, dataUrl);
+          } else {
+            if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
+              await window.FirebaseSyncService.saveAsset(assetPath, dataUrl);
+            }
+            if (typeof writeFile === 'function') {
+              await writeFile(assetPath, dataUrl);
+            }
           }
-          if (typeof writeFile === 'function') {
-            await writeFile(assetPath, dataUrl);
+          if (typeof _savedAssetPaths !== 'undefined') {
+            _savedAssetPaths.add(assetPath);
           }
+        } catch (err) {
+          console.warn('Failed to write dropped image asset:', err);
         }
-        _savedAssetPaths.add(assetPath);
-      } catch (err) {
-        console.warn('Failed to write dropped image asset:', err);
       }
       
       if (isRich && rootEditor) {
@@ -6695,7 +6730,9 @@ function selectEditorImage(imgEl, editorEl) {
     }
     const rect = imgEl.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) {
-      hideImageActiveOverlay();
+      if (typeof window !== 'undefined' && window.getComputedStyle && window.getComputedStyle(imgEl).display === 'none') {
+        hideImageActiveOverlay();
+      }
       return;
     }
     const scrollX = window.scrollX || document.documentElement.scrollLeft;
@@ -6803,6 +6840,116 @@ document.addEventListener('click', (e) => {
   hideImageActiveOverlay();
 });
 
+function _handleCopyEditorImage(e, img) {
+  if (!img) return;
+  const src = img.src || '';
+  const assetPath = img.dataset?.assetPath || img.getAttribute?.('data-asset-path') || '';
+  const style = img.getAttribute?.('style') || 'max-width:100%;width:600px;display:block;margin:0.6rem 0;';
+  const alt = img.getAttribute?.('alt') || '';
+
+  let dataUrl = src;
+  if (typeof _assetDataUrlCache !== 'undefined' && (!src.startsWith('data:') || src.includes('_assets/'))) {
+    dataUrl = _assetDataUrlCache.get(assetPath) || _assetDataUrlCache.get(src) || _assetDataUrlCache.get(assetPath.replace(/^notes\//, '')) || src;
+  }
+
+  const cleanTag = `<img data-asset-path="${escA(assetPath)}" src="${escA(dataUrl)}" alt="${escA(alt)}" style="${escA(style)}">`;
+
+  const cd = e?.clipboardData || (typeof window !== 'undefined' && window.clipboardData) || null;
+  if (cd && typeof cd.setData === 'function') {
+    cd.setData('text/html', cleanTag);
+    cd.setData('text/plain', dataUrl);
+    if (typeof e?.preventDefault === 'function') {
+      e.preventDefault();
+    }
+  }
+
+  if (typeof toast === 'function') {
+    toast((typeof t === 'function' ? t('share.copiedSuccess') : null) || 'Copied to clipboard!');
+  }
+}
+if (typeof window !== 'undefined') {
+  window._handleCopyEditorImage = _handleCopyEditorImage;
+  window._copyEditorImageToClipboard = _copyEditorImageToClipboard;
+}
+
+async function _copyEditorImageToClipboard(img) {
+  if (!img) return;
+  const src = img.src || '';
+  const assetPath = img.dataset?.assetPath || img.getAttribute?.('data-asset-path') || '';
+  const style = img.getAttribute?.('style') || 'max-width:100%;width:600px;display:block;margin:0.6rem 0;';
+  const alt = img.getAttribute?.('alt') || '';
+
+  let dataUrl = src;
+  if (typeof _assetDataUrlCache !== 'undefined' && (!src.startsWith('data:') || src.includes('_assets/'))) {
+    dataUrl = _assetDataUrlCache.get(assetPath) || _assetDataUrlCache.get(src) || _assetDataUrlCache.get(assetPath.replace(/^notes\//, '')) || src;
+  }
+
+  const cleanTag = `<img data-asset-path="${escA(assetPath)}" src="${escA(dataUrl)}" alt="${escA(alt)}" style="${escA(style)}">`;
+
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.write) {
+      const items = {
+        'text/html': new Blob([cleanTag], { type: 'text/html' }),
+        'text/plain': new Blob([dataUrl], { type: 'text/plain' })
+      };
+      if (dataUrl && dataUrl.startsWith('data:image/')) {
+        try {
+          const parts = dataUrl.split(',');
+          const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/png';
+          const bstr = atob(parts[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
+          if (mime === 'image/png') {
+            items['image/png'] = blob;
+          }
+        } catch (_) {}
+      }
+      await navigator.clipboard.write([new ClipboardItem(items)]);
+      if (typeof toast === 'function') {
+        toast((typeof t === 'function' ? t('share.copiedSuccess') : null) || 'Copied to clipboard!');
+      }
+      return;
+    }
+  } catch (_) {}
+
+  try {
+    const listener = (evt) => {
+      evt.clipboardData.setData('text/html', cleanTag);
+      evt.clipboardData.setData('text/plain', dataUrl);
+      evt.preventDefault();
+    };
+    document.addEventListener('copy', listener, { once: true });
+    document.execCommand('copy');
+    if (typeof toast === 'function') {
+      toast((typeof t === 'function' ? t('share.copiedSuccess') : null) || 'Copied to clipboard!');
+    }
+  } catch (_) {}
+}
+
+document.addEventListener('copy', (e) => {
+  if (_activeEditorImage) {
+    _handleCopyEditorImage(e, _activeEditorImage);
+  }
+});
+
+document.addEventListener('cut', (e) => {
+  if (_activeEditorImage) {
+    _handleCopyEditorImage(e, _activeEditorImage);
+    const img = _activeEditorImage;
+    const parentEditor = img.closest('#edit-textarea, #edit-summary, [contenteditable="true"]');
+    hideImageActiveOverlay();
+    img.remove();
+    if (parentEditor) {
+      parentEditor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (typeof syncImageStrip === 'function') syncImageStrip();
+  }
+});
+
 document.addEventListener('keydown', (e) => {
   if (!_activeEditorImage) return;
   if (e.target && e.target.closest && e.target.closest('.img-resize-toolbar, .editor-img-active-overlay')) return;
@@ -6811,6 +6958,22 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if ((e.key === 'Delete' || e.key === 'Backspace') && !document.activeElement?.isContentEditable && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+    const img = _activeEditorImage;
+    const parentEditor = img.closest('#edit-textarea, #edit-summary, [contenteditable="true"]');
+    hideImageActiveOverlay();
+    img.remove();
+    if (parentEditor) {
+      parentEditor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (typeof syncImageStrip === 'function') syncImageStrip();
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) {
+    _copyEditorImageToClipboard(_activeEditorImage);
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'x' || e.key === 'X') && !document.activeElement?.isContentEditable && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+    _copyEditorImageToClipboard(_activeEditorImage);
     const img = _activeEditorImage;
     const parentEditor = img.closest('#edit-textarea, #edit-summary, [contenteditable="true"]');
     hideImageActiveOverlay();

@@ -1145,7 +1145,7 @@ describe('Note Editor Engine Functions (app-notes.js & app-overlay.js)', () => {
       overlay.remove();
     });
 
-    it('handleImagePaste deduplicates identical images and avoids double pasting', async () => {
+    it('handleImagePaste allows adding an image twice at cursor while uploading asset only once', async () => {
       const editor = document.createElement('div');
       editor.id = 'edit-textarea';
       editor.contentEditable = 'true';
@@ -1163,7 +1163,11 @@ describe('Note Editor Engine Functions (app-notes.js & app-overlay.js)', () => {
         }
       }
       globalThis.FileReader = MockFileReader;
-      globalThis.writeFile = () => Promise.resolve(true);
+      let writeCount = 0;
+      globalThis.writeFile = () => {
+        writeCount++;
+        return Promise.resolve(true);
+      };
 
       const event1 = {
         currentTarget: editor,
@@ -1179,9 +1183,14 @@ describe('Note Editor Engine Functions (app-notes.js & app-overlay.js)', () => {
       handleImagePaste(event1);
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(editor.querySelectorAll('img').length).toBe(1);
+      const firstImgs = editor.querySelectorAll('img');
+      expect(firstImgs.length).toBe(1);
+      expect(writeCount).toBe(1);
+      const firstAssetPath = firstImgs[0].dataset.assetPath;
+      const firstId = firstImgs[0].dataset.id;
+      expect(firstAssetPath).toBeTruthy();
 
-      // Paste identical image again
+      // Paste identical image again at second location
       const event2 = {
         currentTarget: editor,
         clipboardData: {
@@ -1196,8 +1205,16 @@ describe('Note Editor Engine Functions (app-notes.js & app-overlay.js)', () => {
       handleImagePaste(event2);
       await new Promise(resolve => setTimeout(resolve, 50));
 
-      // Should still only have 1 image
-      expect(editor.querySelectorAll('img').length).toBe(1);
+      // Should now have 2 images in the note
+      const secondImgs = editor.querySelectorAll('img');
+      expect(secondImgs.length).toBe(2);
+      // But writeFile was not called twice ("don't upload twice")
+      expect(writeCount).toBe(1);
+      // Both images reference the same asset path
+      expect(secondImgs[0].dataset.assetPath).toBe(firstAssetPath);
+      expect(secondImgs[1].dataset.assetPath).toBe(firstAssetPath);
+      // Each has a distinct data-id for independent resizing
+      expect(secondImgs[1].dataset.id).not.toBe(firstId);
 
       editor.remove();
     });
