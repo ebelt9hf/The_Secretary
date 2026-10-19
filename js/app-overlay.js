@@ -3539,7 +3539,7 @@ function sanitizePastedHTML(htmlString) {
   const allowedTags = new Set([
     'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'del', 'mark', 'code', 'a',
     'ul', 'ol', 'li', 'p', 'br', 'h1', 'h2', 'h3', 'blockquote',
-    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'pre', 'input'
+    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'figure', 'figcaption', 'pre', 'input'
   ]);
 
   function cleanNode(node) {
@@ -3582,6 +3582,14 @@ function sanitizePastedHTML(htmlString) {
           }
           if (resolvedSrc) cleanEl.setAttribute('src', resolvedSrc);
           cleanEl.setAttribute('title', (typeof t === 'function' ? t('editor.imageDblClickFullscreen') : null) || 'Double-click to view fullscreen');
+        } else if (tagName === 'figure') {
+          cleanEl.className = node.className || 'note-image-figure';
+          if (node.getAttribute('style')) cleanEl.setAttribute('style', node.getAttribute('style'));
+        } else if (tagName === 'figcaption') {
+          cleanEl.className = 'note-image-caption';
+          cleanEl.setAttribute('contenteditable', 'true');
+          const placeholder = node.getAttribute('data-placeholder') || (typeof t === 'function' ? t('editor.imageCaptionPlaceholder') : null) || 'Add image caption...';
+          cleanEl.setAttribute('data-placeholder', placeholder);
         } else if (tagName === 'input') {
           const type = node.getAttribute('type');
           if (type === 'checkbox') {
@@ -6542,7 +6550,12 @@ function selectEditorImage(imgEl, editorEl) {
     e.preventDefault();
     e.stopPropagation();
     hideImageActiveOverlay();
-    imgEl.remove();
+    const figure = imgEl.closest('.note-image-figure');
+    if (figure) {
+      figure.remove();
+    } else {
+      imgEl.remove();
+    }
     if (targetEditor) {
       targetEditor.dispatchEvent(new Event('input', { bubbles: true }));
     }
@@ -6608,6 +6621,11 @@ function selectEditorImage(imgEl, editorEl) {
         imgEl.style.width = `${newWidth}px`;
         imgEl.style.maxWidth = '100%';
         imgEl.style.height = 'auto';
+        const figure = imgEl.closest('.note-image-figure');
+        if (figure) {
+          figure.style.width = `${newWidth}px`;
+          figure.style.maxWidth = '100%';
+        }
         
         updateOverlayPosition();
         updateToolbarInputs(newWidth);
@@ -6634,6 +6652,10 @@ function selectEditorImage(imgEl, editorEl) {
   // 3. Controls toolbar positioned BELOW the image
   const currentW = parseInt(imgEl.style.width) || Math.round(imgEl.getBoundingClientRect().width) || 600;
   const currentQuality = imgEl.dataset.quality || 'standard';
+  const hasCaption = Boolean(
+    imgEl.closest('.note-image-figure')?.querySelector('.note-image-caption')?.textContent?.trim() ||
+    imgEl.nextElementSibling?.classList.contains('note-image-caption')
+  );
   const toolbar = document.createElement('div');
   toolbar.className = 'img-resize-toolbar';
   toolbar.innerHTML = `
@@ -6644,6 +6666,7 @@ function selectEditorImage(imgEl, editorEl) {
     <button type="button" class="img-preset-btn" data-preset="50" title="50% width">50%</button>
     <button type="button" class="img-preset-btn" data-preset="75" title="75% width">75%</button>
     <button type="button" class="img-preset-btn" data-preset="100" title="100% width">100%</button>
+    <button type="button" class="img-caption-btn ${hasCaption ? 'active' : ''}" title="${escA(typeof t === 'function' ? t('editor.imageCaptionTooltip') : 'Add or edit image caption')}">💬 ${escH(typeof t === 'function' ? t('editor.imageCaption') : 'Caption')}</button>
     <span style="font-weight:500;margin-left:6px;">${escH(typeof t === 'function' ? t('editor.imageQuality') : 'Quality')}:</span>
     <button type="button" class="img-quality-btn ${currentQuality === 'standard' ? 'active' : ''}" data-quality="standard" title="${escA(typeof t === 'function' ? t('editor.imageQualityStandardTooltip') : 'Compress to standard 1080p WebP (85% quality)')}">${escH(typeof t === 'function' ? t('editor.qualityStandard') : 'Standard')}</button>
     <button type="button" class="img-quality-btn ${currentQuality === 'high' ? 'active' : ''}" data-quality="high" title="${escA(typeof t === 'function' ? t('editor.imageQualityHighTooltip') : 'Compress to high quality 4K WebP (95% quality)')}">${escH(typeof t === 'function' ? t('editor.qualityHigh') : 'High (4K)')}</button>
@@ -6659,6 +6682,11 @@ function selectEditorImage(imgEl, editorEl) {
     imgEl.style.width = `${clamped}px`;
     imgEl.style.maxWidth = '100%';
     imgEl.style.height = 'auto';
+    const figure = imgEl.closest('.note-image-figure');
+    if (figure) {
+      figure.style.width = `${clamped}px`;
+      figure.style.maxWidth = '100%';
+    }
     rangeInput.value = clamped;
     numInput.value = clamped;
     updateOverlayPosition();
@@ -6678,6 +6706,12 @@ function selectEditorImage(imgEl, editorEl) {
       const targetW = Math.round((parentW - 20) * (pct / 100));
       applyWidth(targetW);
     });
+  });
+
+  toolbar.querySelector('.img-caption-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleOrFocusImageCaption(imgEl, targetEditor);
   });
 
   toolbar.querySelectorAll('.img-quality-btn').forEach(btn => {
@@ -6711,7 +6745,12 @@ function selectEditorImage(imgEl, editorEl) {
     e.preventDefault();
     e.stopPropagation();
     hideImageActiveOverlay();
-    imgEl.remove();
+    const figure = imgEl.closest('.note-image-figure');
+    if (figure) {
+      figure.remove();
+    } else {
+      imgEl.remove();
+    }
     if (targetEditor) {
       targetEditor.dispatchEvent(new Event('input', { bubbles: true }));
     }
@@ -6743,9 +6782,18 @@ function selectEditorImage(imgEl, editorEl) {
     overlay.style.width = `${rect.width}px`;
     overlay.style.height = `${rect.height}px`;
     
-    // Position toolbar directly below image
+    // Position toolbar directly below image and its caption (if present)
+    const captionEl = imgEl.closest('.note-image-figure')?.querySelector('.note-image-caption')
+      || (imgEl.nextElementSibling?.classList.contains('note-image-caption') ? imgEl.nextElementSibling : null);
+    let bottomY = rect.bottom;
+    if (captionEl && captionEl.getBoundingClientRect) {
+      const capRect = captionEl.getBoundingClientRect();
+      if (capRect.bottom > bottomY) {
+        bottomY = capRect.bottom;
+      }
+    }
     toolbar.style.position = 'absolute';
-    toolbar.style.top = `${rect.bottom + scrollY + 8}px`;
+    toolbar.style.top = `${bottomY + scrollY + 8}px`;
     toolbar.style.left = `${rect.left + scrollX}px`;
   }
   
@@ -6761,6 +6809,97 @@ function selectEditorImage(imgEl, editorEl) {
   document.addEventListener('scroll', _imageOverlayRepositionFn, true);
 }
 window.selectEditorImage = selectEditorImage;
+
+function _attachCaptionKeydownHandler(caption, editor) {
+  if (!caption || caption._hasCaptionHandler) return;
+  caption._hasCaptionHandler = true;
+  caption.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const figure = caption.closest('.note-image-figure') || caption;
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      if (figure.parentNode) {
+        if (figure.nextSibling) {
+          figure.parentNode.insertBefore(p, figure.nextSibling);
+        } else {
+          figure.parentNode.appendChild(p);
+        }
+      }
+      if (typeof window.getSelection === 'function' && document.createRange) {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.setStart(p, 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      p.focus();
+      if (editor) editor.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (e.key === 'Backspace' && (!caption.textContent || caption.textContent.trim() === '')) {
+      e.preventDefault();
+      caption.remove();
+      if (editor) editor.dispatchEvent(new Event('input', { bubbles: true }));
+      if (typeof hideImageActiveOverlay === 'function') hideImageActiveOverlay();
+    }
+  });
+  caption.addEventListener('input', () => {
+    if (editor) editor.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+function toggleOrFocusImageCaption(imgEl, targetEditor) {
+  if (!imgEl) return null;
+  const editor = targetEditor || imgEl.closest('#edit-textarea, #edit-summary, [contenteditable="true"]') || document.getElementById('edit-textarea');
+  let figure = imgEl.closest('.note-image-figure');
+  let caption = figure ? figure.querySelector('.note-image-caption') : null;
+
+  if (!figure) {
+    figure = document.createElement('figure');
+    figure.className = 'note-image-figure';
+    if (imgEl.style.width) {
+      figure.style.width = imgEl.style.width;
+      figure.style.maxWidth = '100%';
+    }
+    const parent = imgEl.parentNode;
+    if (parent && parent.tagName === 'P' && parent.childNodes.length === 1) {
+      parent.parentNode.insertBefore(figure, parent);
+      figure.appendChild(imgEl);
+      parent.remove();
+    } else if (parent) {
+      parent.insertBefore(figure, imgEl);
+      figure.appendChild(imgEl);
+    }
+  }
+
+  if (!caption) {
+    caption = document.createElement('figcaption');
+    caption.className = 'note-image-caption';
+    caption.setAttribute('contenteditable', 'true');
+    caption.setAttribute('data-placeholder', (typeof t === 'function' ? t('editor.imageCaptionPlaceholder') : null) || 'Add image caption...');
+    figure.appendChild(caption);
+  }
+
+  _attachCaptionKeydownHandler(caption, editor);
+
+  hideImageActiveOverlay();
+  caption.focus();
+
+  if (typeof window.getSelection === 'function' && document.createRange) {
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(caption);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  if (editor) {
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  return caption;
+}
+window.toggleOrFocusImageCaption = toggleOrFocusImageCaption;
 
 function showImageResizeToolbar(imgEl, textareaEl) {
   selectEditorImage(imgEl, textareaEl);
@@ -7005,7 +7144,7 @@ document.getElementById('edit-textarea')?.addEventListener('click', handleImageC
 document.getElementById('edit-summary')?.addEventListener('click', handleImageClickForResize);
 
 // ═══ Note Image Fullscreen Lightbox ═══
-function openNoteImageLightbox(src) {
+function openNoteImageLightbox(src, maybeCaption = '') {
   if (!src) return;
   const dialog = document.getElementById('note-image-lightbox');
   const img = document.getElementById('note-image-lightbox-img');
@@ -7016,6 +7155,18 @@ function openNoteImageLightbox(src) {
   }
 
   img.src = src;
+
+  let captionEl = dialog.querySelector('.note-image-lightbox-caption');
+  if (!captionEl) {
+    captionEl = document.createElement('div');
+    captionEl.className = 'note-image-lightbox-caption';
+    captionEl.style.cssText = 'color: #e2e8f0; font-size: 0.95rem; font-style: italic; text-align: center; margin-top: 10px; max-width: 90vw; padding: 0 10px;';
+    const container = dialog.querySelector('.note-image-lightbox-container');
+    if (container) container.appendChild(captionEl);
+  }
+  captionEl.textContent = maybeCaption || '';
+  captionEl.style.display = maybeCaption ? 'block' : 'none';
+
   _initNoteImageLightbox(dialog);
 
   try {
@@ -7049,6 +7200,8 @@ function closeNoteImageLightbox() {
     dialog.style.display = 'none';
   }
   if (img) img.src = '';
+  const captionEl = dialog.querySelector('.note-image-lightbox-caption');
+  if (captionEl) captionEl.style.display = 'none';
 }
 window.closeNoteImageLightbox = closeNoteImageLightbox;
 
@@ -7087,7 +7240,8 @@ document.addEventListener('dblclick', (e) => {
   if (img.closest('#edit-textarea, #edit-summary, #nested-note-body, #overlay-images-strip, .edit-img-strip, .note-view-body, .fl-note-card-body, .note-editor-rich, #note-edit-overlay, .nested-note-overlay')) {
     e.preventDefault();
     e.stopPropagation();
-    openNoteImageLightbox(img.src);
+    const caption = img.closest('.note-image-figure')?.querySelector('.note-image-caption')?.textContent?.trim() || img.alt || '';
+    openNoteImageLightbox(img.src, caption);
   }
 });
 
@@ -10961,7 +11115,9 @@ function syncImageStrip() {
       }
 
       if (targetImg) {
-        targetImg.remove();
+        const figure = targetImg.closest('.note-image-figure');
+        if (figure) figure.remove();
+        else targetImg.remove();
         if (targetEditor) {
           targetEditor.dispatchEvent(new Event('input', { bubbles: true }));
         }

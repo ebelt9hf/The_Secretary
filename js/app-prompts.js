@@ -415,10 +415,14 @@ STRICT PRINCIPLES & HARNESS:
      * Extend the Note: Correlate visual diagrams with meeting notes to produce more complete summaries, action items, decisions, and refactored note proposals.
 
 10. INLINE IMAGE PLACEMENT IN PROPOSALS (PRESERVE POSITIONING):
-   - When the raw note contains embedded images (represented as placeholders such as [IMAGE_1], [IMAGE_2], etc.):
+   - When the raw note contains embedded images (represented as placeholders such as [IMAGE_1], [IMAGE_2], etc., possibly with existing captions like [IMAGE_1: figure image with caption: "..."]):
+     * Explanatory Captions: Every image can and should have a clear, concise explanatory caption displayed directly below it (explaining diagrams, screenshots, whiteboards, tables, or figures).
+     * Adding / Changing Captions: You are empowered to ADD a new explanatory caption or CHANGE/REFINE an existing caption based on the visual contents and meeting context. Format as either:
+       - Inline placeholder with caption: [IMAGE_1: Concise explanatory caption describing the image]
+       - Or semantic HTML figure: <figure class="note-image-figure">[IMAGE_1]<figcaption class="note-image-caption">Concise explanatory caption describing the image</figcaption></figure>
      * Proposal B (Strict In-Situ Preservation): In Proposal B (Comprehensive & Contextual), you MUST preserve every [IMAGE_1], [IMAGE_2] tag at its exact sequential in-situ position adjacent to the detailed notes, explanations, and diagrams explaining it. NEVER omit them or move them all to a gallery at the end.
      * Proposal A (Executive Placement): In Proposal A (Executive), place [IMAGE_X] inline only where it directly illustrates a primary executive decision or high-level architecture overview.
-     * Secretary will automatically reinject the original high-resolution image at the exact position of your [IMAGE_X] tag.
+     * Secretary will automatically reinject the original high-resolution image and render its caption directly below it.
 
 11. TASK EXTRACTION & TODO / ACTION ITEM TITLE FORMATTING:
    - The title of every action item / todo MUST be clean task text (e.g. 'Prepare Q3 financial roadmap') without embedding free-text owner mentions (like '@ColleagueName') or free-text urgency brackets (like '[Urgent]', '[High]', '[Medium]', '[Low]', '[ASAP]').
@@ -509,7 +513,7 @@ YOUR GOAL & STRICT HARNESS:
 1. Preserve all of the user's manual additions, corrections, and formatting adjustments without discarding content.
 2. Perfect the semantic HTML structure (clean <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <mark>). Use <mark>...</mark> VERY SPARINGLY (max 2-4 key takeaways per note), never wrap entire paragraphs or lists in <mark>. Format list items directly as <li>...</li> without inner <p>/<div> wrappers, without internal <br>, and without bullet markers (-/*). STRICTLY FORBIDDEN: <h1>, <script>, <iframe>, <style>, <div>.
 3. MANDATORY: If informal remarks, personal updates (e.g. colleague life events, family news), or chit-chat are present, preserve them distinctly under <h2>Informal Notes</h2>.
-4. VISION & MULTIMODAL INTEGRATION (STANDARD): When images are attached, generate detailed explanations for figures, correlate diagrams with notes to extend the content, and retain relevant [IMAGE_X] tags in appropriate in-situ positions within proposal_c_html.
+4. VISION & MULTIMODAL INTEGRATION (STANDARD): When images are attached, generate or refine concise explanatory captions for figures (e.g. [IMAGE_1: Explanatory caption] or <figure class="note-image-figure">[IMAGE_1]<figcaption class="note-image-caption">Caption</figcaption></figure>), correlate diagrams with notes to extend the content, and retain relevant [IMAGE_X] tags in appropriate in-situ positions within proposal_c_html.
 5. Generate a clean structured meeting summary ('meeting_summary_html') without section headers.
 6. CRITICAL OUTPUT HARNESS: Output strict raw JSON without markdown codeblocks (no \`\`\`json), escaping all double quotes inside HTML attributes.
 
@@ -542,7 +546,7 @@ STRICT GUIDELINES & HARNESS:
 2. NEVER INVENT FACTS: Preserve authentic facts from the note and scratchpad.
 3. Clean semantic HTML: <h3>, <p>, <ul>, <li>, <strong>, <em>, <mark>, @Colleague. Use <mark>...</mark> VERY SPARINGLY (max 2-4 key takeaways per note), never highlight entire paragraphs or list items. Format list items directly as <li>...</li> without inner <p>/<div> wrappers, without internal <br>, and without bullet markers (-/*). STRICTLY FORBIDDEN: <h1>, <script>, <iframe>, <style>, <div>.
 4. MANDATORY: Preserve informal notes and personal updates (e.g. colleague life events, family news) under <h2>Informal Notes</h2>.
-5. VISION & INLINE IMAGES (STANDARD): If the note contains image markers (e.g. [IMAGE_1]) or image payloads, add explanations under/alongside figures, correlate visual diagrams to extend the note content, and place relevant [IMAGE_X] tags in appropriate locations inside Proposal C where the visual belongs.
+5. VISION & INLINE IMAGES (STANDARD): If the note contains image markers (e.g. [IMAGE_1]) or image payloads, add or update explanatory captions under/alongside figures (e.g. [IMAGE_1: Explanatory caption] or <figure class="note-image-figure">[IMAGE_1]<figcaption class="note-image-caption">Caption</figcaption></figure>), correlate visual diagrams to extend the note content, and place relevant [IMAGE_X] tags in appropriate locations inside Proposal C where the visual belongs.
 6. Generate a structured meeting summary ('meeting_summary_html') without section headers.
 7. TASK DEDUPLICATION & LINKING: Check the active open todos list. Do NOT propose duplicate tasks in 'proposed_todos' if an item is already on the board. Instead, link to existing tasks in the note HTML under <h2>Next Steps & Action Items</h2> using <a href="#todo-\${id}" class="note-todo-link" data-todo-id="\${id}" title="\${title}">📋 \${title}</a>. Only include genuinely new action items in 'proposed_todos'.
 8. Language Constraint: Respond in ${langName} (${targetLang}). All generated content, summaries, bullet points, headers, and proposed tasks must be formulated in ${langName}.

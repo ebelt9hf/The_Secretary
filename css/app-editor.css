@@ -2207,6 +2207,69 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
   color: #ffffff;
   border-color: var(--danger, #ef4444);
 }
+.img-resize-toolbar .img-caption-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+.img-resize-toolbar .img-caption-btn.active {
+  background: var(--accent);
+  color: var(--bg, #ffffff);
+  border-color: var(--accent);
+}
+
+/* ── Note Image Figure & Captions ── */
+.note-image-figure {
+  display: block;
+  margin: 0.8rem auto;
+  text-align: center;
+  max-width: 100%;
+  clear: both;
+}
+.note-image-figure img {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+}
+.note-image-caption {
+  display: block;
+  margin: 0.4rem auto 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
+  text-align: center;
+  outline: none;
+  min-height: 1.25em;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm, 4px);
+  box-sizing: border-box;
+  max-width: 100%;
+  cursor: text;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+#edit-textarea .note-image-caption:hover,
+#edit-summary .note-image-caption:hover {
+  background: var(--card-bg-alt, rgba(255, 255, 255, 0.05));
+}
+#edit-textarea .note-image-caption:focus,
+#edit-summary .note-image-caption:focus {
+  background: var(--card-bg-alt, rgba(255, 255, 255, 0.08));
+  color: var(--text, #f8fafc);
+  outline: 1px dashed var(--accent, #3b82f6);
+  outline-offset: 1px;
+}
+.note-image-caption:empty::before,
+.note-image-caption[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted, #64748b);
+  opacity: 0.7;
+  font-style: italic;
+  pointer-events: none;
+}
 
 .md-tab-hint {
   font-size: .72rem;

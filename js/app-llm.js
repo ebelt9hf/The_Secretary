@@ -473,6 +473,24 @@ const LLMService = {
       return cleanAlt ? nextPlaceholder(`markdown image: ${cleanAlt}`) : nextPlaceholder('markdown image');
     });
 
+    // Handle HTML <figure> tags containing <img ...> and <figcaption>
+    text = text.replace(/<figure\b[^>]*>([\s\S]*?)<\/figure>/gi, (figHtml) => {
+      const imgMatch = figHtml.match(/<img\b[^>]*>/i);
+      if (!imgMatch) return figHtml;
+      const captionMatch = figHtml.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i);
+      const rawCaption = captionMatch ? captionMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+      const altMatch = imgMatch[0].match(/\balt\s*=\s*(["'])(.*?)\1/i);
+      const cleanAlt = altMatch ? String(altMatch[2] || '').trim() : '';
+
+      let label = 'figure image';
+      if (rawCaption) {
+        label += ` with caption: "${rawCaption}"`;
+      } else if (cleanAlt) {
+        label += `: ${cleanAlt}`;
+      }
+      return nextPlaceholder(label);
+    });
+
     // HTML img tags
     text = text.replace(/<img\b[^>]*>/gi, (imgTag) => {
       const altMatch = imgTag.match(/\balt\s*=\s*(["'])(.*?)\1/i);
@@ -7957,14 +7975,30 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
   const originalImageEntries = [];
   const tokenMap = typeof _imgTokenMap !== 'undefined' ? _imgTokenMap : (window._imgTokenMap || {});
 
-  // Extract images in document order: <img> tags, NIMGTK tokens, or markdown images along with surrounding context
-  const itemRegex = /(?:<img\b[^>]*>)|(?:\bNIMGTK\d+X\b)|(?:!\[([^\]]*)\]\(([^)]+)\))/gi;
+  // Extract images in document order: <figure> blocks with <img>, standalone <img> tags, NIMGTK tokens, or markdown images
+  const itemRegex = /(?:<figure\b[^>]*>[\s\S]*?<\/figure>)|(?:<img\b[^>]*>)|(?:\bNIMGTK\d+X\b)|(?:!\[([^\]]*)\]\(([^)]+)\))/gi;
   let match;
   let imgCount = 0;
   while ((match = itemRegex.exec(originalHtml)) !== null) {
     const fullMatch = match[0];
     let tag = '';
-    if (fullMatch.startsWith('<img') || fullMatch.startsWith('<IMG')) {
+    let origCaption = '';
+    let figureStyle = '';
+
+    if (fullMatch.startsWith('<figure') || fullMatch.startsWith('<FIGURE')) {
+      const imgMatch = fullMatch.match(/<img\b[^>]*>/i);
+      if (imgMatch) {
+        tag = imgMatch[0];
+        const capMatch = fullMatch.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i);
+        if (capMatch) {
+          origCaption = capMatch[1].replace(/<[^>]*>/g, '').trim();
+        }
+        const styleMatch = fullMatch.match(/\bstyle\s*=\s*(["'])(.*?)\1/i);
+        if (styleMatch) {
+          figureStyle = styleMatch[2];
+        }
+      }
+    } else if (fullMatch.startsWith('<img') || fullMatch.startsWith('<IMG')) {
       tag = fullMatch;
     } else if (fullMatch.startsWith('NIMGTK')) {
       const mapped = tokenMap && tokenMap[fullMatch];
@@ -7994,6 +8028,8 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
 
       originalImageEntries.push({
         tag,
+        caption: origCaption,
+        figureStyle,
         index: imgCount - 1,
         precedingText,
         followingText,
@@ -8008,6 +8044,8 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
       if (typeof t === 'string' && t.includes('<img') && !originalImageEntries.some(e => e.tag === t)) {
         originalImageEntries.push({
           tag: t,
+          caption: '',
+          figureStyle: '',
           index: originalImageEntries.length,
           precedingText: '',
           followingText: '',
@@ -8022,6 +8060,28 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
     return proposalHtml.replace(/(?:<p>\s*)?\[\s*IMAGE[_\s]\d+(?::[^\]]*)?\s*\](?:\s*<\/p>)?/gi, '');
   }
 
+  const buildFigureHtml = (chosenEntry, customCaption) => {
+    let finalCaption = (customCaption !== null && customCaption !== undefined && customCaption.trim() !== '')
+      ? customCaption.trim()
+      : (chosenEntry.caption || '');
+
+    // Strip internal prompt vision artifacts if any were echoed
+    finalCaption = finalCaption
+      .replace(/\(see attached vision[^\)]*\)/gi, '')
+      .replace(/^(?:figure image|html image|markdown image|embedded image)(?:\s*with caption:\s*)?/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    const placeholder = (typeof t === 'function' ? t('editor.imageCaptionPlaceholder') : null) || 'Add image caption...';
+
+    if (finalCaption) {
+      const cleanCap = typeof escH === 'function' ? escH(finalCaption) : finalCaption;
+      const cleanPlaceholder = typeof escA === 'function' ? escA(placeholder) : placeholder;
+      return `\n<figure class="note-image-figure note-embedded-image-wrap" style="max-width:100%;margin:14px auto;text-align:center;">${chosenEntry.tag}<figcaption class="note-image-caption" contenteditable="true" data-placeholder="${cleanPlaceholder}">${cleanCap}</figcaption></figure>\n`;
+    }
+    return `\n<figure class="note-image-figure note-embedded-image-wrap" style="max-width:100%;margin:14px auto;text-align:center;">${chosenEntry.tag}</figure>\n`;
+  };
+
   let resultHtml = proposalHtml;
   const usedImgs = new Set();
 
@@ -8032,8 +8092,27 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
     }
   });
 
+  // Check if LLM already output a <figure> block containing [IMAGE_X]
+  resultHtml = resultHtml.replace(/<figure\b([^>]*)>([\s\S]*?)<\/figure>/gi, (figMatch, figAttrs, figInner) => {
+    const placeholderMatch = figInner.match(/\[\s*IMAGE[_\s](\d+)(?:[:|]\s*([^\]]*?))?\s*\]/i);
+    if (!placeholderMatch) return figMatch;
+    const idx = parseInt(placeholderMatch[1], 10) - 1;
+    let chosenEntry = null;
+    if (idx >= 0 && idx < originalImageEntries.length) {
+      chosenEntry = originalImageEntries[idx];
+    } else {
+      chosenEntry = originalImageEntries.find(e => !usedImgs.has(e.tag)) || null;
+    }
+    if (chosenEntry) {
+      usedImgs.add(chosenEntry.tag);
+      const replacedInner = figInner.replace(placeholderMatch[0], chosenEntry.tag);
+      return `<figure${figAttrs}>${replacedInner}</figure>`;
+    }
+    return figMatch;
+  });
+
   // 1. Replace explicit [IMAGE_X] placeholders inline (handling both inside <p> and standalone)
-  resultHtml = resultHtml.replace(/(?:<p>\s*)?\[\s*IMAGE[_\s](\d+)(?::[^\]]*)?\s*\](?:\s*<\/p>)?/gi, (fullMatch, idxStr) => {
+  resultHtml = resultHtml.replace(/(?:<p>\s*)?\[\s*IMAGE[_\s](\d+)(?:[:|]\s*([^\]]*?))?\s*\](?:\s*<\/p>)?/gi, (fullMatch, idxStr, customCaption) => {
     const idx = parseInt(idxStr, 10) - 1;
     let chosenEntry = null;
     if (idx >= 0 && idx < originalImageEntries.length) {
@@ -8044,17 +8123,17 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
 
     if (chosenEntry) {
       usedImgs.add(chosenEntry.tag);
-      return `\n<div class="note-embedded-image-wrap" style="margin: 14px 0; max-width: 100%; text-align: center;">${chosenEntry.tag}</div>\n`;
+      return buildFigureHtml(chosenEntry, customCaption);
     }
     return '';
   });
 
   // Replace any generic [IMAGE] placeholders
-  resultHtml = resultHtml.replace(/(?:<p>\s*)?\[\s*IMAGE(?::[^\]]*)?\s*\](?:\s*<\/p>)?/gi, () => {
+  resultHtml = resultHtml.replace(/(?:<p>\s*)?\[\s*IMAGE(?:[:|]\s*([^\]]*?))?\s*\](?:\s*<\/p>)?/gi, (fullMatch, customCaption) => {
     const chosenEntry = originalImageEntries.find(e => !usedImgs.has(e.tag)) || null;
     if (chosenEntry) {
       usedImgs.add(chosenEntry.tag);
-      return `\n<div class="note-embedded-image-wrap" style="margin: 14px 0; max-width: 100%; text-align: center;">${chosenEntry.tag}</div>\n`;
+      return buildFigureHtml(chosenEntry, customCaption);
     }
     return '';
   });
@@ -8070,7 +8149,7 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
       return words.filter(w => !stopWords.has(w));
     };
 
-    const blockEndRegex = /<\/(p|h2|h3|h4|ul|ol|blockquote|div)>/gi;
+    const blockEndRegex = /<\/(p|h2|h3|h4|ul|ol|blockquote|div|figure)>/gi;
     const blocks = [];
     let bMatch;
     let lastEnd = 0;
@@ -8089,7 +8168,7 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
 
     if (blocks.length > 0) {
       unplacedEntries.forEach(entry => {
-        const imageWrapHtml = `\n<div class="note-embedded-image-wrap" style="margin: 14px 0; max-width: 100%; text-align: center;">${entry.tag}</div>\n`;
+        const figureWrapHtml = buildFigureHtml(entry, entry.caption);
         const preKeywords = extractKeywords(entry.precedingText);
         const postKeywords = extractKeywords(entry.followingText);
 
@@ -8133,9 +8212,9 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
         if (bestBlock) {
           usedImgs.add(entry.tag);
           const insertIdx = bestBlock.endPos;
-          resultHtml = resultHtml.slice(0, insertIdx) + imageWrapHtml + resultHtml.slice(insertIdx);
+          resultHtml = resultHtml.slice(0, insertIdx) + figureWrapHtml + resultHtml.slice(insertIdx);
 
-          const addedLen = imageWrapHtml.length;
+          const addedLen = figureWrapHtml.length;
           blocks.forEach(b => {
             if (b.endPos >= insertIdx) {
               b.endPos += addedLen;
@@ -8151,7 +8230,7 @@ function restoreOriginalImagesToProposal(originalHtml, proposalHtml) {
   if (remaining.length > 0) {
     const lang = typeof getAppLanguage === 'function' ? getAppLanguage() : 'en';
     const sectionTitle = lang === 'fr' ? 'Images & Captures jointes' : lang === 'de' ? 'Angehängte Bilder & Screenshots' : lang === 'es' ? 'Imágenes y capturas adjuntas' : lang === 'it' ? 'Immagini e screenshot allegati' : 'Attached Images & Screenshots';
-    resultHtml += `\n<h2>${typeof escH === 'function' ? escH(sectionTitle) : sectionTitle}</h2>\n<div class="note-attached-images-gallery" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px;">\n${remaining.map(e => `<div style="max-width:100%; margin-bottom:8px;">${e.tag}</div>`).join('\n')}\n</div>`;
+    resultHtml += `\n<h2>${typeof escH === 'function' ? escH(sectionTitle) : sectionTitle}</h2>\n<div class="note-attached-images-gallery" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px;">\n${remaining.map(e => buildFigureHtml(e, e.caption)).join('\n')}\n</div>`;
   }
 
   return resultHtml;
