@@ -258,6 +258,24 @@ const StorageAPI = {
     return cloned;
   },
 
+  async _hydrateSecureSecrets(settings) {
+    if (!settings || typeof settings !== 'object') return;
+    if (typeof window !== 'undefined' && window.electronAPI?.secureSecrets?.isAvailable) {
+      try {
+        const isAvail = await window.electronAPI.secureSecrets.isAvailable();
+        if (isAvail) {
+          const storedKey = await window.electronAPI.secureSecrets.get('ai.apiKey');
+          if (storedKey) {
+            settings.ai = settings.ai || {};
+            settings.ai.apiKey = storedKey;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not hydrate secrets from OS keychain:', e);
+      }
+    }
+  },
+
   async readSettings(path) {
     const local = (await this._readJSON(path || 'secretary-settings.json', null)) || {};
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
@@ -266,7 +284,7 @@ const StorageAPI = {
         if (cloudSettings && typeof cloudSettings === 'object') {
           const localAi = (local && local.ai) || {};
           const cloudAi = (cloudSettings && cloudSettings.ai) || {};
-          return {
+          const merged = {
             ...local,
             ...cloudSettings,
             ui: { ...(local.ui || {}), ...(cloudSettings.ui || {}) },
@@ -275,16 +293,44 @@ const StorageAPI = {
               ...localAi // Preserves local API keys and endpoints
             }
           };
+          await this._hydrateSecureSecrets(merged);
+          return merged;
         }
       } catch (e) {
         console.warn('Failed reading cloud settings:', e);
       }
     }
-    return local && Object.keys(local).length > 0 ? local : null;
+    if (local && Object.keys(local).length > 0) {
+      await this._hydrateSecureSecrets(local);
+      return local;
+    }
+    return null;
   },
 
   async writeSettings(settings) {
-    await this._writeJSON('secretary-settings.json', settings);
+    let settingsToWrite = settings;
+    if (typeof window !== 'undefined' && window.electronAPI?.secureSecrets?.isAvailable) {
+      try {
+        const isAvail = await window.electronAPI.secureSecrets.isAvailable();
+        if (isAvail) {
+          const aiKey = settings.ai?.apiKey;
+          if (aiKey && aiKey !== '[SECURED_IN_OS_KEYCHAIN]') {
+            await window.electronAPI.secureSecrets.save('ai.apiKey', aiKey);
+          } else if (aiKey === '') {
+            await window.electronAPI.secureSecrets.clear('ai.apiKey');
+          }
+          const cloned = JSON.parse(JSON.stringify(settings));
+          if (cloned.ai) {
+            cloned.ai.apiKey = aiKey ? '[SECURED_IN_OS_KEYCHAIN]' : '';
+          }
+          settingsToWrite = cloned;
+        }
+      } catch (e) {
+        console.warn('Could not securely store secret key via OS keychain:', e);
+      }
+    }
+
+    await this._writeJSON('secretary-settings.json', settingsToWrite);
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
       // Sync non-credential settings to encrypted cloud vault
       const sanitized = this._sanitizeSettingsForCloud(settings);

@@ -95,6 +95,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeFile: (relativePath, content) => ipcRenderer.invoke('fs-write-file', relativePath, content),
   deleteFile: (relativePath) => ipcRenderer.invoke('fs-delete-file', relativePath),
   fileExists: (relativePath) => ipcRenderer.invoke('fs-file-exists', relativePath),
-  listFiles: (subDir) => ipcRenderer.invoke('fs-list-files', subDir),
-  notifyThemeChanged: (theme) => ipcRenderer.send('theme-changed', theme)
+  notifyThemeChanged: (theme) => ipcRenderer.send('theme-changed', theme),
+  securePassphrase: {
+    isAvailable: () => ipcRenderer.invoke('secure-passphrase-available'),
+    save: (passphrase) => ipcRenderer.invoke('secure-passphrase-save', passphrase),
+    get: () => ipcRenderer.invoke('secure-passphrase-get'),
+    clear: () => ipcRenderer.invoke('secure-passphrase-clear')
+  },
+  secureSecrets: {
+    isAvailable: () => ipcRenderer.invoke('secure-secrets-available'),
+    save: (key, value) => ipcRenderer.invoke('secure-secrets-save', key, value),
+    get: (key) => ipcRenderer.invoke('secure-secrets-get', key),
+    clear: (key) => ipcRenderer.invoke('secure-secrets-clear', key)
+  }
 });

@@ -2528,6 +2528,39 @@ function sanitizeGeneratedNoteMarkdown(md) {
 }
 
 /**
+ * Global HTML Sanitizer using DOMPurify (with fallback).
+ * Strips executable scripts, event handlers, and javascript: URIs while preserving rich text formatting,
+ * math elements, note links, and todo checkboxes.
+ */
+function sanitizeHTML(dirty, options = {}) {
+  if (typeof dirty !== 'string') return '';
+  if (!dirty) return '';
+
+  const purifyInstance = typeof DOMPurify !== 'undefined'
+    ? DOMPurify
+    : (typeof window !== 'undefined' && window.DOMPurify ? window.DOMPurify : null);
+
+  if (purifyInstance && typeof purifyInstance.sanitize === 'function') {
+    return purifyInstance.sanitize(dirty, {
+      ADD_TAGS: ['span', 'input', 'button', 'mark', 'include', 'svg', 'path', 'details', 'summary'],
+      ADD_ATTR: [
+        'data-note-id', 'data-note-path', 'data-todo-id', 'data-latex',
+        'data-katex-rendered', 'contenteditable', 'spellcheck', 'target',
+        'checked', 'disabled', 'aria-label', 'aria-hidden', 'role', 'viewbox', 'fill'
+      ],
+      ...options
+    });
+  }
+
+  // Defensive fallback regex sanitization if DOMPurify is not available in non-browser environments
+  return dirty
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/\bon\w+\s*=\s*(["'])[\s\S]*?\1/gi, '')
+    .replace(/\bon\w+\s*=\s*[^>\s]+/gi, '')
+    .replace(/href=["']\s*javascript:[^"']*["']/gi, 'href="#"');
+}
+
+/**
  * mdToPreviewHTML — minimal Markdown→HTML converter for LLM-generated and programmatic notes.
  * Converts markdown, cleans non-usable links, formats headers cleanly, and injects interactive pills.
  */
@@ -2592,7 +2625,7 @@ function mdToPreviewHTML(md) {
         html = convertMentionsToPills(html);
       }
 
-      return html;
+      return sanitizeHTML(html);
     }
   } catch (e) {
     console.error('mdToPreviewHTML parsing error:', e);

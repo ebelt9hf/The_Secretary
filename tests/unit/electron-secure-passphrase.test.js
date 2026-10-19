@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createSecurePassphraseStore } from '../../electron/secure-passphrase.js';
+import { createSecurePassphraseStore, createSecureSecretsStore } from '../../electron/secure-passphrase.js';
 
 function makeFs() {
   const files = new Map();
@@ -68,4 +68,42 @@ describe('electron/secure-passphrase.js', () => {
     fsImpl.files.set(store.filePath, Buffer.from('x'));
     expect(store.get()).toBeNull();
   });
+
+  describe('createSecureSecretsStore', () => {
+    it('stores secrets encrypted in OS keychain and retrieves them by key', () => {
+      const secrets = createSecureSecretsStore({ safeStorage: makeSafeStorage(), userDataPath: '/u', fsImpl });
+      expect(secrets.isAvailable()).toBe(true);
+      expect(secrets.save('ai.apiKey', 'sk-ant-test-key-12345')).toBe(true);
+      // Plaintext must never be in file
+      expect(fsImpl.files.get(secrets.filePath).toString()).not.toContain('sk-ant-test-key-12345');
+      expect(secrets.get('ai.apiKey')).toBe('sk-ant-test-key-12345');
+    });
+
+    it('manages multiple independent secrets and allows clearing single key', () => {
+      const secrets = createSecureSecretsStore({ safeStorage: makeSafeStorage(), userDataPath: '/u', fsImpl });
+      secrets.save('key1', 'val1');
+      secrets.save('key2', 'val2');
+      expect(secrets.get('key1')).toBe('val1');
+      expect(secrets.get('key2')).toBe('val2');
+
+      secrets.clear('key1');
+      expect(secrets.get('key1')).toBeNull();
+      expect(secrets.get('key2')).toBe('val2');
+    });
+
+    it('clears entire store when clear is called without a key', () => {
+      const secrets = createSecureSecretsStore({ safeStorage: makeSafeStorage(), userDataPath: '/u', fsImpl });
+      secrets.save('k', 'v');
+      expect(secrets.clear()).toBe(true);
+      expect(secrets.get('k')).toBeNull();
+    });
+
+    it('returns false/null on invalid inputs or when encryption is unavailable', () => {
+      const secrets = createSecureSecretsStore({ safeStorage: makeSafeStorage({ available: false }), userDataPath: '/u', fsImpl });
+      expect(secrets.isAvailable()).toBe(false);
+      expect(secrets.save('k', 'v')).toBe(false);
+      expect(secrets.get('k')).toBeNull();
+    });
+  });
 });
+

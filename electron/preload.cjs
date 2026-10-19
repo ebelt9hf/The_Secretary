@@ -104,6 +104,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: () => ipcRenderer.invoke('secure-passphrase-get'),
     clear: () => ipcRenderer.invoke('secure-passphrase-clear')
   },
+  secureSecrets: {
+    isAvailable: () => ipcRenderer.invoke('secure-secrets-available'),
+    save: (key, value) => ipcRenderer.invoke('secure-secrets-save', key, value),
+    get: (key) => ipcRenderer.invoke('secure-secrets-get', key),
+    clear: (key) => ipcRenderer.invoke('secure-secrets-clear', key)
+  },
   getSystemAccentColor: () => ipcRenderer.invoke('get-system-accent-color'),
   onSystemAccentColorChanged: (callback) => {
     const handler = (event, color) => callback(color);

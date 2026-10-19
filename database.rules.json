@@ -2,9 +2,10 @@
   "rules": {
     "pairing_codes": {
       "$code": {
-        // Pairing codes are short-lived tokens used to connect devices (readable and writable by authenticated devices)
-        ".read": "auth != null",
-        ".write": "auth != null",
+        // Pairing codes are short-lived tokens used to connect devices.
+        // Protected against global enumeration: only specific keys can be accessed by authenticated owners/recipients.
+        ".read": "auth != null && data.exists() && (!data.hasChild('ownerUid') || data.child('ownerUid').val() === auth.uid)",
+        ".write": "auth != null && (!data.exists() || data.child('ownerUid').val() === auth.uid)",
         ".validate": "newData.hasChildren(['vaultMeta', 'createdAt'])"
       }
     },
@@ -17,9 +18,9 @@
       }
     },
     "licenses": {
-      // License key validation registry
+      // License key validation registry: restricted to authenticated owner to prevent key scraping
       "$licenseKey": {
-        ".read": "auth != null",
+        ".read": "auth != null && data.exists() && data.child('ownerUid').val() === auth.uid",
         ".write": "auth != null && (!data.exists() || data.child('ownerUid').val() === auth.uid)"
       }
     },

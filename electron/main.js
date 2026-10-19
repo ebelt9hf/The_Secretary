@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { app, BrowserWindow, shell, Menu, protocol, net, ipcMain, dialog, globalShortcut, nativeTheme, screen, session, systemPreferences, safeStorage } from 'electron';
-import { createSecurePassphraseStore } from './secure-passphrase.js';
+import { createSecurePassphraseStore, createSecureSecretsStore } from './secure-passphrase.js';
 import {
   APP_ID,
   resolveAppIconPath,
@@ -48,6 +48,57 @@ function saveWorkspacePathConfig(wsPath) {
   try {
     fs.writeFileSync(appDataConfigPath, JSON.stringify({ workspacePath: wsPath }, null, 2), 'utf8');
   } catch (e) {}
+}
+
+const approvedWorkspacePaths = new Set();
+if (currentWorkspacePath) {
+  try { approvedWorkspacePaths.add(path.resolve(currentWorkspacePath)); } catch (e) {}
+}
+
+function isSafeWorkspaceDirectory(folderPath) {
+  if (!folderPath || typeof folderPath !== 'string') return false;
+  try {
+    const resolved = path.resolve(folderPath);
+    if (!fs.existsSync(resolved)) return false;
+    const stat = fs.statSync(resolved);
+    if (!stat.isDirectory()) return false;
+
+    // Disallow filesystem root
+    const parsed = path.parse(resolved);
+    if (resolved === parsed.root) return false;
+
+    // Disallow critical system directories on Unix / Windows
+    const lower = resolved.toLowerCase();
+    const systemDirs = [
+      '/bin', '/sbin', '/usr', '/etc', '/var', '/dev', '/proc', '/sys', '/system', '/library',
+      'c:\\windows', 'c:\\program files', 'c:\\program files (x86)', 'c:\\system32'
+    ];
+    if (systemDirs.some(sys => lower === sys || lower.startsWith(sys + path.sep))) {
+      return false;
+    }
+
+    // Disallow raw user home folder directly (must be a subfolder)
+    try {
+      const homePath = app.getPath('home');
+      if (homePath && resolved === path.resolve(homePath)) {
+        return false;
+      }
+    } catch (e) {}
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isAuthorizedSender(sender) {
+  if (!sender) return false;
+  try {
+    const url = sender.getURL();
+    return url.startsWith('app://') || url.startsWith('http://localhost:5173') || url.startsWith('http://127.0.0.1:5173');
+  } catch (e) {
+    return false;
+  }
 }
 
 let lastKnownTheme = '';
@@ -240,6 +291,7 @@ function normalizeNotePath(p) {
 
 // Workspace & Storage IPC Handlers
 ipcMain.handle('select-folder', async (event) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
   const result = await dialog.showOpenDialog(win, {
     title: 'Select Secretary Workspace Folder',
@@ -248,12 +300,17 @@ ipcMain.handle('select-folder', async (event) => {
   if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
     return null;
   }
-  const folderPath = result.filePaths[0];
+  const folderPath = path.resolve(result.filePaths[0]);
+  if (!isSafeWorkspaceDirectory(folderPath)) {
+    throw new Error('Selected path is not a permitted workspace directory');
+  }
+  approvedWorkspacePaths.add(folderPath);
   saveWorkspacePathConfig(folderPath);
   return { path: folderPath, name: path.basename(folderPath) };
 });
 
-ipcMain.handle('get-workspace-path', async () => {
+ipcMain.handle('get-workspace-path', async (event) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   if (currentWorkspacePath && fs.existsSync(currentWorkspacePath)) {
     return { path: currentWorkspacePath, name: path.basename(currentWorkspacePath) };
   }
@@ -261,16 +318,26 @@ ipcMain.handle('get-workspace-path', async () => {
 });
 
 ipcMain.handle('set-workspace-path', async (event, folderPath) => {
-  if (folderPath && fs.existsSync(folderPath)) {
-    saveWorkspacePathConfig(folderPath);
-    return { path: folderPath, name: path.basename(folderPath) };
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
+  if (folderPath && isSafeWorkspaceDirectory(folderPath)) {
+    const resolved = path.resolve(folderPath);
+    if (approvedWorkspacePaths.has(resolved) || isSafeWorkspaceDirectory(resolved)) {
+      approvedWorkspacePaths.add(resolved);
+      saveWorkspacePathConfig(resolved);
+      return { path: resolved, name: path.basename(resolved) };
+    }
   }
   return null;
 });
 
 function resolveWorkspaceFilePath(relPath) {
   if (!currentWorkspacePath) throw new Error('No workspace directory active');
-  const target = path.resolve(currentWorkspacePath, String(relPath || '').replace(/^\/+/, ''));
+  if (typeof relPath !== 'string' || !relPath.trim()) throw new Error('Invalid relative path');
+  if (path.isAbsolute(relPath) || relPath.includes('\0')) {
+    throw new Error('Access denied: absolute paths or null bytes disallowed');
+  }
+  const clean = String(relPath).replace(/^[/\\]+/, '');
+  const target = path.resolve(currentWorkspacePath, clean);
   if (target !== currentWorkspacePath && !target.startsWith(currentWorkspacePath + path.sep)) {
     throw new Error('Access denied outside workspace directory');
   }
@@ -278,6 +345,7 @@ function resolveWorkspaceFilePath(relPath) {
 }
 
 ipcMain.handle('fs-read-file', async (event, relPath) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     const target = resolveWorkspaceFilePath(relPath);
     if (!fs.existsSync(target)) return null;
@@ -289,6 +357,7 @@ ipcMain.handle('fs-read-file', async (event, relPath) => {
 });
 
 ipcMain.handle('fs-read-asset', async (event, relPath) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     let target = resolveWorkspaceFilePath(relPath);
     if (!fs.existsSync(target)) {
@@ -332,6 +401,7 @@ ipcMain.handle('fs-read-asset', async (event, relPath) => {
 });
 
 ipcMain.handle('fs-write-file', async (event, relPath, content) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   const target = resolveWorkspaceFilePath(relPath);
   const targetDir = path.dirname(target);
   await fs.promises.mkdir(targetDir, { recursive: true });
@@ -366,6 +436,7 @@ ipcMain.handle('fs-write-file', async (event, relPath, content) => {
 });
 
 ipcMain.handle('fs-delete-file', async (event, relPath) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   const target = resolveWorkspaceFilePath(relPath);
   if (fs.existsSync(target)) {
     await fs.promises.unlink(target);
@@ -374,6 +445,7 @@ ipcMain.handle('fs-delete-file', async (event, relPath) => {
 });
 
 ipcMain.handle('fs-file-exists', async (event, relPath) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     const target = resolveWorkspaceFilePath(relPath);
     return fs.existsSync(target);
@@ -383,6 +455,7 @@ ipcMain.handle('fs-file-exists', async (event, relPath) => {
 });
 
 ipcMain.handle('fs-list-files', async (event, subDir) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     const target = resolveWorkspaceFilePath(subDir || '');
     if (!fs.existsSync(target)) return [];
@@ -471,10 +544,17 @@ ipcMain.handle('request-save-all-windows', async () => {
 
 // Secure vault passphrase storage (OS keychain via safeStorage; never plaintext)
 const securePassphraseStore = createSecurePassphraseStore({ safeStorage, userDataPath: app.getPath('userData') });
-ipcMain.handle('secure-passphrase-available', () => securePassphraseStore.isAvailable());
-ipcMain.handle('secure-passphrase-save', (event, passphrase) => securePassphraseStore.save(passphrase));
-ipcMain.handle('secure-passphrase-get', () => securePassphraseStore.get());
-ipcMain.handle('secure-passphrase-clear', () => securePassphraseStore.clear());
+ipcMain.handle('secure-passphrase-available', (event) => isAuthorizedSender(event?.sender) && securePassphraseStore.isAvailable());
+ipcMain.handle('secure-passphrase-save', (event, passphrase) => isAuthorizedSender(event?.sender) && securePassphraseStore.save(passphrase));
+ipcMain.handle('secure-passphrase-get', (event) => isAuthorizedSender(event?.sender) ? securePassphraseStore.get() : null);
+ipcMain.handle('secure-passphrase-clear', (event) => isAuthorizedSender(event?.sender) && securePassphraseStore.clear());
+
+// Secure secrets storage (for AI API keys, local tokens; OS keychain via safeStorage)
+const secureSecretsStore = createSecureSecretsStore({ safeStorage, userDataPath: app.getPath('userData') });
+ipcMain.handle('secure-secrets-available', (event) => isAuthorizedSender(event?.sender) && secureSecretsStore.isAvailable());
+ipcMain.handle('secure-secrets-save', (event, key, val) => isAuthorizedSender(event?.sender) && secureSecretsStore.save(key, val));
+ipcMain.handle('secure-secrets-get', (event, key) => isAuthorizedSender(event?.sender) ? secureSecretsStore.get(key) : null);
+ipcMain.handle('secure-secrets-clear', (event, key) => isAuthorizedSender(event?.sender) && secureSecretsStore.clear(key));
 
 // Windows System Accent Color IPC & Dynamic Listener
 ipcMain.handle('get-system-accent-color', () => {
@@ -600,7 +680,7 @@ function prewarmNoteWindow() {
         preload: path.join(__dirname, 'preload.cjs'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false
+        sandbox: true
       }
     });
 
@@ -759,7 +839,7 @@ function openNoteWindowInstance({ noteId, path: notePath, sourceWin } = {}) {
         preload: path.join(__dirname, 'preload.cjs'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false
+        sandbox: true
       }
     });
 
@@ -987,7 +1067,7 @@ ipcMain.on('open-chat-window', (event) => {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -1065,7 +1145,7 @@ ipcMain.on('open-focus-pip-window', () => {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -1115,8 +1195,7 @@ protocol.registerSchemesAsPrivileged([
       secure: true,
       supportFetchAPI: true,
       corsEnabled: true,
-      stream: true,
-      bypassCSP: true
+      stream: true
     }
   }
 ]);
@@ -1137,7 +1216,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -1282,7 +1361,7 @@ function setupWindowOpenHandler(win) {
           preload: path.join(__dirname, 'preload.cjs'),
           contextIsolation: true,
           nodeIntegration: false,
-          sandbox: false
+          sandbox: true
         }
       }
     };
@@ -1293,16 +1372,20 @@ app.whenReady().then(() => {
   // Automatically authorize media (microphone) and notifications for local application windows
   if (session && session.defaultSession) {
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      const url = webContents.getURL();
+      const isInternal = url.startsWith('app://') || url.startsWith('http://localhost:5173') || url.startsWith('http://127.0.0.1:5173');
       const allowed = ['media', 'notifications', 'accessibility-events', 'clipboard-read', 'fullscreen'];
-      if (allowed.includes(permission)) {
+      if (isInternal && allowed.includes(permission)) {
         return callback(true);
       }
-      callback(true);
+      callback(false);
     });
 
     session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+      const url = webContents.getURL();
+      const isInternal = url.startsWith('app://') || url.startsWith('http://localhost:5173') || url.startsWith('http://127.0.0.1:5173');
       const allowed = ['media', 'notifications', 'accessibility-events', 'clipboard-read', 'fullscreen'];
-      return allowed.includes(permission);
+      return isInternal && allowed.includes(permission);
     });
   }
 
