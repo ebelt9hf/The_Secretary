@@ -1,15 +1,23 @@
 // ── Secretary: File System ──
 // ═══ File System helpers ═══
 
+function _getRootHandle() {
+  if (typeof rootHandle !== 'undefined' && rootHandle) return rootHandle;
+  if (typeof window !== 'undefined' && window.rootHandle) return window.rootHandle;
+  if (typeof globalThis !== 'undefined' && globalThis.rootHandle) return globalThis.rootHandle;
+  return null;
+}
+
 /** Navigate to a nested directory (read-only nav). Throws if not found. */
 async function getDirHandle(pathStr) {
-  if (!rootHandle) throw new Error('No root folder handle loaded');
-  if (typeof rootHandle.getDirectoryHandle !== 'function') {
+  const root = _getRootHandle();
+  if (!root) throw new Error('No root folder handle loaded');
+  if (typeof root.getDirectoryHandle !== 'function') {
     const err = new Error(`FileSystemDirectoryHandle not available for directory navigation: ${pathStr}`);
     err.name = 'NotFoundError';
     throw err;
   }
-  let handle = rootHandle;
+  let handle = root;
   for (const part of pathStr.split('/').filter(Boolean)) {
     handle = await handle.getDirectoryHandle(part);
   }
@@ -18,13 +26,14 @@ async function getDirHandle(pathStr) {
 
 /** Navigate to a nested directory, creating intermediate dirs as needed. */
 async function getOrCreateDirHandle(pathStr) {
-  if (!rootHandle) throw new Error('No root folder handle loaded');
-  if (typeof rootHandle.getDirectoryHandle !== 'function') {
+  const root = _getRootHandle();
+  if (!root) throw new Error('No root folder handle loaded');
+  if (typeof root.getDirectoryHandle !== 'function') {
     const err = new Error(`FileSystemDirectoryHandle not available for creating directory: ${pathStr}`);
     err.name = 'NotFoundError';
     throw err;
   }
-  let handle = rootHandle;
+  let handle = root;
   for (const part of pathStr.split('/').filter(Boolean)) {
     handle = await handle.getDirectoryHandle(part, { create: true });
   }
@@ -45,7 +54,8 @@ async function readFile(pathStr) {
   const name  = parts.pop();
   if (!name) throw new Error(`Invalid file path: ${pathStr}`);
   try {
-    const dir = parts.length ? await getDirHandle(parts.join('/')) : rootHandle;
+    const root = _getRootHandle();
+    const dir = parts.length ? await getDirHandle(parts.join('/')) : root;
     if (dir && typeof dir.getFileHandle === 'function') {
       const fh = await dir.getFileHandle(name);
       return (await fh.getFile()).text();
@@ -57,7 +67,8 @@ async function readFile(pathStr) {
         const backupPath = `_migrated_to_cloud_backup/${pathStr}`;
         const bParts = backupPath.split('/').filter(Boolean);
         const bName = bParts.pop();
-        const bDir = bParts.length ? await getDirHandle(bParts.join('/')) : rootHandle;
+        const root = _getRootHandle();
+        const bDir = bParts.length ? await getDirHandle(bParts.join('/')) : root;
         if (bDir && typeof bDir.getFileHandle === 'function') {
           const bFh = await bDir.getFileHandle(bName);
           return (await bFh.getFile()).text();
@@ -117,11 +128,12 @@ async function readAssetAsDataUrl(pathStr) {
     // Web FileSystemAccess API fallback
     const tryReadHandleAsDataUrl = async (targetPath) => {
       try {
-        if (typeof rootHandle !== 'undefined' && rootHandle) {
+        const root = _getRootHandle();
+        if (root) {
           const parts = targetPath.split('/').filter(Boolean);
           const name = parts.pop();
           if (name) {
-            const dir = parts.length ? await getDirHandle(parts.join('/')) : rootHandle;
+            const dir = parts.length ? await getDirHandle(parts.join('/')) : root;
             const fh = await dir.getFileHandle(name);
             const file = await fh.getFile();
             return await new Promise((resolve) => {
@@ -255,6 +267,32 @@ async function writeFile(pathStr, content) {
   return next;
 }
 
+function _dataUrlToBlob(dataUrl) {
+  try {
+    const commaIdx = dataUrl.indexOf(',');
+    if (commaIdx === -1) return new Blob([dataUrl]);
+    const header = dataUrl.slice(0, commaIdx);
+    const base64Data = dataUrl.slice(commaIdx + 1).replace(/\s+/g, '');
+    const mimeMatch = header.match(/^data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const binary = atob(base64Data);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  } catch (err) {
+    return new Blob([dataUrl]);
+  }
+}
+if (typeof window !== 'undefined') {
+  window._dataUrlToBlob = _dataUrlToBlob;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis._dataUrlToBlob = _dataUrlToBlob;
+}
+
 async function _writeFileDirect(pathStr, content) {
   if (typeof window !== 'undefined' && window.StorageAPI?.getStorageEngine() === 'firebase' && window.FirebaseSyncService?.saveAsset && pathStr.includes('_assets/')) {
     try {
@@ -271,19 +309,27 @@ async function _writeFileDirect(pathStr, content) {
   const parts = pathStr.split('/').filter(Boolean);
   const name  = parts.pop();
   if (!name) throw new Error(`Invalid target filename in path: ${pathStr}`);
-  const dir   = parts.length ? await getOrCreateDirHandle(parts.join('/')) : rootHandle;
+  const root  = _getRootHandle();
+  const dir   = parts.length ? await getOrCreateDirHandle(parts.join('/')) : root;
+  if (!dir || typeof dir.getFileHandle !== 'function') {
+    const err = new Error(`No root folder handle loaded or FileSystemDirectoryHandle not available for path: ${pathStr}`);
+    err.name = 'NotFoundError';
+    throw err;
+  }
   const fh    = await dir.getFileHandle(name, { create: true });
   const w     = await fh.createWritable();
   try {
     if (typeof content === 'string' && content.startsWith('data:image/')) {
-      const blob = await fetch(content).then(r => r.blob());
+      const blob = _dataUrlToBlob(content);
       await w.write(blob);
     } else {
       await w.write(content);
     }
     await w.close();
   } catch (err) {
-    await w.abort().catch(() => {});
+    if (w && typeof w.abort === 'function') {
+      await w.abort().catch(() => {});
+    }
     throw err;
   }
 }
@@ -298,7 +344,9 @@ async function deleteFile(pathStr) {
   const parts = pathStr.split('/').filter(Boolean);
   const name  = parts.pop();
   if (!name) return;
-  const dir   = parts.length ? await getDirHandle(parts.join('/')) : rootHandle;
+  const root  = _getRootHandle();
+  const dir   = parts.length ? await getDirHandle(parts.join('/')) : root;
+  if (!dir || typeof dir.removeEntry !== 'function') return;
   await dir.removeEntry(name);
 }
 

@@ -730,6 +730,22 @@ function togglePassVisibility(inputId, btnEl) {
 window.togglePassVisibility = togglePassVisibility;
 
 function openCloudSyncModalOrPrefs() {
+  const connectorStatus = (typeof StorageAPI !== 'undefined' && StorageAPI.getConnectorStatus) ? StorageAPI.getConnectorStatus() : null;
+  if (connectorStatus && (connectorStatus.status === 'error' || connectorStatus.error)) {
+    const errType = connectorStatus.error?.type;
+    if (errType === 'permission') {
+      if (typeof changeFolderFromPrefs === 'function') {
+        changeFolderFromPrefs();
+        return;
+      }
+    } else if (errType === 'auth') {
+      if (typeof openModal === 'function') {
+        openModal('modal-cloud-sync-unlock');
+        return;
+      }
+    }
+  }
+
   const isVirtual = Boolean(rootHandle?.isVirtual || rootHandle?.isDemo || rootHandle?.name === 'Demo Workspace (Sandbox)');
   if (!isVirtual && window.FirebaseSyncService?.state?.engine === 'firebase' && !window.FirebaseSyncService?.state?.isUnlocked) {
     if (typeof openModal === 'function') {
@@ -747,7 +763,7 @@ function openCloudSyncModalOrPrefs() {
 window.openCloudSyncModalOrPrefs = openCloudSyncModalOrPrefs;
 
 function updateCloudSyncUI(statusObj) {
-  const status = statusObj || (window.FirebaseSyncService ? window.FirebaseSyncService.getStatus() : { status: 'disconnected', engine: 'filesystem' });
+  const status = statusObj || (typeof StorageAPI !== 'undefined' && StorageAPI.getConnectorStatus ? StorageAPI.getConnectorStatus() : (window.FirebaseSyncService ? window.FirebaseSyncService.getStatus() : { status: 'disconnected', engine: 'filesystem' }));
   const iconWrap = document.getElementById('cloud-sync-icon-wrap');
   const btn = document.getElementById('btn-cloud-sync-status');
   const statusText = document.getElementById('prefs-sync-status-text');
@@ -802,25 +818,61 @@ function updateCloudSyncUI(statusObj) {
     }
   }
 
-  if (status.engine === 'filesystem') {
+  if (status.status === 'error' || status.error) {
+    const errInfo = status.error || { type: 'disk', message: 'Storage error' };
+    const isPermission = errInfo.type === 'permission';
+    const isAuth = errInfo.type === 'auth';
+    const isQuota = errInfo.type === 'quota';
+
+    const label = isPermission
+      ? (typeof t === 'function' ? t('sync.statusPermissionDenied') : 'Permission Denied')
+      : (isAuth
+        ? (typeof t === 'function' ? t('sync.statusAuthError') : 'Authentication Error')
+        : (isQuota
+          ? (typeof t === 'function' ? t('sync.statusQuotaExceeded') : 'Storage Full')
+          : (typeof t === 'function' ? t('sync.statusError') : 'Storage Error')));
+
+    const tooltip = isPermission
+      ? (typeof t === 'function' ? t('sync.statusPermissionTooltip') : 'Folder permission was denied or expired. Click to re-grant permission.')
+      : (isAuth
+        ? (typeof t === 'function' ? t('sync.statusAuthTooltip') : 'Authentication expired or vault locked. Click to authenticate.')
+        : (isQuota
+          ? (typeof t === 'function' ? t('sync.statusQuotaTooltip') : 'Storage is full. Please free up space on disk or cloud.')
+          : (errInfo.message || 'Storage connector error. Click to review.')));
+
+    statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:#ef4444" title="${tooltip}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> ${label}</span>`;
+    iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+
+    if (btn) {
+      btn.style.color = '#ef4444';
+      btn.title = tooltip;
+    }
+  } else if (status.engine === 'filesystem') {
+    if (btn) btn.style.color = '';
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:#10b981"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> ${typeof t === 'function' ? t('sync.statusLocalFolder') : 'Local Folder Active'}</span>`;
     iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
   } else if (status.status === 'synced') {
+    if (btn) btn.style.color = '';
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:var(--color-low, #10b981)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="9 15 12 18 17 13"/></svg> ${typeof t === 'function' ? t('sync.statusSynced') : 'Synced (Encrypted)'}</span>`;
     iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><polyline points="9 15 12 18 17 13"/></svg>`;
   } else if (status.status === 'syncing') {
+    if (btn) btn.style.color = '';
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:var(--color-medium, #3b82f6)"><svg class="icon-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg> ${typeof t === 'function' ? t('sync.statusSyncing') : 'Syncing...'}</span>`;
     iconSvg = `<svg class="icon-spin" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>`;
   } else if (status.status === 'declined') {
+    if (btn) btn.style.color = '#ef4444';
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:#ef4444" title="${typeof t === 'function' ? t('sync.statusDeclinedTooltip') : 'Cloud sync is disabled because your Secretary version is below the minimum supported version.'}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> ${typeof t === 'function' ? t('sync.statusDeclined') : 'Version Declined (Sync Disabled)'}</span>`;
     iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`;
   } else if (status.status === 'offline') {
+    if (btn) btn.style.color = '#f59e0b';
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:#f59e0b"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><line x1="1" y1="1" x2="23" y2="23"/></svg> ${typeof t === 'function' ? t('sync.statusOffline') : 'Local Cache (Offline)'}</span>`;
     iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
   } else if (status.status === 'locked') {
+    if (btn) btn.style.color = '#ef4444';
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:#ef4444"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${typeof t === 'function' ? t('sync.statusLocked') : 'Vault Locked'}</span>`;
     iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
   } else {
+    if (btn) btn.style.color = '';
     statusHtml += `<span style="display:inline-flex; align-items:center; gap:5px; color:var(--text-muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg> ${typeof t === 'function' ? t('sync.statusDisconnected') : 'Disconnected'}</span>`;
     iconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>`;
   }
@@ -846,9 +898,11 @@ function updateCloudSyncUI(statusObj) {
   }
   if (iconWrap && iconSvg) iconWrap.innerHTML = iconSvg;
   if (btn) {
-    btn.title = isFirebase
-      ? `${typeof t === 'function' ? t('sync.storage') : 'Storage'}: Firebase E2EE (${status.status})`
-      : `${typeof t === 'function' ? t('sync.storage') : 'Storage'}: ${typeof t === 'function' ? t('sync.localFolderStorage') : 'Local Folder'} (${folderName})`;
+    if (status.status !== 'error' && !status.error) {
+      btn.title = isFirebase
+        ? `${typeof t === 'function' ? t('sync.storage') : 'Storage'}: Firebase E2EE (${status.status})`
+        : `${typeof t === 'function' ? t('sync.storage') : 'Storage'}: ${typeof t === 'function' ? t('sync.localFolderStorage') : 'Local Folder'} (${folderName})`;
+    }
   }
 
   const btnMigrate = document.getElementById('btn-prefs-migrate-firebase');
@@ -4500,11 +4554,11 @@ async function handleSyncMessage(e) {
           const ta = document.getElementById('edit-textarea');
           if (ta) {
             let cleanHTML = parsed.mainHTML || '<p><br></p>';
-            if (typeof window.cleanHtmlBeforeSave === 'function') {
-              cleanHTML = window.cleanHtmlBeforeSave(cleanHTML);
-            }
             if (typeof resolveNoteImages === 'function') {
               cleanHTML = await resolveNoteImages(cleanHTML);
+            }
+            if (typeof window.cleanHtmlBeforeSave === 'function') {
+              cleanHTML = window.cleanHtmlBeforeSave(cleanHTML);
             }
             ta.innerHTML = cleanHTML;
             if (typeof renderLatexInElement === 'function') renderLatexInElement(ta);

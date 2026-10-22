@@ -3176,6 +3176,21 @@ function sanitizeHtmlContent(htmlString, options = {}) {
             continue;
           }
 
+          if (tagName === 'img' && attrName === 'src' && !attrVal.startsWith('data:') && !attrVal.startsWith('http://') && !attrVal.startsWith('https://')) {
+            const cache = (typeof _assetDataUrlCache !== 'undefined' ? _assetDataUrlCache : null) || (typeof window !== 'undefined' && window._assetDataUrlCache ? window._assetDataUrlCache : null);
+            if (cache) {
+              const cleanPath = attrVal.replace(/^(\.\/|\.\.\/)+/, '');
+              const normPath = cleanPath.startsWith('notes/') ? cleanPath : `notes/${cleanPath}`;
+              const fileName = normPath.split('/').pop();
+              const cached = cache.get(normPath) || cache.get(normPath.replace(/^notes\//, '')) || (fileName ? cache.get(fileName) : null);
+              if (cached) {
+                cleanEl.setAttribute('src', cached);
+                cleanEl.setAttribute('data-asset-path', normPath);
+                continue;
+              }
+            }
+          }
+
           cleanEl.setAttribute(attr.name, attrVal);
         }
 

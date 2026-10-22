@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { spawn } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { app, BrowserWindow, shell, Menu, protocol, net, ipcMain, dialog, globalShortcut, nativeTheme, screen, session, systemPreferences, safeStorage } from 'electron';
 import { createSecurePassphraseStore, createSecureSecretsStore } from './secure-passphrase.js';
@@ -348,10 +349,11 @@ ipcMain.handle('fs-read-file', async (event, relPath) => {
   if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     const target = resolveWorkspaceFilePath(relPath);
-    if (!fs.existsSync(target)) return null;
     return await fs.promises.readFile(target, 'utf8');
   } catch (e) {
-    console.warn('fs-read-file error for:', relPath, e.message);
+    if (e.code !== 'ENOENT') {
+      console.warn('fs-read-file error for:', relPath, e.message);
+    }
     return null;
   }
 });
@@ -360,7 +362,15 @@ ipcMain.handle('fs-read-asset', async (event, relPath) => {
   if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     let target = resolveWorkspaceFilePath(relPath);
-    if (!fs.existsSync(target)) {
+    let exists = false;
+    try {
+      await fs.promises.access(target, fs.constants.F_OK);
+      exists = true;
+    } catch {
+      exists = false;
+    }
+
+    if (!exists) {
       const fileName = path.basename(relPath);
       const cleanRel = String(relPath).replace(/^[./\\]+/, '').replace(/^notes\//, '');
       const candidates = [
@@ -372,12 +382,15 @@ ipcMain.handle('fs-read-asset', async (event, relPath) => {
         resolveWorkspaceFilePath(`_migrated_to_cloud_backup/${relPath}`),
         resolveWorkspaceFilePath(`_migrated_to_cloud_backup/${cleanRel}`)
       ];
-      const found = candidates.find(c => fs.existsSync(c));
-      if (found) {
-        target = found;
-      } else {
-        return null;
+      for (const cand of candidates) {
+        try {
+          await fs.promises.access(cand, fs.constants.F_OK);
+          target = cand;
+          exists = true;
+          break;
+        } catch {}
       }
+      if (!exists) return null;
     }
     const ext = path.extname(target).toLowerCase().replace('.', '');
     const mimeMap = {
@@ -423,7 +436,7 @@ ipcMain.handle('fs-write-file', async (event, relPath, content) => {
     return true;
   } catch (atomicErr) {
     try {
-      if (fs.existsSync(tempTarget)) await fs.promises.unlink(tempTarget);
+      await fs.promises.unlink(tempTarget);
     } catch (cleanErr) {}
     // Fallback to direct write if rename fails
     if (bufferToWrite) {
@@ -437,9 +450,11 @@ ipcMain.handle('fs-write-file', async (event, relPath, content) => {
 
 ipcMain.handle('fs-delete-file', async (event, relPath) => {
   if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
-  const target = resolveWorkspaceFilePath(relPath);
-  if (fs.existsSync(target)) {
+  try {
+    const target = resolveWorkspaceFilePath(relPath);
     await fs.promises.unlink(target);
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.warn('fs-delete-file warning:', relPath, e.message);
   }
   return true;
 });
@@ -448,7 +463,8 @@ ipcMain.handle('fs-file-exists', async (event, relPath) => {
   if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     const target = resolveWorkspaceFilePath(relPath);
-    return fs.existsSync(target);
+    await fs.promises.access(target, fs.constants.F_OK);
+    return true;
   } catch (e) {
     return false;
   }
@@ -458,7 +474,6 @@ ipcMain.handle('fs-list-files', async (event, subDir) => {
   if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   try {
     const target = resolveWorkspaceFilePath(subDir || '');
-    if (!fs.existsSync(target)) return [];
     const entries = await fs.promises.readdir(target, { withFileTypes: true });
     return entries.map(ent => ({
       name: ent.name,
@@ -468,6 +483,43 @@ ipcMain.handle('fs-list-files', async (event, subDir) => {
   } catch (e) {
     return [];
   }
+});
+
+// Run calendar sync shell script in separate background process/thread
+ipcMain.handle('run-calendar-sync-script', async (event, customWorkspace) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
+  const wsPath = (customWorkspace && typeof customWorkspace === 'string' && isSafeWorkspaceDirectory(customWorkspace))
+    ? path.resolve(customWorkspace)
+    : currentWorkspacePath;
+  if (!wsPath) throw new Error('No workspace active');
+
+  const scriptPath = path.resolve(__dirname, '..', 'development', 'sync_local_calendar.sh');
+  return new Promise((resolve) => {
+    const child = spawn('/bin/bash', [scriptPath, wsPath], {
+      cwd: wsPath,
+      env: { ...process.env, WORKSPACE_DIR: wsPath }
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+    child.on('close', (code) => {
+      resolve({
+        success: code === 0,
+        code,
+        stdout,
+        stderr
+      });
+    });
+    child.on('error', (err) => {
+      resolve({
+        success: false,
+        error: err.message,
+        stdout,
+        stderr
+      });
+    });
+  });
 });
 
 // Window Control IPC Handlers

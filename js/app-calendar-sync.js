@@ -867,6 +867,88 @@ echo "✨ Sync complete!"
     },
 
     /**
+     * Executes the local calendar sync shell script asynchronously in a separate process/thread.
+     */
+    async runLocalSyncScript(workspacePath = '') {
+      if (typeof window !== 'undefined' && window.AppBridge?.calendarSync?.isSupported?.()) {
+        try {
+          if (typeof toast === 'function') {
+            const msg = (typeof t === 'function')
+              ? (t('prefs.runningSyncScript') || 'Running local calendar sync in background...')
+              : 'Running local calendar sync in background...';
+            toast(msg);
+          }
+          const result = await window.AppBridge.calendarSync.runLocalSyncScript(workspacePath);
+          if (result && result.success) {
+            if (typeof toast === 'function') {
+              const msg = (typeof t === 'function')
+                ? (t('prefs.syncScriptCompleted') || 'Calendar sync completed')
+                : 'Calendar sync completed';
+              toast(msg);
+            }
+            if (typeof checkPlannerRefresh === 'function') {
+              await checkPlannerRefresh();
+            }
+          } else {
+            console.warn('Local calendar sync script exited with error or warning:', result);
+            if (typeof toast === 'function') {
+              toast((result && result.error) || 'Calendar sync script failed', true);
+            }
+          }
+          return result;
+        } catch (err) {
+          console.error('Failed to run local sync script in separate process:', err);
+          if (typeof toast === 'function') toast(err.message || 'Execution error', true);
+          return { success: false, error: err.message };
+        }
+      }
+      return null;
+    },
+
+    /**
+     * Parses and normalizes proposals or calendar results in a background Web Worker thread.
+     */
+    async parseResultsInWorker(text, fileName = 'calendar-result', existingEvents = []) {
+      if (!text || typeof text !== 'string') return [];
+      const isIcs = fileName.endsWith('.ics') || text.includes('BEGIN:VCALENDAR');
+      const fileType = isIcs ? 'ics' : 'json';
+
+      // 1. Try background Web Worker pipeline first (separate thread)
+      if (typeof window !== 'undefined' && window.SyncPipeline && typeof window.SyncPipeline.parseCalendarResults === 'function') {
+        try {
+          const workerRes = await window.SyncPipeline.parseCalendarResults(text, fileType, { name: fileName, existingEvents });
+          if (Array.isArray(workerRes)) {
+            return workerRes;
+          }
+        } catch (workerErr) {
+          console.warn('[CalendarSyncService] Worker thread parsing failed, falling back to async parser:', workerErr);
+        }
+      }
+
+      // 2. Direct SyncWorkerEngine fallback (if in Node/worker scope without Worker constructor)
+      if (typeof SyncWorkerEngine !== 'undefined' && typeof SyncWorkerEngine.parseCalendarResults === 'function') {
+        try {
+          const engineRes = await SyncWorkerEngine.parseCalendarResults(text, fileType, { name: fileName, existingEvents });
+          if (Array.isArray(engineRes)) {
+            return engineRes;
+          }
+        } catch (_engineErr) {}
+      }
+
+      // 3. Fallback to async in-thread parser
+      if (isIcs) {
+        return this.parseICS(text, { name: fileName });
+      }
+      const parsed = JSON.parse(text);
+      if (typeof window !== 'undefined' && typeof window.normalizePlannerProposals === 'function') {
+        return window.normalizePlannerProposals(parsed, existingEvents);
+      }
+      if (Array.isArray(parsed)) return parsed;
+      if (parsed && Array.isArray(parsed.proposals)) return parsed.proposals;
+      return [];
+    },
+
+    /**
      * Handles file input change from input element fallback.
      */
     async handleFileInputChange(e) {
@@ -877,29 +959,15 @@ echo "✨ Sync complete!"
     },
 
     /**
-     * Reads and parses external agent proposals or calendar file.
+     * Reads and parses external agent proposals or calendar file in background thread.
      */
     async handleExternalFile(file) {
       if (!file) return;
       try {
         const text = await file.text();
         const fileName = file.name || 'input-file';
-        let items = [];
-
-        if (fileName.endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
-          const parsed = JSON.parse(text);
-          if (typeof window !== 'undefined' && typeof window.normalizePlannerProposals === 'function') {
-            items = window.normalizePlannerProposals(parsed);
-          } else if (Array.isArray(parsed)) {
-            items = parsed;
-          } else if (parsed && Array.isArray(parsed.proposals)) {
-            items = parsed.proposals;
-          }
-        } else if (fileName.endsWith('.ics') || text.includes('BEGIN:VCALENDAR')) {
-          items = this.parseICS(text, { name: fileName });
-        } else {
-          throw new Error('Unsupported format. Please select a .json or .ics file.');
-        }
+        const existingEvents = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) ? plannerEvents : [];
+        const items = await this.parseResultsInWorker(text, fileName, existingEvents);
 
         if (items && items.length > 0) {
           const res = await this._mergeIntoProposals(items);
@@ -977,10 +1045,8 @@ echo "✨ Sync complete!"
         const text = await file.text();
         if (!text) return;
 
-        const parsed = JSON.parse(text);
-        const items = (typeof window !== 'undefined' && typeof window.normalizePlannerProposals === 'function')
-          ? window.normalizePlannerProposals(parsed)
-          : (Array.isArray(parsed) ? parsed : (parsed.proposals || []));
+        const existingEvents = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) ? plannerEvents : [];
+        const items = await this.parseResultsInWorker(text, 'planner-proposals.json', existingEvents);
 
         if (items && items.length > 0) {
           await this._mergeIntoProposals(items);
@@ -1068,6 +1134,12 @@ echo "✨ Sync complete!"
           el.style.background = 'var(--bg-tag)';
           el.style.color = 'var(--text-muted)';
         });
+      }
+
+      const runBtn = document.getElementById('btn-run-local-sync');
+      if (runBtn) {
+        const isSupported = typeof window !== 'undefined' && window.AppBridge?.calendarSync?.isSupported?.();
+        runBtn.style.display = isSupported ? 'inline-flex' : 'none';
       }
     },
 

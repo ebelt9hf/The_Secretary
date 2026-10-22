@@ -212,6 +212,16 @@ const SyncPipeline = {
     return await this._send('GET_ASSET', { pathOrId });
   },
 
+  // ── Calendar Proposals & Script Results Pipeline Operations ──
+
+  async parseCalendarResults(content, fileType = 'json', options = {}) {
+    return await this._send('PARSE_CALENDAR_RESULTS', { content, fileType, options });
+  },
+
+  async normalizeProposals(proposals, existingEvents = []) {
+    return await this._send('NORMALIZE_PROPOSALS', { proposals, existingEvents });
+  },
+
   // ── Event Bus ──
 
   on(event, handler) {

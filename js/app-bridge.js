@@ -434,6 +434,19 @@
       }
     },
 
+    // ═══ Calendar Sync Shell Script Execution (Separate Process/Thread) ═══
+    calendarSync: {
+      isSupported() {
+        return !!(global.electronAPI && typeof global.electronAPI.runCalendarSyncScript === 'function');
+      },
+      async runLocalSyncScript(workspacePath = '') {
+        if (global.electronAPI && typeof global.electronAPI.runCalendarSyncScript === 'function') {
+          return await global.electronAPI.runCalendarSyncScript(workspacePath);
+        }
+        throw new Error('Local calendar sync execution is only available in desktop environment');
+      }
+    },
+
     // ═══ Cross-Window Broadcast & Sync ═══
     sync: {
       broadcast(msg) {

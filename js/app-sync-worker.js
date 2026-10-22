@@ -758,6 +758,182 @@ const SyncWorkerEngine = {
       }
     }
     return manifests;
+  },
+
+  /**
+   * Offload parsing of shell script results or external calendar files (JSON or ICS)
+   * to this background Web Worker thread.
+   */
+  async parseCalendarResults(content, fileType = 'json', options = {}) {
+    if (!content || typeof content !== 'string') return [];
+    const text = content.trim();
+    if (!text) return [];
+
+    const isIcs = fileType === 'ics' || text.includes('BEGIN:VCALENDAR');
+    if (isIcs) {
+      return this._parseIcsInWorker(text, options);
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      return this.normalizeProposals(parsed, options?.existingEvents || []);
+    } catch (e) {
+      throw new Error(`Failed to parse calendar JSON in worker thread: ${e.message}`);
+    }
+  },
+
+  _parseIcsInWorker(icsText, options = {}) {
+    const events = [];
+    const feedName = options?.name || options?.feedName || 'Local Calendar';
+    const lines = icsText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+    const unfolded = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if ((line.startsWith(' ') || line.startsWith('\t')) && unfolded.length > 0) {
+        unfolded[unfolded.length - 1] += line.slice(1);
+      } else {
+        unfolded.push(line);
+      }
+    }
+
+    let inVEvent = false;
+    let cur = {};
+
+    function parseIcsDate(raw) {
+      if (!raw) return null;
+      const clean = raw.replace(/^[^:]*:/, '').trim();
+      const match = clean.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z?)?/);
+      if (!match) return null;
+      const [_, y, m, d, hh, mm, ss] = match;
+      if (hh !== undefined) {
+        return new Date(Date.UTC(+y, +m - 1, +d, +hh, +mm, +ss || 0));
+      }
+      return new Date(+y, +m - 1, +d);
+    }
+
+    function inferType(title, desc) {
+      const c = (title + ' ' + (desc || '')).toLowerCase();
+      if (/\b(prep|briefing|preparation|vorbereitung)\b/.test(c)) return 'prep';
+      if (/\b(call|meeting|zoom|teams|meet|webex|conference|huddle|1:1|1-on-1|interview|demo|client)\b/.test(c)) return 'call';
+      if (/\b(sync|standup|daily|retrospective|check-in)\b/.test(c)) return 'sync';
+      if (/\b(todo|task|action item)\b/.test(c)) return 'todo';
+      if (/\b(personal|lunch|gym|doctor|dentist|break|vacation|holiday|arzt)\b/.test(c)) return 'personal';
+      if (/\b(ooo|out of office|leave|urlaub|conges)\b/.test(c)) return 'ooo';
+      return 'work';
+    }
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+    for (const line of unfolded) {
+      const upper = line.trim().toUpperCase();
+      if (upper === 'BEGIN:VEVENT') {
+        inVEvent = true;
+        cur = {};
+        continue;
+      }
+      if (upper === 'END:VEVENT') {
+        if (inVEvent && (cur.dtstart || cur.summary)) {
+          const sDate = parseIcsDate(cur.dtstart);
+          const eDate = parseIcsDate(cur.dtend) || (sDate ? new Date(sDate.getTime() + 3600000) : null);
+          if (sDate) {
+            const isAllDay = cur.dtstart && cur.dtstart.includes('VALUE=DATE') && !cur.dtstart.includes('T');
+            const y = sDate.getFullYear();
+            const m = pad(sDate.getMonth() + 1);
+            const d = pad(sDate.getDate());
+            const dateStr = `${y}-${m}-${d}`;
+
+            const startTime = isAllDay ? '00:00' : `${pad(sDate.getHours())}:${pad(sDate.getMinutes())}`;
+            const endTime = isAllDay ? '23:59' : `${pad(eDate.getHours())}:${pad(eDate.getMinutes())}`;
+            const duration = isAllDay ? 1440 : Math.max(15, Math.round((eDate.getTime() - sDate.getTime()) / 60000));
+            const uid = cur.uid || ('ics-' + Math.random().toString(36).slice(2, 9));
+            const id = 'feed-' + String(uid).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+            const title = cur.summary || 'Calendar Event';
+            const desc = cur.description || '';
+
+            events.push({
+              id,
+              title: title.slice(0, 300),
+              date: dateStr,
+              startTime,
+              endTime,
+              duration,
+              type: inferType(title, desc),
+              description: desc.slice(0, 1000),
+              source: feedName,
+              status: 'pending'
+            });
+          }
+        }
+        inVEvent = false;
+        cur = {};
+        continue;
+      }
+      if (!inVEvent) continue;
+
+      const colonIdx = line.indexOf(':');
+      if (colonIdx === -1) continue;
+      const keyPart = line.slice(0, colonIdx).toUpperCase();
+      const val = line.slice(colonIdx + 1).trim();
+
+      if (keyPart.startsWith('SUMMARY')) cur.summary = val;
+      else if (keyPart.startsWith('DESCRIPTION')) cur.description = val;
+      else if (keyPart.startsWith('UID')) cur.uid = val;
+      else if (keyPart.startsWith('DTSTART')) cur.dtstart = line;
+      else if (keyPart.startsWith('DTEND')) cur.dtend = line;
+    }
+
+    return events;
+  },
+
+  normalizeProposals(raw, existingEvents = []) {
+    let items = [];
+    if (Array.isArray(raw)) {
+      items = raw;
+    } else if (raw && Array.isArray(raw.proposals)) {
+      items = raw.proposals;
+    } else if (raw && typeof raw === 'object') {
+      items = [raw];
+    }
+    if (!items.length) return [];
+
+    const existingIds = new Set();
+    if (Array.isArray(existingEvents)) {
+      existingEvents.forEach(e => {
+        if (e && e.proposalId) existingIds.add(e.proposalId);
+      });
+    }
+
+    const dedupMap = new Map();
+    const VALID_TYPES = new Set(['call', 'sync', 'prep', 'work', 'todo', 'personal', 'ooo', 'custom']);
+
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      const id = String(item.id || '').trim();
+      if (!id || existingIds.has(id)) continue;
+
+      const rawType = String(item.type || 'work').toLowerCase().trim();
+      const type = VALID_TYPES.has(rawType) ? rawType : 'work';
+      const status = (item.status === 'accepted' || item.status === 'rejected') ? item.status : 'pending';
+
+      dedupMap.set(id, {
+        id,
+        title: String(item.title || 'Untitled Proposal').slice(0, 300),
+        date: String(item.date || '').trim(),
+        startTime: String(item.startTime || '').trim(),
+        endTime: String(item.endTime || '').trim(),
+        duration: typeof item.duration === 'number' ? item.duration : (parseInt(item.duration, 10) || 60),
+        type,
+        description: String(item.description || '').slice(0, 1000),
+        source: String(item.source || 'Script').slice(0, 100),
+        status,
+        ...(item.collaborators ? { collaborators: item.collaborators } : {}),
+        ...(item.tags ? { tags: item.tags } : {}),
+        ...(item.workstream ? { workstream: item.workstream } : {})
+      });
+    }
+
+    return Array.from(dedupMap.values());
   }
 };
 
@@ -815,6 +991,12 @@ async function handleWorkerMessage(e) {
         break;
       case 'LIST_NOTES':
         result = await SyncWorkerEngine.listNotes();
+        break;
+      case 'PARSE_CALENDAR_RESULTS':
+        result = await SyncWorkerEngine.parseCalendarResults(payload?.content, payload?.fileType, payload?.options);
+        break;
+      case 'NORMALIZE_PROPOSALS':
+        result = SyncWorkerEngine.normalizeProposals(payload?.proposals, payload?.existingEvents);
         break;
       default:
         throw new Error(`Unknown SyncWorker action: ${action}`);

@@ -95,7 +95,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeFile: (relativePath, content) => ipcRenderer.invoke('fs-write-file', relativePath, content),
   deleteFile: (relativePath) => ipcRenderer.invoke('fs-delete-file', relativePath),
   fileExists: (relativePath) => ipcRenderer.invoke('fs-file-exists', relativePath),
+  listFiles: (subDir) => ipcRenderer.invoke('fs-list-files', subDir),
+  runCalendarSyncScript: (workspacePath) => ipcRenderer.invoke('run-calendar-sync-script', workspacePath),
   notifyThemeChanged: (theme) => ipcRenderer.send('theme-changed', theme),
+  // Windows Taskbar & DWM System Integration
   securePassphrase: {
     isAvailable: () => ipcRenderer.invoke('secure-passphrase-available'),
     save: (passphrase) => ipcRenderer.invoke('secure-passphrase-save', passphrase),
@@ -107,5 +110,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     save: (key, value) => ipcRenderer.invoke('secure-secrets-save', key, value),
     get: (key) => ipcRenderer.invoke('secure-secrets-get', key),
     clear: (key) => ipcRenderer.invoke('secure-secrets-clear', key)
+  },
+  getSystemAccentColor: () => ipcRenderer.invoke('get-system-accent-color'),
+  onSystemAccentColorChanged: (callback) => {
+    const handler = (event, color) => callback(color);
+    ipcRenderer.on('system-accent-color-changed', handler);
+    return () => ipcRenderer.removeListener('system-accent-color-changed', handler);
+  },
+  setProgressBar: (progress, options) => ipcRenderer.send('set-progress-bar', { progress, options }),
+  onAppAction: (callback) => {
+    const handler = (event, action) => callback(action);
+    ipcRenderer.on('app-action', handler);
+    return () => ipcRenderer.removeListener('app-action', handler);
   }
 });

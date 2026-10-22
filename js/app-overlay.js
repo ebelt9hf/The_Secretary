@@ -446,62 +446,109 @@ function flushTagEditorInputs() {
 
 const _savedAssetPaths = new Set();
 
+async function _ensureAssetSaved(relPath, fullDataUrl) {
+  if (!relPath || !fullDataUrl) return false;
+  const decoded = (() => {
+    try { return typeof fullDataUrl === 'string' ? decodeURIComponent(fullDataUrl) : ''; } catch (e) { return fullDataUrl; }
+  })();
+  if (typeof fullDataUrl === 'string' && fullDataUrl.includes('data:image/svg+xml') && (decoded.includes('Image not loaded') || decoded.includes('locked'))) {
+    console.warn('Refusing to save placeholder SVG to asset file:', relPath);
+    return false;
+  }
+  if (_savedAssetPaths.has(relPath)) return true;
+  try {
+    if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
+      await StorageAPI.writeAsset(relPath, fullDataUrl);
+    } else {
+      if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
+        await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
+      }
+      if (typeof writeFile === 'function') {
+        await writeFile(relPath, fullDataUrl);
+      }
+    }
+    _savedAssetPaths.add(relPath);
+    return true;
+  } catch (err) {
+    console.warn('Failed to save image asset:', relPath, err);
+    return false;
+  }
+}
+
 async function processAndExternalizeImages(html) {
   if (!html || typeof html !== 'string') return html;
+  if (!html.includes('data:image/')) return html;
 
-  // First, if any images already have a data-asset-path attribute, restore that asset path directly
-  let updatedHtml = html.replace(/<img\b([^>]*?)\bsrc=["']data:image\/[^"']+["']([^>]*?)\bdata-asset-path=["']([^"']+)["']([^>]*?)>/gi, '<img$1src="$3"$2$4>')
-                        .replace(/<img\b([^>]*?)\bdata-asset-path=["']([^"']+)["']([^>]*?)\bsrc=["']data:image\/[^"']+["']([^>]*?)>/gi, '<img$1src="$2"$3$4>');
-
-  if (!updatedHtml.includes('data:image/')) return updatedHtml;
   try {
-    const dataUrlRegex = /src=["'](data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,([^"']+))["']/gi;
+    let updatedHtml = html;
+    const imgRegex = /<img\b[^>]*\bsrc=["'](data:image\/[^"']+)["'][^>]*>/gi;
     let match;
     const replacements = [];
-    while ((match = dataUrlRegex.exec(updatedHtml)) !== null) {
-      const fullDataUrl = match[1];
-      const mimeSub = match[2].replace('+xml', '');
-      const ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
-      const base64Data = match[3];
-      
-      let hash1 = 0xdeadbeef ^ 2166136261;
-      let hash2 = 0x41c6ce57 ^ 2166136261;
-      for (let i = 0; i < base64Data.length; i++) {
-        const ch = base64Data.charCodeAt(i);
-        hash1 = Math.imul(hash1 ^ ch, 2654435761);
-        hash2 = Math.imul(hash2 ^ ch, 1597334677);
-      }
-      const combinedHash = ((hash1 >>> 0) + (hash2 >>> 0)).toString(16);
-      const assetId = `img_${combinedHash}_${base64Data.length}.${ext}`;
-      const relPath = `notes/_assets/${assetId}`;
 
-      if (!_savedAssetPaths.has(relPath)) {
-        try {
-          if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
-            await StorageAPI.writeAsset(relPath, fullDataUrl);
-          } else {
-            if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset && window.StorageAPI?.getStorageEngine() === 'firebase') {
-              await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
-            }
-            if (typeof writeFile === 'function') {
-              await writeFile(relPath, fullDataUrl);
-            }
+    while ((match = imgRegex.exec(html)) !== null) {
+      const fullTag = match[0];
+      const dataUrl = match[1];
+      const assetPathMatch = fullTag.match(/\bdata-asset-path=["']([^"']+)["']/i);
+      let assetPath = assetPathMatch ? assetPathMatch[1] : null;
+
+      // GUARD: Check if this is a pending or locked placeholder SVG (e.g. from resolveNoteImages)
+      const decodedUrl = (() => {
+        try { return typeof dataUrl === 'string' ? decodeURIComponent(dataUrl) : ''; } catch (e) { return dataUrl; }
+      })();
+      const isPlaceholder = fullTag.includes('data-pending-asset') ||
+        (typeof dataUrl === 'string' && dataUrl.includes('data:image/svg+xml') && (decodedUrl.includes('Image not loaded') || decodedUrl.includes('locked')));
+
+      if (isPlaceholder) {
+        // MUST NEVER overwrite disk/cloud asset with placeholder SVG!
+        // Instead, restore original relative asset path in the src attribute.
+        const pendingPath = fullTag.match(/\bdata-pending-asset=["']([^"']+)["']/i)?.[1] || assetPath;
+        if (pendingPath) {
+          let restoredTag = fullTag
+            .replace(dataUrl, pendingPath)
+            .replace(/\s*data-pending-asset=["'][^"']*["']/gi, '');
+          if (!restoredTag.match(/\bdata-asset-path=/i)) {
+            restoredTag = restoredTag.replace(/<img\b/i, `<img data-asset-path="${pendingPath}"`);
           }
-          _savedAssetPaths.add(relPath);
-        } catch (e) {
-          console.warn('Failed to save image asset:', relPath, e);
+          replacements.push({ fullTag, newTag: restoredTag });
         }
+        continue;
       }
-      if (typeof _assetDataUrlCache !== 'undefined') {
-        _assetDataUrlCache.set(relPath, fullDataUrl);
-        _assetDataUrlCache.set(assetId, fullDataUrl);
-        _assetDataUrlCache.set(relPath.replace(/^notes\//, ''), fullDataUrl);
+
+      if (!assetPath) {
+        const mimeSub = (dataUrl.match(/^data:image\/([a-zA-Z0-9+]+)/)?.[1] || 'png').replace('+xml', '');
+        const ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
+        const commaIdx = dataUrl.indexOf(',');
+        const base64Data = commaIdx !== -1 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+        let hash1 = 0xdeadbeef ^ 2166136261;
+        let hash2 = 0x41c6ce57 ^ 2166136261;
+        for (let i = 0; i < base64Data.length; i++) {
+          const ch = base64Data.charCodeAt(i);
+          hash1 = Math.imul(hash1 ^ ch, 2654435761);
+          hash2 = Math.imul(hash2 ^ ch, 1597334677);
+        }
+        const combinedHash = ((hash1 >>> 0) + (hash2 >>> 0)).toString(16);
+        const assetId = `img_${combinedHash}_${base64Data.length}.${ext}`;
+        assetPath = `notes/_assets/${assetId}`;
       }
-      replacements.push({ fullDataUrl, relPath });
+
+      const saved = await _ensureAssetSaved(assetPath, dataUrl);
+      if (saved) {
+        if (typeof _assetDataUrlCache !== 'undefined') {
+          _assetDataUrlCache.set(assetPath, dataUrl);
+          const fileName = assetPath.split('/').pop();
+          if (fileName) _assetDataUrlCache.set(fileName, dataUrl);
+          _assetDataUrlCache.set(assetPath.replace(/^notes\//, ''), dataUrl);
+        }
+        let newTag = fullTag.replace(dataUrl, assetPath);
+        if (!assetPathMatch) {
+          newTag = newTag.replace(/<img\b/i, `<img data-asset-path="${assetPath}"`);
+        }
+        replacements.push({ fullTag, newTag });
+      }
     }
 
     for (const item of replacements) {
-      updatedHtml = updatedHtml.replaceAll(item.fullDataUrl, item.relPath);
+      updatedHtml = updatedHtml.replaceAll(item.fullTag, item.newTag);
     }
     return updatedHtml;
   } catch (e) {
@@ -524,7 +571,7 @@ function resolveNoteImagesSync(html) {
       const altKey = normalizedPath.startsWith('notes/') ? normalizedPath.slice(6) : `notes/${normalizedPath}`;
       const fileName = normalizedPath.split('/').pop();
       const dataUrl = cache.get(normalizedPath) || cache.get(altKey) || cache.get(fileName) || null;
-      if (dataUrl) {
+      if (dataUrl && !(typeof dataUrl === 'string' && dataUrl.includes('data:image/svg+xml') && (dataUrl.includes('Image not loaded') || dataUrl.includes('locked')))) {
         return `src="${dataUrl}" data-asset-path="${normalizedPath}"`;
       }
       return fullMatch;
@@ -554,12 +601,13 @@ async function resolveNoteImages(html) {
       const dataUrl = (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readAsset === 'function' ? await StorageAPI.readAsset(normalizedPath) : null)
         || (typeof readAssetAsDataUrl === 'function' ? await readAssetAsDataUrl(normalizedPath) : null)
         || cache?.get(normalizedPath) || cache?.get(altKey) || cache?.get(fileName) || null;
-      if (dataUrl) {
+      if (dataUrl && !(typeof dataUrl === 'string' && dataUrl.includes('data:image/svg+xml') && (dataUrl.includes('Image not loaded') || dataUrl.includes('locked')))) {
         resolvedHtml = resolvedHtml.replaceAll(`src="${originalSrc}"`, `src="${dataUrl}" data-asset-path="${normalizedPath}"`);
         resolvedHtml = resolvedHtml.replaceAll(`src='${originalSrc}'`, `src="${dataUrl}" data-asset-path="${normalizedPath}"`);
-      } else if (typeof window !== 'undefined' && !window.AppBridge?.fs?.hasNativeFS() && typeof location !== 'undefined' && location.protocol.startsWith('http')) {
-        // Prevent web browsers (e.g. GitHub Pages) from issuing 404 HTTP requests for missing or locked local assets
-        const placeholderSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150" viewBox="0 0 300 150"><rect width="300" height="150" fill="%231e1b4b" rx="8"/><text x="150" y="75" fill="%23a5b4fc" font-family="sans-serif" font-size="13" text-anchor="middle" dominant-baseline="middle">🖼️ [Image not loaded or locked]</text></svg>`;
+      } else {
+        // Prevent web browsers and desktop environments from issuing 404 HTTP requests for missing or locked local assets
+        const rawSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150" viewBox="0 0 300 150"><rect width="300" height="150" fill="%231e1b4b" rx="8"/><text x="150" y="75" fill="%23a5b4fc" font-family="sans-serif" font-size="13" text-anchor="middle" dominant-baseline="middle">🖼️ [Image not loaded or locked]</text></svg>`;
+        const placeholderSvg = `data:image/svg+xml;utf8,${encodeURIComponent(rawSvg)}`;
         resolvedHtml = resolvedHtml.replaceAll(`src="${originalSrc}"`, `src="${placeholderSvg}" data-asset-path="${normalizedPath}" data-pending-asset="${normalizedPath}"`);
         resolvedHtml = resolvedHtml.replaceAll(`src='${originalSrc}'`, `src="${placeholderSvg}" data-asset-path="${normalizedPath}" data-pending-asset="${normalizedPath}"`);
       }
@@ -1133,13 +1181,15 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
   const editArea = document.getElementById('edit-textarea');
   if (editArea) {
     let cleanHTML = currentNote.mainHTML || getDefaultNoteTemplateHTML();
+    if (typeof resolveNoteImages === 'function') {
+      cleanHTML = await resolveNoteImages(cleanHTML);
+    }
     if (typeof window.cleanHtmlBeforeSave === 'function') {
       cleanHTML = window.cleanHtmlBeforeSave(cleanHTML);
     }
     if (!cleanHTML || cleanHTML.trim() === '<p><br></p>' || cleanHTML.trim() === '<p></p>') {
       cleanHTML = getDefaultNoteTemplateHTML();
     }
-    cleanHTML = await resolveNoteImages(cleanHTML);
     editArea.innerHTML = cleanHTML;
     if (typeof renderLatexInElement === 'function') renderLatexInElement(editArea);
   }
@@ -3037,10 +3087,12 @@ async function reloadNoteFromDisk() {
     const ta = document.getElementById('edit-textarea');
     if (ta) {
       let cleanHTML = parsed.mainHTML || '<p><br></p>';
+      if (typeof resolveNoteImages === 'function') {
+        cleanHTML = await resolveNoteImages(cleanHTML);
+      }
       if (typeof window.cleanHtmlBeforeSave === 'function') {
         cleanHTML = window.cleanHtmlBeforeSave(cleanHTML);
       }
-      cleanHTML = await resolveNoteImages(cleanHTML);
       ta.innerHTML = cleanHTML;
       if (typeof renderLatexInElement === 'function') renderLatexInElement(ta);
     }

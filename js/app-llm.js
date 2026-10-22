@@ -553,14 +553,16 @@ const LLMService = {
       console.warn('Could not persist LLM trace to localStorage', err);
     }
 
-    // Persist full trace files under raw/ for later troubleshooting.
-    if (typeof rootHandle === 'undefined' || !rootHandle || typeof writeFile !== 'function') return;
-
+    // Persist full trace files under raw/ for later troubleshooting via StorageAPI
     try {
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       const noteStem = String(trace?.noteId || trace?.noteTitle || 'note').replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 40) || 'note';
       const fileName = `raw/llm-traces/${ts}-${noteStem}.json`;
-      await writeFile(fileName, JSON.stringify(trace, null, 2));
+      if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeDocEntity === 'function') {
+        await StorageAPI.writeDocEntity('llm_traces', `${ts}-${noteStem}`, fileName, trace);
+      } else if (typeof writeFile === 'function') {
+        await writeFile(fileName, JSON.stringify(trace, null, 2));
+      }
     } catch (err) {
       console.warn('Could not persist LLM trace file', err);
     }
@@ -7843,6 +7845,12 @@ async function getMajorTopicMemory(majorTopic, options = {}) {
   }
 
   const filePath = `raw/topic-memories/${sanitized}.json`;
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readDocEntity === 'function') {
+    try {
+      const doc = await StorageAPI.readDocEntity('topic_memories', sanitized, filePath, null);
+      if (doc) return doc;
+    } catch (_e) {}
+  }
   try {
     if (typeof readFile === 'function') {
       const content = await readFile(filePath);
@@ -7884,11 +7892,17 @@ async function saveMajorTopicMemory(majorTopic, data, options = {}) {
     localStorage.setItem(`secretary_topic_memory_${sanitized}`, JSON.stringify(payload));
   } catch (_e) {}
 
-  try {
-    if (typeof writeFile === 'function') {
-      await writeFile(filePath, JSON.stringify(payload, null, 2));
-    }
-  } catch (_e) {}
+  if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeDocEntity === 'function') {
+    try {
+      await StorageAPI.writeDocEntity('topic_memories', sanitized, filePath, payload);
+    } catch (_e) {}
+  } else {
+    try {
+      if (typeof writeFile === 'function') {
+        await writeFile(filePath, JSON.stringify(payload, null, 2));
+      }
+    } catch (_e) {}
+  }
 
   return payload;
 }

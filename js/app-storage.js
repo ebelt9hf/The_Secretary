@@ -27,6 +27,193 @@ const StorageAPI = {
     }
   },
 
+  // ── Connector Status & Error Classification ──
+  _connectorStatus: {
+    status: 'synced', // 'synced' | 'syncing' | 'error' | 'offline'
+    error: null,      // null | { type: 'permission'|'auth'|'quota'|'network'|'disk', message: string, engine: string, raw: Error }
+    lastSyncTime: Date.now()
+  },
+
+  getConnectorStatus() {
+    const engine = this.getStorageEngine();
+    if (engine === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.getStatus) {
+      const fbStatus = window.FirebaseSyncService.getStatus();
+      if (this._connectorStatus.status === 'error' && this._connectorStatus.error?.engine === 'firebase') {
+        return { ...fbStatus, status: 'error', error: this._connectorStatus.error };
+      }
+      return fbStatus;
+    }
+    return {
+      engine: 'filesystem',
+      status: this._connectorStatus.status,
+      error: this._connectorStatus.error,
+      lastSyncTime: this._connectorStatus.lastSyncTime
+    };
+  },
+
+  setConnectorStatus(status, error = null) {
+    this._connectorStatus.status = status;
+    this._connectorStatus.error = error;
+    if (status === 'synced') {
+      this._connectorStatus.lastSyncTime = Date.now();
+    }
+    if (typeof window !== 'undefined' && typeof window.updateCloudSyncUI === 'function') {
+      window.updateCloudSyncUI(this.getConnectorStatus());
+    }
+  },
+
+  classifyConnectorError(err) {
+    if (!err) return { type: 'disk', message: 'Unknown error', engine: this.getStorageEngine() };
+    const name = String(err.name || '').toLowerCase();
+    const msg = String(err.message || err || '');
+    const lower = msg.toLowerCase();
+    const engine = this.getStorageEngine();
+
+    // 1. Disk Permission Issues (File System Access API permission denied/revoked/expired)
+    if (name === 'notallowederror' || name === 'securityerror' || lower.includes('permission') || lower.includes('not allowed') || lower.includes('denied') || lower.includes('user activation') || lower.includes('re-select')) {
+      return { type: 'permission', message: msg || 'Folder access permission denied or expired', engine, raw: err };
+    }
+
+    // 2. Authentication / Vault Issues (Firebase auth, token expired, vault locked)
+    if (name === 'autherror' || lower.includes('auth') || lower.includes('unauthorized') || lower.includes('token') || lower.includes('passphrase') || lower.includes('vault is locked') || lower.includes('permission-denied')) {
+      return { type: 'auth', message: msg || 'Authentication expired or vault locked', engine, raw: err };
+    }
+
+    // 3. Quota / Storage Full Issues
+    if (name === 'quotaexceedederror' || lower.includes('quota') || lower.includes('enospc') || lower.includes('full') || lower.includes('disk full') || lower.includes('out of space')) {
+      return { type: 'quota', message: msg || 'Storage quota exceeded or disk is full', engine, raw: err };
+    }
+
+    // 4. Network Issues
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (isOffline || name === 'networkerror' || lower.includes('network') || lower.includes('offline') || lower.includes('failed to fetch') || lower.includes('econnrefused') || lower.includes('enotfound')) {
+      return { type: 'network', message: msg || 'Network connection unavailable', engine, raw: err };
+    }
+
+    // 5. General disk/filesystem write error
+    return { type: 'disk', message: msg || 'Storage write failed', engine, raw: err };
+  },
+
+  notifyCriticalLocalFailure(err, entity, id) {
+    console.error(`[StorageAPI] CRITICAL: Tier 1 Local Storage (RAM/IndexedDB) failed for ${entity}:${id}!`, err);
+    if (typeof window !== 'undefined') {
+      const msg = typeof t === 'function'
+        ? t('sync.criticalLocalStorageError')
+        : 'CRITICAL STORAGE ERROR: Browser local storage (IndexedDB) failed. Your changes cannot be preserved locally and will be lost!';
+      if (typeof window.toast === 'function') {
+        window.toast(msg, 12000, 'error');
+      } else if (typeof alert === 'function') {
+        alert(msg);
+      }
+    }
+  },
+
+  notifyConnectorError(errorInfo) {
+    if (!errorInfo) return;
+    const type = errorInfo.type || 'disk';
+    let userMsg = '';
+    if (type === 'permission') {
+      userMsg = typeof t === 'function' ? t('sync.errorPermissionDenied') : 'Disk Permission Issue: Folder access was denied or expired. Click the sync icon to re-grant permission.';
+    } else if (type === 'auth') {
+      userMsg = typeof t === 'function' ? t('sync.errorAuthExpired') : 'Authentication Issue: Cloud session expired or vault is locked. Click the sync icon to authenticate.';
+    } else if (type === 'quota') {
+      userMsg = typeof t === 'function' ? t('sync.errorQuotaExceeded') : 'Storage Quota Exceeded: Your disk or cloud storage is full.';
+    } else if (type === 'network') {
+      userMsg = typeof t === 'function' ? t('sync.errorNetworkOffline') : 'Network Offline: Changes are safely stored locally in IndexedDB and will sync when online.';
+    } else {
+      userMsg = typeof t === 'function' ? t('sync.errorConnectorGeneric') : 'Storage Connector Error: Failed to write changes to storage connector. Changes remain safe in local IndexedDB.';
+    }
+
+    if (typeof window !== 'undefined' && typeof window.toast === 'function') {
+      window.toast(userMsg, 8000, type === 'network' ? 'info' : 'error');
+    }
+  },
+
+  // ── Tier 1 (RAM & IndexedDB) Persistence ──
+  async _persistNoteTier1(cleanId, path, content, meta = {}) {
+    // 1. RAM Cache (0ms)
+    this._noteCache.set(path, content);
+    if (cleanId) this._noteCache.set(`notes/${cleanId}.html`, content);
+
+    // 2. IndexedDB Persistent Store
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb && typeof idb.putNote === 'function') {
+      try {
+        await idb.putNote(cleanId, {
+          id: cleanId,
+          path,
+          content,
+          title: meta.title || '',
+          date: meta.date || '',
+          tags: meta.tags || [],
+          workstream: meta.workstream || '',
+          pinned: !!meta.pinned,
+          archived: !!meta.archived,
+          favorite: !!meta.favorite,
+          updatedAt: Date.now()
+        });
+      } catch (idbErr) {
+        this.notifyCriticalLocalFailure(idbErr, 'note', cleanId);
+        throw idbErr;
+      }
+    }
+  },
+
+  async _persistAssetTier1(relPath, fullDataUrl) {
+    if (typeof fullDataUrl === 'string' && fullDataUrl.includes('data:image/svg+xml') && (fullDataUrl.includes('Image not loaded') || fullDataUrl.includes('locked'))) {
+      return;
+    }
+    const clean = String(relPath).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^(_assets|assets)\//, '');
+    const fileName = clean.split('/').pop() || clean;
+
+    // 1. RAM Cache
+    const ramCache = (typeof _assetDataUrlCache !== 'undefined' ? _assetDataUrlCache : null) || (typeof window !== 'undefined' ? window._assetDataUrlCache : null);
+    if (ramCache && typeof ramCache.set === 'function') {
+      ramCache.set(relPath, fullDataUrl);
+      ramCache.set(fileName, fullDataUrl);
+      ramCache.set(`notes/_assets/${fileName}`, fullDataUrl);
+      ramCache.set(`_assets/${fileName}`, fullDataUrl);
+    }
+
+    // 2. IndexedDB Persistent Store
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb && typeof idb.putRecord === 'function') {
+      try {
+        await idb.putRecord('assets', {
+          id: fileName,
+          data: String(fullDataUrl),
+          updatedAt: Date.now()
+        });
+        await idb.putRecord('assets', {
+          id: `notes/_assets/${fileName}`,
+          data: String(fullDataUrl),
+          updatedAt: Date.now()
+        });
+      } catch (idbErr) {
+        this.notifyCriticalLocalFailure(idbErr, 'asset', fileName);
+        throw idbErr;
+      }
+    }
+  },
+
+  async _persistDocTier1(kind, id, payload) {
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb && typeof idb.putRecord === 'function') {
+      try {
+        await idb.putRecord('docs', {
+          id: `${kind}:${id}`,
+          kind,
+          docId: id,
+          data: payload,
+          updatedAt: Date.now()
+        });
+      } catch (idbErr) {
+        this.notifyCriticalLocalFailure(idbErr, kind, id);
+        throw idbErr;
+      }
+    }
+  },
+
   // ── Generic JSON Storage Helpers ──
   async _readJSON(filePath, fallback = null) {
     try {
@@ -128,22 +315,67 @@ const StorageAPI = {
 
   // ── Generic Document Entity Helpers ──
   async readDocEntity(docKind, docId, localFile, fallback = null) {
+    // 1. Check IndexedDB Persistent Layer (fast local)
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    let idbResult = null;
+    if (idb && typeof idb.getRecord === 'function') {
+      try {
+        const found = await idb.getRecord('docs', `${docKind}:${docId}`) || await idb.getRecord('docs', docId);
+        if (found && found.data !== undefined) {
+          idbResult = found.data;
+        }
+      } catch (e) {}
+    }
+
+    // 2. Check active connector
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
       const doc = await window.FirebaseSyncService.getDoc(docKind, docId);
-      return doc !== null && doc !== undefined ? doc : fallback;
+      if (doc !== null && doc !== undefined) {
+        if (idb && typeof idb.putRecord === 'function') {
+          idb.putRecord('docs', { id: `${docKind}:${docId}`, kind: docKind, docId, data: doc, updatedAt: Date.now() }).catch(() => {});
+        }
+        return doc;
+      }
+      return idbResult !== null ? idbResult : fallback;
     }
-    return await this._readJSON(localFile, fallback);
+
+    const localRes = await this._readJSON(localFile, null);
+    if (localRes !== null && localRes !== undefined) {
+      if (idb && typeof idb.putRecord === 'function') {
+        idb.putRecord('docs', { id: `${docKind}:${docId}`, kind: docKind, docId, data: localRes, updatedAt: Date.now() }).catch(() => {});
+      }
+      return localRes;
+    }
+
+    return idbResult !== null ? idbResult : fallback;
   },
 
   async writeDocEntity(docKind, docId, localFile, payload) {
-    if (this.getStorageEngine() !== 'firebase') {
-      try {
-        await this._writeJSON(localFile, payload);
-      } catch (_e) {}
+    // 1. Write to Tier 1 (IndexedDB) immediately
+    await this._persistDocTier1(docKind, docId, payload);
+
+    // 2. Dispatch to Asynchronous Connector
+    try {
+      this.setConnectorStatus('syncing');
+
+      if (this.getStorageEngine() !== 'firebase') {
+        try {
+          await this._writeJSON(localFile, payload);
+        } catch (localErr) {
+          console.warn('StorageAPI writeDocEntity local filesystem write warning:', localFile, localErr);
+        }
+      } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+        await window.FirebaseSyncService.putDoc(docKind, docId, payload);
+      }
+
+      this.setConnectorStatus('synced');
+    } catch (e) {
+      const errorInfo = this.classifyConnectorError(e);
+      this.setConnectorStatus('error', errorInfo);
+      this.notifyConnectorError(errorInfo);
+      throw e;
     }
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc(docKind, docId, payload);
-    }
+
     this.emit('storage:change', { entity: 'docs', kind: docKind, id: docId, action: 'save' });
   },
 
@@ -184,24 +416,31 @@ const StorageAPI = {
 
   // ── Planner Proposals (External Agent Proposed Events & Subscribed Feeds) ──
   async readPlannerProposals() {
+    // 1. Check local file on disk first so external agents running on computer are detected immediately
     try {
       const local = await this._readJSON('planner-proposals.json', null);
-      if (local && typeof local === 'object') return local;
-      if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-        return await window.FirebaseSyncService.getDoc('planner', 'proposals');
+      if (local && typeof local === 'object') {
+        await this._persistDocTier1('planner', 'proposals', local).catch(() => {});
+        return local;
       }
-      return local;
-    } catch {
-      return null;
-    }
+    } catch {}
+
+    // 2. Route through 2-tier async doc entity (Firebase vault or Tier 1 IndexedDB)
+    return await this.readDocEntity('planner', 'proposals', 'planner-proposals.json', null);
   },
 
   async writePlannerProposals(proposalsData) {
+    // 1. Persist to Tier 1 IndexedDB immediately
+    await this._persistDocTier1('planner', 'proposals', proposalsData);
+
+    // 2. Always write to local planner-proposals.json on disk if available (for external agents & scripts)
     try {
       await this._writeJSON('planner-proposals.json', proposalsData);
     } catch (e) {
       // Expected in pure web mode when no local folder handle is loaded
     }
+
+    // 3. If in Firebase mode, sync to encrypted cloud vault
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
       try {
         await window.FirebaseSyncService.putDoc('planner', 'proposals', proposalsData);
@@ -209,14 +448,12 @@ const StorageAPI = {
         console.warn('Firebase putDoc for proposals failed:', e);
       }
     }
+
+    this.emit('storage:change', { entity: 'docs', kind: 'planner', id: 'proposals', action: 'save' });
   },
 
   async hasPlannerProposals() {
-    try {
-      return await fileExists('planner-proposals.json');
-    } catch {
-      return false;
-    }
+    return await this.hasDocEntity('planner', 'proposals', 'planner-proposals.json');
   },
 
   // ── Colleagues ──
@@ -396,41 +633,72 @@ const StorageAPI = {
 
   async readNoteContent(path) {
     if (!path) return '';
+
+    // 1. Check RAM Cache (0ms)
     if (this._noteCache.has(path)) {
       return this._noteCache.get(path);
     }
 
+    const cleanId = path.replace(/^notes\//, '').replace(/\.html$/, '');
+
+    // 2. Check IndexedDB Persistent Layer (fast local)
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb && typeof idb.getNote === 'function') {
+      try {
+        const rec = await idb.getNote(cleanId) || await idb.getNote(path);
+        if (rec && rec.content) {
+          this._noteCache.set(path, rec.content);
+          return rec.content;
+        }
+      } catch (e) {}
+    }
+
+    // 3. Check Connector
     if (this.getStorageEngine() === 'firebase') {
       if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
         const noteId = window.FirebaseSyncService._normalizeId
           ? window.FirebaseSyncService._normalizeId(path)
-          : path.replace(/^notes\//, '').replace(/\.html$/, '');
+          : cleanId;
         const firebaseNote = await window.FirebaseSyncService.getNote(noteId);
         if (firebaseNote) {
           const content = firebaseNote.contentHtml || firebaseNote.html || '';
           this._noteCache.set(path, content);
+          if (idb && typeof idb.putNote === 'function') {
+            idb.putNote(cleanId, { id: cleanId, path, content, ...firebaseNote }).catch(() => {});
+          }
           return content;
         }
       }
-      // Fallback: check local filesystem / backup if note not found in cloud vault
       try {
         const content = await readFile(path);
         if (content && typeof content === 'string') {
           this._noteCache.set(path, content);
+          if (idb && typeof idb.putNote === 'function') {
+            idb.putNote(cleanId, { id: cleanId, path, content }).catch(() => {});
+          }
           return content;
         }
       } catch (e) {}
       return '';
     }
 
-    // Local filesystem mode
+    // Local filesystem connector
     try {
       const content = await readFile(path);
       if (content && typeof content === 'string') {
         this._noteCache.set(path, content);
+        if (idb && typeof idb.putNote === 'function') {
+          idb.putNote(cleanId, { id: cleanId, path, content }).catch(() => {});
+        }
         return content;
       }
-    } catch (e) {}
+    } catch (e) {
+      if (e?.name === 'NotAllowedError') {
+        const errInfo = this.classifyConnectorError(e);
+        this.setConnectorStatus('error', errInfo);
+        this.notifyConnectorError(errInfo);
+      }
+    }
 
     const err = new Error(`File not found: ${path}`);
     err.name = 'NotFoundError';
@@ -438,46 +706,52 @@ const StorageAPI = {
   },
 
   async writeNoteContent(path, content, meta = {}) {
-    // 1. Write to local filesystem only if in filesystem mode
-    if (this.getStorageEngine() !== 'firebase') {
-      try {
+    const cleanId = meta.id || path.replace(/^notes\//, '').replace(/\.html$/, '');
+
+    // 1. Write to Tier 1 (RAM & IndexedDB) immediately
+    await this._persistNoteTier1(cleanId, path, content, meta);
+
+    // 2. Dispatch to Asynchronous Connector
+    try {
+      this.setConnectorStatus('syncing');
+
+      if (this.getStorageEngine() !== 'firebase') {
         await writeFile(path, content);
-      } catch (e) {
-        throw e;
+      } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+        const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
+        let resolvedTitle = meta.title;
+        if (isDummy(resolvedTitle, cleanId) && content && typeof parseNoteHTML === 'function') {
+          try {
+            const parsed = parseNoteHTML(content);
+            if (parsed.title && !isDummy(parsed.title, cleanId)) {
+              resolvedTitle = parsed.title;
+            }
+          } catch (e) {}
+        }
+        await window.FirebaseSyncService.queueSyncNote({
+          id: cleanId,
+          path,
+          contentHtml: content,
+          title: resolvedTitle || meta.title || cleanId,
+          date: meta.date,
+          tags: meta.tags,
+          workstream: meta.workstream,
+          pinned: meta.pinned,
+          archived: meta.archived,
+          favorite: meta.favorite,
+          updatedAt: Date.now()
+        });
       }
+
+      this.setConnectorStatus('synced');
+    } catch (e) {
+      const errorInfo = this.classifyConnectorError(e);
+      this.setConnectorStatus('error', errorInfo);
+      this.notifyConnectorError(errorInfo);
+      throw e;
     }
 
-    if (path) {
-      this._noteCache.set(path, content);
-    }
-
-    // 2. Sync to Firebase local cache & cloud if unlocked
-    if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const noteId = meta.id || path.replace(/^notes\//, '').replace(/\.html$/, '');
-      const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
-      let resolvedTitle = meta.title;
-      if (isDummy(resolvedTitle, noteId) && content && typeof parseNoteHTML === 'function') {
-        try {
-          const parsed = parseNoteHTML(content);
-          if (parsed.title && !isDummy(parsed.title, noteId)) {
-            resolvedTitle = parsed.title;
-          }
-        } catch (e) {}
-      }
-      await window.FirebaseSyncService.queueSyncNote({
-        id: noteId,
-        path,
-        contentHtml: content,
-        title: resolvedTitle || meta.title || noteId,
-        date: meta.date,
-        tags: meta.tags,
-        workstream: meta.workstream,
-        pinned: meta.pinned,
-        archived: meta.archived,
-        favorite: meta.favorite,
-        updatedAt: Date.now()
-      });
-    }
+    this.emit('storage:change', { entity: 'notes', id: cleanId, path, action: 'save' });
   },
 
   async deleteNoteContent(path) {
@@ -1072,24 +1346,87 @@ const StorageAPI = {
 
   // ── Asset Management ──
   async writeAsset(relPath, fullDataUrl) {
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset) {
-      await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
+    if (typeof fullDataUrl === 'string' && fullDataUrl.includes('data:image/svg+xml') && (fullDataUrl.includes('Image not loaded') || fullDataUrl.includes('locked'))) {
+      console.warn('[StorageAPI] Refusing to persist placeholder SVG as real asset:', relPath);
+      return;
     }
-    await writeFile(relPath, fullDataUrl);
+    // 1. Write to Tier 1 (RAM & IndexedDB) immediately
+    await this._persistAssetTier1(relPath, fullDataUrl);
+
+    // 2. Dispatch to Asynchronous Connector
+    try {
+      this.setConnectorStatus('syncing');
+
+      if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset) {
+        await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
+      }
+      await writeFile(relPath, fullDataUrl);
+
+      this.setConnectorStatus('synced');
+    } catch (e) {
+      const errorInfo = this.classifyConnectorError(e);
+      this.setConnectorStatus('error', errorInfo);
+      this.notifyConnectorError(errorInfo);
+      throw e;
+    }
+
     this.emit('storage:change', { entity: 'assets', id: relPath, action: 'save' });
   },
 
   async readAsset(relPath) {
+    if (!relPath) return null;
+    const clean = String(relPath).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^(_assets|assets)\//, '');
+    const fileName = clean.split('/').pop() || clean;
+
+    // 1. RAM Cache (0ms)
+    const ramCache = (typeof _assetDataUrlCache !== 'undefined' ? _assetDataUrlCache : null) || (typeof window !== 'undefined' ? window._assetDataUrlCache : null);
+    if (ramCache && typeof ramCache.get === 'function') {
+      const fromRam = ramCache.get(relPath) || ramCache.get(fileName) || ramCache.get(`notes/_assets/${fileName}`) || ramCache.get(`_assets/${fileName}`);
+      if (fromRam && !(typeof fromRam === 'string' && fromRam.includes('data:image/svg+xml') && (fromRam.includes('Image not loaded') || fromRam.includes('locked')))) {
+        return fromRam;
+      }
+    }
+
+    // 2. IndexedDB (fast local persistence)
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb && typeof idb.getRecord === 'function') {
+      try {
+        const found = await idb.getRecord('assets', fileName) || await idb.getRecord('assets', `notes/_assets/${fileName}`) || await idb.getRecord('assets', relPath);
+        if (found && (found.data || found.content)) {
+          const val = found.data || found.content;
+          if (val && !(typeof val === 'string' && val.includes('data:image/svg+xml') && (val.includes('Image not loaded') || val.includes('locked')))) {
+            if (ramCache && typeof ramCache.set === 'function') {
+              ramCache.set(relPath, val);
+              ramCache.set(fileName, val);
+            }
+            return val;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 3. Active Connector (Firebase or Filesystem)
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.getAsset) {
-      const fileName = relPath.split('/').pop();
       const asset = await window.FirebaseSyncService.getAsset(fileName) || await window.FirebaseSyncService.getAsset(relPath);
-      if (asset) return asset;
+      if (asset) {
+        if (idb && typeof idb.putRecord === 'function') {
+          idb.putRecord('assets', { id: fileName, data: String(asset), updatedAt: Date.now() }).catch(() => {});
+        }
+        return asset;
+      }
     }
     if (typeof readAssetAsDataUrl === 'function') {
-      return await readAssetAsDataUrl(relPath);
+      const fromFs = await readAssetAsDataUrl(relPath);
+      if (fromFs) {
+        if (idb && typeof idb.putRecord === 'function') {
+          idb.putRecord('assets', { id: fileName, data: String(fromFs), updatedAt: Date.now() }).catch(() => {});
+        }
+        return fromFs;
+      }
     }
     if (window.AppBridge?.fs?.readAsset) {
-      return await window.AppBridge.fs.readAsset(relPath);
+      const fromBridge = await window.AppBridge.fs.readAsset(relPath);
+      if (fromBridge) return fromBridge;
     }
     return null;
   },
