@@ -47,11 +47,32 @@ Secretary supports **15 European languages**: English (`en`), Deutsch (`de`), Fr
 
 ## 4. Unit Testing & Test-Driven Bug Fixing Guidelines
 
-- **Unit Test Coverage**: All new features, parameter schemas, and core engine methods MUST be covered with unit tests under `tests/unit/`.
-- **Test-Driven Bug Fixing**: Whenever addressing a bug, regression, or edge case:
+- **Coverage Mandate**: All new features, parameter schemas, and core engine methods MUST be covered with unit tests under `tests/unit/`.
+- **Test-Driven Bug Fixing Workflow**: Whenever addressing a bug, regression, or edge case:
   1. **Design a Reproducing Unit Test**: Create or update a unit test in `tests/unit/` that specifically reproduces the bug and catches the failure.
   2. **Verify Failure**: Run `npm test` to confirm the new unit test fails as expected.
   3. **Fix the Bug**: Update the codebase logic until all tests pass cleanly.
+  4. **Perform 4-Point Audit**: Verify the test meets the quality and isolation criteria below.
+
+- **Mandatory 4-Point Unit Test Review & Audit Checklist**:
+  Every unit test (new or existing) must be verified and documented against these four core principles:
+  1. **Protected Behavior**:
+     - *Question*: What specific invariant, contract, or behavior does this test protect?
+     - *Standard*: State the exact functional behavior and condition being asserted. Test titles (`it(...)` / `test(...)`) must explicitly describe the expected outcome and condition (avoid vague titles like `"works"` or `"handles errors"`).
+  2. **Regression Target**:
+     - *Question*: What exact code failure or regression would cause this test to fail?
+     - *Standard*: Assertions must be tight and specific (`toBe()`, `toEqual()`, `toHaveBeenCalledWith()`, or specific error messages) rather than loose truthiness checks (`toBeTruthy()`).
+  3. **Coverage Overlap & Redundancy**:
+     - *Question*: Is this failure mode already covered by an existing test?
+     - *Standard*: Avoid duplicate tests exercising identical execution branches. Multi-layer tests are only permitted when intentionally validating architectural boundaries (e.g. UI-layer sanitization vs. storage-layer defense-in-depth, or main thread vs. Web Worker thread execution).
+  4. **Production Code Footprint**:
+     - *Question*: Does this test require production code that exists only to support testing?
+     - *Standard*: Production code must **NEVER** contain helper functions, test flags, dummy properties, or bypasses introduced solely to accommodate tests. Tests must exercise authentic production contracts and public module interfaces. Use Vitest mocks/spies (`vi.spyOn`, `vi.fn`) or test fixtures under `tests/helpers/` for test isolation.
+
+- **Test Hygiene & Isolation Rules**:
+  - Always clean up in `beforeEach` / `afterEach` by resetting shared state, clearing caches, and restoring mocks (`vi.restoreAllMocks()`).
+  - Never allow tests to mutate shared globals without guaranteed restoration in `afterEach`.
+  - Never perform unmocked network or native filesystem calls in unit tests.
 
 ---
 
