@@ -41,6 +41,12 @@ describe('Note Image Retention, Externalization & CSP Safeguards', () => {
     globalThis.fetch = origFetch;
   });
 
+  /**
+   * 1. Protected Behavior: Confirms HTML CSP <meta> tags allow data: and blob: in connect-src.
+   * 2. Regression Target: Accidental removal of data: or blob:, causing browser to block local fetch/streaming.
+   * 3. Coverage Overlap / Redundancy: None; other CSP tests verify frame/script-src, not connect-src data/blob.
+   * 4. Production Code Footprint: None; inspects production HTML <meta> tags.
+   */
   it('connect-src in app.html, note-window.html, and secretary-window.html whitelists data: and blob:', () => {
     const htmlFiles = ['app.html', 'note-window.html', 'secretary-window.html'];
     for (const file of htmlFiles) {
@@ -54,6 +60,12 @@ describe('Note Image Retention, Externalization & CSP Safeguards', () => {
     }
   });
 
+  /**
+   * 1. Protected Behavior: Ensures _writeFileDirect uses atob/Uint8Array instead of fetch() to avoid CSP errors.
+   * 2. Regression Target: Reverting to fetch('data:...') which throws TypeError under restrictive CSP.
+   * 3. Coverage Overlap / Redundancy: None; only test validating CSP-safe binary conversion in filesystem layer.
+   * 4. Production Code Footprint: None; validates production _writeFileDirect method.
+   */
   it('_writeFileDirect converts data URLs to Blobs without calling fetch (CSP safe)', async () => {
     // Simulate browser CSP blocking fetch('data:...')
     globalThis.fetch = vi.fn().mockImplementation((url) => {
@@ -96,6 +108,12 @@ describe('Note Image Retention, Externalization & CSP Safeguards', () => {
     expect(streamClosed).toBe(true);
   });
 
+  /**
+   * 1. Protected Behavior: Ensures duplicate/restored images with data-asset-path are still written to disk.
+   * 2. Regression Target: Skipping writeAsset when data-asset-path exists, causing orphaned image links.
+   * 3. Coverage Overlap / Redundancy: None; app-notes-image-paste tests initial paste without pre-existing path.
+   * 4. Production Code Footprint: None; exercises production processAndExternalizeImages.
+   */
   it('processAndExternalizeImages ensures assets with existing data-asset-path are written to StorageAPI', async () => {
     const writtenAssets = [];
     StorageAPI.writeAsset = vi.fn(async (relPath, dataUrl) => {
@@ -116,6 +134,12 @@ describe('Note Image Retention, Externalization & CSP Safeguards', () => {
     expect(resultHtml).not.toContain(sampleBase64);
   });
 
+  /**
+   * 1. Protected Behavior: Zero data-loss guarantee; retains inline base64 in HTML if storage write fails.
+   * 2. Regression Target: Swallowing writeAsset failure and stripping base64 data, causing permanent image loss.
+   * 3. Coverage Overlap / Redundancy: None; unique failure resilience test for image externalization.
+   * 4. Production Code Footprint: None.
+   */
   it('processAndExternalizeImages retains inline data URL if storage write fails, preventing data loss', async () => {
     // Simulate storage failure (disk full or write error)
     StorageAPI.writeAsset = vi.fn(async () => {
@@ -131,6 +155,12 @@ describe('Note Image Retention, Externalization & CSP Safeguards', () => {
     expect(resultHtml).toContain(sampleBase64);
   });
 
+  /**
+   * 1. Protected Behavior: Prevents browser 404 network requests by injecting SVG placeholder for missing assets.
+   * 2. Regression Target: Leaving raw missing asset path in src, which triggers browser HTTP 404 error.
+   * 3. Coverage Overlap / Redundancy: None; only test verifying missing image placeholder resolution.
+   * 4. Production Code Footprint: None.
+   */
   it('resolveNoteImages uses placeholder SVG when asset is missing to prevent 404 HTTP requests', async () => {
     StorageAPI.readAsset = vi.fn(async () => null);
     globalThis.readAssetAsDataUrl = vi.fn(async () => null);
@@ -146,6 +176,12 @@ describe('Note Image Retention, Externalization & CSP Safeguards', () => {
     expect(resolvedHtml).toContain(`data-pending-asset="${assetPath}"`);
   });
 
+  /**
+   * 1. Protected Behavior: Prevents overwriting real disk assets with placeholder SVG when saving a note.
+   * 2. Regression Target: Overwriting valid disk assets with placeholder SVG or saving placeholder into note HTML.
+   * 3. Coverage Overlap / Redundancy: None; critical anti-corruption protection for notes containing unloaded images.
+   * 4. Production Code Footprint: None.
+   */
   it('processAndExternalizeImages NEVER overwrites disk asset with placeholder SVG and restores asset path in HTML', async () => {
     const writtenAssets = [];
     StorageAPI.writeAsset = vi.fn(async (relPath, dataUrl) => {
@@ -170,6 +206,12 @@ describe('Note Image Retention, Externalization & CSP Safeguards', () => {
     expect(savedHtml).not.toContain('data-pending-asset');
   });
 
+  /**
+   * 1. Protected Behavior: Defense-in-depth storage guard; StorageAPI.writeAsset rejects placeholder SVGs.
+   * 2. Regression Target: Regression in StorageAPI.writeAsset allowing placeholder SVG writes to corrupt disk/IDB.
+   * 3. Coverage Overlap / Redundancy: Intentional defense-in-depth at storage API layer complementing editor layer.
+   * 4. Production Code Footprint: None.
+   */
   it('StorageAPI.writeAsset refuses to write placeholder SVGs to disk or IndexedDB', async () => {
     const putRecordSpy = vi.spyOn(VaultIDBStorage, 'putRecord');
     const realAssetPath = 'notes/_assets/my-diagram.png';
