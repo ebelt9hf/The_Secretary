@@ -773,6 +773,7 @@ Generate the complete structured JSON memory dossier for this Workstream with sc
 
     const appVersion = p.version || (typeof getSecretaryVersion === 'function' ? getSecretaryVersion() : '') || (typeof document !== 'undefined' && document.getElementById('connect-version-hint')?.getAttribute('data-version')) || '';
     const versionHeader = appVersion ? ` (Secretary v${appVersion})` : '';
+    const userLocalTz = p.timezone || (typeof Intl !== 'undefined' && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC');
 
     return `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary${versionHeader}
 
@@ -782,6 +783,7 @@ You are an AI automation agent responsible for discovering and extracting upcomi
 - Connect to or inspect the user's email program (e.g. Apple Mail, Microsoft Outlook, Mozilla Thunderbird, Gmail / Google Workspace, or exported .eml / .ics invitations).
 - If you do not know which mail application or account the user uses, ask them directly:
   "Which email program or mailbox should I inspect to extract your upcoming calendar invitations and meetings?"
+- **User's Local Timezone**: \`${userLocalTz}\` (Secretary will automatically normalize events to this timezone).
 
 ## 2. Target File Location & Path (FULLY IMPLEMENTED)
 - **Target File**: \`planner-proposals.json\`
@@ -807,6 +809,7 @@ You are an AI automation agent responsible for discovering and extracting upcomi
       "date": "YYYY-MM-DD",
       "startTime": "HH:MM",
       "endTime": "HH:MM",
+      "timezone": "America/New_York",
       "duration": 60,
       "type": "call",
       "description": "Discuss Q4 roadmap and architecture decisions extracted from email invite.",
@@ -822,8 +825,9 @@ You are an AI automation agent responsible for discovering and extracting upcomi
 - \`id\` (string, required): A unique, stable identifier for the event (e.g. \`agent-mail-20260916-arch-review\`). Secretary uses this ID for deduplication.
 - \`title\` (string, required): The meeting or event subject.
 - \`date\` (string, required): Date in ISO format \`YYYY-MM-DD\`.
-- \`startTime\` (string, optional): Start time in 24-hour format \`HH:MM\` (e.g. \`09:30\`, \`14:00\`). Defaults to \`10:00\` (or \`00:00\` for all-day events).
+- \`startTime\` (string, optional): Start time in 24-hour format \`HH:MM\` (e.g. \`09:30\`, \`14:00\`). Defaults to \`10:00\` (or \`00:00\` for all-day events). May also include timezone offset or ISO string (e.g. \`14:00Z\`, \`10:00-05:00\`).
 - \`endTime\` (string, optional): End time in 24-hour format \`HH:MM\` (e.g. \`10:30\`, \`15:00\`). If omitted, Secretary calculates it automatically from \`startTime\` + \`duration\`.
+- \`timezone\` (string, strongly recommended for calendar invites): The IANA timezone name (e.g. \`"America/New_York"\`, \`"Europe/Paris"\`, \`"UTC"\`) or UTC offset (e.g. \`"+02:00"\`, \`"-05:00"\`) of the meeting extracted from the email or invite. Secretary automatically converts and imports the event into the user's local timezone (\`${userLocalTz}\`) so that the event always appears at the correct local hour.
 - \`duration\` (number or string, optional): Flexible duration format. Supports:
   - Integer or decimal minutes: e.g. \`30\`, \`45\`, \`60\`, \`90\`.
   - Unit strings: e.g. \`"45m"\`, \`"45min"\`, \`"1.5h"\`, \`"2 hrs"\`, \`"1h 30m"\`, \`"01:30"\`, ISO 8601 \`"PT1H30M"\`.

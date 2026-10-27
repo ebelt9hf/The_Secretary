@@ -886,6 +886,111 @@ const SyncWorkerEngine = {
     return events;
   },
 
+  parseDateTimeInTimezone(dateStr, timeStr, timeZone) {
+    if (!timeZone || typeof timeZone !== 'string') return null;
+    const cleanTz = timeZone.trim();
+    if (!cleanTz || !dateStr || !timeStr) return null;
+
+    if (/^(UTC|GMT|Z)$/i.test(cleanTz)) {
+      const d = new Date(dateStr + 'T' + timeStr + (timeStr.length === 5 ? ':00' : '') + 'Z');
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    const offsetMatch = cleanTz.match(/^([+-])(\d{1,2})(?::?(\d{2}))?$/) || cleanTz.match(/^UTC([+-]\d{1,2}(?::?\d{2})?)$/i);
+    if (offsetMatch) {
+      let sign, hours, mins;
+      if (offsetMatch[1] && offsetMatch[2]) {
+        sign = offsetMatch[1];
+        hours = offsetMatch[2].padStart(2, '0');
+        mins = (offsetMatch[3] || '00').padStart(2, '0');
+      } else {
+        const rest = offsetMatch[1] || offsetMatch[0];
+        const m = rest.match(/([+-])(\d{1,2})(?::?(\d{2}))?/);
+        if (m) {
+          sign = m[1];
+          hours = m[2].padStart(2, '0');
+          mins = (m[3] || '00').padStart(2, '0');
+        }
+      }
+      if (sign && hours) {
+        const d = new Date(dateStr + 'T' + timeStr + (timeStr.length === 5 ? ':00' : '') + sign + hours + ':' + mins);
+        return isNaN(d.getTime()) ? null : d;
+      }
+    }
+
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const [h, min] = timeStr.split(':').map(Number);
+      let guessMs = Date.UTC(y, m - 1, d, h, min, 0);
+      const dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone: cleanTz,
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: 'numeric', second: 'numeric',
+        hour12: false
+      });
+      for (let i = 0; i < 3; i++) {
+        const parts = dtf.formatToParts(new Date(guessMs));
+        const p = {};
+        parts.forEach(pt => { p[pt.type] = pt.value; });
+        const tzH = p.hour === '24' ? 0 : Number(p.hour);
+        const tzDateInMs = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), tzH, Number(p.minute), Number(p.second));
+        const diff = Date.UTC(y, m - 1, d, h, min, 0) - tzDateInMs;
+        if (diff === 0) break;
+        guessMs += diff;
+      }
+      const finalDate = new Date(guessMs);
+      return isNaN(finalDate.getTime()) ? null : finalDate;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  convertEventToLocalTime(dateStr, startTimeStr, endTimeStr, timezoneStr, durationMins = null) {
+    if (!timezoneStr || !dateStr || !startTimeStr) {
+      return { date: dateStr, startTime: startTimeStr, endTime: endTimeStr, duration: durationMins, converted: false };
+    }
+
+    const startDate = this.parseDateTimeInTimezone(dateStr, startTimeStr, timezoneStr);
+    if (!startDate) {
+      return { date: dateStr, startTime: startTimeStr, endTime: endTimeStr, duration: durationMins, converted: false };
+    }
+
+    const pad = n => String(n).padStart(2, '0');
+    const localDate = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
+    const localStartTime = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
+
+    let localEndTime = endTimeStr;
+    let dur = durationMins;
+
+    if (endTimeStr) {
+      let endSourceDate = dateStr;
+      const [sh, sm] = startTimeStr.split(':').map(Number);
+      const [eh, em] = endTimeStr.split(':').map(Number);
+      if (eh < sh || (eh === sh && em < sm)) {
+        const [sy, sM, sd] = dateStr.split('-').map(Number);
+        const nextDay = new Date(Date.UTC(sy, sM - 1, sd + 1));
+        endSourceDate = nextDay.toISOString().slice(0, 10);
+      }
+      const endDate = this.parseDateTimeInTimezone(endSourceDate, endTimeStr, timezoneStr);
+      if (endDate) {
+        localEndTime = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+        dur = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+      }
+    } else if (dur) {
+      const endDate = new Date(startDate.getTime() + dur * 60000);
+      localEndTime = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+    }
+
+    return {
+      date: localDate,
+      startTime: localStartTime,
+      endTime: localEndTime,
+      duration: dur,
+      converted: (localDate !== dateStr || localStartTime !== startTimeStr),
+      timestamp: startDate.getTime()
+    };
+  },
+
   normalizeProposals(raw, existingEvents = []) {
     let items = [];
     if (Array.isArray(raw)) {
@@ -916,17 +1021,69 @@ const SyncWorkerEngine = {
       const type = VALID_TYPES.has(rawType) ? rawType : 'work';
       const status = (item.status === 'accepted' || item.status === 'rejected') ? item.status : 'pending';
 
+      let rawDate = String(item.date || '').trim();
+      let rawStartTime = String(item.startTime || '').trim();
+      let rawEndTime = String(item.endTime || '').trim();
+      let rawTimezone = String(item.timezone || item.timeZone || '').trim();
+
+      const startIso = (typeof item.startDateTime === 'string' ? item.startDateTime.trim() : '') || (rawStartTime.includes('T') ? rawStartTime : '');
+      if (startIso) {
+        const isoMatch = startIso.match(/^(\d{4}-\d{2}-\d{2})T(\d{1,2}:\d{2})(?::\d{2})?(?:(\.\d+))?(Z|[+-]\d{2}:?\d{2})?/i);
+        if (isoMatch) {
+          if (!rawDate) rawDate = isoMatch[1];
+          rawStartTime = isoMatch[2];
+          if (isoMatch[4] && !rawTimezone) rawTimezone = isoMatch[4];
+        }
+      }
+      const endIso = (typeof item.endDateTime === 'string' ? item.endDateTime.trim() : '') || (rawEndTime.includes('T') ? rawEndTime : '');
+      if (endIso) {
+        const isoMatch = endIso.match(/^(\d{4}-\d{2}-\d{2})T(\d{1,2}:\d{2})(?::\d{2})?(?:(\.\d+))?(Z|[+-]\d{2}:?\d{2})?/i);
+        if (isoMatch) {
+          rawEndTime = isoMatch[2];
+          if (isoMatch[4] && !rawTimezone) rawTimezone = isoMatch[4];
+        }
+      }
+
+      const offsetInStart = rawStartTime.match(/^(\d{1,2}:\d{2})(Z|[+-]\d{2}:?\d{2})$/i);
+      if (offsetInStart) {
+        rawStartTime = offsetInStart[1];
+        if (!rawTimezone) rawTimezone = offsetInStart[2];
+      }
+      const offsetInEnd = rawEndTime.match(/^(\d{1,2}:\d{2})(Z|[+-]\d{2}:?\d{2})$/i);
+      if (offsetInEnd) {
+        rawEndTime = offsetInEnd[1];
+        if (!rawTimezone) rawTimezone = offsetInEnd[2];
+      }
+
+      let parsedDuration = typeof item.duration === 'number' ? item.duration : (parseInt(item.duration, 10) || 60);
+      let origDate = rawDate;
+      let origStartTime = rawStartTime;
+      let wasConverted = false;
+
+      if (rawTimezone && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && /^\d{1,2}:\d{2}$/.test(rawStartTime)) {
+        const conv = this.convertEventToLocalTime(rawDate, rawStartTime, rawEndTime, rawTimezone, parsedDuration);
+        if (conv) {
+          rawDate = conv.date;
+          rawStartTime = conv.startTime;
+          if (conv.endTime) rawEndTime = conv.endTime;
+          if (conv.duration) parsedDuration = conv.duration;
+          wasConverted = conv.converted;
+        }
+      }
+
       dedupMap.set(id, {
         id,
         title: String(item.title || 'Untitled Proposal').slice(0, 300),
-        date: String(item.date || '').trim(),
-        startTime: String(item.startTime || '').trim(),
-        endTime: String(item.endTime || '').trim(),
-        duration: typeof item.duration === 'number' ? item.duration : (parseInt(item.duration, 10) || 60),
+        date: rawDate,
+        startTime: rawStartTime,
+        endTime: rawEndTime,
+        duration: parsedDuration,
         type,
         description: String(item.description || '').slice(0, 1000),
         source: String(item.source || 'Script').slice(0, 100),
         status,
+        ...(rawTimezone ? { timezone: rawTimezone } : {}),
+        ...(wasConverted ? { originalTimezone: rawTimezone, originalStartTime: origStartTime, originalDate: origDate } : {}),
         ...(item.collaborators ? { collaborators: item.collaborators } : {}),
         ...(item.tags ? { tags: item.tags } : {}),
         ...(item.workstream ? { workstream: item.workstream } : {})

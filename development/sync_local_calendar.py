@@ -29,6 +29,20 @@ def get_workspace_path(cli_path=None):
         return parent_dir
     return os.getcwd()
 
+def get_system_timezone():
+    try:
+        if os.path.exists("/etc/localtime"):
+            target = os.path.realpath("/etc/localtime")
+            if "zoneinfo/" in target:
+                return target.split("zoneinfo/")[-1]
+    except Exception:
+        pass
+    try:
+        import time
+        return time.tzname[time.daylight] if (time.daylight and len(time.tzname) > 1) else time.tzname[0]
+    except Exception:
+        return "UTC"
+
 def infer_event_type(title, description=""):
     combined = f"{title} {description}".lower()
     if any(k in combined for k in ["prep", "briefing", "preparation", "vorbereitung"]):
@@ -113,16 +127,24 @@ def fetch_apple_calendar_events(start_dt, end_dt):
         is_all_day = all_day_str in ["true", "yes", "1"]
 
         try:
-            start_clean = start_iso.replace("Z", "").split(".")[0]
-            dt = datetime.fromisoformat(start_clean)
+            if start_iso.endswith("Z") or "+00:00" in start_iso:
+                dt_utc = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+                dt = dt_utc.astimezone()
+            else:
+                start_clean = start_iso.split(".")[0]
+                dt = datetime.fromisoformat(start_clean)
             date_str = dt.strftime("%Y-%m-%d")
             start_time = "00:00" if is_all_day else dt.strftime("%H:%M")
 
             duration = 60
             if end_iso and not is_all_day:
                 try:
-                    end_clean = end_iso.replace("Z", "").split(".")[0]
-                    dt_end = datetime.fromisoformat(end_clean)
+                    if end_iso.endswith("Z") or "+00:00" in end_iso:
+                        dt_end_utc = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
+                        dt_end = dt_end_utc.astimezone()
+                    else:
+                        end_clean = end_iso.split(".")[0]
+                        dt_end = datetime.fromisoformat(end_clean)
                     duration = max(15, int((dt_end - dt).total_seconds() / 60))
                     end_time = dt_end.strftime("%H:%M")
                 except Exception:
@@ -141,6 +163,7 @@ def fetch_apple_calendar_events(start_dt, end_dt):
                 "startTime": start_time,
                 "endTime": end_time,
                 "duration": duration,
+                "timezone": get_system_timezone(),
                 "type": infer_event_type(title, desc),
                 "description": desc[:MAX_EVENT_DESC_LEN] if desc else (f"Location: {location}" if location else ""),
                 "source": "Local: Apple Calendar",
@@ -203,16 +226,24 @@ def fetch_outlook_events(start_dt, end_dt):
         is_all_day = all_day_str in ["true", "yes", "1"]
 
         try:
-            start_clean = start_iso.replace("Z", "").split(".")[0]
-            dt = datetime.fromisoformat(start_clean)
+            if start_iso.endswith("Z") or "+00:00" in start_iso:
+                dt_utc = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+                dt = dt_utc.astimezone()
+            else:
+                start_clean = start_iso.split(".")[0]
+                dt = datetime.fromisoformat(start_clean)
             date_str = dt.strftime("%Y-%m-%d")
             start_time = "00:00" if is_all_day else dt.strftime("%H:%M")
 
             duration = 60
             if end_iso and not is_all_day:
                 try:
-                    end_clean = end_iso.replace("Z", "").split(".")[0]
-                    dt_end = datetime.fromisoformat(end_clean)
+                    if end_iso.endswith("Z") or "+00:00" in end_iso:
+                        dt_end_utc = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
+                        dt_end = dt_end_utc.astimezone()
+                    else:
+                        end_clean = end_iso.split(".")[0]
+                        dt_end = datetime.fromisoformat(end_clean)
                     duration = max(15, int((dt_end - dt).total_seconds() / 60))
                     end_time = dt_end.strftime("%H:%M")
                 except Exception:
@@ -231,6 +262,7 @@ def fetch_outlook_events(start_dt, end_dt):
                 "startTime": start_time,
                 "endTime": end_time,
                 "duration": duration,
+                "timezone": get_system_timezone(),
                 "type": infer_event_type(title, desc),
                 "description": desc[:MAX_EVENT_DESC_LEN] if desc else (f"Location: {location}" if location else ""),
                 "source": "Local: Microsoft Outlook",
@@ -308,6 +340,19 @@ def main():
     args = parser.parse_args()
 
     if sys.platform != "darwin":
+        if sys.platform == "win32":
+            ps_script = os.path.join(os.path.dirname(__file__), "sync_local_calendar.ps1")
+            if os.path.exists(ps_script):
+                print("🪟 Windows detected. Delegating to PowerShell Outlook sync helper...")
+                cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps_script]
+                if args.workspace:
+                    cmd.extend(["-Workspace", args.workspace])
+                if args.days:
+                    cmd.extend(["-Days", str(args.days)])
+                if args.dry_run:
+                    cmd.append("-DryRun")
+                res = subprocess.run(cmd)
+                sys.exit(res.returncode)
         print("⚠️ Local AppleScript calendar extraction is currently only supported on macOS.")
         print("For Windows/Linux or web accounts, please use the WebCal/iCal URL feed subscription in Secretary Settings.")
         sys.exit(1)

@@ -37,6 +37,10 @@ Secretary has a **fully implemented real-time proposals system**. External AI ag
 ### Rules for External Agents (MANDATORY):
 - **Append-Only**: NEVER overwrite, clear, or delete existing proposals in `planner-proposals.json`.
 - **Deduplication via Unique ID**: Always supply a unique, stable `id` for each proposal (e.g. `"agent-mail-20260916-standup"`). Secretary uses this ID to prevent duplicate entries and calendar overlaps.
+- **Timezone Specification**:
+  - Always include the invite's source timezone in the `"timezone"` field (e.g. `"timezone": "America/New_York"`, `"Europe/Paris"`, `"UTC"`, or offset `"+02:00"`).
+  - You may also provide ISO 8601 timestamps in `startDateTime` / `endDateTime` (e.g. `"2026-09-16T14:00:00Z"` or `"2026-09-16T10:00:00-04:00"`), or append timezone indicators directly to `startTime` (e.g. `"14:00Z"`, `"14:00+02:00"`).
+  - Secretary automatically converts external events across timezones and midnight boundaries into the user's local timezone upon ingestion while preserving original timezone metadata.
 - **Status**: Always initialize the proposal with `"status": "pending"`.
 - **Supported Event Types**:
   - `"call"`: Voice or video call (e.g. client calls, Zoom / Google Meet conferences, phone calls). Supports linking collaborators and notes.
@@ -60,7 +64,9 @@ Secretary has a **fully implemented real-time proposals system**. External AI ag
       "date": "2026-09-16",
       "startTime": "14:00",
       "endTime": "15:00",
+      "duration": 60,
       "type": "work",
+      "timezone": "America/New_York",
       "description": "Discuss Q4 roadmap and architecture decisions extracted from email invite.",
       "source": "Claude Agent",
       "collaborators": ["Etienne"],

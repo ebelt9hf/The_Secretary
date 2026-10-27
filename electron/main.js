@@ -493,9 +493,17 @@ ipcMain.handle('run-calendar-sync-script', async (event, customWorkspace) => {
     : currentWorkspacePath;
   if (!wsPath) throw new Error('No workspace active');
 
-  const scriptPath = path.resolve(__dirname, '..', 'development', 'sync_local_calendar.sh');
+  const isWin = process.platform === 'win32';
+  const scriptPath = isWin
+    ? path.resolve(__dirname, '..', 'development', 'sync_local_calendar.ps1')
+    : path.resolve(__dirname, '..', 'development', 'sync_local_calendar.sh');
+  const cmd = isWin ? 'powershell.exe' : '/bin/bash';
+  const args = isWin
+    ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, wsPath]
+    : [scriptPath, wsPath];
+
   return new Promise((resolve) => {
-    const child = spawn('/bin/bash', [scriptPath, wsPath], {
+    const child = spawn(cmd, args, {
       cwd: wsPath,
       env: { ...process.env, WORKSPACE_DIR: wsPath }
     });

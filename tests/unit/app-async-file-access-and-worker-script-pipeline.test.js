@@ -269,5 +269,26 @@ describe('Async File Access Architecture & Separate Worker Thread Script Pipelin
       expect(res.success).toBe(false);
       expect(res.error).toContain('Calendar permission denied');
     });
+
+    /**
+     * 1. Protected Behavior: Handles Windows PowerShell execution results gracefully via runLocalSyncScript.
+     * 2. Regression Target: Unhandled rejection or bad status handling when running PowerShell on Windows.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('handles Windows PowerShell execution results gracefully via runLocalSyncScript', async () => {
+      globalThis.electronAPI = {
+        runCalendarSyncScript: vi.fn().mockResolvedValue({
+          success: true,
+          code: 0,
+          stdout: '✓ Successfully synchronized 3 new calendar events into planner-proposals.json',
+          stderr: ''
+        })
+      };
+
+      const res = await CalendarSyncService.runLocalSyncScript('C:\\Users\\test\\Workspace');
+      expect(globalThis.electronAPI.runCalendarSyncScript).toHaveBeenCalledWith('C:\\Users\\test\\Workspace');
+      expect(res.success).toBe(true);
+    });
   });
 });

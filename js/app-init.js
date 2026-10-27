@@ -4145,7 +4145,7 @@ function updateExternalAgentPromptDisplay() {
         workspacePath: wsPath
       });
     } else {
-      textarea.value = `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary\n\nTarget file: planner-proposals.json in the root workspace.\nAlways append new proposals to planner-proposals.json without deleting existing entries.\nAsk user for their mail application if unknown.`;
+      textarea.value = `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary\n\nTarget file: planner-proposals.json in the root workspace.\nAlways append new proposals to planner-proposals.json without deleting existing entries.\nInclude event timezone (e.g. "timezone": "Europe/Paris" or "America/New_York") so Secretary imports it into your local time.\nAsk user for their mail application if unknown.`;
     }
   }
 }
@@ -4181,6 +4181,12 @@ function renderCalendarSyncPrefs() {
   }
 
   if (typeof CalendarSyncService === 'undefined') return;
+
+  const cmdInput = document.getElementById('prefs-local-sync-cmd');
+  if (cmdInput && typeof CalendarSyncService.getLocalSyncCommand === 'function') {
+    cmdInput.value = CalendarSyncService.getLocalSyncCommand();
+  }
+
   const config = CalendarSyncService.getConfig();
   const feeds = config.feeds || [];
 

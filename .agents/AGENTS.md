@@ -105,6 +105,7 @@ External AI agents or background processes on the user's computer can propose ca
         "date": "2026-09-16",
         "startTime": "10:00",
         "endTime": "11:00",
+        "timezone": "America/New_York",
         "duration": 60,
         "type": "work",
         "description": "Proposed by Agent: Review PR #42",
@@ -114,6 +115,10 @@ External AI agents or background processes on the user's computer can propose ca
     ]
   }
   ```
+- **Timezone Support (`timezone`)**: Strongly recommended for meeting invitations and scheduled events.
+  - Supports standard IANA time zone identifiers (e.g. `"America/New_York"`, `"Europe/Paris"`, `"Europe/London"`, `"Asia/Tokyo"`, `"UTC"`) or UTC offsets (e.g. `"+02:00"`, `"-05:00"`).
+  - External agents should extract the invitation's timezone and specify it here (or provide ISO 8601 strings with timezone/offset in `startTime` or `startDateTime`, e.g. `"14:00Z"`, `"2026-09-16T10:00:00-05:00"`).
+  - Secretary automatically converts the proposed event's date and times into the user's local system timezone upon import, ensuring calendar blocks appear at the exact correct local time.
 - **Supported Event Types (`type`)**: `type` is required and must be one of the following 8 supported event types:
   - `"call"`: Voice or video call (e.g. client calls, Zoom / Google Meet conferences, external phone conversations). Supports linking collaborators and notes.
   - `"sync"`: Team synchronization or 1-on-1 meeting (e.g. daily standups, weekly 1:1 check-ins, sprint planning, team alignment). Supports linking collaborators and notes.

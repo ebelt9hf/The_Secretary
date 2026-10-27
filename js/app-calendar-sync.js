@@ -184,7 +184,7 @@
           .replace(/\\\\/g, '\\');
       };
 
-      const parseICSDate = (raw) => {
+      const parseICSDate = (raw, tzid = null) => {
         if (!raw) return null;
         const clean = raw.trim();
         // Check for all-day date: YYYYMMDD
@@ -220,16 +220,42 @@
               time: `${localH}:${localMin}`,
               allDay: false,
               isUtc: true,
+              timezone: 'UTC',
               timestamp: utcDate.getTime()
             };
           }
 
+          const rawDate = `${dtMatch[1]}-${dtMatch[2]}-${dtMatch[3]}`;
+          const rawTime = `${dtMatch[4]}:${dtMatch[5]}`;
+
+          if (tzid) {
+            const convFn = (typeof convertEventToLocalTime === 'function')
+              ? convertEventToLocalTime
+              : ((typeof global !== 'undefined' && global && typeof global.convertEventToLocalTime === 'function')
+                  ? global.convertEventToLocalTime
+                  : ((typeof globalThis !== 'undefined' && typeof globalThis.convertEventToLocalTime === 'function')
+                      ? globalThis.convertEventToLocalTime
+                      : null));
+            const conv = convFn ? convFn(rawDate, rawTime, null, tzid) : null;
+            if (conv && conv.date && conv.startTime) {
+              return {
+                date: conv.date,
+                time: conv.startTime,
+                allDay: false,
+                isUtc: false,
+                timezone: tzid,
+                timestamp: conv.timestamp || new Date(`${conv.date}T${conv.startTime}:00`).getTime()
+              };
+            }
+          }
+
           return {
-            date: `${dtMatch[1]}-${dtMatch[2]}-${dtMatch[3]}`,
-            time: `${dtMatch[4]}:${dtMatch[5]}`,
+            date: rawDate,
+            time: rawTime,
             allDay: false,
             isUtc: false,
-            timestamp: new Date(`${dtMatch[1]}-${dtMatch[2]}-${dtMatch[3]}T${dtMatch[4]}:${dtMatch[5]}:00`).getTime()
+            timezone: tzid || undefined,
+            timestamp: new Date(`${rawDate}T${rawTime}:00`).getTime()
           };
         }
         return null;
@@ -254,13 +280,15 @@
             const summary = currentProps['SUMMARY'] || (typeof t === 'function' ? t('planner.importedEvent') : 'Calendar Event');
             const dtStartRaw = currentProps['DTSTART'];
             const dtEndRaw = currentProps['DTEND'];
+            const dtStartTzid = currentProps['DTSTART_TZID'] || currentProps['TZID'];
+            const dtEndTzid = currentProps['DTEND_TZID'] || currentProps['TZID'] || dtStartTzid;
             const description = currentProps['DESCRIPTION'] || '';
             const location = currentProps['LOCATION'] || '';
             const uid = currentProps['UID'] || '';
 
-            const startParsed = parseICSDate(dtStartRaw);
+            const startParsed = parseICSDate(dtStartRaw, dtStartTzid);
             if (startParsed) {
-              let endParsed = parseICSDate(dtEndRaw);
+              let endParsed = parseICSDate(dtEndRaw, dtEndTzid);
               let startTime = startParsed.time;
               let endTime = '17:00';
               let duration = 60;
@@ -309,7 +337,8 @@
                 description: description.slice(0, 1000) || (location ? `Location: ${location}` : ''),
                 source: feedInfo.name ? `WebCal: ${feedInfo.name}` : 'WebCal Calendar',
                 status: 'pending',
-                allDay: startParsed.allDay || false
+                allDay: startParsed.allDay || false,
+                ...(startParsed.timezone ? { timezone: startParsed.timezone } : {})
               });
             }
           }
@@ -323,6 +352,10 @@
             const valPart = line.substring(colonIdx + 1);
             const keyName = keyPart.split(';')[0].trim().toUpperCase();
             currentProps[keyName] = unescapeICS(valPart);
+            const tzidMatch = keyPart.match(/TZID=([^;:]+)/i);
+            if (tzidMatch) {
+              currentProps[keyName + '_TZID'] = tzidMatch[1].replace(/["']/g, '').trim();
+            }
           }
         }
       }
@@ -603,9 +636,29 @@
     _externalLoadedInfo: null,
 
     /**
-     * Generates terminal command to execute zero-dependency local macOS sync script.
+     * Detects if the current host environment is Windows.
      */
-    getLocalSyncCommand(workspacePath = '') {
+    isWindows() {
+      if (typeof process !== 'undefined' && process?.platform) {
+        return process.platform === 'win32';
+      }
+      if (typeof navigator !== 'undefined') {
+        const ua = navigator.userAgent || '';
+        const plat = navigator.platform || '';
+        return /win/i.test(ua) || /win/i.test(plat);
+      }
+      return false;
+    },
+
+    /**
+     * Generates terminal command to execute zero-dependency local sync script (macOS or Windows).
+     */
+    getLocalSyncCommand(workspacePath = '', targetPlatform = null) {
+      const isWin = targetPlatform === 'win' || (targetPlatform !== 'mac' && this.isWindows());
+      if (isWin) {
+        const wsArg = workspacePath ? ` -Workspace "${workspacePath}"` : '';
+        return `powershell.exe -ExecutionPolicy Bypass -File .\\development\\sync_local_calendar.ps1${wsArg}`;
+      }
       const wsArg = workspacePath ? ` "${workspacePath}"` : '';
       return `./development/sync_local_calendar.sh${wsArg}`;
     },
@@ -808,24 +861,248 @@ echo "✨ Sync complete!"
     },
 
     /**
-     * Downloads sync_local_calendar.sh to user's computer via browser.
+     * Returns full content of the zero-dependency Windows PowerShell sync script.
      */
-    async downloadSyncScript() {
-      let content = this.getSyncScriptContent();
+    getWindowsSyncScriptContent() {
+      return `<#
+.SYNOPSIS
+Secretary Local Calendar Sync Helper for Windows (Zero-Dependency PowerShell Script)
+
+.DESCRIPTION
+Extracts upcoming calendar events from local Microsoft Outlook on Windows
+into Secretary's planner-proposals.json.
+#>
+
+param(
+    [string]$Workspace = "",
+    [int]$Days = 14,
+    [switch]$DryRun
+)
+
+$ErrorActionPreference = "Stop"
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($Workspace)) {
+    $Candidate = Split-Path -Parent $ScriptDir
+    if (Test-Path -LiteralPath (Join-Path $Candidate "app.html")) {
+        $WorkspaceDir = $Candidate
+    } else {
+        $WorkspaceDir = (Get-Location).Path
+    }
+} else {
+    $WorkspaceDir = (Resolve-Path -LiteralPath $Workspace).Path
+}
+
+$ProposalsFile = Join-Path $WorkspaceDir "planner-proposals.json"
+$PlannerFile   = Join-Path $WorkspaceDir "planner.json"
+
+Write-Host "🗓️ Secretary Calendar Sync Helper (Windows PowerShell)" -ForegroundColor Cyan
+Write-Host "📂 Workspace: $WorkspaceDir"
+Write-Host "📄 Target:    $ProposalsFile"
+
+function Get-SecretaryEventType([string]$Title, [string]$Desc) {
+    $c = "$Title $Desc".ToLower()
+    if ($c -match '\\b(prep|briefing|preparation|vorbereitung)\\b') { return "prep" }
+    if ($c -match '\\b(call|meeting|zoom|teams|meet|webex|conference|huddle|1:1|1-on-1|interview|demo|client)\\b') { return "call" }
+    if ($c -match '\\b(sync|standup|daily|retrospective|check-in)\\b') { return "sync" }
+    if ($c -match '\\b(todo|task|action item)\\b') { return "todo" }
+    if ($c -match '\\b(personal|lunch|gym|doctor|dentist|break|vacation|holiday|arzt)\\b') { return "personal" }
+    if ($c -match '\\b(ooo|out of office|leave|urlaub|conges)\\b') { return "ooo" }
+    return "work"
+}
+
+function Get-SystemTimezoneString {
+    try {
+        $offset = [System.TimeZoneInfo]::Local.GetUtcOffset([DateTime]::Now)
+        $sign = if ($offset.Ticks -ge 0) { "+" } else { "-" }
+        $offsetStr = "{0}{1:D2}:{2:D2}" -f $sign, [Math]::Abs($offset.Hours), [Math]::Abs($offset.Minutes)
+        $ianaProp = [System.TimeZoneInfo]::Local.GetType().GetProperty("IanaId")
+        if ($ianaProp) {
+            $ianaVal = $ianaProp.GetValue([System.TimeZoneInfo]::Local, $null)
+            if (-not [string]::IsNullOrWhiteSpace($ianaVal)) { return $ianaVal }
+        }
+        return $offsetStr
+    } catch {
+        return "UTC"
+    }
+}
+
+$TimezoneStr = Get-SystemTimezoneString
+
+$ExistingData = $null
+$ExistingIds = @{}
+
+if (Test-Path -LiteralPath $ProposalsFile) {
+    try {
+        $raw = Get-Content -LiteralPath $ProposalsFile -Raw -Encoding UTF8
+        if (-not [string]::IsNullOrWhiteSpace($raw)) {
+            $ExistingData = ConvertFrom-Json $raw
+            if ($ExistingData -and $ExistingData.proposals) {
+                foreach ($p in $ExistingData.proposals) {
+                    if ($p.id) { $ExistingIds[$p.id] = $true }
+                }
+            }
+        }
+    } catch {
+        Write-Warning "Could not read existing proposals file: $($_.Exception.Message)"
+    }
+}
+
+if (Test-Path -LiteralPath $PlannerFile) {
+    try {
+        $rawPlanner = Get-Content -LiteralPath $PlannerFile -Raw -Encoding UTF8
+        if (-not [string]::IsNullOrWhiteSpace($rawPlanner)) {
+            $plannerJson = ConvertFrom-Json $rawPlanner
+            if ($plannerJson -and $plannerJson.events) {
+                foreach ($ev in $plannerJson.events) {
+                    if ($ev.proposalId) { $ExistingIds[$ev.proposalId] = $true }
+                }
+            }
+        }
+    } catch {}
+}
+
+if ($null -eq $ExistingData -or -not (Get-Member -InputObject $ExistingData -Name "proposals")) {
+    $ExistingData = [PSCustomObject]@{
+        _notice = "IMPORTANT FOR AGENTS: Do NOT delete or overwrite existing proposed events in this file. Only append new proposals. Secretary tracks processed/accepted proposals by their unique 'id' to prevent duplicate entries and calendar overlaps. External agents should provide the event's source timezone (e.g. 'timezone': 'America/New_York', 'UTC', '+02:00'). Secretary automatically converts proposals across timezones and midnight boundaries into the user's local timezone."
+        version = 1
+        proposals = @()
+    }
+}
+
+$NewEvents = [System.Collections.Generic.List[PSCustomObject]]::new()
+$now = Get-Date
+$startBoundary = $now.AddDays(-1)
+$endBoundary   = $now.AddDays($Days)
+
+Write-Host "🔍 Querying Microsoft Outlook from $($startBoundary.ToString('yyyy-MM-dd')) to $($endBoundary.ToString('yyyy-MM-dd'))..."
+
+$outlook = $null
+$calendar = $null
+
+try {
+    $outlook = New-Object -ComObject Outlook.Application -ErrorAction Stop
+    $namespace = $outlook.GetNamespace("MAPI")
+    $calendar = $namespace.GetDefaultFolder(9)
+    $items = $calendar.Items
+    $items.IncludeRecurrences = $true
+    $items.Sort("[Start]")
+
+    foreach ($item in $items) {
+        try {
+            if ($null -eq $item) { continue }
+            $startVal = $item.Start
+            if ($null -eq $startVal) { continue }
+            $sDate = [datetime]$startVal
+            if ($sDate -lt $startBoundary) { continue }
+            if ($sDate -gt $endBoundary) { break }
+
+            $title = if (-not [string]::IsNullOrWhiteSpace($item.Subject)) { [string]$item.Subject } else { "Outlook Meeting" }
+            if ($title.Length -gt 300) { $title = $title.Substring(0, 300) }
+
+            $isAllDay = [bool]$item.AllDayEvent
+            $eDateVal = $item.End
+            $eDate = if ($eDateVal) { [datetime]$eDateVal } else { $sDate.AddMinutes(60) }
+
+            $dateStr   = $sDate.ToString("yyyy-MM-dd")
+            $startTime = if ($isAllDay) { "00:00" } else { $sDate.ToString("HH:mm") }
+            $endTime   = if ($isAllDay) { "23:59" } else { $eDate.ToString("HH:mm") }
+            $duration  = if ($isAllDay) { 1440 } else { [Math]::Max(15, [int][Math]::Round(($eDate - $sDate).TotalMinutes)) }
+
+            $desc = if (-not [string]::IsNullOrWhiteSpace($item.Body)) { [string]$item.Body } else { "" }
+            $location = if (-not [string]::IsNullOrWhiteSpace($item.Location)) { [string]$item.Location } else { "" }
+            if (-not [string]::IsNullOrWhiteSpace($location) -and -not $desc.Contains($location)) {
+                $desc = "Location: $location\`n$desc".Trim()
+            }
+            if ($desc.Length -gt 1000) { $desc = $desc.Substring(0, 1000) }
+
+            $entryId = if (-not [string]::IsNullOrWhiteSpace($item.EntryID)) { [string]$item.EntryID } else { "" }
+            if ($entryId) {
+                $cleanId = ($entryId -replace '[^a-zA-Z0-9_-]', '')
+                if ($cleanId.Length -gt 32) { $cleanId = $cleanId.Substring(0, 32) }
+                $propId = "local-outlook-win-$cleanId"
+            } else {
+                $hash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes("$title$dateStr$startTime"))).Replace("-","").Substring(0,16).ToLower()
+                $propId = "local-outlook-win-$hash"
+            }
+
+            if ($ExistingIds.ContainsKey($propId)) { continue }
+
+            $proposal = [PSCustomObject]@{
+                id          = $propId
+                title       = $title
+                date        = $dateStr
+                startTime   = $startTime
+                endTime     = $endTime
+                duration    = $duration
+                timezone    = $TimezoneStr
+                type        = (Get-SecretaryEventType $title $desc)
+                description = $desc
+                source      = "Local: Microsoft Outlook (Windows)"
+                status      = "pending"
+            }
+
+            $NewEvents.Add($proposal)
+            $ExistingIds[$propId] = $true
+        } catch {
+            continue
+        }
+    }
+} catch {
+    Write-Host "ℹ️ Could not query local Microsoft Outlook COM object: $($_.Exception.Message)"
+} finally {
+    if ($null -ne $calendar) { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($calendar) | Out-Null }
+    if ($null -ne $outlook)  { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($outlook) | Out-Null }
+    [System.GC]::Collect()
+}
+
+Write-Host "  • Microsoft Outlook (Windows): $($NewEvents.Count) new event(s) found."
+
+if ($DryRun) {
+    Write-Host "[Dry Run] Found $($NewEvents.Count) new proposals to add."
+    exit 0
+}
+
+if ($NewEvents.Count -gt 0) {
+    $currentProposalsList = [System.Collections.Generic.List[object]]::new()
+    if ($ExistingData.proposals) {
+        foreach ($p in $ExistingData.proposals) { $currentProposalsList.Add($p) }
+    }
+    foreach ($np in $NewEvents) { $currentProposalsList.Add($np) }
+    $ExistingData.proposals = $currentProposalsList.ToArray()
+
+    $jsonOutput = ConvertTo-Json $ExistingData -Depth 10
+    [System.IO.File]::WriteAllText($ProposalsFile, $jsonOutput, [System.Text.Encoding]::UTF8)
+    Write-Host "✓ Successfully synchronized $($NewEvents.Count) new calendar events into planner-proposals.json"
+} else {
+    Write-Host "✓ Calendar is up to date. No new proposals found."
+}
+Write-Host "✨ Sync complete!"
+`;
+    },
+
+    /**
+     * Downloads sync script (.sh on macOS or .ps1 on Windows) to user's computer via browser.
+     */
+    async downloadSyncScript(targetPlatform = null) {
+      const isWin = targetPlatform === 'win' || (targetPlatform !== 'mac' && this.isWindows());
+      const fileName = isWin ? 'sync_local_calendar.ps1' : 'sync_local_calendar.sh';
+      const mimeType = isWin ? 'text/plain;charset=utf-8' : 'text/x-sh;charset=utf-8';
+      let content = isWin ? this.getWindowsSyncScriptContent() : this.getSyncScriptContent();
       try {
         if (typeof fetch === 'function') {
-          const resp = await fetch('development/sync_local_calendar.sh');
+          const resp = await fetch(`development/${fileName}`);
           if (resp && resp.ok) {
             content = await resp.text();
           }
         }
       } catch (_e) {}
 
-      const blob = new Blob([content], { type: 'text/x-sh;charset=utf-8' });
+      const blob = new Blob([content], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'sync_local_calendar.sh';
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

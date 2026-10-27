@@ -300,6 +300,9 @@ describe('AppPrompts Module (app-prompts.js)', () => {
       expect(prompt).toContain('Personal event, break');
       expect(prompt).toContain('Out of Office');
       expect(prompt).toContain('Flexible or uncategorized');
+      expect(prompt).toContain('"timezone": "America/New_York"');
+      expect(prompt).toContain("User's Local Timezone");
+      expect(prompt).toContain('Secretary automatically converts and imports the event into the user\'s local timezone');
     });
 
     it('customizes prompt with user name when provided', () => {
@@ -315,6 +318,14 @@ describe('AppPrompts Module (app-prompts.js)', () => {
       expect(prompt).toContain('/Users/etienne/Projects/Secretary/planner-proposals.json');
       expect(prompt).toContain('./planner-proposals.json');
       expect(prompt).toContain('FULLY IMPLEMENTED');
+    });
+
+    it('customizes prompt with custom timezone when provided', () => {
+      const prompt = AppPrompts.buildExternalAgentEmailProposalPrompt({
+        timezone: 'Asia/Tokyo'
+      });
+      expect(prompt).toContain("User's Local Timezone**: `Asia/Tokyo`");
+      expect(prompt).toContain("into the user's local timezone (`Asia/Tokyo`)");
     });
   });
 });

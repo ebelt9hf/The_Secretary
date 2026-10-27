@@ -53,6 +53,7 @@ When a directory is mounted, Secretary expects and maintains the following struc
 3.  **Settings (`secretary-settings.json`)**: JSON file storing UI preferences (theme, working hours, active days), user profile details, and AI API keys/endpoints.
 4.  **Agent Planner Proposals (`planner-proposals.json`)**: Dedicated inbox file for external AI agents or automation scripts running on the user's computer.
     *   **Append-Only Rule**: External agents must **never** delete existing entries from this file; they should only append new proposals. Secretary tracks processed/accepted proposals by their unique `id` to prevent duplicates or overlaps.
+    *   **Timezone Processing**: External agents should supply the event's source timezone via `"timezone"` (e.g. `"America/New_York"`, `"Europe/Paris"`, `"UTC"`, `"+02:00"`), or via ISO timestamps (`startDateTime`). Secretary's ingestion engine automatically converts proposed times and dates across timezones and midnight boundaries into the user's local timezone, while recording original timezone info.
     *   **Schema**:
         ```json
         {
@@ -65,7 +66,9 @@ When a directory is mounted, Secretary expects and maintains the following struc
               "date": "2026-09-16",
               "startTime": "14:00",
               "endTime": "15:00",
+              "duration": 60,
               "type": "work",
+              "timezone": "America/New_York",
               "description": "Proposed by CodeAgent: Review system architecture",
               "source": "CodeAgent",
               "collaborators": ["Etienne"],

@@ -920,7 +920,120 @@ function unescapeICSValue(val) {
   return val.replace(/\\([,;\\nN])/g, (_, ch) => (ch.toLowerCase() === 'n' ? '\n' : ch)).trim();
 }
 
-function parseICSDateTime(dtStr) {
+function parseDateTimeInTimezone(dateStr, timeStr, timeZone) {
+  if (typeof globalThis !== 'undefined' && typeof globalThis.parseDateTimeInTimezone === 'function' && globalThis.parseDateTimeInTimezone !== parseDateTimeInTimezone) {
+    const res = globalThis.parseDateTimeInTimezone(dateStr, timeStr, timeZone);
+    if (res) return res;
+  }
+  if (!timeZone || typeof timeZone !== 'string') return null;
+  const cleanTz = timeZone.trim();
+  if (!cleanTz || !dateStr || !timeStr) return null;
+
+  if (/^(UTC|GMT|Z)$/i.test(cleanTz)) {
+    const d = new Date(dateStr + 'T' + timeStr + (timeStr.length === 5 ? ':00' : '') + 'Z');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  const offsetMatch = cleanTz.match(/^([+-])(\d{1,2})(?::?(\d{2}))?$/) || cleanTz.match(/^UTC([+-]\d{1,2}(?::?\d{2})?)$/i);
+  if (offsetMatch) {
+    let sign, hours, mins;
+    if (offsetMatch[1] && offsetMatch[2]) {
+      sign = offsetMatch[1];
+      hours = offsetMatch[2].padStart(2, '0');
+      mins = (offsetMatch[3] || '00').padStart(2, '0');
+    } else {
+      const rest = offsetMatch[1] || offsetMatch[0];
+      const m = rest.match(/([+-])(\d{1,2})(?::?(\d{2}))?/);
+      if (m) {
+        sign = m[1];
+        hours = m[2].padStart(2, '0');
+        mins = (m[3] || '00').padStart(2, '0');
+      }
+    }
+    if (sign && hours) {
+      const d = new Date(dateStr + 'T' + timeStr + (timeStr.length === 5 ? ':00' : '') + sign + hours + ':' + mins);
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const [h, min] = timeStr.split(':').map(Number);
+    let guessMs = Date.UTC(y, m - 1, d, h, min, 0);
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: cleanTz,
+      year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric',
+      hour12: false
+    });
+    for (let i = 0; i < 3; i++) {
+      const parts = dtf.formatToParts(new Date(guessMs));
+      const p = {};
+      parts.forEach(pt => { p[pt.type] = pt.value; });
+      const tzH = p.hour === '24' ? 0 : Number(p.hour);
+      const tzDateInMs = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), tzH, Number(p.minute), Number(p.second));
+      const diff = Date.UTC(y, m - 1, d, h, min, 0) - tzDateInMs;
+      if (diff === 0) break;
+      guessMs += diff;
+    }
+    const finalDate = new Date(guessMs);
+    return isNaN(finalDate.getTime()) ? null : finalDate;
+  } catch (e) {
+    return null;
+  }
+}
+
+function convertEventToLocalTime(dateStr, startTimeStr, endTimeStr, timezoneStr, durationMins = null) {
+  if (typeof globalThis !== 'undefined' && typeof globalThis.convertEventToLocalTime === 'function' && globalThis.convertEventToLocalTime !== convertEventToLocalTime) {
+    const res = globalThis.convertEventToLocalTime(dateStr, startTimeStr, endTimeStr, timezoneStr, durationMins);
+    if (res) return res;
+  }
+  if (!timezoneStr || !dateStr || !startTimeStr) {
+    return { date: dateStr, startTime: startTimeStr, endTime: endTimeStr, duration: durationMins, converted: false };
+  }
+
+  const startDate = parseDateTimeInTimezone(dateStr, startTimeStr, timezoneStr);
+  if (!startDate) {
+    return { date: dateStr, startTime: startTimeStr, endTime: endTimeStr, duration: durationMins, converted: false };
+  }
+
+  const pad = n => String(n).padStart(2, '0');
+  const localDate = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
+  const localStartTime = `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`;
+
+  let localEndTime = endTimeStr;
+  let dur = durationMins;
+
+  if (endTimeStr) {
+    let endSourceDate = dateStr;
+    const [sh, sm] = startTimeStr.split(':').map(Number);
+    const [eh, em] = endTimeStr.split(':').map(Number);
+    if (eh < sh || (eh === sh && em < sm)) {
+      const [sy, sM, sd] = dateStr.split('-').map(Number);
+      const nextDay = new Date(Date.UTC(sy, sM - 1, sd + 1));
+      endSourceDate = nextDay.toISOString().slice(0, 10);
+    }
+    const endDate = parseDateTimeInTimezone(endSourceDate, endTimeStr, timezoneStr);
+    if (endDate) {
+      localEndTime = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+      dur = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+    }
+  } else if (dur) {
+    const endDate = new Date(startDate.getTime() + dur * 60000);
+    localEndTime = `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}`;
+  }
+
+  return {
+    date: localDate,
+    startTime: localStartTime,
+    endTime: localEndTime,
+    duration: dur,
+    converted: (localDate !== dateStr || localStartTime !== startTimeStr),
+    timestamp: startDate.getTime()
+  };
+}
+
+function parseICSDateTime(dtStr, tzid = null) {
   if (!dtStr) return null;
   const str = String(dtStr).trim();
 
@@ -942,16 +1055,30 @@ function parseICSDateTime(dtStr) {
     return {
       date: `${y}-${m}-${d}`,
       time: `${hh}:${mm}`,
-      allDay: false
+      allDay: false,
+      timezone: 'UTC'
     };
   }
 
-  // 2. Local floating date-time: 20260802T143000 or 20260802T1430
+  // 2. Local floating date-time or timezone-qualified: 20260802T143000 or 20260802T1430
   const localMatch = str.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(?:(\d{2}))?$/i);
   if (localMatch) {
+    const rawDate = `${localMatch[1]}-${localMatch[2]}-${localMatch[3]}`;
+    const rawTime = `${localMatch[4]}:${localMatch[5]}`;
+    if (tzid) {
+      const conv = convertEventToLocalTime(rawDate, rawTime, null, tzid);
+      if (conv && conv.date && conv.startTime) {
+        return {
+          date: conv.date,
+          time: conv.startTime,
+          allDay: false,
+          timezone: tzid
+        };
+      }
+    }
     return {
-      date: `${localMatch[1]}-${localMatch[2]}-${localMatch[3]}`,
-      time: `${localMatch[4]}:${localMatch[5]}`,
+      date: rawDate,
+      time: rawTime,
       allDay: false
     };
   }
@@ -967,6 +1094,15 @@ function parseICSDateTime(dtStr) {
   }
 
   return null;
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.parseDateTimeInTimezone = parseDateTimeInTimezone;
+  globalThis.convertEventToLocalTime = convertEventToLocalTime;
+}
+if (typeof window !== 'undefined') {
+  window.parseDateTimeInTimezone = parseDateTimeInTimezone;
+  window.convertEventToLocalTime = convertEventToLocalTime;
 }
 
 function inferPlannerEventType(summary, description) {
@@ -1005,13 +1141,15 @@ function parseICSContent(icsText) {
         const summary = currentProps['SUMMARY'] || (t('planner.importedEvent') || 'Imported Event');
         const dtStartRaw = currentProps['DTSTART'];
         const dtEndRaw = currentProps['DTEND'];
+        const dtStartTzid = currentProps['DTSTART_TZID'] || currentProps['TZID'];
+        const dtEndTzid = currentProps['DTEND_TZID'] || currentProps['TZID'] || dtStartTzid;
         const description = currentProps['DESCRIPTION'] || '';
         const location = currentProps['LOCATION'] || '';
         const uid = currentProps['UID'] || '';
 
-        const startParsed = parseICSDateTime(dtStartRaw);
+        const startParsed = parseICSDateTime(dtStartRaw, dtStartTzid);
         if (startParsed) {
-          let endParsed = parseICSDateTime(dtEndRaw);
+          let endParsed = parseICSDateTime(dtEndRaw, dtEndTzid);
           let startTime = startParsed.time;
           let endTime = '17:00';
 
@@ -1039,7 +1177,8 @@ function parseICSContent(icsText) {
             description: description,
             location: location,
             allDay: startParsed.allDay || false,
-            icsUid: uid
+            icsUid: uid,
+            ...(startParsed.timezone ? { timezone: startParsed.timezone } : {})
           };
           events.push(newEvt);
         }
@@ -1054,6 +1193,10 @@ function parseICSContent(icsText) {
         const valPart = line.substring(colonIdx + 1);
         const keyName = keyPart.split(';')[0].trim().toUpperCase();
         currentProps[keyName] = unescapeICSValue(valPart);
+        const tzidMatch = keyPart.match(/TZID=([^;:]+)/i);
+        if (tzidMatch) {
+          currentProps[keyName + '_TZID'] = tzidMatch[1].replace(/["']/g, '').trim();
+        }
       }
     }
   }
@@ -1781,16 +1924,39 @@ function normalizePlannerProposals(rawProposals, currentPlannerEvents = []) {
     if (!title) title = (typeof t === 'function' ? t('planner.blockLabel') : '') || 'Proposed Event';
     title = title.slice(0, 500);
 
-    let date = typeof item.date === 'string' ? item.date.trim() : '';
-    let isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
-    if (isValidDate) {
-      const [y, m, d] = date.split('-').map(Number);
-      if (m < 1 || m > 12 || d < 1 || d > 31) isValidDate = false;
+    let rawDate = typeof item.date === 'string' ? item.date.trim() : '';
+    let rawStartTime = typeof item.startTime === 'string' ? item.startTime.trim() : (typeof item.start === 'string' ? item.start.trim() : '');
+    let rawEndTime = typeof item.endTime === 'string' ? item.endTime.trim() : (typeof item.end === 'string' ? item.end.trim() : '');
+    let rawTimezone = typeof item.timezone === 'string' ? item.timezone.trim() : (typeof item.timeZone === 'string' ? item.timeZone.trim() : '');
+
+    // Extract ISO strings with time/date/offset from startDateTime / startTime / endDateTime / endTime
+    const startIso = (typeof item.startDateTime === 'string' ? item.startDateTime.trim() : '') || (rawStartTime.includes('T') ? rawStartTime : '');
+    if (startIso) {
+      const isoMatch = startIso.match(/^(\d{4}-\d{2}-\d{2})T(\d{1,2}:\d{2})(?::\d{2})?(?:(\.\d+))?(Z|[+-]\d{2}:?\d{2})?/i);
+      if (isoMatch) {
+        if (!rawDate) rawDate = isoMatch[1];
+        rawStartTime = isoMatch[2];
+        if (isoMatch[4] && !rawTimezone) rawTimezone = isoMatch[4];
+      }
     }
-    if (!isValidDate) {
-      date = (typeof formatLocalDateValue === 'function')
-        ? formatLocalDateValue(new Date())
-        : new Date().toISOString().slice(0, 10);
+    const endIso = (typeof item.endDateTime === 'string' ? item.endDateTime.trim() : '') || (rawEndTime.includes('T') ? rawEndTime : '');
+    if (endIso) {
+      const isoMatch = endIso.match(/^(\d{4}-\d{2}-\d{2})T(\d{1,2}:\d{2})(?::\d{2})?(?:(\.\d+))?(Z|[+-]\d{2}:?\d{2})?/i);
+      if (isoMatch) {
+        rawEndTime = isoMatch[2];
+        if (isoMatch[4] && !rawTimezone) rawTimezone = isoMatch[4];
+      }
+    }
+
+    const offsetInStart = rawStartTime.match(/^(\d{1,2}:\d{2})(Z|[+-]\d{2}:?\d{2})$/i);
+    if (offsetInStart) {
+      rawStartTime = offsetInStart[1];
+      if (!rawTimezone) rawTimezone = offsetInStart[2];
+    }
+    const offsetInEnd = rawEndTime.match(/^(\d{1,2}:\d{2})(Z|[+-]\d{2}:?\d{2})$/i);
+    if (offsetInEnd) {
+      rawEndTime = offsetInEnd[1];
+      if (!rawTimezone) rawTimezone = offsetInEnd[2];
     }
 
     const rawDuration = item.duration ?? item.dur ?? item.length ?? item.durationMinutes ?? null;
@@ -1804,7 +1970,34 @@ function normalizePlannerProposals(rawProposals, currentPlannerEvents = []) {
       parsedDuration === 1439
     );
 
-    let startTime = typeof item.startTime === 'string' ? item.startTime.trim() : (typeof item.start === 'string' ? item.start.trim() : '');
+    let origDate = rawDate;
+    let origStartTime = rawStartTime;
+    let origEndTime = rawEndTime;
+    let wasConverted = false;
+
+    if (!isExplicitAllDay && rawTimezone && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && /^\d{1,2}:\d{2}$/.test(rawStartTime)) {
+      const conv = convertEventToLocalTime(rawDate, rawStartTime, rawEndTime, rawTimezone, parsedDuration);
+      if (conv) {
+        rawDate = conv.date;
+        rawStartTime = conv.startTime;
+        if (conv.endTime) rawEndTime = conv.endTime;
+        wasConverted = conv.converted;
+      }
+    }
+
+    let date = rawDate;
+    let isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    if (isValidDate) {
+      const [y, m, d] = date.split('-').map(Number);
+      if (m < 1 || m > 12 || d < 1 || d > 31) isValidDate = false;
+    }
+    if (!isValidDate) {
+      date = (typeof formatLocalDateValue === 'function')
+        ? formatLocalDateValue(new Date())
+        : new Date().toISOString().slice(0, 10);
+    }
+
+    let startTime = rawStartTime;
     let isValidStartTime = /^\d{1,2}:\d{2}$/.test(startTime);
     if (isValidStartTime) {
       const [sh, sm] = startTime.split(':').map(Number);
@@ -1815,7 +2008,7 @@ function normalizePlannerProposals(rawProposals, currentPlannerEvents = []) {
     }
     if (startTime.length === 4) startTime = '0' + startTime;
 
-    let endTime = typeof item.endTime === 'string' ? item.endTime.trim() : (typeof item.end === 'string' ? item.end.trim() : '');
+    let endTime = rawEndTime;
     let isValidEndTime = /^\d{1,2}:\d{2}$/.test(endTime);
     if (isValidEndTime) {
       const [eh, em] = endTime.split(':').map(Number);
@@ -1859,9 +2052,14 @@ function normalizePlannerProposals(rawProposals, currentPlannerEvents = []) {
         : 'work';
     }
 
-    const description = typeof item.description === 'string'
+    let description = typeof item.description === 'string'
       ? item.description.trim().slice(0, 5000)
       : (typeof item.context === 'string' ? item.context.trim().slice(0, 5000) : '');
+    if (wasConverted && rawTimezone && !description.includes(rawTimezone)) {
+      const tzNotice = `[Timezone: ${rawTimezone} (${origStartTime})]`;
+      description = description ? `${description}\n${tzNotice}` : tzNotice;
+    }
+
     const source = (typeof item.source === 'string' ? item.source.trim().slice(0, 100) : '') || (typeof t === 'function' ? t('planner.proposedByAgent') : 'Agent');
     const collaborators = Array.isArray(item.collaborators)
       ? item.collaborators.map(c => (typeof c === 'string' || typeof c === 'number' ? String(c).trim().slice(0, 100) : '')).filter(Boolean).slice(0, 50)
@@ -1887,6 +2085,16 @@ function normalizePlannerProposals(rawProposals, currentPlannerEvents = []) {
       collaborators,
       status
     };
+
+    if (rawTimezone) {
+      normalized.timezone = rawTimezone;
+    }
+    if (wasConverted) {
+      normalized.originalTimezone = rawTimezone;
+      normalized.originalStartTime = origStartTime;
+      normalized.originalDate = origDate;
+      if (origEndTime) normalized.originalEndTime = origEndTime;
+    }
 
     if (item.isDraft || source === 'Draft') {
       normalized.isDraft = true;
@@ -2034,6 +2242,10 @@ async function quickAcceptPlannerProposal(proposalId) {
     linkedNoteIds: [],
     linkedTodoIds: []
   };
+  if (proposal.timezone) newEvent.timezone = proposal.timezone;
+  if (proposal.originalTimezone) newEvent.originalTimezone = proposal.originalTimezone;
+  if (proposal.originalStartTime) newEvent.originalStartTime = proposal.originalStartTime;
+  if (proposal.originalDate) newEvent.originalDate = proposal.originalDate;
   if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
     plannerEvents.push(newEvent);
   }

@@ -1,5 +1,5 @@
 {
-  "_notice": "IMPORTANT FOR AGENTS: Do NOT delete or overwrite existing proposed events in this file. Only append new proposals. Secretary tracks processed/accepted proposals by their unique 'id' to prevent duplicate entries and calendar overlaps.",
+  "_notice": "IMPORTANT FOR AGENTS: Do NOT delete or overwrite existing proposed events in this file. Only append new proposals. Secretary tracks processed/accepted proposals by their unique 'id' to prevent duplicate entries and calendar overlaps. External agents should provide the event's source timezone (e.g. 'timezone': 'America/New_York', 'UTC', '+02:00'). Secretary automatically converts proposals across timezones and midnight boundaries into the user's local timezone.",
   "_eventTypes": {
     "call": "Voice or video call (e.g. client calls, Zoom/Teams conferences, phone calls). Supports linking notes and collaborators.",
     "sync": "Team synchronization or 1-on-1 meeting (e.g. daily standups, weekly 1:1, sprint planning). Supports linking notes and collaborators.",
@@ -20,6 +20,7 @@
       "endTime": "15:00",
       "duration": 60,
       "type": "sync",
+      "timezone": "America/New_York",
       "description": "Proposed by Agent: Review proposals schema, deduplication mechanics, and UI presentation.",
       "source": "Agent Alpha",
       "collaborators": [

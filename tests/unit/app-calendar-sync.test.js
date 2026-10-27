@@ -203,6 +203,21 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       const defaultCmd = CalendarSyncService.getLocalSyncCommand();
       expect(defaultCmd).toBe('./development/sync_local_calendar.sh');
     });
+
+    it('generates the correct zero-dependency local Windows PowerShell sync script command', () => {
+      const cmd = CalendarSyncService.getLocalSyncCommand('C:\\Users\\alice\\MyWorkspace', 'win');
+      expect(cmd).toBe('powershell.exe -ExecutionPolicy Bypass -File .\\development\\sync_local_calendar.ps1 -Workspace "C:\\Users\\alice\\MyWorkspace"');
+
+      const defaultCmd = CalendarSyncService.getLocalSyncCommand('', 'win');
+      expect(defaultCmd).toBe('powershell.exe -ExecutionPolicy Bypass -File .\\development\\sync_local_calendar.ps1');
+    });
+
+    it('detects Windows platform via isWindows() correctly', () => {
+      expect(typeof CalendarSyncService.isWindows).toBe('function');
+      const isWinSpy = vi.spyOn(CalendarSyncService, 'isWindows').mockReturnValue(true);
+      expect(CalendarSyncService.getLocalSyncCommand('C:\\Test')).toContain('powershell.exe');
+      isWinSpy.mockRestore();
+    });
   });
 
   describe('Feed Management & Proposals Merge', () => {
@@ -430,6 +445,28 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       expect(createObjectURLMock).toHaveBeenCalled();
       expect(clicked).toBe(true);
       expect(downloadAttr).toBe('sync_local_calendar.sh');
+    });
+
+    it('downloads sync_local_calendar.ps1 on Windows platform', async () => {
+      let clicked = false;
+      let downloadAttr = '';
+      const originalCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        const el = originalCreateElement(tag);
+        if (tag === 'a') {
+          el.click = () => {
+            clicked = true;
+            downloadAttr = el.download;
+          };
+        }
+        return el;
+      });
+
+      window.toast = vi.fn();
+      await CalendarSyncService.downloadSyncScript('win');
+
+      expect(clicked).toBe(true);
+      expect(downloadAttr).toBe('sync_local_calendar.ps1');
     });
 
     it('handles direct upload of external agent proposals JSON file', async () => {
