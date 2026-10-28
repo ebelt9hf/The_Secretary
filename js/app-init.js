@@ -1350,6 +1350,7 @@ window.showCloudSyncDiagnosticError = showCloudSyncDiagnosticError;
 function setCloudSyncStep(stepName, options = {}) {
   clearCloudSyncDiagnosticError();
 
+  const stepInvite = document.getElementById('sync-step-invite');
   const stepConfig = document.getElementById('sync-step-config');
   const stepIntent = document.getElementById('sync-step-intent');
   const stepAuth = document.getElementById('sync-step-auth');
@@ -1360,16 +1361,27 @@ function setCloudSyncStep(stepName, options = {}) {
 
   const backendBar = document.getElementById('sync-active-backend-bar');
   const backendName = document.getElementById('sync-active-backend-name');
+  const inviteVerifiedBadge = document.getElementById('sync-invite-verified-badge');
+  const inviteRequiredBadge = document.getElementById('sync-invite-required-badge');
   const changeBackendBtn = document.getElementById('btn-sync-change-backend');
 
   let targetStep = stepName;
   if (stepName === 'connect' || stepName === 'create') {
     targetStep = 'auth';
     _cloudSyncSubMode = stepName;
+  } else if (stepName === 'invite') {
+    if (options.subMode) {
+      _cloudSyncSubMode = options.subMode;
+    } else if (!options.preserveSubMode) {
+      _cloudSyncSubMode = null;
+    }
+  } else if (stepName === 'intent' || stepName === 'config') {
+    _cloudSyncSubMode = null;
   }
 
   _cloudSyncCurrentStep = targetStep;
 
+  if (stepInvite) stepInvite.style.display = targetStep === 'invite' ? 'block' : 'none';
   if (stepConfig) stepConfig.style.display = targetStep === 'config' ? 'block' : 'none';
   if (stepIntent) stepIntent.style.display = targetStep === 'intent' ? 'block' : 'none';
   if (stepAuth) stepAuth.style.display = targetStep === 'auth' ? 'block' : 'none';
@@ -1391,13 +1403,39 @@ function setCloudSyncStep(stepName, options = {}) {
             : "Etienne's Cloud Vault";
         }
       }
+      if (inviteVerifiedBadge && inviteRequiredBadge) {
+        if (!customCfg && window.FirebaseSyncService?.isEtienneFirebase?.()) {
+          const hasInvite = !!window.FirebaseSyncService?.hasValidInviteCode?.();
+          inviteVerifiedBadge.style.display = hasInvite ? 'inline-block' : 'none';
+          inviteRequiredBadge.style.display = hasInvite ? 'none' : 'inline-block';
+        } else {
+          inviteVerifiedBadge.style.display = 'none';
+          inviteRequiredBadge.style.display = 'none';
+        }
+      }
       if (changeBackendBtn) {
         changeBackendBtn.style.display = customCfg ? 'inline-flex' : 'none';
       }
     }
   }
 
-  if (targetStep === 'config') {
+  if (targetStep === 'invite') {
+    if (modalTitle) modalTitle.textContent = typeof t === 'function' ? t('sync.inviteStepTitle') : "Etienne's Cloud Vault - Invite Code Required";
+    if (modalDesc) modalDesc.textContent = typeof t === 'function' ? t('sync.inviteStepDesc') : "Access to Etienne's Managed Cloud Vault is limited to invited users. Enter your invite code below, or connect your own free Google Firebase project.";
+    if (backBtn) {
+      backBtn.style.display = _cloudSyncCameFromConfig ? 'inline-flex' : 'none';
+    }
+    const alertEl = document.getElementById('sync-invite-error-alert');
+    if (alertEl) alertEl.style.display = 'none';
+    const inviteInput = document.getElementById('sync-invite-code-input');
+    if (inviteInput) {
+      if (!inviteInput.value) {
+        const stored = window.FirebaseSyncService?.getInviteCode?.();
+        if (stored) inviteInput.value = stored;
+      }
+      setTimeout(() => inviteInput.focus(), 100);
+    }
+  } else if (targetStep === 'config') {
     _cloudSyncCameFromConfig = true;
     if (modalTitle) modalTitle.textContent = typeof t === 'function' ? t('sync.configStepTitle') : 'Configure Firebase Project';
     if (modalDesc) modalDesc.textContent = typeof t === 'function' ? t('sync.configStepDesc') : 'Paste your Firebase Web App configuration below to connect Secretary to your own Firebase project.';
@@ -1458,10 +1496,69 @@ function setCloudSyncStep(stepName, options = {}) {
 }
 window.setCloudSyncStep = setCloudSyncStep;
 
+async function verifyAndApplyInviteCodeUI() {
+  const input = document.getElementById('sync-invite-code-input');
+  const alertEl = document.getElementById('sync-invite-error-alert');
+  const alertText = document.getElementById('sync-invite-error-text');
+  const submitBtn = document.getElementById('btn-submit-invite-code');
+  const code = (input?.value || '').trim();
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+  }
+
+  try {
+    const isValid = await (window.FirebaseSyncService?.verifyInviteCodeRemote
+      ? window.FirebaseSyncService.verifyInviteCodeRemote(code)
+      : Promise.resolve(window.FirebaseSyncService?.validateInviteCode?.(code)));
+
+    if (!isValid) {
+      if (alertEl) {
+        alertEl.style.display = 'block';
+        if (alertText) {
+          alertText.textContent = typeof t === 'function' ? t('sync.invalidInviteCode') : 'Invalid invite code. Please verify your code or connect your own free Firebase project.';
+        }
+      }
+      if (typeof showToast === 'function') {
+        showToast(typeof t === 'function' ? t('sync.invalidInviteCode') : 'Invalid invite code. Please verify your code or connect your own free Firebase project.', true);
+      }
+      return;
+    }
+
+    if (alertEl) alertEl.style.display = 'none';
+    window.FirebaseSyncService?.setInviteCode?.(code, true);
+    if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.inviteCodeAccepted') : "Invite code accepted! Access to Etienne's Cloud Vault unlocked.");
+    }
+    const nextStep = _cloudSyncSubMode || 'intent';
+    _cloudSyncSubMode = null;
+    setCloudSyncStep(nextStep);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+    }
+  }
+}
+window.verifyAndApplyInviteCodeUI = verifyAndApplyInviteCodeUI;
+
+function selectCloudSyncIntent(intent) {
+  if (window.FirebaseSyncService?.requiresInviteCode?.()) {
+    setCloudSyncStep('invite', { subMode: intent });
+    return;
+  }
+  setCloudSyncStep(intent);
+}
+window.selectCloudSyncIntent = selectCloudSyncIntent;
+
 function navigateCloudSyncStepBack() {
   if (_cloudSyncCurrentStep === 'auth') {
     setCloudSyncStep('intent');
   } else if (_cloudSyncCurrentStep === 'intent') {
+    if (_cloudSyncCameFromConfig) {
+      setCloudSyncStep('config');
+    }
+  } else if (_cloudSyncCurrentStep === 'invite') {
     if (_cloudSyncCameFromConfig) {
       setCloudSyncStep('config');
     }
@@ -2065,6 +2162,13 @@ async function submitCloudSyncSetup() {
       }
     }
 
+    // Enforce invite code limit for Etienne Firebase
+    if (window.FirebaseSyncService?.requiresInviteCode?.()) {
+      notify(typeof t === 'function' ? t('sync.inviteCodeRequired') : 'An invite code is required to use Etienne\'s Cloud Vault', true);
+      if (typeof setCloudSyncStep === 'function') setCloudSyncStep('invite');
+      return;
+    }
+
     const email = emailInput?.value?.trim() || '';
     const authPass = authPassInput?.value?.trim() || '';
     const rawPass = passInput?.value || '';
@@ -2335,6 +2439,13 @@ window.submitCloudSyncSetup = submitCloudSyncSetup;
 
 async function submitCloudSyncGoogle() {
   clearCloudSyncDiagnosticError();
+  if (window.FirebaseSyncService?.requiresInviteCode?.()) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.inviteCodeRequired') : 'An invite code is required to use Etienne\'s Cloud Vault', true);
+    }
+    if (typeof setCloudSyncStep === 'function') setCloudSyncStep('invite');
+    return;
+  }
   const passInput = document.getElementById('sync-setup-passphrase');
   const rememberPass = document.getElementById('sync-setup-remember-pass')?.checked;
   let rawPass = passInput?.value || '';
@@ -2398,6 +2509,13 @@ async function submitCloudSyncGoogle() {
 window.submitCloudSyncGoogle = submitCloudSyncGoogle;
 
 async function submitCloudSyncMagicLink() {
+  if (window.FirebaseSyncService?.requiresInviteCode?.()) {
+    if (typeof showToast === 'function') {
+      showToast(typeof t === 'function' ? t('sync.inviteCodeRequired') : 'An invite code is required to use Etienne\'s Cloud Vault', true);
+    }
+    if (typeof setCloudSyncStep === 'function') setCloudSyncStep('invite');
+    return;
+  }
   const emailInput = document.getElementById('sync-setup-email');
   const email = emailInput?.value?.trim() || '';
 
@@ -2953,6 +3071,19 @@ function updateCustomFirebaseStatusUI() {
       pill.textContent = typeof t === 'function' ? t('sync.customFirebaseStatusDefault') : "Etienne's Firebase Project";
       pill.style.background = 'rgba(59, 130, 246, 0.12)';
       pill.style.color = '#3b82f6';
+    }
+  }
+
+  const inviteVerifiedBadge = document.getElementById('sync-invite-verified-badge');
+  const inviteRequiredBadge = document.getElementById('sync-invite-required-badge');
+  if (inviteVerifiedBadge && inviteRequiredBadge) {
+    if (!customCfg && window.FirebaseSyncService?.isEtienneFirebase?.()) {
+      const hasInvite = !!window.FirebaseSyncService?.hasValidInviteCode?.();
+      inviteVerifiedBadge.style.display = hasInvite ? 'inline-block' : 'none';
+      inviteRequiredBadge.style.display = hasInvite ? 'none' : 'inline-block';
+    } else {
+      inviteVerifiedBadge.style.display = 'none';
+      inviteRequiredBadge.style.display = 'none';
     }
   }
 }
@@ -5347,7 +5478,11 @@ function openManagedFirebaseSetupFromLanding() {
   if (body) body.style.display = 'none';
   if (typeof switchSyncSetupTab === 'function') switchSyncSetupTab('signup');
   _cloudSyncCameFromConfig = false;
-  if (typeof setCloudSyncStep === 'function') setCloudSyncStep('intent');
+  if (window.FirebaseSyncService?.requiresInviteCode?.()) {
+    if (typeof setCloudSyncStep === 'function') setCloudSyncStep('invite');
+  } else {
+    if (typeof setCloudSyncStep === 'function') setCloudSyncStep('intent');
+  }
   if (typeof updateCustomFirebaseStatusUI === 'function') updateCustomFirebaseStatusUI();
   const emailInput = document.getElementById('sync-setup-email');
   if (emailInput) setTimeout(() => emailInput.focus(), 150);

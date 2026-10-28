@@ -14,6 +14,7 @@ describe('Firebase Multi-Step Progressive Setup & Diagnostic UI', () => {
     globalThis.applyLocalizedUI = () => {};
 
     loadScriptsIntoGlobal([
+      'js/firebase-config.js',
       'js/app-utils.js',
       'js/app-firebase-sync.js',
       'js/app-init.js'
@@ -34,6 +35,12 @@ describe('Firebase Multi-Step Progressive Setup & Diagnostic UI', () => {
         <div id="sync-active-backend-bar" style="display:none;">
           <strong id="sync-active-backend-name"></strong>
           <button id="btn-sync-change-backend" style="display:none;"></button>
+        </div>
+
+        <!-- Step 0: Invite -->
+        <div id="sync-step-invite" class="sync-step-view" style="display:none;">
+          <input type="text" id="sync-invite-code-input" value="">
+          <button id="btn-submit-invite-code"></button>
         </div>
 
         <!-- Step 1: Config -->
@@ -122,6 +129,7 @@ describe('Firebase Multi-Step Progressive Setup & Diagnostic UI', () => {
 
   afterEach(() => {
     window.FirebaseSyncService?.clearCustomFirebaseConfig?.();
+    window.FirebaseSyncService?.clearInviteCode?.();
     vi.restoreAllMocks();
   });
 
@@ -372,10 +380,21 @@ describe('Firebase Multi-Step Progressive Setup & Diagnostic UI', () => {
   });
 
   describe('Landing Page Openers', () => {
-    it('openManagedFirebaseSetupFromLanding opens modal directly to intent step', () => {
+    it('openManagedFirebaseSetupFromLanding routes to invite step when no invite code exists', () => {
+      window.FirebaseSyncService.clearInviteCode();
+      window.openManagedFirebaseSetupFromLanding();
+
+      expect(document.getElementById('sync-step-invite').style.display).toBe('block');
+      expect(document.getElementById('sync-step-intent').style.display).toBe('none');
+      expect(document.getElementById('sync-step-config').style.display).toBe('none');
+    });
+
+    it('openManagedFirebaseSetupFromLanding opens modal directly to intent step when valid invite code exists', () => {
+      window.FirebaseSyncService.setInviteCode('ETIENNE-BETA');
       window.openManagedFirebaseSetupFromLanding();
 
       expect(document.getElementById('sync-step-intent').style.display).toBe('block');
+      expect(document.getElementById('sync-step-invite').style.display).toBe('none');
       expect(document.getElementById('sync-step-config').style.display).toBe('none');
     });
 

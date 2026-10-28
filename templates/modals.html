@@ -609,6 +609,8 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
         <span data-i18n="sync.activeBackendLabel">Active Backend:</span>
         <strong id="sync-active-backend-name" style="color:var(--text); font-weight:600;">Etienne's Cloud Vault</strong>
+        <span id="sync-invite-verified-badge" style="display:none; font-size:0.68rem; padding:1px 6px; border-radius:10px; background:rgba(16,185,129,0.15); color:#10b981; font-weight:600;" data-i18n="sync.inviteVerifiedBadge">Invite Verified</span>
+        <span id="sync-invite-required-badge" style="display:none; font-size:0.68rem; padding:1px 6px; border-radius:10px; background:rgba(245,158,11,0.15); color:#f59e0b; font-weight:600;" data-i18n="sync.inviteRequiredBadge">Invite Required</span>
       </span>
       <button type="button" class="btn btn-secondary" id="btn-sync-change-backend" onclick="openCustomFirebaseConfigFromIntent()" style="padding:2px 8px; font-size:0.72rem; display:none;" title="Change Firebase project configuration" data-i18n-title="sync.editProjectTooltip" data-i18n="sync.editProjectBtn">Change</button>
     </div>
@@ -616,6 +618,38 @@
     <p id="sync-setup-modal-desc" style="margin: 0 0 12px 0; font-size: 0.83rem; color: var(--text-muted); line-height: 1.45;" data-i18n="sync.setupDesc">
       Synchronize your notes securely across devices with Zero-Knowledge Client-Side Encryption (AES-256-GCM). Your master password never leaves your device.
     </p>
+
+    <!-- ── STEP 0: Etienne's Firebase Invite Code View ── -->
+    <div id="sync-step-invite" class="sync-step-view" style="display:none;">
+      <div style="margin:0 0 14px 0; padding:12px 14px; border-radius:10px; background:color-mix(in srgb, var(--accent) 7%, var(--card-bg)); border:1px solid color-mix(in srgb, var(--accent) 22%, transparent); font-size:0.8rem; line-height:1.45; color:var(--text);">
+        <div style="font-weight:700; color:var(--accent); display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          <span data-i18n="sync.inviteCalloutTitle">Limited Access · Invite Code Required</span>
+        </div>
+        <div style="color:var(--text-muted); font-size:0.75rem;" data-i18n="sync.inviteCalloutDesc">
+          To prevent server overload during early access, Etienne's cloud infrastructure requires an invite code. Anyone can still use cloud sync by connecting their own free Firebase project.
+        </div>
+      </div>
+
+      <!-- In-Modal Invite Error Box -->
+      <div id="sync-invite-error-alert" style="display:none; margin-bottom:12px; padding:8px 12px; border-radius:8px; font-size:0.75rem; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); color:#ef4444;">
+        <span id="sync-invite-error-text"></span>
+      </div>
+
+      <div class="form-field" style="margin-bottom:14px;">
+        <label for="sync-invite-code-input" style="display:block; font-weight:600; font-size:0.8rem; margin-bottom:4px; color:var(--text);" data-i18n="sync.inviteCodeLabel">Invite Code</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="sync-invite-code-input" class="prefs-input" style="flex:1; font-family:monospace; font-weight:600; font-size:0.85rem; letter-spacing:1px; text-transform:uppercase;" placeholder="e.g. ETIENNE-BETA" title="Enter the invite code provided by Etienne" data-i18n-title="sync.inviteCodeTooltip" data-i18n-placeholder="sync.inviteCodePlaceholder" onkeydown="if(event.key==='Enter'){event.preventDefault();verifyAndApplyInviteCodeUI();}">
+          <button type="button" class="btn btn-primary" id="btn-submit-invite-code" onclick="verifyAndApplyInviteCodeUI()" style="padding:6px 14px; font-size:0.8rem; font-weight:600;" title="Verify this invite code and unlock access to Etienne's Cloud Vault" data-i18n-title="sync.verifyInviteTooltip" data-i18n="sync.verifyInviteBtn">Unlock Vault</button>
+        </div>
+        <small style="color:var(--text-muted); font-size:0.72rem; margin-top:3px; display:block;" data-i18n="sync.inviteCodeHelp">Have an invite code from Etienne? Enter it to get immediate cloud synchronization access.</small>
+      </div>
+
+      <div style="padding-top:10px; border-top:1px solid var(--card-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <button type="button" class="btn btn-secondary" id="btn-invite-use-custom-firebase" onclick="openCustomFirebaseSetupFromLanding()" style="font-size:0.75rem;" title="Switch to configuring your own free Google Firebase project without any invite code" data-i18n-title="sync.connectOwnInsteadTooltip" data-i18n="sync.connectOwnInsteadBtn">No invite code? Connect Own Firebase</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cloud-sync-setup')" style="font-size:0.75rem;" data-i18n="common.cancel" data-i18n-title="common.cancelTooltip" title="Close this dialog">Cancel</button>
+      </div>
+    </div>
 
     <!-- ── STEP 1: Custom Firebase Project Configuration View ── -->
     <div id="sync-step-config" class="sync-step-view" style="display:none;">
@@ -671,7 +705,7 @@
     <div id="sync-step-intent" class="sync-step-view" style="display:none;">
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; margin-bottom:16px;">
         <!-- Option A: Connect Existing Account -->
-        <div class="sync-intent-card" id="card-intent-existing" onclick="setCloudSyncStep('connect')" style="padding:16px 14px; border-radius:10px; border:1px solid var(--card-border); background:var(--card-bg-alt); cursor:pointer; transition:transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; display:flex; flex-direction:column; justify-content:space-between;">
+        <div class="sync-intent-card" id="card-intent-existing" onclick="selectCloudSyncIntent('connect')" style="padding:16px 14px; border-radius:10px; border:1px solid var(--card-border); background:var(--card-bg-alt); cursor:pointer; transition:transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; display:flex; flex-direction:column; justify-content:space-between;">
           <div>
             <div style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:8px; background:rgba(59,130,246,0.12); color:#3b82f6; margin-bottom:10px;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -683,7 +717,7 @@
         </div>
 
         <!-- Option B: Create New Account -->
-        <div class="sync-intent-card" id="card-intent-new" onclick="setCloudSyncStep('create')" style="padding:16px 14px; border-radius:10px; border:1px solid var(--card-border); background:var(--card-bg-alt); cursor:pointer; transition:transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; display:flex; flex-direction:column; justify-content:space-between;">
+        <div class="sync-intent-card" id="card-intent-new" onclick="selectCloudSyncIntent('create')" style="padding:16px 14px; border-radius:10px; border:1px solid var(--card-border); background:var(--card-bg-alt); cursor:pointer; transition:transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease; display:flex; flex-direction:column; justify-content:space-between;">
           <div>
             <div style="display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:8px; background:rgba(16,185,129,0.12); color:#10b981; margin-bottom:10px;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>

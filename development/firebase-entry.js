@@ -327,6 +327,40 @@ export const FirebaseBridge = {
     return snapshot.exists() ? snapshot.val() : null;
   },
 
+  async checkInviteCode(rawCode, timeoutMs = 15000) {
+    if (!rawCode || typeof rawCode !== 'string') {
+      return { valid: false, reason: 'empty' };
+    }
+    const normalized = rawCode.trim().toUpperCase().replace(/[\s_]+/g, '-');
+    if (!normalized) {
+      return { valid: false, reason: 'empty' };
+    }
+    if (!this.db) {
+      return { valid: false, reason: 'no_db' };
+    }
+    try {
+      if (typeof this.ensureAuth === 'function') {
+        await this.ensureAuth();
+      }
+      const codeRef = ref(this.db, `invite_codes/${normalized}`);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Network timeout checking invite code')), timeoutMs);
+      });
+      const snapshot = await Promise.race([get(codeRef), timeoutPromise]);
+      if (snapshot && snapshot.exists()) {
+        const val = snapshot.val();
+        const isActive = val === true || (typeof val === 'object' && val !== null && val.active !== false) || (typeof val === 'string' && val.toLowerCase() === 'active');
+        if (isActive) {
+          return { valid: true, code: normalized, data: val };
+        }
+      }
+      return { valid: false, reason: 'not_found' };
+    } catch (err) {
+      console.warn('FirebaseBridge.checkInviteCode failed:', err);
+      return { valid: false, error: err };
+    }
+  },
+
   async getAllNotes(userId, timeoutMs = 25000) {
     if (!this.db || !userId) return [];
     const vaultRef = ref(this.db, `users/${userId}/vault`);

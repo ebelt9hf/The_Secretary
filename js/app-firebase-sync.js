@@ -430,6 +430,145 @@ const FirebaseSyncService = {
     }
   },
 
+  VALID_INVITE_CODES: [
+    'ETIENNE-BETA',
+    'SECRETARY-2026',
+    'ETIENNE-VIP',
+    'SECRETARY-VIP',
+    'VIP-ACCESS',
+    'ETIENNE-CLOUD',
+    'ETIENNE-ACCESS',
+    'SECRETARY-CLOUD',
+    'INVITE-2026'
+  ],
+
+  isEtienneFirebase(config = null) {
+    const customCfg = this.getCustomFirebaseConfig();
+    if (customCfg && customCfg.apiKey && customCfg.projectId && customCfg.projectId !== 'secretary-98cdd') {
+      return false;
+    }
+    const cfg = config || this.state?.config || customCfg || (typeof window !== 'undefined' ? window.DEFAULT_FIREBASE_CONFIG : (typeof globalThis !== 'undefined' ? globalThis.DEFAULT_FIREBASE_CONFIG : null));
+    if (!cfg || !cfg.apiKey) return false;
+    return cfg.projectId === 'secretary-98cdd' || (!cfg.projectId && !customCfg);
+  },
+
+  validateInviteCode(rawCode) {
+    if (!rawCode || typeof rawCode !== 'string') return false;
+    const normalized = rawCode.trim().toUpperCase().replace(/[\s_]+/g, '-');
+    if (!normalized) return false;
+
+    // Check stored code if already verified
+    const current = this.getInviteCode?.();
+    if (current && current === normalized) return true;
+
+    const validList = this.VALID_INVITE_CODES || [];
+    if (validList.includes(normalized)) return true;
+
+    const customList = (typeof window !== 'undefined' && window.ETIENNE_VALID_INVITE_CODES) ||
+                       (typeof globalThis !== 'undefined' && globalThis.ETIENNE_VALID_INVITE_CODES);
+    if (Array.isArray(customList) && customList.some(c => String(c).trim().toUpperCase().replace(/[\s_]+/g, '-') === normalized)) {
+      return true;
+    }
+
+    if (/^SEC-INV-[A-Z0-9]{4,}$/.test(normalized)) return true;
+    if (/^ETN-[A-Z0-9-]{4,}$/.test(normalized)) return true;
+
+    return false;
+  },
+
+  async verifyInviteCodeRemote(rawCode) {
+    if (!rawCode || typeof rawCode !== 'string') return false;
+    const normalized = rawCode.trim().toUpperCase().replace(/[\s_]+/g, '-');
+    if (!normalized) return false;
+
+    // Fast-path: local override or development list
+    const customList = (typeof window !== 'undefined' && window.ETIENNE_VALID_INVITE_CODES) ||
+                       (typeof globalThis !== 'undefined' && globalThis.ETIENNE_VALID_INVITE_CODES);
+    if (Array.isArray(customList) && customList.some(c => String(c).trim().toUpperCase().replace(/[\s_]+/g, '-') === normalized)) {
+      return true;
+    }
+
+    const bridge = this._getBridge();
+    if (bridge && typeof bridge.checkInviteCode === 'function') {
+      try {
+        const res = await bridge.checkInviteCode(normalized);
+        if (res && res.valid === true) {
+          return true;
+        }
+        if (res && res.reason === 'not_found') {
+          return false;
+        }
+      } catch (e) {
+        console.warn('[FirebaseSyncService] Remote invite check error:', e);
+      }
+    }
+
+    // Fallback to local regex/patterns if bridge is offline or unavailable
+    return this.validateInviteCode(rawCode);
+  },
+
+  setInviteCode(rawCode, skipValidate = false) {
+    if (!skipValidate && !this.validateInviteCode(rawCode)) return false;
+    const normalized = rawCode.trim().toUpperCase().replace(/[\s_]+/g, '-');
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('secretary_etienne_invite_code', normalized);
+      }
+      if (typeof settings !== 'undefined' && settings) {
+        settings.etienneInviteCode = normalized;
+        if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
+      }
+      if (this.state) {
+        this.state.inviteCode = normalized;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  getInviteCode() {
+    try {
+      if (this.state?.inviteCode) return this.state.inviteCode;
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('secretary_etienne_invite_code');
+        if (stored) return stored;
+      }
+      if (typeof settings !== 'undefined' && settings?.etienneInviteCode) {
+        return settings.etienneInviteCode;
+      }
+    } catch (e) {}
+    return null;
+  },
+
+  hasValidInviteCode() {
+    const code = this.getInviteCode();
+    return !!code && (this.validateInviteCode(code) || (typeof code === 'string' && code.trim().length >= 4));
+  },
+
+  clearInviteCode() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('secretary_etienne_invite_code');
+      }
+      if (typeof settings !== 'undefined' && settings) {
+        delete settings.etienneInviteCode;
+        if (typeof saveFolderSettingsDebounced === 'function') saveFolderSettingsDebounced();
+      }
+      if (this.state) {
+        delete this.state.inviteCode;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  requiresInviteCode(config = null) {
+    if (!this.isEtienneFirebase(config)) return false;
+    return !this.hasValidInviteCode();
+  },
+
   parseFirebaseConfigString(str) {
     if (!str || typeof str !== 'string') return null;
     const trimmed = str.trim();
