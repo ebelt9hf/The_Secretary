@@ -2,6 +2,50 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import fs from 'fs';
 
+function preservePwaAssetsPlugin() {
+  const MANIFEST_PLACEHOLDER = '<!-- __VITE_PWA_MANIFEST_PLACEHOLDER__ -->';
+  const ICON_PLACEHOLDER = '<!-- __VITE_PWA_ICON_PLACEHOLDER__ -->';
+  const APPLE_ICON_PLACEHOLDER = '<!-- __VITE_PWA_APPLE_ICON_PLACEHOLDER__ -->';
+
+  return [
+    {
+      name: 'preserve-pwa-assets-pre',
+      transformIndexHtml: {
+        order: 'pre',
+        handler(html) {
+          return html
+            .replace(/<link\s+rel=["']manifest["'][^>]*>/i, MANIFEST_PLACEHOLDER)
+            .replace(/<link\s+rel=["']icon["'][^>]*>/i, ICON_PLACEHOLDER)
+            .replace(/<link\s+rel=["']apple-touch-icon["'][^>]*>/i, APPLE_ICON_PLACEHOLDER);
+        }
+      }
+    },
+    {
+      name: 'preserve-pwa-assets-post',
+      transformIndexHtml: {
+        order: 'post',
+        handler(html) {
+          return html
+            .replace(MANIFEST_PLACEHOLDER, '<link rel="manifest" href="./manifest.webmanifest">')
+            .replace(ICON_PLACEHOLDER, '<link rel="icon" type="image/svg+xml" href="./icon.svg">')
+            .replace(APPLE_ICON_PLACEHOLDER, '<link rel="apple-touch-icon" href="./icon-192.png">');
+        }
+      },
+      closeBundle() {
+        const assetsDir = resolve(__dirname, 'dist/assets');
+        if (fs.existsSync(assetsDir)) {
+          const files = fs.readdirSync(assetsDir);
+          for (const file of files) {
+            if (file.startsWith('manifest-') && file.endsWith('.webmanifest')) {
+              try { fs.unlinkSync(resolve(assetsDir, file)); } catch (e) {}
+            }
+          }
+        }
+      }
+    }
+  ];
+}
+
 function cleanDistAssets() {
   return {
     name: 'clean-dist-assets',
@@ -102,7 +146,7 @@ function htmlPartialsPlugin() {
 export default defineConfig({
   root: '.',
   base: './',
-  plugins: [cleanDistAssets(), htmlPartialsPlugin(), copyStaticAssets(), devAppHtmlRewrite()],
+  plugins: [cleanDistAssets(), ...preservePwaAssetsPlugin(), htmlPartialsPlugin(), copyStaticAssets(), devAppHtmlRewrite()],
   build: {
     outDir: 'dist',
     emptyOutDir: false,

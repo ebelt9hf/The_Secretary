@@ -19,7 +19,7 @@ if [ "$CURRENT_BRANCH" = "main" ]; then
     else
         echo "🚀 Commit to main detected without staged version bump. Automatically bumping patch version..."
         python3 development/bump_version.py --patch
-        git add package.json package-lock.json app.html note-window.html secretary-window.html README.md 2>/dev/null || true
+        git add package.json package-lock.json app.html note-window.html secretary-window.html README.md sw.js 2>/dev/null || true
         python3 development/bump_version.py --check
         echo "✓ Version successfully incremented and staged for commit to main."
     fi

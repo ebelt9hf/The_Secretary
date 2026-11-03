@@ -145,4 +145,36 @@ describe('Progressive Web App (PWA) Implementation (tests/unit/app-pwa.test.js)'
     expect(window.PwaManager.canPrompt).toBe(false);
     expect(document.getElementById('btn-install-app').style.display).toBe('none');
   });
+
+  it('ensures dist/app.html references root manifest.webmanifest to prevent Chrome start_url 404 in assets directory', () => {
+    const distHtmlPath = path.resolve(__dirname, '../../dist/app.html');
+    if (!fs.existsSync(distHtmlPath)) {
+      return; // Skip if dist hasn't been built yet
+    }
+    const distHtml = fs.readFileSync(distHtmlPath, 'utf-8');
+
+    // Regression check: Vite bundling manifest into assets/ causes Chrome to resolve start_url ("./app.html")
+    // relative to manifest URL, requesting "/assets/app.html" which 404s and aborts PWA installation.
+    expect(distHtml).not.toMatch(/href=["']\.\/assets\/manifest-[^"']+\.webmanifest["']/);
+    expect(distHtml).toMatch(/<link\s+rel=["']manifest["']\s+href=["']\.\/manifest\.webmanifest["']/);
+  });
+
+  it('ensures sw.js CACHE_NAME matches package.json version and precaches root shell assets', () => {
+    const swPath = path.resolve(__dirname, '../../sw.js');
+    const pkgPath = path.resolve(__dirname, '../../package.json');
+    const swContent = fs.readFileSync(swPath, 'utf-8');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+
+    expect(swContent).toContain(`secretary-pwa-v${pkg.version}`);
+    expect(swContent).toContain("'./app.html'");
+    expect(swContent).toContain("'./manifest.webmanifest'");
+  });
+
+  it('ensures sw.js fetch logic provides fallback when server returns 404 for app.html', () => {
+    const swPath = path.resolve(__dirname, '../../sw.js');
+    const swContent = fs.readFileSync(swPath, 'utf-8');
+
+    // sw.js must handle 404 responses for app shell and fall back to cached app.html
+    expect(swContent).toMatch(/response\.status === 404[\s\S]*app\.html/);
+  });
 });

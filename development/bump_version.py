@@ -100,6 +100,19 @@ def update_readme(version: str):
     readme_file.write_text(content, encoding="utf-8")
     print(f"  ✓ README.md (release links) -> v{version}")
 
+def update_sw_js(version: str):
+    sw_file = ROOT / "sw.js"
+    if not sw_file.exists():
+        return
+    content = sw_file.read_text(encoding="utf-8")
+    new_content = re.sub(
+        r"const CACHE_NAME = 'secretary-pwa-v[0-9]+\.[0-9]+\.[0-9]+';",
+        f"const CACHE_NAME = 'secretary-pwa-v{version}';",
+        content
+    )
+    sw_file.write_text(new_content, encoding="utf-8")
+    print(f"  ✓ sw.js (CACHE_NAME) -> secretary-pwa-v{version}")
+
 def check_parity() -> bool:
     curr = get_current_version()
     mismatches = []
@@ -119,6 +132,13 @@ def check_parity() -> bool:
     hint_match = re.search(r'id="connect-version-hint"\s+data-version="([^"]*)"', content)
     if hint_match and hint_match.group(1) != curr:
         mismatches.append(f"app.html landing version hint is '{hint_match.group(1)}' but package.json is '{curr}'")
+
+    sw_file = ROOT / "sw.js"
+    if sw_file.exists():
+        sw_content = sw_file.read_text(encoding="utf-8")
+        sw_match = re.search(r"const CACHE_NAME = 'secretary-pwa-v([0-9]+\.[0-9]+\.[0-9]+)';", sw_content)
+        if sw_match and sw_match.group(1) != curr:
+            mismatches.append(f"sw.js CACHE_NAME is 'secretary-pwa-v{sw_match.group(1)}' but package.json is '{curr}'")
         
     if mismatches:
         print(f"❌ Version discrepancies found (current package.json: {curr}):")
@@ -148,6 +168,7 @@ def main():
     update_package_lock_json(new_ver)
     update_app_html(new_ver)
     update_readme(new_ver)
+    update_sw_js(new_ver)
     print(f"\n🎉 Successfully bumped project version to {new_ver} across all files!")
 
 if __name__ == "__main__":

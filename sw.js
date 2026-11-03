@@ -1,7 +1,7 @@
 // ── Secretary: Progressive Web App Service Worker ──
 // Provides installability criteria, background caching of shell assets, and transparent network bypass for E2EE cloud sync & AI APIs.
 
-const CACHE_NAME = 'secretary-pwa-v4.0.33';
+const CACHE_NAME = 'secretary-pwa-v4.0.53';
 
 const PRECACHE_ASSETS = [
   './',
@@ -99,11 +99,15 @@ self.addEventListener('fetch', (event) => {
           if (response && response.status === 200) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            return response;
+          }
+          if (response && response.status === 404) {
+            return caches.match('./app.html').then((cached) => cached || caches.match('./') || response);
           }
           return response;
         })
         .catch(() => {
-          return caches.match(request).then((cached) => cached || caches.match('./app.html'));
+          return caches.match(request).then((cached) => cached || caches.match('./app.html') || caches.match('./'));
         })
     );
     return;
@@ -117,11 +121,23 @@ self.addEventListener('fetch', (event) => {
           if (response && response.status === 200) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            return response;
+          }
+          // If server responded with 404 (e.g. Chrome install verifying start_url or misrouted app.html)
+          if (response && response.status === 404) {
+            if (url.pathname.endsWith('/app.html') || url.pathname.endsWith('/index.html')) {
+              return caches.match('./app.html').then((cached) => cached || caches.match('./') || response);
+            }
           }
           return response;
         })
         .catch(() => {
-          return caches.match(request);
+          return caches.match(request).then((cached) => {
+            if (cached) return cached;
+            if (url.pathname.endsWith('/app.html') || url.pathname.endsWith('/index.html')) {
+              return caches.match('./app.html').then((appCached) => appCached || caches.match('./'));
+            }
+          });
         })
     );
     return;
