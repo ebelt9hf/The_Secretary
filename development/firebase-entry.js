@@ -18,7 +18,7 @@ import {
   unlink,
   deleteUser
 } from 'firebase/auth';
-import { getDatabase, ref, set, get, onValue, remove, child } from 'firebase/database';
+import { getDatabase, ref, set, get, onValue, remove, child, forceWebSockets } from 'firebase/database';
 
 export const FirebaseBridge = {
   app: null,
@@ -33,6 +33,9 @@ export const FirebaseBridge = {
       const existing = getApps();
       this.app = existing.length > 0 ? existing[0] : initializeApp(config);
       this.auth = getAuth(this.app);
+      if (typeof forceWebSockets === 'function') {
+        try { forceWebSockets(); } catch (e) {}
+      }
       this.db = getDatabase(this.app);
       return true;
     } catch (err) {

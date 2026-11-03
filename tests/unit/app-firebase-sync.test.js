@@ -539,6 +539,120 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
       expect(result.status).toBe('up_to_date');
     });
 
+    /**
+     * 1. Protected Behavior: FirebaseSyncService.listenAppVersion uses exponential backoff delays on listener errors.
+     * 2. Regression Target: Infinite tight loop reconnecting to Firebase on connection failures.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('retries listenAppVersion with exponential backoff when listenAppInfo errors', () => {
+      vi.useFakeTimers();
+      let errorCb = null;
+      let dataCb = null;
+      let unsubscribeCalled = false;
+
+      const mockBridge = {
+        app: {},
+        listenAppInfo: vi.fn().mockImplementation((onData, onError) => {
+          dataCb = onData;
+          errorCb = onError;
+          return () => { unsubscribeCalled = true; };
+        })
+      };
+
+      const bridgeSpy = vi.spyOn(window.FirebaseSyncService, '_getBridge').mockReturnValue(mockBridge);
+
+      try {
+        // Start listening
+        const cancel = window.FirebaseSyncService.listenAppVersion();
+        expect(mockBridge.listenAppInfo).toHaveBeenCalledTimes(1);
+
+        // Trigger error 1
+        errorCb(new Error('Connection failed'));
+        expect(unsubscribeCalled).toBe(true);
+        expect(window.FirebaseSyncService._versionRetryCount).toBe(1);
+
+        // Advance by 1000ms -> triggers retry 1
+        vi.advanceTimersByTime(1000);
+        expect(mockBridge.listenAppInfo).toHaveBeenCalledTimes(2);
+
+        // Trigger error 2
+        errorCb(new Error('Connection failed again'));
+        expect(window.FirebaseSyncService._versionRetryCount).toBe(2);
+
+        // Advance by 2000ms -> triggers retry 2
+        vi.advanceTimersByTime(2000);
+        expect(mockBridge.listenAppInfo).toHaveBeenCalledTimes(3);
+
+        // Now data arrives successfully
+        dataCb({ minVersion: '4.0.0', latestVersion: '4.0.56' });
+        expect(window.FirebaseSyncService._versionRetryCount).toBe(0);
+
+        cancel();
+      } finally {
+        bridgeSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    /**
+     * 1. Protected Behavior: FirebaseSyncService.listenRemoteVault uses exponential backoff delays on listener errors.
+     * 2. Regression Target: Tight error loop when remote vault listener experiences network disconnects.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('retries listenRemoteVault with exponential backoff on listener errors', () => {
+      vi.useFakeTimers();
+      let errorCb = null;
+      let dataCb = null;
+      let unsubscribeCalled = false;
+
+      const mockBridge = {
+        app: {},
+        listenVault: vi.fn().mockImplementation((uid, onData, onError) => {
+          dataCb = onData;
+          errorCb = onError;
+          return () => { unsubscribeCalled = true; };
+        }),
+        listenDocs: vi.fn().mockReturnValue(() => {})
+      };
+
+      const bridgeSpy = vi.spyOn(window.FirebaseSyncService, '_getBridge').mockReturnValue(mockBridge);
+      window.FirebaseSyncService.state.userId = 'test-exp-user';
+      window.FirebaseSyncService.state.isUnlocked = true;
+
+      try {
+        const cancel = window.FirebaseSyncService.listenRemoteVault();
+        expect(mockBridge.listenVault).toHaveBeenCalledTimes(1);
+
+        // Error 1
+        errorCb(new Error('Network drop'));
+        expect(unsubscribeCalled).toBe(true);
+        expect(window.FirebaseSyncService._vaultRetryCount).toBe(1);
+
+        // Retry 1 after 1000ms
+        vi.advanceTimersByTime(1000);
+        expect(mockBridge.listenVault).toHaveBeenCalledTimes(2);
+
+        // Error 2
+        errorCb(new Error('Network drop 2'));
+        expect(window.FirebaseSyncService._vaultRetryCount).toBe(2);
+
+        // Retry 2 after 2000ms
+        vi.advanceTimersByTime(2000);
+        expect(mockBridge.listenVault).toHaveBeenCalledTimes(3);
+
+        // Success
+        dataCb({});
+        expect(window.FirebaseSyncService._vaultRetryCount).toBe(0);
+
+        cancel();
+      } finally {
+        bridgeSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
     it('blocks sync operations when client is in DECLINED state', async () => {
       window.FirebaseSyncService.applyVersionStatus({
         status: 'declined',

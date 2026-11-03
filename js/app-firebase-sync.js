@@ -909,18 +909,43 @@ const FirebaseSyncService = {
     return true;
   },
 
+  _vaultRetryCount: 0,
+  _vaultRetryTimer: null,
+
+  _scheduleRemoteVaultRetry() {
+    if (this._vaultRetryTimer) return;
+    this._vaultRetryCount = (this._vaultRetryCount || 0) + 1;
+    const delays = [1000, 2000, 4000, 8000, 16000, 32000];
+    const delayMs = delays[Math.min(this._vaultRetryCount - 1, delays.length - 1)];
+    this._vaultRetryTimer = setTimeout(() => {
+      this._vaultRetryTimer = null;
+      if (this.state.isUnlocked && this.state.userId && this.state.userId !== 'default_user') {
+        this.listenRemoteVault();
+      }
+    }, delayMs);
+  },
+
   listenRemoteVault() {
     const bridge = this._getBridge();
     if (!bridge || !this.state.userId || this.state.userId === 'default_user' || !this.state.isUnlocked) {
       return () => {};
     }
     if (this._remoteUnsubscribe) {
-      this._remoteUnsubscribe();
+      try { this._remoteUnsubscribe(); } catch (e) {}
       this._remoteUnsubscribe = null;
+    }
+    if (this._vaultRetryTimer) {
+      clearTimeout(this._vaultRetryTimer);
+      this._vaultRetryTimer = null;
     }
     this._remoteUnsubscribe = bridge.listenVault(
       this.state.userId,
       async (remoteNotesMap) => {
+        this._vaultRetryCount = 0;
+        if (this._vaultRetryTimer) {
+          clearTimeout(this._vaultRetryTimer);
+          this._vaultRetryTimer = null;
+        }
         if (!remoteNotesMap || typeof remoteNotesMap !== 'object') return;
         let hasChanges = false;
         for (const [id, remoteDoc] of Object.entries(remoteNotesMap)) {
@@ -1054,18 +1079,32 @@ const FirebaseSyncService = {
       },
       (err) => {
         console.warn('Realtime Database listener error:', err);
+        if (this._remoteUnsubscribe) {
+          try { this._remoteUnsubscribe(); } catch (e) {}
+          this._remoteUnsubscribe = null;
+        }
+        if (this._remoteDocsUnsubscribe) {
+          try { this._remoteDocsUnsubscribe(); } catch (e) {}
+          this._remoteDocsUnsubscribe = null;
+        }
+        this._scheduleRemoteVaultRetry();
       }
     );
 
     // Listen to generic & itemized documents
     if (typeof bridge.listenDocs === 'function') {
       if (this._remoteDocsUnsubscribe) {
-        this._remoteDocsUnsubscribe();
+        try { this._remoteDocsUnsubscribe(); } catch (e) {}
         this._remoteDocsUnsubscribe = null;
       }
       this._remoteDocsUnsubscribe = bridge.listenDocs(
         this.state.userId,
         async (remoteDocsMap) => {
+          this._vaultRetryCount = 0;
+          if (this._vaultRetryTimer) {
+            clearTimeout(this._vaultRetryTimer);
+            this._vaultRetryTimer = null;
+          }
           if (!remoteDocsMap || typeof remoteDocsMap !== 'object') return;
           const processDocEntry = async (docKey, remoteDoc) => {
             if (!remoteDoc || !remoteDoc.updatedAt) return;
@@ -1126,13 +1165,18 @@ const FirebaseSyncService = {
 
     return () => {
       if (this._remoteUnsubscribe) {
-        this._remoteUnsubscribe();
+        try { this._remoteUnsubscribe(); } catch (e) {}
         this._remoteUnsubscribe = null;
       }
       if (this._remoteDocsUnsubscribe) {
-        this._remoteDocsUnsubscribe();
+        try { this._remoteDocsUnsubscribe(); } catch (e) {}
         this._remoteDocsUnsubscribe = null;
       }
+      if (this._vaultRetryTimer) {
+        clearTimeout(this._vaultRetryTimer);
+        this._vaultRetryTimer = null;
+      }
+      this._vaultRetryCount = 0;
     };
   },
 
@@ -1241,6 +1285,21 @@ const FirebaseSyncService = {
     return () => this._versionListeners.delete(listener);
   },
 
+  _versionRetryCount: 0,
+  _versionRetryTimer: null,
+
+  _scheduleAppVersionRetry() {
+    if (this._versionRetryTimer) return;
+    this._versionRetryCount = (this._versionRetryCount || 0) + 1;
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s max
+    const delays = [1000, 2000, 4000, 8000, 16000, 32000];
+    const delayMs = delays[Math.min(this._versionRetryCount - 1, delays.length - 1)];
+    this._versionRetryTimer = setTimeout(() => {
+      this._versionRetryTimer = null;
+      this.listenAppVersion();
+    }, delayMs);
+  },
+
   listenAppVersion() {
     const bridge = this._getBridge();
     if (!bridge || typeof bridge.listenAppInfo !== 'function') return () => {};
@@ -1251,21 +1310,45 @@ const FirebaseSyncService = {
     }
 
     if (this._versionUnsubscribe) {
-      this._versionUnsubscribe();
+      try { this._versionUnsubscribe(); } catch (e) {}
       this._versionUnsubscribe = null;
+    }
+    if (this._versionRetryTimer) {
+      clearTimeout(this._versionRetryTimer);
+      this._versionRetryTimer = null;
     }
 
     this._versionUnsubscribe = bridge.listenAppInfo(
       (appInfo) => {
+        this._versionRetryCount = 0;
+        if (this._versionRetryTimer) {
+          clearTimeout(this._versionRetryTimer);
+          this._versionRetryTimer = null;
+        }
         const result = this.checkVersionCompatibility(appInfo);
         this.applyVersionStatus(result);
       },
       (err) => {
         console.warn('listenAppInfo error:', err);
+        if (this._versionUnsubscribe) {
+          try { this._versionUnsubscribe(); } catch (e) {}
+          this._versionUnsubscribe = null;
+        }
+        this._scheduleAppVersionRetry();
       }
     );
 
-    return this._versionUnsubscribe;
+    return () => {
+      if (this._versionUnsubscribe) {
+        try { this._versionUnsubscribe(); } catch (e) {}
+        this._versionUnsubscribe = null;
+      }
+      if (this._versionRetryTimer) {
+        clearTimeout(this._versionRetryTimer);
+        this._versionRetryTimer = null;
+      }
+      this._versionRetryCount = 0;
+    };
   },
 
   // ── Sync Code (Pairing Key) Helpers ──
@@ -2013,13 +2096,18 @@ const FirebaseSyncService = {
 
   lockVault() {
     if (this._remoteUnsubscribe) {
-      this._remoteUnsubscribe();
+      try { this._remoteUnsubscribe(); } catch (e) {}
       this._remoteUnsubscribe = null;
     }
     if (this._remoteDocsUnsubscribe) {
-      this._remoteDocsUnsubscribe();
+      try { this._remoteDocsUnsubscribe(); } catch (e) {}
       this._remoteDocsUnsubscribe = null;
     }
+    if (this._vaultRetryTimer) {
+      clearTimeout(this._vaultRetryTimer);
+      this._vaultRetryTimer = null;
+    }
+    this._vaultRetryCount = 0;
     this.state.masterKey = null;
     this.state.isUnlocked = false;
     this.setActivePassphrase(null);

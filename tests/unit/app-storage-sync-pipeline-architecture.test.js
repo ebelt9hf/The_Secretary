@@ -400,5 +400,42 @@ describe('Two-Tier Storage Pipeline Architecture (RAM + IndexedDB -> Connector)'
       expect(StorageAPI._syncQueue.has(cleanId)).toBe(false);
       expect(StorageAPI.getConnectorStatus().status).toBe('synced');
     });
+
+    /**
+     * 1. Protected Behavior: StorageAPI._scheduleSyncRetry backs off exponentially on consecutive connector failures.
+     * 2. Regression Target: Fixed flat retry interval causing aggressive reconnection hammering.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('schedules sync retry using exponential backoff delays on consecutive connector errors', () => {
+      vi.useFakeTimers();
+      StorageAPI.clearSyncQueue();
+
+      // Enqueue an item
+      StorageAPI._enqueueSync({ id: 'exp-test', action: 'save' });
+
+      // First failure
+      StorageAPI._scheduleSyncRetry();
+      expect(StorageAPI._syncRetryCount).toBe(1);
+      expect(StorageAPI._syncRetryTimer).not.toBeNull();
+
+      // Clear timer simulating execution of timeout
+      StorageAPI._syncRetryTimer = null;
+
+      // Second failure
+      StorageAPI._scheduleSyncRetry();
+      expect(StorageAPI._syncRetryCount).toBe(2);
+
+      StorageAPI._syncRetryTimer = null;
+      StorageAPI._scheduleSyncRetry();
+      expect(StorageAPI._syncRetryCount).toBe(3);
+
+      // Clearing queue resets retry count
+      StorageAPI.clearSyncQueue();
+      expect(StorageAPI._syncRetryCount).toBe(0);
+      expect(StorageAPI._syncRetryTimer).toBeNull();
+
+      vi.useRealTimers();
+    });
   });
 });

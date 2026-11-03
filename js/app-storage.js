@@ -637,6 +637,7 @@ const StorageAPI = {
   _isProcessingSyncQueue: false,
   _activeSyncQueuePromise: null,
   _syncRetryTimer: null,
+  _syncRetryCount: 0,
 
   _enqueueSync(item) {
     if (!item || !item.id) return;
@@ -649,6 +650,7 @@ const StorageAPI = {
 
   clearSyncQueue() {
     this._syncQueue.clear();
+    this._syncRetryCount = 0;
     if (this._syncRetryTimer) {
       clearTimeout(this._syncRetryTimer);
       this._syncRetryTimer = null;
@@ -657,12 +659,16 @@ const StorageAPI = {
 
   _scheduleSyncRetry() {
     if (this._syncRetryTimer) return;
+    this._syncRetryCount = (this._syncRetryCount || 0) + 1;
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s max
+    const delays = [1000, 2000, 4000, 8000, 16000, 32000];
+    const delayMs = delays[Math.min(this._syncRetryCount - 1, delays.length - 1)];
     this._syncRetryTimer = setTimeout(() => {
       this._syncRetryTimer = null;
       if (this._syncQueue.size > 0) {
         this._processSyncQueue().catch(() => {});
       }
-    }, 3000);
+    }, delayMs);
   },
 
   async _processSyncQueue() {
@@ -750,6 +756,7 @@ const StorageAPI = {
 
         if (this._syncQueue.size === 0) {
           this.setConnectorStatus('synced');
+          this._syncRetryCount = 0;
           if (this._syncRetryTimer) {
             clearTimeout(this._syncRetryTimer);
             this._syncRetryTimer = null;
