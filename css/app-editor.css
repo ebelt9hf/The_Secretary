@@ -5300,8 +5300,8 @@ body[data-theme='dark'] .decision-btn {
 /* ── Word-like & Modern Document Canvas Styling ── */
 .edit-body {
   background: color-mix(in srgb, var(--card-bg-alt) 40%, var(--bg));
-  padding: 1.5rem 1.8rem;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
 }
 
 .edit-body-left {
@@ -5312,6 +5312,8 @@ body[data-theme='dark'] .decision-btn {
   flex-direction: column;
   width: 100%;
   min-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 body[data-theme='dark'] .edit-body-left {

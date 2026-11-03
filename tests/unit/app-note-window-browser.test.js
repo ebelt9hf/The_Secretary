@@ -10,6 +10,10 @@ describe('Note Window in Browser Environment', () => {
     globalThis.escH = (s) => String(s || '');
     globalThis.escA = (s) => String(s || '');
     globalThis.renderPlanner = vi.fn();
+    globalThis.toast = vi.fn();
+    globalThis.autoSaveNote = vi.fn().mockResolvedValue(true);
+    globalThis.hasUnsavedNoteOverlayChanges = vi.fn().mockReturnValue(false);
+    globalThis.renderBoard = vi.fn();
 
     loadScriptsIntoGlobal([
       'js/translations.js',
@@ -19,6 +23,8 @@ describe('Note Window in Browser Environment', () => {
       'js/app-state.js',
       'js/app-notes.js',
       'js/app-bridge.js',
+      'js/app-overlay.js',
+      'js/app-collab.js',
       'js/app-init.js'
     ]);
   });
@@ -141,5 +147,50 @@ describe('Note Window in Browser Environment', () => {
     expect(window.rootHandle).toBe(mockRootHandle);
     expect(globalThis.openNoteOverlay).toHaveBeenCalledWith('notes/demo-42.html', null, null, false, null, { sameWindow: true });
     expect(window.currentNote.title).toBe('Demo Note 42');
+  });
+
+  it('note-window.html template does not hardcode is-electron on body', () => {
+    const htmlPath = path.resolve(process.cwd(), 'note-window.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+    const bodyMatch = html.match(/<body[^>]*class=["']([^"']*)["']/i);
+    expect(bodyMatch).not.toBeNull();
+    const bodyClasses = bodyMatch[1].split(/\s+/);
+    expect(bodyClasses).not.toContain('is-electron');
+  });
+
+  it('closeNoteOverlay resets _noteCloseInProgress, removes focused-note-mode and restores body overflow', async () => {
+    document.body.classList.add('focused-note-mode');
+    document.body.style.overflow = 'hidden';
+    globalThis._isFocusedMode = true;
+    globalThis.currentNote = { id: 'note-1', path: 'notes/note-1.html', title: 'Note 1' };
+    
+    window.close = vi.fn();
+    window.AppBridge.isElectron = false;
+
+    await globalThis.closeNoteOverlay();
+
+    expect(globalThis._noteCloseInProgress).toBe(false);
+    expect(document.body.classList.contains('focused-note-mode')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
+    expect(globalThis._isFocusedMode).toBe(false);
+  });
+
+  it('getBacklinksForNote handles NotFoundError from StorageAPI without throwing', async () => {
+    globalThis.manifest = [
+      { id: 'missing-note', path: 'notes/missing.html', title: 'Missing Note', modified: '2026-01-01' }
+    ];
+    globalThis.noteContentCache = {};
+    const notFoundErr = new Error('File not found: notes/missing.html');
+    notFoundErr.name = 'NotFoundError';
+    globalThis.StorageAPI = {
+      readNoteContent: vi.fn().mockRejectedValue(notFoundErr)
+    };
+
+    const targetNote = { id: 'target-note', path: 'notes/target.html', title: 'Target' };
+    const backlinks = await globalThis.getBacklinksForNote(targetNote);
+    expect(Array.isArray(backlinks)).toBe(true);
+    expect(backlinks.length).toBe(0);
+    expect(globalThis.noteContentCache['notes/missing.html']).toBeDefined();
+    expect(globalThis.noteContentCache['notes/missing.html'].notFound).toBe(true);
   });
 });

@@ -20,6 +20,22 @@ describe('Cloud Backup Fallback, Image Asset Recovery & CSP Whitelisting', () =>
     }
   });
 
+  it('verifies that CSP whitelists file: in script-src, script-src-elem, style-src, font-src, and media-src across all entrypoints', () => {
+    const htmlFiles = ['app.html', 'note-window.html', 'secretary-window.html'];
+    for (const file of htmlFiles) {
+      const fullPath = path.join(rootDir, file);
+      const content = fs.readFileSync(fullPath, 'utf8');
+      const cspMatch = content.match(/<meta\s+http-equiv=["']Content-Security-Policy["']\s+content="([^"]*)"/i);
+      expect(cspMatch).not.toBeNull();
+      const csp = cspMatch[1];
+      expect(csp).toMatch(/script-src[^;]*\bfile:/);
+      expect(csp).toMatch(/script-src-elem[^;]*\bfile:/);
+      expect(csp).toMatch(/style-src[^;]*\bfile:/);
+      expect(csp).toMatch(/font-src[^;]*\bfile:/);
+      expect(csp).toMatch(/media-src[^;]*\bfile:/);
+    }
+  });
+
   describe('Web File System Access & Storage Fallbacks to _migrated_to_cloud_backup/', () => {
     let mockFileSystem;
 

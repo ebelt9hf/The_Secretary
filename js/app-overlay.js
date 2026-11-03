@@ -1297,7 +1297,11 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
 
   // Render image strip and related notes panel
   syncImageStrip();
-  await renderInspectorPanel();
+  try {
+    await renderInspectorPanel();
+  } catch (inspErr) {
+    console.warn('Inspector panel render failed:', inspErr);
+  }
 
   // Render planner block info for this note
   _renderPlannerBlocksForNote(currentNote?.id);
@@ -3188,16 +3192,17 @@ function showNoteCloseProgressDialog(message) {
 async function closeNoteOverlay(forceCloseAll = false) {
   if (_noteCloseInProgress) return;
   _noteCloseInProgress = true;
-  flushTagEditorInputs();
-
-  const panelEl = document.querySelector('#note-edit-overlay .overlay-panel');
-  if (panelEl) panelEl.classList.add('overlay-busy');
-  setSaveIndicator('closing');
 
   let progress = null;
   let progressTimer = null;
+  let panelEl = null;
 
   try {
+    flushTagEditorInputs();
+
+    panelEl = document.querySelector('#note-edit-overlay .overlay-panel');
+    if (panelEl) panelEl.classList.add('overlay-busy');
+    setSaveIndicator('closing');
     if (typeof unmountAiLane === 'function') {
       unmountAiLane();
     }
@@ -3307,12 +3312,22 @@ async function closeNoteOverlay(forceCloseAll = false) {
     updateUrlHash();
     if (_isFocusedMode) {
       document.title = (typeof t === 'function' ? t('app.name') : 'Secretary');
-      _tryCloseCurrentWindow();
-      if (!window.AppBridge?.isElectron) {
+      const closed = _tryCloseCurrentWindow();
+      if (!closed || !window.AppBridge?.isElectron) {
         _isFocusedMode = false;
         document.body.classList.remove('focused-note-mode');
+        document.body.style.overflow = '';
+        const screenMain = document.getElementById('screen-main');
+        if (screenMain) screenMain.style.overflow = '';
         const overlay = document.getElementById('note-edit-overlay');
-        if (overlay) overlay.style.display = 'none';
+        if (overlay) {
+          overlay.style.display = 'none';
+          overlay.classList.remove('active', 'closing');
+          overlay.style.zIndex = '';
+        }
+        if (typeof renderBoard === 'function') {
+          renderBoard();
+        }
       }
     } else {
       if (activeTab === 'notes' || activeTab === 'todos') {

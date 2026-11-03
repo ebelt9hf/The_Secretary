@@ -2417,7 +2417,9 @@ async function indexCollaborativeData() {
           };
         }
       } catch (e) {
-        console.warn('Could not index collaborative data for', entry.path, e);
+        if (e?.name !== 'NotFoundError') {
+          console.warn('Could not index collaborative data for', entry.path, e);
+        }
       }
     }));
   }
@@ -11878,19 +11880,34 @@ async function getBacklinksForNote(targetNote) {
       try {
         let content = '';
         const cached = typeof noteContentCache !== 'undefined' ? noteContentCache[n.path] : null;
-        if (cached && cached.modified === n.modified) {
+        if (cached && (cached.notFound || cached.modified === n.modified)) {
           content = cached.rawContent || '';
         } else if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readNoteContent === 'function') {
-          const html = await StorageAPI.readNoteContent(n.path);
-          if (typeof noteContentCache !== 'undefined') {
-            const parsed = typeof parseNoteHTML === 'function' ? parseNoteHTML(html) : { mainHTML: html };
-            noteContentCache[n.path] = {
-              modified: n.modified || '',
-              text: new DOMParser().parseFromString('<div>'+(parsed.mainHTML||'')+'</div>','text/html').body.textContent||'',
-              rawContent: html
-            };
+          try {
+            const html = await StorageAPI.readNoteContent(n.path);
+            if (typeof noteContentCache !== 'undefined') {
+              const parsed = typeof parseNoteHTML === 'function' ? parseNoteHTML(html) : { mainHTML: html };
+              noteContentCache[n.path] = {
+                modified: n.modified || '',
+                text: new DOMParser().parseFromString('<div>'+(parsed.mainHTML||'')+'</div>','text/html').body.textContent||'',
+                rawContent: html
+              };
+            }
+            content = html;
+          } catch (readErr) {
+            if (readErr?.name === 'NotFoundError') {
+              if (typeof noteContentCache !== 'undefined') {
+                noteContentCache[n.path] = {
+                  modified: n.modified || '',
+                  text: '',
+                  rawContent: '',
+                  notFound: true
+                };
+              }
+            } else {
+              throw readErr;
+            }
           }
-          content = html;
         }
         
         if (content && (content.toLowerCase().includes('data-path="' + targetNote.path.toLowerCase() + '"') ||
@@ -11898,7 +11915,9 @@ async function getBacklinksForNote(targetNote) {
           backlinks.push(n);
         }
       } catch (e) {
-        console.warn('Failed to parse backlink candidate', n.path, e);
+        if (e?.name !== 'NotFoundError') {
+          console.warn('Failed to parse backlink candidate', n.path, e);
+        }
       }
     }));
   }
