@@ -231,4 +231,174 @@ describe('Two-Tier Storage Pipeline Architecture (RAM + IndexedDB -> Connector)'
       expect(res).toBe(assetData);
     });
   });
+
+  describe('Note Deletion & Unique Sync Queue Architecture', () => {
+    /**
+     * 1. Protected Behavior: Deletes note from RAM cache and IndexedDB first (Stage 1) before connector sync.
+     * 2. Regression Target: Bypassing IndexedDB deletion or deleting connector file before Tier 1 is committed.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('deletes note from RAM and IndexedDB in Stage 1 before connector deleteFile', async () => {
+      const deleteNoteSpy = vi.spyOn(VaultIDBStorage, 'deleteNote').mockResolvedValue(true);
+      const executionOrder = [];
+
+      deleteNoteSpy.mockImplementation(async (id) => {
+        executionOrder.push('idb:delete');
+        return true;
+      });
+
+      const deleteFileSpy = vi.fn().mockImplementation(async (path) => {
+        executionOrder.push('connector:delete');
+        return true;
+      });
+      globalThis.deleteFile = deleteFileSpy;
+
+      const path = 'notes/note-to-delete.html';
+      StorageAPI._noteCache.set(path, '<p>Delete me</p>');
+      StorageAPI._noteCache.set('notes/note-to-delete.html', '<p>Delete me</p>');
+
+      await StorageAPI.deleteNoteContent(path, { id: 'note-to-delete' });
+
+      // RAM cache must be cleared immediately
+      expect(StorageAPI.getNoteFromCache(path)).toBeNull();
+
+      // IndexedDB delete must be called
+      expect(deleteNoteSpy).toHaveBeenCalledWith('note-to-delete');
+
+      // Stage 1 (IDB) must execute before Stage 2 (connector)
+      expect(executionOrder).toEqual(['idb:delete', 'connector:delete']);
+      expect(deleteFileSpy).toHaveBeenCalledWith(path);
+    });
+
+    /**
+     * 1. Protected Behavior: IndexedDB deletion failure triggers notifyCriticalLocalFailure.
+     * 2. Regression Target: Swallowing IDB deletion errors silently.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('triggers notifyCriticalLocalFailure if Stage 1 IndexedDB note deletion throws', async () => {
+      const criticalSpy = vi.spyOn(StorageAPI, 'notifyCriticalLocalFailure');
+      vi.spyOn(VaultIDBStorage, 'deleteNote').mockRejectedValue(new Error('IDB delete error'));
+      globalThis.deleteFile = vi.fn().mockResolvedValue(true);
+
+      const path = 'notes/fail-delete.html';
+      await expect(StorageAPI.deleteNoteContent(path, { id: 'fail-delete' })).rejects.toThrow();
+      expect(criticalSpy).toHaveBeenCalledWith(expect.any(Error), 'note:delete', 'fail-delete');
+    });
+
+    /**
+     * 1. Protected Behavior: Enforces queue uniqueness per note: if multiple autosaves are queued, only the last one is executed.
+     * 2. Regression Target: Executing every intermediate autosave or queueing duplicate writes for the same note.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('collapses multiple queued autosaves for the same note so only the last autosave is executed', async () => {
+      vi.spyOn(VaultIDBStorage, 'putNote').mockResolvedValue(true);
+
+      const writtenPayloads = [];
+      let delayedWriteResolve;
+      const writeBlockedPromise = new Promise(r => { delayedWriteResolve = r; });
+      globalThis.writeFile = vi.fn().mockImplementation(async (path, content) => {
+        writtenPayloads.push(content);
+        // Delay first write to allow subsequent autosaves to queue up
+        if (writtenPayloads.length === 1) {
+          await writeBlockedPromise;
+        }
+      });
+
+      const path = 'notes/note-queue-test.html';
+      const cleanId = 'note-queue-test';
+
+      // Kick off first autosave (will enter connector write and pause)
+      const p1 = StorageAPI.writeNoteContent(path, '<h1>Autosave 1</h1>', { id: cleanId });
+
+      // While first is in-flight, kick off autosave 2 and autosave 3
+      const p2 = StorageAPI.writeNoteContent(path, '<h1>Autosave 2</h1>', { id: cleanId });
+      const p3 = StorageAPI.writeNoteContent(path, '<h1>Autosave 3 (Final)</h1>', { id: cleanId });
+
+      // Unblock first write
+      delayedWriteResolve();
+      await Promise.all([p1, p2, p3]);
+
+      // Written payloads must have executed Autosave 1, and then ONLY Autosave 3 (skipping Autosave 2)
+      expect(writtenPayloads).toEqual(['<h1>Autosave 1</h1>', '<h1>Autosave 3 (Final)</h1>']);
+    });
+
+    /**
+     * 1. Protected Behavior: Deleting a note supersedes any queued autosaves for that note, preventing stale writes.
+     * 2. Regression Target: Executing an earlier autosave after note deletion, recreating deleted files on disk.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('supersedes queued autosaves when note deletion is queued', async () => {
+      vi.spyOn(VaultIDBStorage, 'putNote').mockResolvedValue(true);
+      vi.spyOn(VaultIDBStorage, 'deleteNote').mockResolvedValue(true);
+
+      const ops = [];
+      let blockFirstWriteResolve;
+      const blockFirstPromise = new Promise(r => { blockFirstWriteResolve = r; });
+      globalThis.writeFile = vi.fn().mockImplementation(async (path, content) => {
+        ops.push(`write:${content}`);
+        if (ops.length === 1) {
+          await blockFirstPromise;
+        }
+      });
+      globalThis.deleteFile = vi.fn().mockImplementation(async (path) => {
+        ops.push(`delete:${path}`);
+      });
+
+      const path = 'notes/supersede-test.html';
+      const cleanId = 'supersede-test';
+
+      const pSave1 = StorageAPI.writeNoteContent(path, 'v1', { id: cleanId });
+      const pSave2 = StorageAPI.writeNoteContent(path, 'v2', { id: cleanId });
+      const pDelete = StorageAPI.deleteNoteContent(path, { id: cleanId });
+
+      blockFirstWriteResolve();
+      await Promise.all([pSave1, pSave2, pDelete]);
+
+      // v2 should never have been written; the deletion superseded it!
+      expect(ops).toEqual(['write:v1', `delete:${path}`]);
+    });
+
+    /**
+     * 1. Protected Behavior: Keeps failed sync operations in queue and retries until successful.
+     * 2. Regression Target: Losing sync operations on connector errors or dropping unwritten changes.
+     * 3. Coverage Overlap / Redundancy: None.
+     * 4. Production Code Footprint: None.
+     */
+    it('keeps failed deletion in queue and completes upon connector recovery', async () => {
+      vi.spyOn(VaultIDBStorage, 'deleteNote').mockResolvedValue(true);
+
+      let failDelete = true;
+      globalThis.deleteFile = vi.fn().mockImplementation(async (path) => {
+        if (failDelete) {
+          const err = new Error('Disk locked');
+          err.name = 'NotAllowedError';
+          throw err;
+        }
+        return true;
+      });
+
+      const path = 'notes/retry-del.html';
+      const cleanId = 'retry-del';
+
+      // First attempt fails at connector stage
+      await expect(StorageAPI.deleteNoteContent(path, { id: cleanId })).rejects.toThrow();
+
+      // Deletion is still queued in StorageAPI._syncQueue
+      expect(StorageAPI._syncQueue.has(cleanId)).toBe(true);
+      expect(StorageAPI._syncQueue.get(cleanId).action).toBe('delete');
+      expect(StorageAPI.getConnectorStatus().status).toBe('error');
+
+      // Now disk recovers
+      failDelete = false;
+      await StorageAPI._processSyncQueue();
+
+      // Queue is now empty and connector is synced
+      expect(StorageAPI._syncQueue.has(cleanId)).toBe(false);
+      expect(StorageAPI.getConnectorStatus().status).toBe('synced');
+    });
+  });
 });

@@ -159,6 +159,56 @@ const StorageAPI = {
     }
   },
 
+  // ── Tier 1 (RAM & IndexedDB) Note Deletion ──
+  async _deleteNoteTier1(cleanId, path) {
+    // 1. RAM Cache (0ms)
+    if (path) {
+      this._noteCache.delete(path);
+      this._noteCache.delete(path.replace(/\\/g, '/'));
+    }
+    if (cleanId) {
+      this._noteCache.delete(`notes/${cleanId}.html`);
+      this._noteCache.delete(cleanId);
+    }
+
+    if (typeof noteContentCache !== 'undefined' && noteContentCache) {
+      if (path) {
+        delete noteContentCache[path];
+        delete noteContentCache[path.replace(/\\/g, '/')];
+      }
+      if (cleanId) {
+        delete noteContentCache[`notes/${cleanId}.html`];
+        delete noteContentCache[cleanId];
+      }
+    }
+
+    if (typeof collaborativeDataCache !== 'undefined' && collaborativeDataCache) {
+      if (path) {
+        delete collaborativeDataCache[path];
+        delete collaborativeDataCache[path.replace(/\\/g, '/')];
+      }
+      if (cleanId) {
+        delete collaborativeDataCache[`notes/${cleanId}.html`];
+        delete collaborativeDataCache[cleanId];
+      }
+    }
+
+    // 2. IndexedDB Persistent Store
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb) {
+      try {
+        if (typeof idb.deleteNote === 'function') {
+          await idb.deleteNote(cleanId);
+        } else if (typeof idb.deleteRecord === 'function') {
+          await idb.deleteRecord('notes', cleanId);
+        }
+      } catch (idbErr) {
+        this.notifyCriticalLocalFailure(idbErr, 'note:delete', cleanId);
+        throw idbErr;
+      }
+    }
+  },
+
   async _persistAssetTier1(relPath, fullDataUrl) {
     if (typeof fullDataUrl === 'string' && fullDataUrl.includes('data:image/svg+xml') && (fullDataUrl.includes('Image not loaded') || fullDataUrl.includes('locked'))) {
       return;
@@ -582,8 +632,141 @@ const StorageAPI = {
   // ── Note / Todo Content (HTML or MD) & Cache ──
   _noteCache: new Map(),
 
+  // ── Unique Connector Sync Queue ──
+  _syncQueue: new Map(), // cleanId -> { id, path, action: 'save'|'delete', content?, meta?, createdAt }
+  _isProcessingSyncQueue: false,
+  _activeSyncQueuePromise: null,
+  _syncRetryTimer: null,
+
+  _enqueueSync(item) {
+    if (!item || !item.id) return;
+    this._syncQueue.set(item.id, item);
+  },
+
+  getSyncQueue() {
+    return Array.from(this._syncQueue.values());
+  },
+
+  clearSyncQueue() {
+    this._syncQueue.clear();
+    if (this._syncRetryTimer) {
+      clearTimeout(this._syncRetryTimer);
+      this._syncRetryTimer = null;
+    }
+  },
+
+  _scheduleSyncRetry() {
+    if (this._syncRetryTimer) return;
+    this._syncRetryTimer = setTimeout(() => {
+      this._syncRetryTimer = null;
+      if (this._syncQueue.size > 0) {
+        this._processSyncQueue().catch(() => {});
+      }
+    }, 3000);
+  },
+
+  async _processSyncQueue() {
+    if (this._isProcessingSyncQueue) {
+      return this._activeSyncQueuePromise;
+    }
+    if (this._syncQueue.size === 0) {
+      this.setConnectorStatus('synced');
+      return;
+    }
+
+    this._isProcessingSyncQueue = true;
+    this._activeSyncQueuePromise = (async () => {
+      try {
+        this.setConnectorStatus('syncing');
+
+        while (this._syncQueue.size > 0) {
+          const keys = Array.from(this._syncQueue.keys());
+          let processedCount = 0;
+
+          for (const key of keys) {
+            const item = this._syncQueue.get(key);
+            if (!item) continue;
+
+            try {
+              if (item.action === 'save') {
+                if (this.getStorageEngine() !== 'firebase') {
+                  await writeFile(item.path, item.content);
+                } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+                  const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
+                  let resolvedTitle = item.meta?.title;
+                  if (isDummy(resolvedTitle, item.id) && item.content && typeof parseNoteHTML === 'function') {
+                    try {
+                      const parsed = parseNoteHTML(item.content);
+                      if (parsed.title && !isDummy(parsed.title, item.id)) {
+                        resolvedTitle = parsed.title;
+                      }
+                    } catch (e) {}
+                  }
+                  await window.FirebaseSyncService.queueSyncNote({
+                    id: item.id,
+                    path: item.path,
+                    contentHtml: item.content,
+                    title: resolvedTitle || item.meta?.title || item.id,
+                    date: item.meta?.date,
+                    tags: item.meta?.tags,
+                    workstream: item.meta?.workstream,
+                    pinned: item.meta?.pinned,
+                    archived: item.meta?.archived,
+                    favorite: item.meta?.favorite,
+                    updatedAt: Date.now()
+                  });
+                }
+              } else if (item.action === 'delete') {
+                if (this.getStorageEngine() !== 'firebase') {
+                  try {
+                    await deleteFile(item.path);
+                  } catch (delErr) {
+                    if (delErr?.name !== 'NotFoundError' && !delErr?.message?.includes('File not found')) {
+                      throw delErr;
+                    }
+                  }
+                }
+                if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+                  await window.FirebaseSyncService.deleteNote(item.id);
+                }
+              }
+
+              // Only delete from queue if not superseded by a newer autosave/delete while in-flight
+              if (this._syncQueue.get(key) === item) {
+                this._syncQueue.delete(key);
+              }
+              processedCount++;
+            } catch (err) {
+              const errorInfo = this.classifyConnectorError(err);
+              this.setConnectorStatus('error', errorInfo);
+              this.notifyConnectorError(errorInfo);
+              this._scheduleSyncRetry();
+              throw err;
+            }
+          }
+
+          if (processedCount === 0) break;
+        }
+
+        if (this._syncQueue.size === 0) {
+          this.setConnectorStatus('synced');
+          if (this._syncRetryTimer) {
+            clearTimeout(this._syncRetryTimer);
+            this._syncRetryTimer = null;
+          }
+        }
+      } finally {
+        this._isProcessingSyncQueue = false;
+        this._activeSyncQueuePromise = null;
+      }
+    })();
+
+    return this._activeSyncQueuePromise;
+  },
+
   clearNoteCache() {
     this._noteCache.clear();
+    this.clearSyncQueue();
   },
 
   invalidateNoteCache(path) {
@@ -708,69 +891,51 @@ const StorageAPI = {
   async writeNoteContent(path, content, meta = {}) {
     const cleanId = meta.id || path.replace(/^notes\//, '').replace(/\.html$/, '');
 
-    // 1. Write to Tier 1 (RAM & IndexedDB) immediately
+    // 1. First stage: Write to Tier 1 (RAM & IndexedDB) immediately
     await this._persistNoteTier1(cleanId, path, content, meta);
 
-    // 2. Dispatch to Asynchronous Connector
+    // 2. Second stage: Dispatch to Unique Connector Sync Queue
+    this._enqueueSync({
+      id: cleanId,
+      path,
+      action: 'save',
+      content,
+      meta,
+      createdAt: Date.now()
+    });
+
     try {
-      this.setConnectorStatus('syncing');
-
-      if (this.getStorageEngine() !== 'firebase') {
-        await writeFile(path, content);
-      } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-        const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
-        let resolvedTitle = meta.title;
-        if (isDummy(resolvedTitle, cleanId) && content && typeof parseNoteHTML === 'function') {
-          try {
-            const parsed = parseNoteHTML(content);
-            if (parsed.title && !isDummy(parsed.title, cleanId)) {
-              resolvedTitle = parsed.title;
-            }
-          } catch (e) {}
-        }
-        await window.FirebaseSyncService.queueSyncNote({
-          id: cleanId,
-          path,
-          contentHtml: content,
-          title: resolvedTitle || meta.title || cleanId,
-          date: meta.date,
-          tags: meta.tags,
-          workstream: meta.workstream,
-          pinned: meta.pinned,
-          archived: meta.archived,
-          favorite: meta.favorite,
-          updatedAt: Date.now()
-        });
-      }
-
-      this.setConnectorStatus('synced');
+      await this._processSyncQueue();
     } catch (e) {
-      const errorInfo = this.classifyConnectorError(e);
-      this.setConnectorStatus('error', errorInfo);
-      this.notifyConnectorError(errorInfo);
       throw e;
     }
 
     this.emit('storage:change', { entity: 'notes', id: cleanId, path, action: 'save' });
   },
 
-  async deleteNoteContent(path) {
-    if (this.getStorageEngine() !== 'firebase') {
-      try {
-        await deleteFile(path);
-      } catch (e) {
-        throw e;
-      }
+  async deleteNoteContent(path, meta = {}) {
+    const cleanId = meta.id || String(path || '').replace(/^notes\//, '').replace(/\.html$/, '');
+    const targetPath = meta.path || (path && path.startsWith('notes/') ? path : (cleanId ? `notes/${cleanId}.html` : path));
+
+    // 1. First stage: Delete from Tier 1 (RAM & IndexedDB) immediately
+    await this._deleteNoteTier1(cleanId, targetPath);
+
+    // 2. Second stage: Enqueue and sync deletion to disk or Firebase
+    this._enqueueSync({
+      id: cleanId,
+      path: targetPath,
+      action: 'delete',
+      meta,
+      createdAt: Date.now()
+    });
+
+    try {
+      await this._processSyncQueue();
+    } catch (e) {
+      throw e;
     }
 
-    if (path) {
-      this._noteCache.delete(path);
-    }
-
-    if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const noteId = path.replace(/^notes\//, '').replace(/\.html$/, '');
-      await window.FirebaseSyncService.deleteNote(noteId);
-    }
+    this.emit('storage:change', { entity: 'notes', id: cleanId, path: targetPath, action: 'delete' });
   },
 
   // ── Trash Bin (.trash/) ──
