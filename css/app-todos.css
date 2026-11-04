@@ -209,23 +209,69 @@ body[data-theme='dark'] .todo-overlay-panel {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
 }
 
+.todo-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .todo-modal-title-input {
   background: transparent !important;
   border: none !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-bottom: 1px solid transparent !important;
   color: #f8fafc !important;
   font-size: 1.15rem !important;
   font-weight: 700 !important;
+  flex: 1 1 auto !important;
   width: 100% !important;
+  min-width: 0 !important;
   outline: none !important;
   padding: 4px 8px !important;
   border-radius: 4px !important;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.todo-modal-title-input:focus {
+.todo-modal-title-input[readonly] {
+  cursor: default;
+  border-bottom-color: transparent !important;
+  background: transparent !important;
+}
+
+.todo-modal-title-input.is-editing,
+.todo-modal-title-input:not([readonly]):focus {
   border-bottom-color: var(--accent, #6366f1) !important;
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.todo-modal-title-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.todo-modal-title-edit-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.todo-status-select {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 38px !important;
+  font-weight: 600 !important;
+  text-overflow: ellipsis;
 }
 
 .todo-modal-title-input::placeholder {

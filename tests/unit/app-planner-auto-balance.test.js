@@ -246,4 +246,25 @@ describe('PlannerScheduler Future Slot and Auto-Balance', () => {
     closeBtn.click();
     expect(document.getElementById('planner-autobalance-modal')).toBeNull();
   });
+
+  it('filters auto-balance candidate tasks according to active sidebar priority and search filters', () => {
+    window.getPlannerDaysToDisplay = () => [new Date(2026, 8, 2), new Date(2026, 8, 3)];
+    window.todosManifest = [
+      { id: 'todo-q1', title: 'Urgent server fix', durationMins: 30, eisenhowerQuadrant: 'Q1' },
+      { id: 'todo-q2', title: 'Draft roadmap', durationMins: 45, eisenhowerQuadrant: 'Q2' },
+      { id: 'todo-q3', title: 'Reply to vendor', durationMins: 15, eisenhowerQuadrant: 'Q3' }
+    ];
+    window._plannerSetSidePriority('Q2');
+    window._plannerOnSideSearchInput('roadmap');
+
+    window.openPlannerAutoBalanceModal();
+
+    const modal = document.getElementById('planner-autobalance-modal');
+    expect(modal).not.toBeNull();
+    const items = modal.querySelectorAll('.planner-autobalance-item');
+    expect(items.length).toBe(1);
+    expect(items[0].textContent).toContain('Draft roadmap');
+
+    modal.querySelector('#autobalance-modal-close').click();
+  });
 });

@@ -356,17 +356,28 @@ function openPlannerAutoBalanceModal() {
     (plannerEvents || []).filter(e => e && e.todoId).map(e => String(e.todoId))
   );
 
-  const allCandidateTodos = (typeof todosManifest !== 'undefined' ? todosManifest : []).filter(t => {
+  const baseCandidateTodos = (typeof todosManifest !== 'undefined' ? todosManifest : []).filter(t => {
     if (!t || t.priority === 'Done' || (typeof isUserTask === 'function' && !isUserTask(t))) return false;
     if (scheduledTodoIds.has(String(t.id))) return false;
     if (typeof TaskGraphEngine !== 'undefined' && TaskGraphEngine.isBlocked(t.id)) return false;
     return true;
-  }).sort((a, b) => {
+  });
+  const filteredCandidateTodos = (typeof _filterTodosBySideQueryAndPriority === 'function')
+    ? _filterTodosBySideQueryAndPriority(baseCandidateTodos)
+    : baseCandidateTodos;
+
+  const allCandidateTodos = filteredCandidateTodos.sort((a, b) => {
     const quadRank = { Q1: 4, Q2: 3, Q3: 2, Q4: 1 };
     const qA = quadRank[typeof getTodoQuadrant === 'function' ? getTodoQuadrant(a) : (a.eisenhowerQuadrant || 'Q2')] || 2;
     const qB = quadRank[typeof getTodoQuadrant === 'function' ? getTodoQuadrant(b) : (b.eisenhowerQuadrant || 'Q2')] || 2;
     return qB - qA;
   });
+
+  const hasActiveSideFilter = (typeof _plannerSidePriorityFilter !== 'undefined' && _plannerSidePriorityFilter && _plannerSidePriorityFilter !== 'All') ||
+    (typeof _plannerSideSearchQuery !== 'undefined' && Boolean(String(_plannerSideSearchQuery || '').trim()));
+  if (hasActiveSideFilter) {
+    currentLimit = 'all';
+  }
 
   const selectedTodoIds = new Set();
   function syncSelectedIdsToLimit() {
@@ -2422,16 +2433,19 @@ function setPlannerPaneTab(tab) {
 }
 
 function _filterTodosBySideQueryAndPriority(todos) {
+  const prioFilter = (typeof _plannerSidePriorityFilter !== 'undefined' && _plannerSidePriorityFilter) ? _plannerSidePriorityFilter : 'All';
+  const searchQuery = (typeof _plannerSideSearchQuery !== 'undefined' && _plannerSideSearchQuery) ? String(_plannerSideSearchQuery).trim() : '';
   return todos.filter(t => {
-    if (_plannerSidePriorityFilter !== 'All') {
-      if (['Q1', 'Q2', 'Q3', 'Q4'].includes(_plannerSidePriorityFilter)) {
-        if (getTodoQuadrant(t) !== _plannerSidePriorityFilter) return false;
-      } else if ((t.priority || 'Medium') !== _plannerSidePriorityFilter) {
+    if (prioFilter !== 'All') {
+      if (['Q1', 'Q2', 'Q3', 'Q4'].includes(prioFilter)) {
+        const quad = typeof getTodoQuadrant === 'function' ? getTodoQuadrant(t) : (t.eisenhowerQuadrant || 'Q2');
+        if (quad !== prioFilter) return false;
+      } else if ((t.priority || 'Medium') !== prioFilter) {
         return false;
       }
     }
-    if (_plannerSideSearchQuery) {
-      const q = _plannerSideSearchQuery.toLowerCase();
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       const title = (t.title || t.id || '').toLowerCase();
       if (!title.includes(q)) return false;
     }
@@ -2802,31 +2816,15 @@ function renderPlanner() {
     return true;
   }).length;
 
+  const sidebarTitleText = hasSelectedBlock
+    ? tabDetails
+    : _plannerText('planner.tasksTab', 'Tasks');
+  const prevTextOnly = String(prevLabel || '').replace(/^[‹<]\s*/, '').trim();
+  const nextTextOnly = String(nextLabel || '').replace(/\s*[›>]$/, '').trim();
+
   // Create Main Calendar Area + Unified Right Sidebar (Tabbed)
   panel.innerHTML = `
     <div class="planner-main-content">
-      <div class="planner-stats-bar" role="toolbar" aria-label="${escA(t('planner.totalPlanned') || 'Statistics')}">
-        <div class="planner-stat-item stat-total${_plannerTypeFilter === null ? ' active' : ''}" onclick="togglePlannerTypeFilter(null)" title="${escA(t('planner.showAllFilterTooltip') || 'Show all planned events and reset category filter')}">
-          <span class="planner-stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-          <span>${escH(t('planner.totalPlanned') || 'Total')}:</span>
-          <span class="planner-stat-val">${stats.totalHours}h</span>
-        </div>
-        <div class="planner-stat-item stat-call${_plannerTypeFilter === 'call' ? ' active' : ''}" onclick="togglePlannerTypeFilter('call')" title="${escA(t('planner.filterCallTooltip') || 'Click to highlight Calls only (or click again to show all)')}">
-          <span class="planner-stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
-          <span>${escH(t('planner.callHours') || 'Calls')}:</span>
-          <span class="planner-stat-val">${stats.callHours}h</span>
-        </div>
-        <div class="planner-stat-item stat-work${_plannerTypeFilter === 'work' ? ' active' : ''}" onclick="togglePlannerTypeFilter('work')" title="${escA(t('planner.filterWorkTooltip') || 'Click to highlight Focus Work only (or click again to show all)')}">
-          <span class="planner-stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg></span>
-          <span>${escH(t('planner.workHours') || 'Work')}:</span>
-          <span class="planner-stat-val">${stats.workHours}h</span>
-        </div>
-        <div class="planner-stat-item stat-prep${_plannerTypeFilter === 'prep' ? ' active' : ''}" onclick="togglePlannerTypeFilter('prep')" title="${escA(t('planner.filterPrepTooltip') || 'Click to highlight Prep only (or click again to show all)')}">
-          <span class="planner-stat-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></span>
-          <span>${escH(t('planner.prepHours') || 'Prep')}:</span>
-          <span class="planner-stat-val">${stats.prepHours}h</span>
-        </div>
-      </div>
       <div class="planner-header">
         <div class="planner-header-left">
           <div class="planner-week-title" id="planner-week-range-title"></div>
@@ -2837,6 +2835,12 @@ function renderPlanner() {
             <button class="planner-view-btn${plannerViewMode === '5days' ? ' active' : ''}" onclick="setPlannerViewMode('5days')" title="${escA(t('planner.view5DaysTooltip'))}">${t('planner.view5Days')}</button>
             <button class="planner-view-btn${plannerViewMode === 'week' ? ' active' : ''}" onclick="setPlannerViewMode('week')" title="${escA(t('planner.viewWeekTooltip'))}">${t('planner.viewWeek')}</button>
           </div>
+          <select class="planner-view-select" onchange="setPlannerViewMode(this.value)" title="${escA(t('planner.viewWeekTooltip') || 'Select calendar view range')}" aria-label="${escA(t('planner.viewWeekTooltip') || 'Select calendar view range')}">
+            <option value="today"${plannerViewMode === 'today' ? ' selected' : ''}>${escH(t('planner.viewToday'))}</option>
+            <option value="3days"${plannerViewMode === '3days' ? ' selected' : ''}>${escH(t('planner.view3Days'))}</option>
+            <option value="5days"${plannerViewMode === '5days' ? ' selected' : ''}>${escH(t('planner.view5Days'))}</option>
+            <option value="week"${plannerViewMode === 'week' ? ' selected' : ''}>${escH(t('planner.viewWeek'))}</option>
+          </select>
         </div>
 
         <div class="planner-nav-group">
@@ -2847,9 +2851,9 @@ function renderPlanner() {
               <span class="planner-proposals-badge-count">${pendingProposalsCount}</span>
             </button>
           ` : ''}
-          <button class="planner-nav-btn" onclick="navigatePlannerWeek(${prevOffset})" title="${escA(prevTitle)}">${prevLabel}</button>
-          <button class="planner-nav-btn" onclick="navigatePlannerWeek(0)" title="${escA(t('planner.todayTooltip'))}">${t('planner.today')}</button>
-          <button class="planner-nav-btn" onclick="navigatePlannerWeek(${nextOffset})" title="${escA(nextTitle)}">${nextLabel}</button>
+          <button class="planner-nav-btn planner-nav-prev-btn" onclick="navigatePlannerWeek(${prevOffset})" title="${escA(prevTitle)}"><span class="planner-nav-btn-arrow" aria-hidden="true">‹</span>${prevTextOnly ? `<span class="planner-nav-btn-label"> ${escH(prevTextOnly)}</span>` : ''}</button>
+          <button class="planner-nav-btn today-btn" onclick="navigatePlannerWeek(0)" title="${escA(t('planner.todayTooltip'))}">${t('planner.today')}</button>
+          <button class="planner-nav-btn planner-nav-next-btn" onclick="navigatePlannerWeek(${nextOffset})" title="${escA(nextTitle)}">${nextTextOnly ? `<span class="planner-nav-btn-label">${escH(nextTextOnly)} </span>` : ''}<span class="planner-nav-btn-arrow" aria-hidden="true">›</span></button>
           <button class="planner-nav-btn planner-more-btn" id="planner-more-menu-btn" onclick="togglePlannerMoreDropdown(event)" title="${escA(t('planner.moreOptionsTooltip') || t('planner.moreOptions') || 'More options')}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="12" r="1.5"/></svg></button>
         </div>
       </div>
@@ -2869,19 +2873,13 @@ function renderPlanner() {
           <button class="planner-sidebar-toggle" onclick="event.stopPropagation(); togglePlannerRightSidebar()" title="${escA(t('common.expandSidebar') || 'Click to expand sidebar')}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <span class="sidebar-header-title">${escH(_plannerText('planner.panel', 'Planner'))}</span>
+          <span class="sidebar-header-title">${escH(sidebarTitleText)}</span>
         ` : `
           <button class="planner-sidebar-contract-btn" onclick="event.stopPropagation(); togglePlannerRightSidebar()" title="${escA(t('common.collapseSidebar') || 'Click to collapse sidebar')}">
             <span class="planner-sidebar-contract-icon">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </span>
-            <span class="planner-sidebar-contract-title">${escH(_plannerText('planner.panel', 'Planner'))}</span>
-          </button>
-          <button class="planner-sidebar-balance-btn" onclick="event.stopPropagation(); triggerPlannerAutoBalance()" title="${escA(t('planner.autoBalanceTooltip') || 'Automatically fit unassigned priority tasks into free time gaps')}">
-            <span class="planner-sidebar-balance-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
-            </span>
-            <span class="planner-sidebar-balance-label">${escH(t('planner.autoBalance') || 'Auto-Balance')}</span>
+            <span class="planner-sidebar-contract-title">${escH(sidebarTitleText)}</span>
           </button>
         `}
       </div>
@@ -2912,6 +2910,16 @@ function renderPlanner() {
           <div id="planner-pane-tab-notdone" class="planner-pane-tab-panel${!hasSelectedBlock && plannerActivePaneTab === 'notdone' ? ' active' : ''}"></div>
           <div id="planner-right-sidebar-inspector" class="planner-pane-tab-panel${hasSelectedBlock ? ' active' : ''}"></div>
         </div>
+        ${!hasSelectedBlock ? `
+          <div class="planner-side-footer">
+            <button class="planner-sidebar-balance-btn" onclick="event.stopPropagation(); triggerPlannerAutoBalance()" title="${escA(t('planner.autoBalanceTooltip') || 'Automatically fit unassigned priority tasks into free time gaps')}">
+              <span class="planner-sidebar-balance-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+              </span>
+              <span class="planner-sidebar-balance-label">${escH(t('planner.autoBalance') || 'Auto-Balance')}</span>
+            </button>
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
@@ -3194,9 +3202,9 @@ function renderCalendarGrid() {
     weekTitle.innerHTML = `<span>${escH(startStr)} – ${escH(endStr)}, ${year}</span> <span class="badge badge-subtle" style="font-size:0.75rem; padding:2px 7px; border-radius:10px; font-weight:600; background:color-mix(in srgb, var(--accent) 12%, var(--card-bg)); color:var(--accent); margin-left:6px;" title="Week ${weekNum}">W${weekNum}</span>`;
   }
 
-  // Set dynamic grid styles
-  grid.style.gridTemplateColumns = `50px repeat(${days.length}, 1fr)`;
-  grid.style.minWidth = `calc(50px + ${days.length} * 180px)`;
+  // Set dynamic grid styles (minmax(0, 1fr) and minWidth 0 so right side / times are never cut off when sidebar is open)
+  grid.style.gridTemplateColumns = `50px repeat(${days.length}, minmax(0, 1fr))`;
+  grid.style.minWidth = '0px';
 
   const todayStr = formatLocalDateValue(new Date());
 

@@ -1446,12 +1446,33 @@ async function openNewTodoDialog(options = {}) {
   setTodoOverlayBusy(false);
 
   if (focusTitle && titleInp) {
-    setTimeout(() => {
-      titleInp.focus();
-      titleInp.setSelectionRange(0, titleInp.value.length);
-    }, 0);
+    enableTodoModalTitleEdit();
+  } else if (titleInp) {
+    titleInp.readOnly = true;
+    titleInp.classList.remove('is-editing');
   }
 }
+
+function enableTodoModalTitleEdit() {
+  const titleInp = document.getElementById('todo-edit-title');
+  if (!titleInp) return;
+  titleInp.readOnly = false;
+  titleInp.classList.add('is-editing');
+  setTimeout(() => {
+    titleInp.focus();
+    const len = (titleInp.value || '').length;
+    try { titleInp.setSelectionRange(len, len); } catch (e) {}
+  }, 0);
+}
+window.enableTodoModalTitleEdit = enableTodoModalTitleEdit;
+
+function finishTodoModalTitleEdit() {
+  const titleInp = document.getElementById('todo-edit-title');
+  if (!titleInp) return;
+  titleInp.readOnly = true;
+  titleInp.classList.remove('is-editing');
+}
+window.finishTodoModalTitleEdit = finishTodoModalTitleEdit;
 
 // ═══ Todo Overlay Edit Mode & Interactive Matrix Picker ═══
 let _todoOverlayFile = null;
@@ -1533,6 +1554,24 @@ function clearTodoDueDate() {
 
 function setTodoModalStatus(status) {
   _todoModalStatus = status || 'pending';
+  const statusSelect = document.getElementById('todo-edit-status');
+  if (statusSelect) {
+    statusSelect.value = _todoModalStatus;
+    statusSelect.setAttribute('data-status', _todoModalStatus);
+    const tooltipKeyMap = {
+      pending: 'todo.statusPendingTooltip',
+      wip: 'todo.statusWipTooltip',
+      done: 'todo.statusDoneTooltip',
+      wont_do: 'todo.statusWontDoTooltip'
+    };
+    const tKey = tooltipKeyMap[_todoModalStatus] || 'todo.statusPendingTooltip';
+    if (typeof t === 'function') {
+      const translatedTitle = t(tKey);
+      if (translatedTitle && translatedTitle !== tKey) {
+        statusSelect.title = translatedTitle;
+      }
+    }
+  }
   const group = document.getElementById('todo-status-segmented-group');
   if (group) {
     group.querySelectorAll('.todo-status-seg-btn').forEach(btn => {
@@ -1906,10 +1945,8 @@ async function openTodoOverlay(todoId, maybeOptions = {}) {
   setTodoOverlayBusy(false);
 
   if (titleInp) {
-    setTimeout(() => {
-      titleInp.focus();
-      titleInp.setSelectionRange(0, titleInp.value.length);
-    }, 0);
+    titleInp.readOnly = true;
+    titleInp.classList.remove('is-editing');
   }
 }
 

@@ -370,23 +370,28 @@ describe('UI Buttons - Todo Edit Overlay & Interactive Matrix Picker', () => {
       expect(globalThis.clearTodoDueDate).toHaveBeenCalledTimes(1);
     });
 
-    it('handles execution status segmented buttons (pending, wip, done, wont_do)', () => {
-      const segButtons = document.querySelectorAll('#todo-status-segmented-group button');
-      expect(segButtons.length).toBe(4);
+    it('handles execution status dropdown select (pending, wip, done, wont_do) and title edit button', () => {
+      const statusSelect = document.getElementById('todo-edit-status');
+      expect(statusSelect).not.toBeNull();
+      const options = Array.from(statusSelect.querySelectorAll('option')).map(o => o.value);
+      expect(options).toEqual(['pending', 'wip', 'done', 'wont_do']);
 
       globalThis.setTodoModalStatus = vi.fn();
 
-      triggerClick(segButtons[0]);
-      expect(globalThis.setTodoModalStatus).toHaveBeenCalledWith('pending');
-
-      triggerClick(segButtons[1]);
+      statusSelect.value = 'wip';
+      new Function('event', statusSelect.getAttribute('onchange')).call(statusSelect, new Event('change'));
       expect(globalThis.setTodoModalStatus).toHaveBeenCalledWith('wip');
 
-      triggerClick(segButtons[2]);
-      expect(globalThis.setTodoModalStatus).toHaveBeenCalledWith('done');
-
-      triggerClick(segButtons[3]);
+      statusSelect.value = 'wont_do';
+      new Function('event', statusSelect.getAttribute('onchange')).call(statusSelect, new Event('change'));
       expect(globalThis.setTodoModalStatus).toHaveBeenCalledWith('wont_do');
+
+      const editTitleBtn = document.getElementById('todo-edit-title-btn');
+      expect(editTitleBtn).not.toBeNull();
+      expect(editTitleBtn.querySelector('svg')).not.toBeNull();
+      globalThis.enableTodoModalTitleEdit = vi.fn();
+      triggerClick(editTitleBtn);
+      expect(globalThis.enableTodoModalTitleEdit).toHaveBeenCalledTimes(1);
     });
 
     it('handles add checklist item button', () => {

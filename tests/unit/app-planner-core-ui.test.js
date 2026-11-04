@@ -23,7 +23,7 @@ describe('Planner Header and Side Panel UI Elements', () => {
     expect(rules).toMatch(/box-shadow:\s*(none|0 1px 2px|var\(--shadow)/);
   });
 
-  it('renders more options menu button in planner-header and contract title button with auto-balance in sidebar header', () => {
+  it('renders responsive planner header controls, contextual sidebar title, and places auto-balance at the bottom of the tasks view only when tasks are shown', () => {
     const plannerCode = fs.readFileSync(path.resolve(__dirname, '../../js/app-planner.js'), 'utf8');
     
     // Create panel container
@@ -32,8 +32,17 @@ describe('Planner Header and Side Panel UI Elements', () => {
     document.body.appendChild(panel);
 
     const initFunc = new Function(`
-      window.plannerEvents = [];
+      window.plannerEvents = [
+        { id: 'evt-1', type: 'work', title: 'Deep Work', date: '2026-08-31', startTime: '09:00', endTime: '10:00' }
+      ];
       window.todosManifest = [];
+      window.manifest = [];
+      window.btnLabel = function(icon, key, fallback) { return icon + ' ' + (window.t(key) || fallback); };
+      window.getNoteById = function() { return null; };
+      window.getTodoById = function() { return null; };
+      window.getIntrinsicAssociatedNotesForPlannerEvent = function() { return []; };
+      window.getRelatedNotesForTags = function() { return []; };
+      window.getPlannerEventLinkedTodoIds = function() { return []; };
       window.selectedPlannerEventId = null;
       window.plannerRightSidebarCollapsed = false;
       window.plannerActivePaneTab = 'unassigned';
@@ -67,9 +76,13 @@ describe('Planner Header and Side Panel UI Elements', () => {
       window.t = function(k) {
         const dict = {
           'planner.panel': 'Planificateur',
+          'planner.tasksTab': 'Tâches',
+          'planner.eventDetails': 'Détails de l\\'événement',
           'planner.autoBalance': 'Équilibrer',
           'planner.autoBalanceTooltip': 'Placer automatiquement les tâches prioritaires dans les créneaux libres',
           'planner.moreOptionsTooltip': 'Plus d\\'options',
+          'planner.prevWeek': '‹ Sem. préc.',
+          'planner.nextWeek': 'Sem. suiv. ›',
           'common.collapseSidebar': 'Réduire la barre latérale',
           'common.expandSidebar': 'Développer la barre latérale'
         };
@@ -87,24 +100,27 @@ describe('Planner Header and Side Panel UI Elements', () => {
 
     initFunc.renderPlanner();
 
-    // Verify header layout: Date title & View switcher on left, Nav group & More button on right
+    // Verify redundant stats bar is no longer rendered in planner
+    expect(document.querySelector('.planner-stats-bar')).toBeNull();
+
+    // Verify header layout: Date title, View switcher & compact View select on left, Nav group & More button on right
     const headerLeft = document.querySelector('.planner-header .planner-header-left');
     expect(headerLeft).not.toBeNull();
     const titleInLeft = headerLeft.querySelector('#planner-week-range-title');
     const viewSwitcherInLeft = headerLeft.querySelector('.planner-view-switcher');
+    const viewSelectInLeft = headerLeft.querySelector('.planner-view-select');
     expect(titleInLeft).not.toBeNull();
     expect(viewSwitcherInLeft).not.toBeNull();
+    expect(viewSelectInLeft).not.toBeNull();
 
     const navGroup = document.querySelector('.planner-header .planner-nav-group');
     expect(navGroup).not.toBeNull();
+    expect(navGroup.querySelectorAll('.planner-nav-btn-label').length).toBe(2);
+    expect(navGroup.querySelectorAll('.planner-nav-btn-arrow').length).toBe(2);
 
     // Verify Daily Review button is no longer in nav group
     const reviewBtn = navGroup.querySelector('.planner-review-btn');
     expect(reviewBtn).toBeNull();
-
-    // Verify stats bar icons are SVGs
-    const statIcons = document.querySelectorAll('.planner-stat-item svg');
-    expect(statIcons.length).toBeGreaterThanOrEqual(4);
 
     // Verify side pills icons are SVGs
     const pillIcons = document.querySelectorAll('.planner-side-pill svg');
@@ -116,22 +132,31 @@ describe('Planner Header and Side Panel UI Elements', () => {
     expect(moreBtn.querySelector('svg')).not.toBeNull();
     expect(moreBtn.getAttribute('title')).toBeTruthy();
 
-    // Verify contract button in sidebar header
+    // Verify contract button in sidebar header uses contextual title ('Tâches') instead of 'Planificateur'
     const contractBtn = document.querySelector('.planner-sidebar-contract-btn');
     expect(contractBtn).not.toBeNull();
-    expect(contractBtn.textContent).toContain('Planificateur');
+    expect(contractBtn.textContent).toContain('Tâches');
+    expect(contractBtn.textContent).not.toContain('Planificateur');
     expect(contractBtn.querySelector('svg')).not.toBeNull();
     expect(contractBtn.getAttribute('title')).toBeTruthy();
 
-    // Verify auto-balance button in sidebar header
-    const balanceBtn = document.querySelector('.planner-sidebar-balance-btn');
+    // Verify auto-balance button is in the tasks footer (not in sidebar header) when tasks are shown
+    expect(document.querySelector('.planner-sidebar-header .planner-sidebar-balance-btn')).toBeNull();
+    const balanceBtn = document.querySelector('.planner-side-footer .planner-sidebar-balance-btn');
     expect(balanceBtn).not.toBeNull();
     expect(balanceBtn.textContent).toContain('Équilibrer');
     expect(balanceBtn.querySelector('svg')).not.toBeNull();
     expect(balanceBtn.getAttribute('title')).toBeTruthy();
 
+    // When a calendar event is selected, auto-balance button is hidden and sidebar title reflects Event Details
+    window.selectedPlannerEventId = 'evt-1';
+    initFunc.renderPlanner();
+    expect(document.querySelector('.planner-sidebar-balance-btn')).toBeNull();
+    const contractBtnSelected = document.querySelector('.planner-sidebar-contract-btn');
+    expect(contractBtnSelected.textContent).toContain("Détails de l'événement");
+
     // Test togglePlannerMoreDropdown
-    initFunc.togglePlannerMoreDropdown({ currentTarget: moreBtn, stopPropagation: () => {} });
+    initFunc.togglePlannerMoreDropdown({ currentTarget: document.getElementById('planner-more-menu-btn'), stopPropagation: () => {} });
     const dropdown = document.getElementById('planner-more-dropdown-menu');
     expect(dropdown).not.toBeNull();
 
@@ -144,6 +169,18 @@ describe('Planner Header and Side Panel UI Elements', () => {
 
     initFunc.closePlannerMoreDropdown();
     expect(document.getElementById('planner-more-dropdown-menu')).toBeNull();
+  });
+
+  it('ensures single event details tab takes full 100% width and calendar grid does not force horizontal clipping in CSS', () => {
+    const cssContent = fs.readFileSync(path.resolve(__dirname, '../../css/app-planner.css'), 'utf8');
+    const singleTabMatch = cssContent.match(/\.planner-pane-tabs\.single\s+\.planner-pane-tab-btn\s*\{([^}]+)\}/);
+    expect(singleTabMatch).not.toBeNull();
+    expect(singleTabMatch[1]).toContain('width: 100%');
+    expect(singleTabMatch[1]).not.toContain('min-width: 52%');
+
+    const gridMatch = cssContent.match(/\.planner-calendar-grid\s*\{([^}]+)\}/);
+    expect(gridMatch).not.toBeNull();
+    expect(gridMatch[1]).toContain('min-width: 0');
   });
 });
 

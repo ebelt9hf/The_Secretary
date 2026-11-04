@@ -3,7 +3,8 @@
   <div class="overlay-panel todo-overlay-panel" onclick="event.stopPropagation()">
     <div class="overlay-header todo-modal-header todo-dark-header">
       <div class="todo-modal-title-group" style="flex:1; margin-right:12px;">
-        <input id="todo-edit-title" type="text" class="todo-modal-title-input" placeholder="Task title..." title="Type the task title">
+        <input id="todo-edit-title" type="text" class="todo-modal-title-input" placeholder="Task title..." title="Type the task title" readonly ondblclick="enableTodoModalTitleEdit()" onblur="finishTodoModalTitleEdit()">
+        <button type="button" id="todo-edit-title-btn" class="todo-modal-title-edit-btn" onclick="enableTodoModalTitleEdit()" data-i18n-title="todo.editTodo" title="Edit task title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
         <span id="todo-overlay-indicator" class="save-indicator"></span>
       </div>
       <button class="overlay-close-btn" onclick="requestCloseTodoOverlay()" title="Close overlay"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -56,13 +57,13 @@
           </div>
         </div>
         <div class="todo-edit-field">
-          <div class="todo-edit-label">Execution Status</div>
-          <div class="todo-status-segmented-group" id="todo-status-segmented-group">
-            <button type="button" class="todo-status-seg-btn active" data-status="pending" onclick="setTodoModalStatus('pending')" data-i18n-title="todo.statusPendingTooltip" title="Mark task status as pending"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span> <span data-i18n="todo.statusPending">Pending</span></button>
-            <button type="button" class="todo-status-seg-btn" data-status="wip" onclick="setTodoModalStatus('wip')" data-i18n-title="todo.statusWipTooltip" title="Mark task status as in progress"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> <span data-i18n="todo.statusInProgress">In Progress</span></button>
-            <button type="button" class="todo-status-seg-btn" data-status="done" onclick="setTodoModalStatus('done')" data-i18n-title="todo.statusDoneTooltip" title="Mark task status as completed"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span> <span data-i18n="todo.statusDone">Done</span></button>
-            <button type="button" class="todo-status-seg-btn" data-status="wont_do" onclick="setTodoModalStatus('wont_do')" data-i18n-title="todo.statusWontDoTooltip" title="Mark task status as won't do"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span> <span data-i18n="todo.statusWontDo">Won't Do</span></button>
-          </div>
+          <label class="todo-edit-label" for="todo-edit-status" data-i18n="todo.status">Execution Status</label>
+          <select id="todo-edit-status" class="todo-edit-input todo-status-select" data-status="pending" onchange="setTodoModalStatus(this.value)" data-i18n-title="todo.statusPendingTooltip" title="Mark task status as pending">
+            <option value="pending" data-i18n="todo.statusPending">Pending</option>
+            <option value="wip" data-i18n="todo.statusInProgress">In Progress</option>
+            <option value="done" data-i18n="todo.statusDone">Done</option>
+            <option value="wont_do" data-i18n="todo.statusWontDo">Won't Do</option>
+          </select>
         </div>
 
         <!-- Description / Context -->
