@@ -14,7 +14,7 @@
         
         <!-- Eisenhower Quadrant & Matrix Picker Button -->
         <div class="todo-edit-field todo-edit-span-2">
-          <label class="todo-edit-label">Eisenhower Quadrant</label>
+          <label class="todo-edit-label" for="todo-edit-quadrant">Eisenhower Quadrant</label>
           <div class="todo-quadrant-input-group">
             <select id="todo-edit-quadrant" class="todo-edit-input" title="Choose Eisenhower Quadrant" onchange="onTodoModalQuadrantChanged(this.value)">
               <option value="Q1">Q1 - Do First (Urgent & Important)</option>
@@ -37,17 +37,17 @@
 
         <!-- Owner & Requested by (One line) -->
         <div class="todo-edit-field">
-          <label class="todo-edit-label">Owner <span class="todo-field-hint">(optional)</span></label>
+          <div class="todo-edit-label">Owner <span class="todo-field-hint">(optional)</span></div>
           <div id="todo-edit-owner-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select colleague owner"></div>
         </div>
         <div class="todo-edit-field">
-          <label class="todo-edit-label">Requested by <span class="todo-field-hint">(optional)</span></label>
+          <div class="todo-edit-label">Requested by <span class="todo-field-hint">(optional)</span></div>
           <div id="todo-edit-asked-by-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select colleague who requested this task"></div>
         </div>
 
         <!-- Due Date & Execution Status (One line) -->
         <div class="todo-edit-field">
-          <label class="todo-edit-label">Due Date</label>
+          <label class="todo-edit-label" for="todo-edit-due-date">Due Date</label>
           <div class="todo-due-picker-widget" id="todo-due-picker-container" onclick="triggerTodoDatePicker()" title="Click to choose a due date">
             <span class="todo-due-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
             <span id="todo-due-display-text" class="todo-due-text">Not set</span>
@@ -56,7 +56,7 @@
           </div>
         </div>
         <div class="todo-edit-field">
-          <label class="todo-edit-label">Execution Status</label>
+          <div class="todo-edit-label">Execution Status</div>
           <div class="todo-status-segmented-group" id="todo-status-segmented-group">
             <button type="button" class="todo-status-seg-btn active" data-status="pending" onclick="setTodoModalStatus('pending')" data-i18n-title="todo.statusPendingTooltip" title="Mark task status as pending"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg></span> <span data-i18n="todo.statusPending">Pending</span></button>
             <button type="button" class="todo-status-seg-btn" data-status="wip" onclick="setTodoModalStatus('wip')" data-i18n-title="todo.statusWipTooltip" title="Mark task status as in progress"><span class="ui-icon-wrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> <span data-i18n="todo.statusInProgress">In Progress</span></button>
@@ -67,14 +67,14 @@
 
         <!-- Description / Context -->
         <div class="todo-edit-field todo-edit-span-2">
-          <label class="todo-edit-label">Description / Context</label>
+          <label class="todo-edit-label" for="todo-edit-context">Description / Context</label>
           <textarea id="todo-edit-context" rows="4" class="todo-edit-textarea" placeholder="Add optional details, context, or notes..." title="Click and type description or context"></textarea>
         </div>
 
         <!-- Checklist / Subtasks -->
         <div class="todo-edit-field todo-edit-span-2">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <label class="todo-edit-label" style="margin:0;"><span data-i18n="todo.checklistTitle">Checklist / Subtasks</span> <span id="todo-edit-checklist-badge" class="todo-field-hint"></span></label>
+            <label class="todo-edit-label" for="todo-edit-new-checklist-input" style="margin:0;"><span data-i18n="todo.checklistTitle">Checklist / Subtasks</span> <span id="todo-edit-checklist-badge" class="todo-field-hint"></span></label>
           </div>
           <div id="todo-edit-checklist-items" style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px;"></div>
           <div style="display:flex; gap:6px;">
@@ -105,10 +105,10 @@
         <!-- Delegation Tracking & Dated Updates (for delegated or tracked tasks) -->
         <div class="todo-edit-field todo-edit-span-2" id="todo-edit-delegation-updates-section" style="background:var(--card-bg-alt); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <label class="todo-edit-label" style="margin:0; display:flex; align-items:center; gap:6px;">
+            <div class="todo-edit-label" style="margin:0; display:flex; align-items:center; gap:6px;">
               <span class="ui-icon-wrap" style="color:var(--accent);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
               <span data-i18n="todo.delegatedUpdatesSectionTitle">Delegation Tracking & Dated Updates</span>
-            </label>
+            </div>
             <div style="display:flex; align-items:center; gap:8px; font-size:0.8rem;">
               <label for="todo-edit-delegated-date" style="color:var(--text-muted); font-size:0.75rem;" data-i18n="todo.delegatedDateLabel">Delegated:</label>
               <input type="date" id="todo-edit-delegated-date" class="todo-edit-input" style="width:auto; padding:2px 6px; font-size:0.78rem;" title="Date when this task was delegated" onchange="onTodoDelegatedDateChanged(this.value)">
@@ -130,7 +130,7 @@
 
         <!-- Associated Notes -->
         <div class="todo-edit-field todo-edit-span-2">
-          <label class="todo-edit-label">Associated Notes <span class="todo-field-hint">(optional)</span></label>
+          <label class="todo-edit-label" for="todo-edit-assoc-notes-search">Associated Notes <span class="todo-field-hint">(optional)</span></label>
           <div id="todo-edit-assoc-notes-container" class="todo-assoc-notes-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
           <div style="position:relative;">
             <input id="todo-edit-assoc-notes-search" type="text" class="todo-edit-input" placeholder="Search a note to associate..." autocomplete="off"
@@ -141,7 +141,7 @@
 
         <!-- Task Prerequisites & Dependencies -->
         <div class="todo-edit-field todo-edit-span-2">
-          <label class="todo-edit-label">Prerequisites / Dependencies <span class="todo-field-hint">(this task is blocked until selected tasks are done)</span></label>
+          <label class="todo-edit-label" for="todo-edit-depends-search">Prerequisites / Dependencies <span class="todo-field-hint">(this task is blocked until selected tasks are done)</span></label>
           <div id="todo-edit-depends-container" class="todo-assoc-notes-container" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
           <div style="position:relative;">
             <input id="todo-edit-depends-search" type="text" class="todo-edit-input" placeholder="Search prerequisite tasks..." autocomplete="off"

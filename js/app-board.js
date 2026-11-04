@@ -2066,35 +2066,35 @@ function renderLabelManager() {
         <div class="lm-panel">
           ${tab === 'rename' ? `
             <div class="lm-field-card">
-              <label class="lm-field-label">${escH(t('editor.labelManagerRenameTo'))}</label>
+              <label class="lm-field-label" for="lm-rename-target">${escH(t('editor.labelManagerRenameTo'))}</label>
               <input class="lm-input lm-picker-input" id="lm-rename-target" data-suggest-type="${escA(type)}" data-lm-role="rename" type="text" value="${escA(label)}" placeholder="${escA(t('common.typeOrClickSuggestion'))}" title="${escA(t('common.typeOrClickSuggestion'))}" autocomplete="off" spellcheck="false" autocapitalize="off">
               <div class="lm-field-hint">${escH(t('editor.labelManagerRenameHint', { type: typeTitle.toLowerCase() }))}</div>
             </div>
           ` : ''}
           ${tab === 'merge' ? `
             <div class="lm-field-card">
-              <label class="lm-field-label">${escH(t('editor.labelManagerMergeInto'))}</label>
+              <label class="lm-field-label" for="lm-merge-target">${escH(t('editor.labelManagerMergeInto'))}</label>
               <input class="lm-input lm-picker-input" id="lm-merge-target" data-suggest-type="${escA(type)}" data-lm-role="merge" type="text" placeholder="${escA(t('common.typeOrClickSuggestion'))}" title="${escA(t('common.typeOrClickSuggestion'))}" autocomplete="off" spellcheck="false" autocapitalize="off">
               <div class="lm-field-hint">${escH(t('editor.labelManagerMergeHint'))}</div>
             </div>
           ` : ''}
           ${tab === 'promote' ? `
             <div class="lm-field-card">
-              <label class="lm-field-label">${escH(t('editor.labelManagerPromoteToType'))}</label>
+              <label class="lm-field-label" for="lm-promote-type">${escH(t('editor.labelManagerPromoteToType'))}</label>
               <select class="lm-input" id="lm-promote-type" onchange="setLabelManagerPromoteType(this.value)" title="${escA(t('editor.labelManagerPromoteToType'))}">
                 ${partitionOptions.filter(t => t !== type).map(t => `<option value="${t}"${t === promoteType ? ' selected' : ''}>${getLabelTypeTitle(t)}</option>`).join('')}
               </select>
               <div class="lm-field-hint">${escH(t('editor.labelManagerPromoteHint'))}</div>
             </div>
             <div class="lm-field-card">
-              <label class="lm-field-label">${escH(t('editor.labelManagerTargetLabel'))}</label>
+              <label class="lm-field-label" for="lm-promote-label">${escH(t('editor.labelManagerTargetLabel'))}</label>
               <input class="lm-input lm-picker-input" id="lm-promote-label" data-suggest-type="${escA(promoteType)}" data-lm-role="promote" type="text" value="${escA(label)}" placeholder="${escA(t('common.typeOrClickSuggestion'))}" title="${escA(t('common.typeOrClickSuggestion'))}" autocomplete="off" spellcheck="false" autocapitalize="off">
               <div class="lm-field-hint">${escH(t('editor.labelManagerPromoteSuggestions'))}</div>
             </div>
           ` : ''}
           ${tab === 'split' ? `
             <div class="lm-field-card">
-              <label class="lm-field-label">${escH(t('editor.labelManagerSplitBy'))}</label>
+              <label class="lm-field-label" for="lm-split-partition">${escH(t('editor.labelManagerSplitBy'))}</label>
               <select class="lm-input" id="lm-split-partition" onchange="setLabelManagerPartitionType(this.value)" title="${escA(t('editor.labelManagerSplitBy'))}">
                 ${partitionOptions.map(t => `<option value="${t}"${t === partitionType ? ' selected' : ''}>${getLabelTypeTitle(t)}</option>`).join('')}
               </select>

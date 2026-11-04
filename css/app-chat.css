@@ -261,6 +261,7 @@ body[data-theme='dark'] .chat-message-bubble.user {
 
 /* Agent Thinking Accordion Disclosure */
 .chat-thinking-accordion {
+  position: relative;
   margin: 6px 0 12px 0;
   border: 1px solid var(--card-border, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-md, 8px);
@@ -309,6 +310,15 @@ body[data-theme='dark'] .chat-message-bubble.user {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.chat-thinking-actions {
+  position: absolute;
+  top: 5px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  z-index: 2;
 }
 
 .chat-thinking-copy-btn {

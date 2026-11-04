@@ -3,32 +3,32 @@
   <div class="modal">
     <h2 style="display:flex; align-items:center; gap:8px;"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> <span data-i18n="editor.newNoteTitle">New Note</span></h2>
     <div class="form-field">
-      <label>Title</label>
+      <label for="nn-title">Title</label>
       <input type="text" id="nn-title" placeholder="Meeting / topic title…" title="Click and type the note title">
     </div>
     <div class="form-field">
-      <label>Date</label>
+      <label for="nn-date">Date</label>
       <input type="date" id="nn-date" title="Click to choose the note date">
     </div>
     <div class="form-field">
-      <label>Group tag</label>
+      <label for="nn-group">Group tag</label>
       <input type="text" id="nn-group" list="list-groups" placeholder="e.g. Calls" title="Click and type a group tag">
       <datalist id="list-groups"></datalist>
       <p class="form-hint">First-level folder (e.g. Calls, Projects)</p>
     </div>
     <div class="form-field">
-      <label>Major Topic tag</label>
+      <label for="nn-major">Major Topic tag</label>
       <input type="text" id="nn-major" list="list-majors" placeholder="e.g. Strategy" title="Click and type a major topic tag">
       <datalist id="list-majors"></datalist>
     </div>
     <div class="form-field">
-      <label>Topic tag</label>
+      <label for="nn-topic">Topic tag</label>
       <input type="text" id="nn-topic" list="list-topics" placeholder="e.g. Leadership-Meeting" title="Click and type a topic tag">
       <datalist id="list-topics"></datalist>
       <p class="form-hint">Second-level folder</p>
     </div>
       <div class="form-field">
-        <label>Content</label>
+        <label for="nn-content">Content</label>
         <span class="md-tab-hint" style="margin-bottom:6px;display:block">**bold** &nbsp;*italic* &nbsp;- bullet &nbsp;# heading</span>
         <textarea id="nn-content" placeholder="# Summary&#10;&#10;**Key decisions:**&#10;- Decision 1&#10;- Decision 2&#10;&#10;**Action items:**&#10;- [ ] Task for someone" title="Click and type the note content"></textarea>
       </div>
@@ -53,15 +53,15 @@
 
     <h2 style="display:flex; align-items:center; gap:8px;"><span id="nt-priority-pin" style="color:var(--color-medium, #f59e0b); display:inline-flex; align-items:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg></span> <span id="nt-dialog-title">New Todo</span></h2>
     <div class="form-field">
-      <label>Title <span style="color:#bbb;font-weight:normal">(used as file name)</span></label>
+      <label for="nt-title">Title <span style="color:#bbb;font-weight:normal">(used as file name)</span></label>
       <input type="text" id="nt-title" placeholder="Short title…" title="Click and type the todo title">
     </div>
     <div class="form-field">
-      <label>Description</label>
+      <label for="nt-text">Description</label>
       <input type="text" id="nt-text" placeholder="What needs to be done?" title="Click and type the todo description">
     </div>
     <div class="form-field">
-      <label>Eisenhower Quadrant</label>
+      <label for="nt-priority">Eisenhower Quadrant</label>
       <select id="nt-priority" title="Click to choose Eisenhower Quadrant" onchange="updateNewTodoPinColor(this.value)">
         <option value="Q1">Q1 - Do First (Urgent & Important)</option>
         <option value="Q2" selected>Q2 - Schedule (Important, Not Urgent)</option>
@@ -70,23 +70,23 @@
       </select>
     </div>
     <div class="form-field">
-      <label>Due date <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <label for="nt-due-date">Due date <span style="color:#bbb;font-weight:normal">(optional)</span></label>
       <input type="date" id="nt-due-date" title="Click to choose a due date">
     </div>
     <div class="form-field">
-      <label>Owner <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <div class="form-label">Owner <span style="color:#bbb;font-weight:normal">(optional)</span></div>
       <div id="nt-owner-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select collaborator"></div>
     </div>
     <div class="form-field">
-      <label>Requested by <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <div class="form-label">Requested by <span style="color:#bbb;font-weight:normal">(optional)</span></div>
       <div id="nt-asked-by-picker" class="tags-editor todo-owner-picker" data-type="topic" title="Select collaborator who requested this task"></div>
     </div>
     <div class="form-field">
-      <label>Context <span style="color:#bbb;font-weight:normal">(optional)</span></label>
+      <label for="nt-context">Context <span style="color:#bbb;font-weight:normal">(optional)</span></label>
       <input type="text" id="nt-context" placeholder="Additional context…" title="Click and type extra context">
     </div>
     <div class="form-field" id="nt-schedule-field">
-      <label id="nt-schedule-label">Planifier la tâche</label>
+      <label id="nt-schedule-label" for="nt-schedule">Planifier la tâche</label>
       <select id="nt-schedule" title="Planifier cette tâche dans l'agenda">
         <option value="next-slot" selected>Prochain créneau disponible (30 min)</option>
         <option value="open-modal">Ouvrir l'éditeur de bloc</option>
@@ -124,13 +124,13 @@
     <input type="hidden" id="ed-decision-id">
     
     <div class="form-field">
-      <label data-i18n="decision.titleLabel">Décision</label>
+      <label for="ed-text" data-i18n="decision.titleLabel">Décision</label>
       <input type="text" id="ed-text" placeholder="Description de la décision…" title="Saisir l'intitulé de la décision" data-i18n-placeholder="decision.titlePlaceholder" data-i18n-title="decision.titleInputTooltip">
     </div>
     
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
       <div class="form-field">
-        <label data-i18n="decision.statusLabel">Statut</label>
+        <label for="ed-status" data-i18n="decision.statusLabel">Statut</label>
         <select id="ed-status" title="Sélectionner le statut de la décision" data-i18n-title="decision.statusSelectTooltip">
           <option value="active" data-i18n="team.statusActive">Active</option>
           <option value="proposed" data-i18n="team.statusProposed">Proposée / À prendre</option>
@@ -138,7 +138,7 @@
         </select>
       </div>
       <div class="form-field">
-        <label data-i18n="decision.authorityLabel">Autorité</label>
+        <label for="ed-authority" data-i18n="decision.authorityLabel">Autorité</label>
         <select id="ed-authority" title="Sélectionner le niveau d'autorité" data-i18n-title="decision.authoritySelectTooltip">
           <option value="team" data-i18n="team.teamRole">Équipe</option>
           <option value="manager" data-i18n="team.managerBadge">Manager / Direction</option>
@@ -148,7 +148,7 @@
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
       <div class="form-field">
-        <label data-i18n="decision.impactLabel">Impact</label>
+        <label for="ed-impact" data-i18n="decision.impactLabel">Impact</label>
         <select id="ed-impact" title="Sélectionner le niveau d'impact" data-i18n-title="decision.impactSelectTooltip">
           <option value="high" data-i18n="team.impactHigh">Impact Élevé</option>
           <option value="medium" data-i18n="team.impactMedium">Impact Moyen</option>
@@ -156,18 +156,18 @@
         </select>
       </div>
       <div class="form-field">
-        <label data-i18n="decision.majorTopicLabel">Projet / Axe de travail</label>
+        <div class="form-label" data-i18n="decision.majorTopicLabel">Projet / Axe de travail</div>
         <div class="tags-editor" id="ed-major-topic" data-type="major" title="Cliquer pour choisir un ou plusieurs projets ou axes de travail" data-i18n-title="decision.majorTopicTooltip"></div>
       </div>
     </div>
 
     <div class="form-field">
-      <label data-i18n="decision.rationaleLabel">Contexte & Rationale</label>
+      <label for="ed-rationale" data-i18n="decision.rationaleLabel">Contexte & Rationale</label>
       <textarea id="ed-rationale" rows="3" style="width:100%; box-sizing:border-box; padding:0.5rem; border-radius:var(--radius-md); border:1px solid var(--card-border); background:var(--bg); color:var(--text);" placeholder="Notes explicatives, contexte, arbitrage..." title="Saisir le contexte ou les justifications de la décision" data-i18n-placeholder="decision.rationalePlaceholder" data-i18n-title="decision.rationaleTooltip"></textarea>
     </div>
 
     <div class="form-field" id="ed-assoc-notes-field">
-      <label id="ed-assoc-notes-label" data-i18n="decision.assocNotesLabel">Notes associées</label>
+      <label id="ed-assoc-notes-label" for="ed-linked-notes-search" data-i18n="decision.assocNotesLabel">Notes associées</label>
       <div id="ed-linked-notes-search-wrap" style="width:100%; position:relative; margin-bottom:0.4rem;">
         <input type="text" id="ed-linked-notes-search" class="field-input" autocomplete="off" placeholder="Associer une note..." style="width:100%; box-sizing:border-box; padding:0.45rem 0.6rem; border-radius:var(--radius-md); border:1px solid var(--card-border); background:var(--bg); color:var(--text); font-size:0.85rem;" title="Rechercher une note pour associer cette décision" data-i18n-placeholder="decision.assocNotesSearchPlaceholder" data-i18n-title="decision.assocNotesSearchTooltip">
         <div id="ed-linked-notes-list" class="planner-dropdown-list" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:180px; overflow-y:auto; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; z-index:10000; box-shadow:var(--shadow-lg);"></div>

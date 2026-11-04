@@ -91,4 +91,59 @@ describe('Modal DOM Hierarchy & Tag Parity (tests/unit/app-modal-dom-hierarchy.t
     expect(extraClosing).toEqual([]);
     expect(stack).toEqual([]);
   });
+
+  it('ensures every <label> in app.html and included templates is associated with a labelable form control', () => {
+    const fullHtml = getProcessedAppHtml();
+    const window = new Window();
+    window.document.write(fullHtml);
+
+    const labelableTags = new Set(['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'METER', 'OUTPUT', 'PROGRESS']);
+    const labels = Array.from(window.document.querySelectorAll('label'));
+    const unassociated = [];
+
+    for (const label of labels) {
+      const forAttr = label.getAttribute('for');
+      const nestedControl = label.querySelector('input, select, textarea, button, meter, output, progress');
+      if (forAttr) {
+        const target = window.document.getElementById(forAttr);
+        if (!target || !labelableTags.has(target.tagName.toUpperCase())) {
+          unassociated.push(`for="${forAttr}" -> ${target ? target.tagName : 'MISSING'}`);
+        }
+      } else if (!nestedControl) {
+        unassociated.push(label.outerHTML.replace(/\s+/g, ' ').slice(0, 80));
+      }
+    }
+
+    expect(unassociated).toEqual([]);
+  });
+
+  it('ensures dynamic JS <label> markup always specifies a for attribute or wraps a form control', () => {
+    const jsFiles = [
+      'js/app-board.js',
+      'js/app-collab.js',
+      'js/app-dailyreview.js',
+      'js/app-planner.js',
+      'js/app-tutorial.js'
+    ];
+    const invalidLabels = [];
+
+    for (const relPath of jsFiles) {
+      const content = fs.readFileSync(path.join(process.cwd(), relPath), 'utf-8');
+      const regex = /<label\b([^>]*)>([\s\S]*?)<\/label>/gi;
+      let m;
+      while ((m = regex.exec(content)) !== null) {
+        const attrs = m[1];
+        const inner = m[2];
+        const hasFor = /\bfor\s*=\s*["'][^"']+["']/i.test(attrs);
+        const hasControl = /<(input|select|textarea)\b/i.test(inner);
+        const hasNonFormTarget = /\bfor\s*=\s*["']ws-dossier-summary["']/i.test(attrs);
+        if (hasNonFormTarget || (!hasFor && !hasControl)) {
+          const line = content.slice(0, m.index).split('\n').length;
+          invalidLabels.push(`${relPath}:${line}`);
+        }
+      }
+    }
+
+    expect(invalidLabels).toEqual([]);
+  });
 });

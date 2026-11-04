@@ -11524,20 +11524,20 @@ function openContinueWorkModal(sourceEventId) {
 
   const modalHtml = `
     <div class="form-field">
-      <label>${t('planner.title')}</label>
+      <label for="cw-title">${t('planner.title')}</label>
       <input type="text" id="cw-title" value="${escA(sourceEvent.title)}">
     </div>
     <div class="form-field">
-      <label>${t('planner.date')}</label>
+      <label for="cw-date">${t('planner.date')}</label>
       <input type="date" id="cw-date" value="${dateStr}">
     </div>
     <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
       <div class="form-field" style="flex:1;min-width:90px">
-        <label>${t('planner.startTime')}</label>
+        <label for="cw-start-time">${t('planner.startTime')}</label>
         <input type="time" id="cw-start-time" value="${sourceEvent.startTime}" oninput="_cwSyncDuration()">
       </div>
       <div class="form-field" style="flex:1;min-width:80px">
-        <label>Duration</label>
+        <label for="cw-duration">Duration</label>
         <select id="cw-duration" oninput="_cwSyncEndFromDuration()">
           <option value="15" ${_calcDurationMins(sourceEvent.startTime, sourceEvent.endTime) === 15 ? 'selected' : ''}>15 min</option>
           <option value="30" ${_calcDurationMins(sourceEvent.startTime, sourceEvent.endTime) === 30 ? 'selected' : ''}>30 min</option>
@@ -11550,7 +11550,7 @@ function openContinueWorkModal(sourceEventId) {
         </select>
       </div>
       <div class="form-field" style="flex:1;min-width:90px;display:${![15, 30, 45, 60, 90, 120, 180].includes(_calcDurationMins(sourceEvent.startTime, sourceEvent.endTime)) ? '' : 'none'};" id="cw-end-time-field">
-        <label>${t('planner.endTime')}</label>
+        <label for="cw-end-time">${t('planner.endTime')}</label>
         <input type="time" id="cw-end-time" value="${sourceEvent.endTime}" oninput="_cwSyncDurationFromEnd()">
       </div>
     </div>

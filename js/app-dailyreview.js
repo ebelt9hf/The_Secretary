@@ -2477,6 +2477,7 @@ const DailyReviewController = {
     // Option 3: Associate Existing Note Section
     const searchLabel = document.createElement('label');
     searchLabel.id = 'dr-modal-search-label';
+    searchLabel.htmlFor = 'dr-modal-note-search';
     searchLabel.style.fontSize = '0.8rem';
     searchLabel.style.fontWeight = '600';
     searchLabel.style.color = 'var(--text-muted)';

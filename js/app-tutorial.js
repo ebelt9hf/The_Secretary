@@ -1346,7 +1346,7 @@ const SetupWizardController = {
           </div>
 
           <div class="setup-wizard-form-group" style="flex:1">
-            <label class="setup-wizard-label">${t('setupWizard.themeLabel') || 'App Theme'}</label>
+            <div class="setup-wizard-label">${t('setupWizard.themeLabel') || 'App Theme'}</div>
             <div class="setup-wizard-theme-toggle">
               <button type="button" class="setup-wizard-theme-btn ${this.state.theme === 'system' ? 'active' : ''}" onclick="SetupWizardController.onThemeChange('system')" title="${t('setupWizard.themeSystem') || 'System'}">💻 ${t('setupWizard.themeSystem') || 'System'}</button>
               <button type="button" class="setup-wizard-theme-btn ${this.state.theme === 'light' ? 'active' : ''}" onclick="SetupWizardController.onThemeChange('light')" title="${t('setupWizard.themeLight') || 'Light'}">☀️ ${t('setupWizard.themeLight') || 'Light'}</button>
@@ -1356,7 +1356,7 @@ const SetupWizardController = {
         </div>
 
         <div class="setup-wizard-form-group">
-          <label class="setup-wizard-label">${t('setupWizard.accentLabel') || 'Accent Color'}</label>
+          <div class="setup-wizard-label">${t('setupWizard.accentLabel') || 'Accent Color'}</div>
           ${accentOptions}
         </div>
       </div>
@@ -1403,7 +1403,7 @@ const SetupWizardController = {
         </div>
 
         <div class="setup-wizard-form-group">
-          <label class="setup-wizard-label">${t('setupWizard.workingDaysLabel') || 'Working Days'}</label>
+          <div class="setup-wizard-label">${t('setupWizard.workingDaysLabel') || 'Working Days'}</div>
           ${dayChips}
         </div>
 
@@ -1680,7 +1680,7 @@ const SetupWizardController = {
         </div>
 
         <div class="setup-wizard-providers-container ${!this.state.aiEnabled ? 'is-disabled' : ''}">
-          <label class="setup-wizard-label">${t('setupWizard.providerLabel') || 'AI Provider'}</label>
+          <div class="setup-wizard-label">${t('setupWizard.providerLabel') || 'AI Provider'}</div>
           ${providersCardsHtml}
 
           <div class="setup-wizard-form-row" style="margin-top:1rem">

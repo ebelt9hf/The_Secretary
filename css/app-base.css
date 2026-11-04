@@ -2012,7 +2012,7 @@ html.is-electron-linux:not(.is-fullscreen) body .topbar-main-row{margin-right:va
 }
 .modal h2{font-size:1.18rem;color: var(--accent);margin-bottom:1rem;font-weight:700;letter-spacing:-0.015em}
 .form-field{margin-bottom:.85rem}
-.form-field label{display:block;font-size:.82rem;color: var(--text-muted);margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+.form-field label,.form-field .form-label{display:block;font-size:.82rem;color: var(--text-muted);margin-bottom:.35rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
 .form-field input,.form-field textarea,.form-field select{width:100%;padding:.5rem .75rem;background: var(--field-bg);color: var(--field-text);border:1px solid var(--field-border);border-radius:var(--radius-md);font-size:.88rem;font-family:inherit;outline:none;transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;}
 .form-field input:focus,.form-field textarea:focus,.form-field select:focus{border-color: var(--accent);box-shadow:0 0 0 3.5px color-mix(in srgb, var(--accent) 25%, transparent), 0 2px 8px color-mix(in srgb, var(--accent) 12%, transparent);}
 .form-field textarea{min-height:140px;resize:vertical;font-family:inherit;font-size:.9rem;line-height:1.55}

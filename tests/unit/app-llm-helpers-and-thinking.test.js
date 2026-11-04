@@ -160,7 +160,7 @@ describe('AI Agent Thinking & Reasoning Process Helpers (app-llm.js)', () => {
   });
 
   describe('LLMService.renderThinkingAccordionHTML', () => {
-    it('renders structured HTML disclosure accordion with tooltips and copy button', () => {
+    it('renders structured HTML disclosure accordion with tooltips and copy button outside <summary>', () => {
       const thoughtText = 'Checking calendar events and task list.';
       const html = LLMService.renderThinkingAccordionHTML(thoughtText, { title: 'Thought process' });
       
@@ -168,6 +168,10 @@ describe('AI Agent Thinking & Reasoning Process Helpers (app-llm.js)', () => {
       expect(html).toContain('title=');
       expect(html).toContain('Checking calendar events and task list.');
       expect(html).toContain('chat-thinking-copy-btn');
+
+      const summaryMatch = html.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i);
+      expect(summaryMatch).not.toBeNull();
+      expect(summaryMatch[1]).not.toMatch(/<(button|a|input|select|textarea)\b/i);
     });
 
     it('returns empty string if thought content is blank', () => {

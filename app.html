@@ -9,25 +9,25 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e1b4b">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.59">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.59">
-<link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.59">
-<script src="js/vendor/katex.min.js?v=4.0.59"></script>
-<script src="js/vendor/katex-auto-render.min.js?v=4.0.59"></script>
-<script src="js/vendor/dompurify.min.js?v=4.0.59"></script>
-<script src="js/vendor/marked.min.js?v=4.0.59"></script>
-<script src="js/vendor/turndown.js?v=4.0.59"></script>
-<script src="js/vendor/turndown-plugin-gfm.js?v=4.0.59"></script>
+<link rel="stylesheet" href="css/app-base.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.60">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.60">
+<link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.60">
+<script src="js/vendor/katex.min.js?v=4.0.60"></script>
+<script src="js/vendor/katex-auto-render.min.js?v=4.0.60"></script>
+<script src="js/vendor/dompurify.min.js?v=4.0.60"></script>
+<script src="js/vendor/marked.min.js?v=4.0.60"></script>
+<script src="js/vendor/turndown.js?v=4.0.60"></script>
+<script src="js/vendor/turndown-plugin-gfm.js?v=4.0.60"></script>
 <script>
   (function() {
     try {
@@ -212,7 +212,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.59" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.59</p>
+      <p id="connect-version-hint" data-version="4.0.60" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.60</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -512,7 +512,7 @@
       <div class="prefs-section" id="prefs-sec-appearance">
         <h3>Appearance</h3>
         <div class="prefs-row">
-          <label class="prefs-label">Theme</label>
+          <label class="prefs-label" for="prefs-theme">Theme</label>
           <select id="prefs-theme" onchange="prefsThemeChanged(this.value)" class="prefs-input" title="Choose the app theme">
             <option value="system">System (Auto)</option>
             <option value="light">Studio Light</option>
@@ -520,7 +520,7 @@
           </select>
         </div>
         <div class="prefs-row">
-          <label class="prefs-label">Accent Color</label>
+          <label class="prefs-label" for="prefs-accent-color">Accent Color</label>
           <div style="display:flex;align-items:center;gap:8px">
             <input type="color" id="prefs-accent-color" value="#4f46e5" onchange="prefsAccentChanged(this.value)" class="prefs-input" style="width:40px;height:32px;padding:2px;cursor:pointer" title="Pick accent color">
             <select id="prefs-accent-preset" onchange="prefsAccentChanged(this.value)" class="prefs-input" style="max-width:130px" title="Choose accent preset">
@@ -534,7 +534,7 @@
           </div>
         </div>
         <div class="prefs-row">
-          <label class="prefs-label">Lane sorting</label>
+          <label class="prefs-label" for="prefs-lane-sorting">Lane sorting</label>
           <select id="prefs-lane-sorting" onchange="prefsLaneSortChanged(this.value)" class="prefs-input" title="Choose how lanes are ordered">
             <option value="recent">Newest first</option>
             <option value="alpha">Alphabetical</option>
@@ -542,7 +542,7 @@
           <small style="display:block;color:#6b7280;margin-top:.3rem">Controls ordering of lanes in the Notes board</small>
         </div>
         <div class="prefs-row">
-          <label class="prefs-label">Older notes threshold</label>
+          <label class="prefs-label" for="prefs-week-cutoff">Older notes threshold</label>
           <div style="display:flex;align-items:center;gap:.5rem">
             <input type="number" id="prefs-week-cutoff" min="1" max="104" class="prefs-input" style="max-width:72px" onchange="prefsWeekCutoffChanged(+this.value)" title="Choose how many weeks before notes move to Older Notes">
             <small style="color:#6b7280">weeks — notes older than this appear in the "Older Notes" lane (Weeks view)</small>
@@ -553,15 +553,15 @@
       <div class="prefs-section" id="prefs-sec-schedule">
         <h3>Work Schedule</h3>
         <div class="prefs-row">
-          <label class="prefs-label">Work start</label>
+          <label class="prefs-label" for="prefs-work-start">Work start</label>
           <input type="time" id="prefs-work-start" class="prefs-input" style="max-width:120px" onchange="prefsWorkTimeChanged()" title="Work day start time" value="09:00">
         </div>
         <div class="prefs-row">
-          <label class="prefs-label">Work end</label>
+          <label class="prefs-label" for="prefs-work-end">Work end</label>
           <input type="time" id="prefs-work-end" class="prefs-input" style="max-width:120px" onchange="prefsWorkTimeChanged()" title="Work day end time" value="18:30">
         </div>
         <div class="prefs-row">
-          <label class="prefs-label" id="prefs-working-days-label">Working days</label>
+          <span class="prefs-label" id="prefs-working-days-label">Working days</span>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;color:var(--text);font-size:0.85rem;">
             <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-1" onchange="prefsWorkingDaysChanged()" checked> Mon</label>
             <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" id="pref-wd-2" onchange="prefsWorkingDaysChanged()" checked> Tue</label>
@@ -573,7 +573,7 @@
           </div>
         </div>
         <div class="prefs-row">
-          <label class="prefs-label" id="prefs-default-duration-label">Default block duration</label>
+          <label class="prefs-label" id="prefs-default-duration-label" for="prefs-default-duration">Default block duration</label>
           <select id="prefs-default-duration" class="prefs-input" style="max-width:120px" onchange="prefsDefaultDurationChanged()" title="Default planned block duration">
             <option value="15">15 min</option>
             <option value="30">30 min</option>
@@ -717,7 +717,7 @@
 
         <!-- Linked Authentication Methods List -->
         <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <label class="prefs-label" data-i18n="sync.linkedAuthMethodsTitle">Available Authentication Methods</label>
+          <span class="prefs-label" data-i18n="sync.linkedAuthMethodsTitle">Available Authentication Methods</span>
           <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
 
             <!-- 1. Master Passphrase (E2EE) -->
@@ -794,7 +794,7 @@
 
         <!-- Danger Zone: User Account & Data Deletion Card -->
         <div class="prefs-row" id="prefs-danger-zone-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:16px;">
-          <label class="prefs-label" style="color:var(--color-danger, #ef4444); font-weight:700;" data-i18n="prefs.dangerZoneTitle">Danger Zone</label>
+          <span class="prefs-label" style="color:var(--color-danger, #ef4444); font-weight:700;" data-i18n="prefs.dangerZoneTitle">Danger Zone</span>
           <div style="width:100%; padding:14px; background:var(--card-bg-alt); border:1px solid color-mix(in srgb, var(--color-danger, #ef4444) 30%, transparent); border-radius:8px;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
               <div style="display:flex; align-items:center; gap:12px;">
@@ -815,7 +815,7 @@
       <div class="prefs-section" id="prefs-sec-profile">
         <h3>Collaborator Profile</h3>
         <div class="prefs-row">
-          <label class="prefs-label">My Name (alias for "me")</label>
+          <label class="prefs-label" for="prefs-username">My Name (alias for "me")</label>
           <input type="text" id="prefs-username" class="prefs-input" style="max-width:200px" onchange="prefsUsernameChanged(this.value)" placeholder="e.g. Alex" title="Your name as an alias for 'me'">
         </div>
       </div>
@@ -823,7 +823,7 @@
       <div class="prefs-section" id="prefs-sec-language">
         <h3 data-i18n="prefs.language">Language</h3>
         <div class="prefs-row">
-          <label class="prefs-label" data-i18n="prefs.appLanguage">App Language</label>
+          <label class="prefs-label" for="prefs-language" data-i18n="prefs.appLanguage">App Language</label>
           <select id="prefs-language" onchange="prefsLanguageChanged(this.value)" class="prefs-input" title="Choose the app interface language" data-i18n-title="prefs.appLanguageTooltip">
             <option value="en">English</option>
             <option value="de">Deutsch</option>
@@ -843,7 +843,7 @@
           </select>
         </div>
         <div class="prefs-row">
-          <label class="prefs-label" data-i18n="prefs.workingLanguage">Working Language</label>
+          <label class="prefs-label" for="prefs-working-language" data-i18n="prefs.workingLanguage">Working Language</label>
           <select id="prefs-working-language" onchange="prefsWorkingLanguageChanged(this.value)" class="prefs-input" title="Choose the working language for note templates and 1-on-1 notes" data-i18n-title="prefs.workingLanguageTooltip">
             <option value="en">English</option>
             <option value="de">Deutsch</option>
@@ -880,7 +880,7 @@
 
         <!-- Providers Container (Dimmable when disabled) -->
         <div id="prefs-ai-providers-container" class="setup-wizard-providers-container">
-          <label class="setup-wizard-label" data-i18n="setupWizard.providerLabel">AI Provider</label>
+          <label class="setup-wizard-label" for="prefs-ai-provider" data-i18n="setupWizard.providerLabel">AI Provider</label>
           
           <!-- Provider Cards Grid -->
           <div id="prefs-ai-providers-grid" class="setup-wizard-providers-grid"></div>
@@ -961,7 +961,7 @@
           </div>
 
           <div class="setup-wizard-form-group" style="margin-top:0.75rem;">
-            <label class="setup-wizard-label" id="prefs-ai-schema-label">Structured Output JSON Schema</label>
+            <label class="setup-wizard-label" id="prefs-ai-schema-label" for="prefs-ai-schema-display">Structured Output JSON Schema</label>
             <div style="position:relative; width:100%;">
               <textarea id="prefs-ai-schema-display" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:110px;width:100%;background:var(--card-bg-alt);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2.2rem;resize:vertical;box-sizing:border-box;"></textarea>
               <button type="button" class="btn" onclick="copyAiJsonSchema()" id="btn-copy-ai-schema" title="Copy AI structured output JSON schema to clipboard" data-i18n-title="prefs.copySchemaTooltip" style="position:absolute; top:6px; right:6px; padding:.2rem .55rem; font-size:.72rem; z-index:10; background:var(--card-bg); border:1px solid var(--card-border); border-radius:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> <span data-i18n="prefs.copySchema">Copy Schema</span></button>
@@ -970,7 +970,7 @@
 
           <!-- External Agent Mail-to-Planner Instructions -->
           <div class="setup-wizard-form-group" style="margin-top:0.85rem; border-top:1px dashed var(--card-border); padding-top:0.85rem;">
-            <label class="setup-wizard-label" id="prefs-external-agent-prompt-label" data-i18n="prefs.externalAgentPromptLabel">External Agent Guidelines (Mail & Calendar)</label>
+            <label class="setup-wizard-label" id="prefs-external-agent-prompt-label" for="prefs-external-agent-prompt" data-i18n="prefs.externalAgentPromptLabel">External Agent Guidelines (Mail & Calendar)</label>
             <small class="prefs-desc" style="display:block;color:var(--text-muted);font-size:0.78rem;margin-bottom:6px;" data-i18n="prefs.externalAgentPromptDesc">Copy and paste these guidelines into an external AI agent or automation script to extract calendar events from your mail program into planner-proposals.json.</small>
             <div style="position:relative; width:100%;">
               <textarea id="prefs-external-agent-prompt" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:120px;width:100%;background:var(--card-bg-alt);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2.2rem;resize:vertical;box-sizing:border-box;"></textarea>
@@ -980,7 +980,7 @@
 
           <!-- Preserved Bulk Summaries Row -->
           <div class="setup-wizard-form-group" style="border-top:1px dashed var(--card-border);padding-top:0.85rem;margin-top:0.85rem">
-            <label class="setup-wizard-label" style="font-weight:600">Génération en bloc</label>
+            <label class="setup-wizard-label" for="bulk-summary-weeks" style="font-weight:600">Génération en bloc</label>
             <div style="display:flex;flex-direction:column;gap:.6rem;flex:1">
               <div id="bulk-summary-controls" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
                 <span style="font-size:.82rem">Générer les résumés IA des meetings des dernières</span>
@@ -1006,7 +1006,7 @@
         <h3 data-i18n="prefs.maintenanceTitle">Index & Maintenance</h3>
         <div class="prefs-row" style="flex-direction:column;align-items:flex-start;gap:6px">
           <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-            <label class="prefs-label" id="prefs-rebuild-index-label" data-i18n="prefs.rebuildIndexLabel">Reconstruct Index</label>
+            <span class="prefs-label" id="prefs-rebuild-index-label" data-i18n="prefs.rebuildIndexLabel">Reconstruct Index</span>
             <button class="btn" onclick="rebuildAll()" title="Rebuild the notes and todos indexes" data-i18n-title="prefs.rebuildIndexes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> <span data-i18n="prefs.rebuild">Rebuild</span></button>
           </div>
           <small id="prefs-rebuild-index-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="prefs.rebuildIndexDesc">Rescans note files in your workspace folder, registers new orphan files, and removes deleted notes from the app index.</small>
@@ -1017,21 +1017,21 @@
         <h3 data-i18n="prefs.helpAndTutorial">Help & Tutorial</h3>
         <div class="prefs-row" style="flex-direction:column;align-items:flex-start;gap:6px">
           <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-            <label class="prefs-label" id="prefs-setup-wizard-label" data-i18n="prefs.setupWizardLabel">First Startup Wizard</label>
+            <span class="prefs-label" id="prefs-setup-wizard-label" data-i18n="prefs.setupWizardLabel">First Startup Wizard</span>
             <button class="btn" id="prefs-setup-wizard-btn" onclick="SetupWizardController.open()" title="Relaunch the initial setup wizard to reconfigure workspace settings" data-i18n-title="prefs.runSetupWizardTooltip" data-i18n="prefs.runSetupWizardBtn">Run Setup Wizard</button>
           </div>
           <small id="prefs-setup-wizard-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="prefs.setupWizardDesc">Relaunches the step-by-step setup wizard to configure folder location, AI options, and default workspace parameters.</small>
         </div>
         <div class="prefs-row" style="flex-direction:column;align-items:flex-start;gap:6px;margin-top:12px">
           <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-            <label class="prefs-label" id="prefs-tutorial-label" data-i18n="prefs.interactiveTutorial">Interactive Tutorial</label>
+            <span class="prefs-label" id="prefs-tutorial-label" data-i18n="prefs.interactiveTutorial">Interactive Tutorial</span>
             <button class="btn" id="prefs-tutorial-btn" onclick="startTutorial()" title="Launch the interactive application tour" data-i18n-title="prefs.startTourTooltip" data-i18n="prefs.startTour">Start Tour</button>
           </div>
           <small id="prefs-tutorial-desc" class="prefs-desc" style="color:#6b7280;font-size:0.8rem;margin:0" data-i18n="prefs.tutorialDesc">Launches the guided walkthrough introducing key views, keyboard shortcuts, and board features.</small>
         </div>
         <div class="prefs-row" id="prefs-row-pwa-install" style="flex-direction:column;align-items:flex-start;gap:6px;margin-top:12px">
           <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-            <label class="prefs-label" id="prefs-pwa-install-label" data-i18n="pwa.installApp">Install App</label>
+            <span class="prefs-label" id="prefs-pwa-install-label" data-i18n="pwa.installApp">Install App</span>
             <button class="btn" id="btn-prefs-pwa-install" onclick="window.PwaManager?.promptInstall()" title="Install Secretary as a standalone desktop application" data-i18n-title="pwa.installTooltip" data-i18n="pwa.installApp" style="display:none;">Install App</button>
             <span id="prefs-pwa-installed-status" style="display:none;color:var(--success);font-size:0.85rem;" data-i18n="pwa.standaloneRunning">Running in standalone window</span>
           </div>
@@ -1042,7 +1042,7 @@
       <div class="prefs-section" id="prefs-sec-folder">
         <h3 data-i18n="prefs.folder">Folder</h3>
         <div class="prefs-row">
-          <label class="prefs-label" data-i18n="prefs.savedFolder">Saved folder</label>
+          <span class="prefs-label" data-i18n="prefs.savedFolder">Saved folder</span>
           <div style="display:flex;gap:8px;align-items:center">
             <span id="prefs-folder-name" style="color:#6b7280">Not set</span>
             <button class="btn" onclick="changeFolderFromPrefs()" title="Pick a different folder" data-i18n-title="prefs.pickFolder" data-i18n="prefs.change">Change</button>
@@ -1077,7 +1077,7 @@
         </div>
 
         <div class="prefs-row" id="prefs-sync-account-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.accountCardTitle">Cloud Account</label>
+          <span class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.accountCardTitle">Cloud Account</span>
           <div style="display:flex; justify-content:space-between; align-items:center; width:100%; flex-wrap:wrap; gap:10px; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px;">
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:6px; background:rgba(99,102,241,0.15); color:var(--accent);">
@@ -1095,7 +1095,7 @@
 
         <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:16px; flex-wrap:wrap;">
-            <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.activeEngineLabel">Active Storage Engine</label>
+            <label class="prefs-label" for="prefs-storage-engine-select" style="min-width:auto; width:auto;" data-i18n="sync.activeEngineLabel">Active Storage Engine</label>
             <select id="prefs-storage-engine-select" onchange="changeStorageEngineUI(this.value)" class="prefs-input" style="flex:1; min-width:260px; max-width:420px;" title="Choose between local filesystem and encrypted Firebase Firestore" data-i18n-title="sync.selectStorageBackendTooltip">
               <option value="filesystem" data-i18n="sync.engineOptionFs">Local Filesystem Folder (Free & Private Default)</option>
               <option value="firebase" data-i18n="sync.engineOptionFirebase">Firebase Cloud Vault (Optional E2EE Sync)</option>
@@ -1107,7 +1107,7 @@
         </div>
 
         <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.statusCardTitle">Synchronization Status</label>
+          <span class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.statusCardTitle">Synchronization Status</span>
           <div style="display:flex; gap:12px; align-items:center; width:100%; flex-wrap:wrap; padding:10px 14px; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px;">
             <span id="prefs-sync-status-text" style="font-size:0.85rem; font-weight:600; color:var(--text);">Status: Disconnected</span>
             <span id="prefs-sync-count-text" style="font-size:0.82rem; color:var(--text-muted);">0 notes cached</span>
@@ -1118,7 +1118,7 @@
 
         <div class="prefs-row" id="prefs-sync-code-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:12px;">
-            <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
+            <label class="prefs-label" for="prefs-sync-code-input" style="min-width:auto; width:auto;" data-i18n="sync.syncCodeLabel">Sync Code (Pairing Key)</label>
             <span id="prefs-sync-code-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(99,102,241,0.15); color:var(--accent); border:1px solid rgba(99,102,241,0.3); white-space:nowrap;">Cloud Pairing</span>
           </div>
           <div style="display:flex; gap:8px; align-items:center; width:100%;">
@@ -1130,7 +1130,7 @@
 
         <div class="prefs-row" id="prefs-sync-pass-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:12px;">
-            <label class="prefs-label" style="min-width:auto; width:auto;" data-i18n="sync.masterPasswordLabel">Master Passphrase (E2EE)</label>
+            <label class="prefs-label" for="prefs-sync-pass-input" style="min-width:auto; width:auto;" data-i18n="sync.masterPasswordLabel">Master Passphrase (E2EE)</label>
             <span id="prefs-sync-pass-badge" style="font-size:0.72rem; padding:2px 8px; border-radius:10px; font-weight:600; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); white-space:nowrap;">AES-256-GCM</span>
           </div>
           <div style="display:flex; gap:8px; align-items:center; width:100%;">
@@ -1150,7 +1150,7 @@
 
         <div class="prefs-row" id="prefs-sync-remember-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px; display:none;">
           <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-            <label class="prefs-label" data-i18n="sync.rememberPassLabel">Remember Passphrase</label>
+            <span class="prefs-label" data-i18n="sync.rememberPassLabel">Remember Passphrase</span>
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;" title="Toggle automatic vault unlocking on this device" data-i18n-title="sync.rememberPassTooltip">
               <input type="checkbox" id="prefs-sync-remember-pass" onchange="toggleRememberPassphraseUI(this.checked)">
               <span style="font-size:0.85rem; font-weight:500;" data-i18n="sync.rememberPassOption">Remember on this device</span>
@@ -1162,7 +1162,7 @@
         </div>
 
         <div class="prefs-row" style="flex-direction:column; align-items:flex-start; gap:8px; margin-top:12px;">
-          <label class="prefs-label" data-i18n="sync.vaultActionsTitle">Vault & Migration Actions</label>
+          <span class="prefs-label" data-i18n="sync.vaultActionsTitle">Vault & Migration Actions</span>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button type="button" class="btn" id="btn-prefs-migrate-firebase" onclick="openModal('modal-cloud-sync-setup')" title="Import all local notes into encrypted Firebase vault" data-i18n-title="sync.migrateToFirebaseTooltip" data-i18n="sync.migrateToFirebaseBtn">Migrate to Firebase</button>
             <button type="button" class="btn" id="btn-prefs-configure-firebase" onclick="openModal('modal-cloud-sync-setup'); toggleCustomFirebaseSetupUI();" title="Configure your custom Google Firebase project credentials" data-i18n-title="sync.configureFirebaseTooltip" data-i18n="sync.configureFirebaseBtn">Configure Firebase Project</button>
@@ -1496,7 +1496,7 @@
 
               <!-- Tab 2: Meeting & Notes Summaries List -->
               <div class="dr-step5-tab-content" id="dr-step5-tab-list" style="display:none; flex-direction:column; flex:1; min-height:0; width:100%;">
-                <label id="dr-ai-meeting-summaries-label" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.5rem;" data-i18n="dailyreview.meetingSummariesLabel">Activités et réunions de la journée :</label>
+                <div id="dr-ai-meeting-summaries-label" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.5rem;" data-i18n="dailyreview.meetingSummariesLabel">Activités et réunions de la journée :</div>
                 <div id="dr-ai-meeting-summaries-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.8rem; padding-right:4px; min-height:0;">
                   <!-- Dynamic list of today's meeting notes and summaries -->
                 </div>
@@ -1504,7 +1504,7 @@
 
               <!-- Tab 3: Workstream Updates & Agent Sync List -->
               <div class="dr-step5-tab-content" id="dr-step5-tab-workstreams" style="display:none; flex-direction:column; flex:1; min-height:0; width:100%;">
-                <label id="dr-ai-workstream-updates-label" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.5rem;" data-i18n="dailyreview.workstreamUpdatesDesc">Mises à jour extraites par l'IA des notes du jour pour les workstreams actifs :</label>
+                <div id="dr-ai-workstream-updates-label" style="font-size:0.85rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.5rem;" data-i18n="dailyreview.workstreamUpdatesDesc">Mises à jour extraites par l'IA des notes du jour pour les workstreams actifs :</div>
                 <div id="dr-ai-workstream-updates-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.8rem; padding-right:4px; min-height:0;">
                   <!-- Dynamic list of extracted workstream updates -->
                 </div>
@@ -1607,42 +1607,42 @@
 <!-- ── Toast ── -->
 <div class="toast" id="toast"></div>
 
-<script src="js/app-state.js?v=4.0.59"></script>
-<script src="js/app-utils.js?v=4.0.59"></script>
-<script src="js/app-icons.js?v=4.0.59"></script>
-<script src="js/app-popover-manager.js?v=4.0.59"></script>
-<script src="js/translations.js?v=4.0.59"></script>
-<script src="js/app-i18n.js?v=4.0.59"></script>
-<script src="js/app-bridge.js?v=4.0.59"></script>
-<script src="js/app-pwa.js?v=4.0.59"></script>
-<script src="js/app-fs.js?v=4.0.59"></script>
-<script src="js/firebase-bundle.js?v=4.0.59"></script>
-<script src="js/firebase-config.js?v=4.0.59"></script>
-<script src="js/app-crypto.js?v=4.0.59"></script>
-<script src="js/app-image-optimizer.js?v=4.0.59"></script>
-<script src="js/app-idb.js?v=4.0.59"></script>
-<script src="js/app-firebase-sync.js?v=4.0.59"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.59"></script>
-<script src="js/app-storage.js?v=4.0.59"></script>
-<script src="js/storage-migration.js?v=4.0.59"></script>
-<script src="js/app-stash-service.js?v=4.0.59"></script>
-<script src="js/app-omnibar.js?v=4.0.59"></script>
-<script src="js/app-topic-memory.js?v=4.0.59"></script>
-<script src="js/app-prompts.js?v=4.0.59"></script>
-<script src="js/app-llm.js?v=4.0.59"></script>
-<script src="js/app-dailyreview.js?v=4.0.59"></script>
-<script src="js/app-notes.js?v=4.0.59"></script>
-<script src="js/app-todos-board.js?v=4.0.59"></script>
-<script src="js/app-board.js?v=4.0.59"></script>
-<script src="js/app-focus.js?v=4.0.59"></script>
-<script src="js/app-overlay.js?v=4.0.59"></script>
-<script src="js/app-calendar-sync.js?v=4.0.59"></script>
-<script src="js/app-planner.js?v=4.0.59"></script>
-<script src="js/app-collab.js?v=4.0.59"></script>
-<script src="js/app-retro.js?v=4.0.59"></script>
-<script src="js/app-tutorial.js?v=4.0.59"></script>
-<script src="js/app-graph-view.js?v=4.0.59"></script>
-<script src="js/app-chat.js?v=4.0.59"></script>
-<script src="js/app-init.js?v=4.0.59"></script>
+<script src="js/app-state.js?v=4.0.60"></script>
+<script src="js/app-utils.js?v=4.0.60"></script>
+<script src="js/app-icons.js?v=4.0.60"></script>
+<script src="js/app-popover-manager.js?v=4.0.60"></script>
+<script src="js/translations.js?v=4.0.60"></script>
+<script src="js/app-i18n.js?v=4.0.60"></script>
+<script src="js/app-bridge.js?v=4.0.60"></script>
+<script src="js/app-pwa.js?v=4.0.60"></script>
+<script src="js/app-fs.js?v=4.0.60"></script>
+<script src="js/firebase-bundle.js?v=4.0.60"></script>
+<script src="js/firebase-config.js?v=4.0.60"></script>
+<script src="js/app-crypto.js?v=4.0.60"></script>
+<script src="js/app-image-optimizer.js?v=4.0.60"></script>
+<script src="js/app-idb.js?v=4.0.60"></script>
+<script src="js/app-firebase-sync.js?v=4.0.60"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.60"></script>
+<script src="js/app-storage.js?v=4.0.60"></script>
+<script src="js/storage-migration.js?v=4.0.60"></script>
+<script src="js/app-stash-service.js?v=4.0.60"></script>
+<script src="js/app-omnibar.js?v=4.0.60"></script>
+<script src="js/app-topic-memory.js?v=4.0.60"></script>
+<script src="js/app-prompts.js?v=4.0.60"></script>
+<script src="js/app-llm.js?v=4.0.60"></script>
+<script src="js/app-dailyreview.js?v=4.0.60"></script>
+<script src="js/app-notes.js?v=4.0.60"></script>
+<script src="js/app-todos-board.js?v=4.0.60"></script>
+<script src="js/app-board.js?v=4.0.60"></script>
+<script src="js/app-focus.js?v=4.0.60"></script>
+<script src="js/app-overlay.js?v=4.0.60"></script>
+<script src="js/app-calendar-sync.js?v=4.0.60"></script>
+<script src="js/app-planner.js?v=4.0.60"></script>
+<script src="js/app-collab.js?v=4.0.60"></script>
+<script src="js/app-retro.js?v=4.0.60"></script>
+<script src="js/app-tutorial.js?v=4.0.60"></script>
+<script src="js/app-graph-view.js?v=4.0.60"></script>
+<script src="js/app-chat.js?v=4.0.60"></script>
+<script src="js/app-init.js?v=4.0.60"></script>
 </body>
 </html>

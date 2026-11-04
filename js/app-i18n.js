@@ -892,8 +892,8 @@ function applyLocalizedUI() {
   setElementText('#modal-new-todo .form-field:nth-of-type(2) > label', t('todo.description'));
   setElementText('#modal-new-todo .form-field:nth-of-type(3) > label', t('todo.priority'));
   setElementHTML('#modal-new-todo .form-field:nth-of-type(4) > label', `${t('todo.dueDate')} <span style="color:#bbb;font-weight:normal">${t('todo.optional')}</span>`);
-  setElementHTML('#modal-new-todo .form-field:nth-of-type(5) > label', `${t('todo.owner')} <span style="color:#bbb;font-weight:normal">${t('todo.optional')}</span>`);
-  setElementHTML('#modal-new-todo .form-field:nth-of-type(6) > label', `${t('todo.context')} <span style="color:#bbb;font-weight:normal">${t('todo.optional')}</span>`);
+  setElementHTML('#modal-new-todo .form-field:nth-of-type(5) > label, #modal-new-todo .form-field:nth-of-type(5) > .form-label', `${t('todo.owner')} <span style="color:#bbb;font-weight:normal">${t('todo.optional')}</span>`);
+  setElementHTML('#modal-new-todo .form-field:nth-of-type(6) > label, #modal-new-todo .form-field:nth-of-type(6) > .form-label', `${t('todo.context')} <span style="color:#bbb;font-weight:normal">${t('todo.optional')}</span>`);
   setElementText('#nt-priority option[value="WIP"]', `🟣 ${t('todo.wip')}`);
   setElementText('#nt-priority option[value="High"]', `🔴 ${t('todo.high')}`);
   setElementText('#nt-priority option[value="Medium"]', `🟡 ${t('todo.medium')}`);

@@ -679,12 +679,14 @@ const LLMService = {
             <span class="chat-thinking-title">${escFn(label)}</span>
           </div>
           <div class="chat-thinking-summary-right">
-            <button type="button" class="chat-thinking-copy-btn" onclick="LLMService.copyThinkingText(this, event)" title="${escAttr(copyLabel)}">
-              ${copySvg}
-            </button>
             <span class="chat-thinking-chevron">${chevronSvg}</span>
           </div>
         </summary>
+        <div class="chat-thinking-actions">
+          <button type="button" class="chat-thinking-copy-btn" onclick="LLMService.copyThinkingText(this, event)" title="${escAttr(copyLabel)}">
+            ${copySvg}
+          </button>
+        </div>
         <div class="chat-thinking-content-body">${formattedContent}</div>
       </details>
     `;

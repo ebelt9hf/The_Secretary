@@ -1783,7 +1783,7 @@ function showTeamAssignDialog(colleagueName) {
     body.appendChild(colCard);
 
     // Team selection label
-    const label = document.createElement('label');
+    const label = document.createElement('div');
     label.style.cssText = 'font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:-8px;';
     label.textContent = t('team.teamRole') || 'Team / Équipe';
     body.appendChild(label);
@@ -3369,12 +3369,14 @@ function showTeamSettingsModal(teamId) {
 
   // Rename Section
   const renameLabel = document.createElement('label');
+  renameLabel.htmlFor = 'team-settings-name-input';
   renameLabel.style.cssText = 'font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;';
   renameLabel.textContent = t('team.renameLabel') || 'Team Name';
   box.appendChild(renameLabel);
 
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
+  nameInput.id = 'team-settings-name-input';
   nameInput.className = 'dialog-input';
   nameInput.style.cssText = 'width:100%; padding:8px; box-sizing:border-box; margin-bottom:15px; background:var(--card-bg); color:var(--text); border:1px solid var(--card-border); border-radius:4px;';
   nameInput.value = resolvedTeamName;
@@ -3382,6 +3384,7 @@ function showTeamSettingsModal(teamId) {
 
   // Leader / Manager Section
   const leaderLabel = document.createElement('label');
+  leaderLabel.htmlFor = 'team-settings-leader-select';
   leaderLabel.style.cssText = 'font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;';
   leaderLabel.textContent = t('team.leaderLabel') || 'Team Leader / Manager';
   box.appendChild(leaderLabel);
@@ -3390,6 +3393,7 @@ function showTeamSettingsModal(teamId) {
   selectRow.style.cssText = 'display:flex; gap:6px; margin-bottom:20px;';
 
   const select = document.createElement('select');
+  select.id = 'team-settings-leader-select';
   select.className = 'dialog-input';
   select.style.cssText = 'flex:1; padding:8px; box-sizing:border-box; background:var(--card-bg); color:var(--text); border:1px solid var(--card-border); border-radius:4px;';
 
@@ -3793,11 +3797,11 @@ function renderMeView(container) {
     <!-- Team & Role Settings -->
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem; border-bottom:1px solid var(--card-border); padding-bottom:1.5rem;">
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">${escH(t('team.teamRole') || 'Team / Équipe')}</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">${escH(t('team.teamRole') || 'Team / Équipe')}</div>
         <div id="me-team-combobox-mount" style="position:relative;"></div>
       </div>
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">${escH(t('team.role') || 'Role / Rôle')}</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">${escH(t('team.role') || 'Role / Rôle')}</div>
         <label id="me-is-manager-label" style="display:flex; align-items:center; gap:8px; cursor:${currentTeamId === 'team-other-bucket' ? 'default' : 'pointer'}; margin-top:10px; font-size:0.9rem; color:var(--text); opacity:${currentTeamId === 'team-other-bucket' ? 0.5 : 1}; pointer-events:${currentTeamId === 'team-other-bucket' ? 'none' : 'auto'};">
           <input type="checkbox" id="me-is-manager" ${isManagerOfCurrentTeam ? 'checked' : ''} ${currentTeamId === 'team-other-bucket' ? 'disabled' : ''} style="width:18px; height:18px;" title="${escA(t('team.managerLabel') || 'Manager')}">
           <span>${escH(t('team.managerLabel') || 'Manager')}</span>
@@ -3807,26 +3811,26 @@ function renderMeView(container) {
 
     <!-- Tags Editor -->
     <div style="border-bottom:1px solid var(--card-border); padding-bottom:1.5rem;">
-      <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Tags (VIP, Important, Vite...)</label>
+      <label for="me-tags-input" style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Tags (VIP, Important, Vite...)</label>
       <input type="text" id="me-tags-input" value="${escA(collabTags.join(', '))}" placeholder="Enter tags separated by commas..." style="width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.9rem;" title="Tags">
     </div>
 
     <!-- Reporting Hierarchy -->
     <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1.5rem; border-bottom:1px solid var(--card-border); padding-bottom:1.5rem;">
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Reports to / Manager</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Reports to / Manager</div>
         <div style="font-size:0.9rem; color:var(--text); margin-top:6px;">
           ${managerHtml}
         </div>
       </div>
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Peers / Pairs (My Peers)</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Peers / Pairs (My Peers)</div>
         <div style="font-size:0.9rem; color:var(--text); margin-top:6px; max-height: 120px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
           ${peersHtml}
         </div>
       </div>
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Direct Reports / Directs (My Directs)</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:6px;">Direct Reports / Directs (My Directs)</div>
         <div style="font-size:0.9rem; color:var(--text); margin-top:6px; max-height: 120px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
           ${directsHtml}
         </div>
@@ -5366,21 +5370,21 @@ function openCreateWorkstreamModal(initialData = {}) {
       <!-- Scrollable Content Body -->
       <div style="flex:1; overflow-y:auto; padding:18px 22px; display:flex; flex-direction:column; gap:16px;">
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <label style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">${escH(t('workstream.topicNameLabel') || 'Workstream / Topic Name:')} <span style="color:#ef4444;">*</span></label>
+          <label for="ws-modal-topic-name" style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">${escH(t('workstream.topicNameLabel') || 'Workstream / Topic Name:')} <span style="color:#ef4444;">*</span></label>
           <input type="text" id="ws-modal-topic-name" class="field-input" style="width:100%; padding:8px 10px; font-size:0.9rem; border-radius:6px; border:1px solid var(--field-border); background:var(--field-bg); color:var(--field-text);" placeholder="${escA(t('workstream.topicNamePlaceholder') || 'e.g. Q3 Marketing Launch, API V2 Migration...')}" title="${escA(t('workstream.topicNameTooltip') || 'Enter unique name for this workstream')}">
         </div>
 
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <label style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">${escH(t('workstream.promptLabel') || 'Initial Context / Focus Instructions (Optional):')}</label>
+          <label for="ws-modal-prompt" style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">${escH(t('workstream.promptLabel') || 'Initial Context / Focus Instructions (Optional):')}</label>
           <textarea id="ws-modal-prompt" class="field-input" style="width:100%; min-height:54px; padding:8px 10px; font-size:0.85rem; border-radius:6px; border:1px solid var(--field-border); background:var(--field-bg); color:var(--field-text); line-height:1.4;" placeholder="${escA(t('workstream.promptPlaceholder') || 'Describe goals, key focus areas, or instructions for Secretary AI agent...')}" title="${escA(t('workstream.promptTooltip') || 'Optional prompt to guide Secretary AI synthesis')}"></textarea>
         </div>
 
         <!-- Tag Selection Group Definition (Required Wizard Step) -->
         <div style="display:flex; flex-direction:column; gap:8px;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <label style="font-size:0.82rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:6px;">
+            <div style="font-size:0.82rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:6px;">
               <span>${getWsIcon('tag', 15)}</span> <span>${escH(t('workstream.addSelectionGroup') || 'Define Tag Selection Group')} <span style="color:#ef4444;">*</span></span>
-            </label>
+            </div>
             <span style="font-size:0.75rem; color:var(--text-muted);">${escH(t('workstream.assignTagDesc') || 'Route matching decisions, tasks, and notes into this workstream.')}</span>
           </div>
 
@@ -6095,7 +6099,7 @@ async function openWorkstreamSynthesisModal(topicName, options = {}) {
       `).join('')}
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
-        <label style="font-size:0.82rem; font-weight:700; color:var(--text-muted);">${escH(t('workstream.synthesisFreeTextLabel') || 'Additional Scope Refinements & Instructions (Free text):')}</label>
+        <label for="ws-synthesis-freetext" style="font-size:0.82rem; font-weight:700; color:var(--text-muted);">${escH(t('workstream.synthesisFreeTextLabel') || 'Additional Scope Refinements & Instructions (Free text):')}</label>
         <textarea id="ws-synthesis-freetext" class="field-input" style="width:100%; min-height:70px; padding:10px; font-size:0.85rem; border-radius:8px; border:1px solid var(--card-border); background:var(--field-bg); color:var(--field-text); line-height:1.45;" placeholder="${escA(t('workstream.synthesisFreeTextPlaceholder') || 'Specify what is strictly in scope, non-goals, past incidents, or key priorities...')}" title="${escA(t('workstream.synthesisFreeTextLabel') || 'Scope instructions')}">${escH(options.prompt || '')}</textarea>
       </div>
     </div>
@@ -7404,10 +7408,10 @@ async function renderWorkstreamOverviewTab(topicName, parentContainer, existingM
 
     <!-- Scope (Auto-saves on input/blur & rich HTML editable) -->
     <div style="display:flex; flex-direction:column; gap:4px;">
-      <label for="ws-dossier-summary" style="font-size:0.78rem; font-weight:600; color:var(--text-muted); display:inline-flex; align-items:center; gap:5px;">
+      <div style="font-size:0.78rem; font-weight:600; color:var(--text-muted); display:inline-flex; align-items:center; gap:5px;">
         ${getWsIcon('target', 14)} ${escH(t('workstream.summaryLabel') || 'Workstream Scope:')}
         ${isSynthRunning ? `<span style="font-size:0.72rem; color:var(--accent); font-weight:600; font-style:italic;">(${escH(t('workstream.scopeSynthesizing') || 'Synthesizing...')}...)</span>` : ''}
-      </label>
+      </div>
       <div id="ws-dossier-summary" class="field-input workstream-scope-editable" contenteditable="true" style="width:100%; min-height:56px; max-height:220px; overflow-y:auto; font-size:0.84rem; padding:8px 12px; border-radius:6px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text); line-height:1.5; outline:none; box-sizing:border-box;" title="${escA(t('workstream.summaryInputTooltip') || 'Edit scope and boundaries for this workstream')}" data-placeholder="${escA(t('workstream.summaryPlaceholder') || '1-sentence explanation of the workstream, then bullet points defining in-scope and out-of-scope if needed...')}"></div>
     </div>
 
@@ -10561,7 +10565,7 @@ async function openMeetingPrepBriefingModal(meetingEvent, topicName) {
 
     <!-- Objective -->
     <div style="display:flex; flex-direction:column; gap:4px;">
-      <label style="font-size:0.78rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:5px;">${getWsIcon('target', 14)} Objectif de la réunion :</label>
+      <div style="font-size:0.78rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:5px;">${getWsIcon('target', 14)} Objectif de la réunion :</div>
       <div style="font-size:0.86rem; color:var(--text); background:rgba(99,102,241,0.06); padding:8px 12px; border-radius:6px; border:1px solid rgba(99,102,241,0.2);">
         ${escH(briefingData.objective || 'Alignement stratégique')}
       </div>
@@ -10569,7 +10573,7 @@ async function openMeetingPrepBriefingModal(meetingEvent, topicName) {
 
     <!-- Talking Points -->
     <div style="display:flex; flex-direction:column; gap:6px;">
-      <label style="font-size:0.78rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:5px;">${getWsIcon('list', 14)} Ordre du jour & Points à aborder :</label>
+      <div style="font-size:0.78rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:5px;">${getWsIcon('list', 14)} Ordre du jour & Points à aborder :</div>
       <div style="display:flex; flex-direction:column; gap:4px;">
         ${(briefingData.talkingPoints || []).map(p => `
           <div style="display:flex; align-items:flex-start; gap:8px; font-size:0.84rem; color:var(--text); line-height:1.4;">
@@ -10583,7 +10587,7 @@ async function openMeetingPrepBriefingModal(meetingEvent, topicName) {
     <!-- Decisions to Validate -->
     ${Array.isArray(briefingData.decisionsToValidate) && briefingData.decisionsToValidate.length > 0 ? `
       <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
-        <label style="font-size:0.78rem; font-weight:700; color:#10b981; display:flex; align-items:center; gap:5px;">${getWsIcon('decision', 14)} Décisions & Arbitrages à trancher :</label>
+        <div style="font-size:0.78rem; font-weight:700; color:#10b981; display:flex; align-items:center; gap:5px;">${getWsIcon('decision', 14)} Décisions & Arbitrages à trancher :</div>
         <div style="display:flex; flex-direction:column; gap:4px;">
           ${briefingData.decisionsToValidate.map(d => `
             <div style="display:flex; align-items:flex-start; gap:8px; font-size:0.84rem; color:var(--text); line-height:1.4;">
@@ -10598,7 +10602,7 @@ async function openMeetingPrepBriefingModal(meetingEvent, topicName) {
     <!-- Risks & Blockers -->
     ${Array.isArray(briefingData.criticalTasksOrRisks) && briefingData.criticalTasksOrRisks.length > 0 ? `
       <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
-        <label style="font-size:0.78rem; font-weight:700; color:#f59e0b; display:flex; align-items:center; gap:5px;">${getWsIcon('alertTriangle', 14)} Points de vigilance & Risques :</label>
+        <div style="font-size:0.78rem; font-weight:700; color:#f59e0b; display:flex; align-items:center; gap:5px;">${getWsIcon('alertTriangle', 14)} Points de vigilance & Risques :</div>
         <div style="display:flex; flex-direction:column; gap:4px;">
           ${briefingData.criticalTasksOrRisks.map(r => `
             <div style="display:flex; align-items:flex-start; gap:8px; font-size:0.84rem; color:var(--text); line-height:1.4;">
@@ -10803,14 +10807,14 @@ async function openScheduleMeetingModal(suggestion, topicName) {
           
           <!-- Title -->
           <div style="display:flex; flex-direction:column; gap:4px;">
-            <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('editor.title') || 'Titre de la réunion')} :</label>
+            <label for="sch-title" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('editor.title') || 'Titre de la réunion')} :</label>
             <input type="text" id="sch-title" class="field-input" style="width:100%; padding:8px 10px; font-size:0.85rem; border-radius:6px; border:1px solid var(--card-border);" value="${escA(suggestion?.title || `Point : ${topicName}`)}">
           </div>
 
           <!-- Date Navigation -->
           <div style="display:flex; flex-direction:column; gap:4px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('editor.date') || 'Date')} :</label>
+              <label for="sch-date" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('editor.date') || 'Date')} :</label>
               <div style="display:flex; gap:4px;">
                 <button type="button" class="btn btn-secondary btn-quick-date" data-date="${todayStr}" style="font-size:0.72rem; padding:2px 7px;" title="${escA(t('planner.todayTooltip') || 'Aujourd\'hui')}">${escH(t('planner.today') || 'Aujourd\'hui')}</button>
                 <button type="button" class="btn btn-secondary btn-quick-date" data-date="${tomorrowStr}" style="font-size:0.72rem; padding:2px 7px;" title="${escA(t('planner.tomorrowTooltip') || 'Demain')}">${escH(t('planner.tomorrow') || 'Demain')}</button>
@@ -10826,11 +10830,11 @@ async function openScheduleMeetingModal(suggestion, topicName) {
           <!-- Time & Duration -->
           <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('planner.startTime') || 'Heure de début')} :</label>
+              <label for="sch-time" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('planner.startTime') || 'Heure de début')} :</label>
               <input type="time" id="sch-time" class="field-input" style="padding:7px 10px; font-size:0.85rem; border-radius:6px; border:1px solid var(--card-border);" value="${toTimeStr(currentStartMins)}">
             </div>
             <div style="display:flex; flex-direction:column; gap:4px;">
-              <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('planner.durationLabel') || 'Durée')} :</label>
+              <label for="sch-duration" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('planner.durationLabel') || 'Durée')} :</label>
               <select id="sch-duration" class="field-input" style="padding:7px 10px; font-size:0.85rem; border-radius:6px; border:1px solid var(--card-border);">
                 <option value="15" ${durationMins === 15 ? 'selected' : ''}>15 min</option>
                 <option value="30" ${durationMins === 30 ? 'selected' : ''}>30 min</option>
@@ -10862,19 +10866,19 @@ async function openScheduleMeetingModal(suggestion, topicName) {
 
           <!-- Suggested Available Slots -->
           <div style="display:flex; flex-direction:column; gap:4px;">
-            <label style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">${escH(t('workstream.freeSlots') || 'Créneaux libres suggérés')} :</label>
+            <div style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">${escH(t('workstream.freeSlots') || 'Créneaux libres suggérés')} :</div>
             <div id="sch-free-slots-chips" style="display:flex; flex-wrap:wrap; gap:6px; min-height:26px;"></div>
           </div>
 
           <!-- Participants -->
           <div style="display:flex; flex-direction:column; gap:4px;">
-            <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('planner.withWhom') || 'Participants')} :</label>
+            <label for="sch-participants" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('planner.withWhom') || 'Participants')} :</label>
             <input type="text" id="sch-participants" class="field-input" style="width:100%; padding:7px 10px; font-size:0.82rem; border-radius:6px; border:1px solid var(--card-border);" value="${escA((suggestion?.targetParticipants || []).join(', '))}" placeholder="Ex: Alice, Bob">
           </div>
 
           <!-- Agenda / Notes -->
           <div style="display:flex; flex-direction:column; gap:4px;">
-            <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('todo.description') || 'Ordre du jour proposé')} :</label>
+            <label for="sch-agenda" style="font-size:0.78rem; font-weight:600; color:var(--text-muted);">${escH(t('todo.description') || 'Ordre du jour proposé')} :</label>
             <textarea id="sch-agenda" class="field-input" style="width:100%; min-height:64px; padding:7px 10px; font-size:0.8rem; border-radius:6px; border:1px solid var(--card-border); line-height:1.4;">${escH(Array.isArray(suggestion?.agenda) ? suggestion.agenda.join('\n') : (suggestion?.reason || ''))}</textarea>
           </div>
         </div>
@@ -11450,7 +11454,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
 
     ${resThreads.length > 0 ? `
       <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
-        <label style="font-size:0.78rem; font-weight:700; color:#10b981; display:flex; align-items:center; gap:5px;">${getWsIcon('checkSquare', 14)} Clôturer les questions résolues :</label>
+        <div style="font-size:0.78rem; font-weight:700; color:#10b981; display:flex; align-items:center; gap:5px;">${getWsIcon('checkSquare', 14)} Clôturer les questions résolues :</div>
         ${resThreads.map((t, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
             <input type="checkbox" checked class="chk-sync-thread" data-index="${idx}">
@@ -11462,7 +11466,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
 
     ${valDecisions.length > 0 ? `
       <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
-        <label style="font-size:0.78rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:5px;">${getWsIcon('decision', 14)} Valider les décisions actées (Passer en active) :</label>
+        <div style="font-size:0.78rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:5px;">${getWsIcon('decision', 14)} Valider les décisions actées (Passer en active) :</div>
         ${valDecisions.map((d, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
             <input type="checkbox" checked class="chk-sync-decision" data-index="${idx}">
@@ -11474,7 +11478,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
 
     ${newFacts.length > 0 ? `
       <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
-        <label style="font-size:0.78rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:5px;">${getWsIcon('pin', 14)} Nouveaux faits marquants à ajouter :</label>
+        <div style="font-size:0.78rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:5px;">${getWsIcon('pin', 14)} Nouveaux faits marquants à ajouter :</div>
         ${newFacts.map((f, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
             <input type="checkbox" checked class="chk-sync-fact" data-index="${idx}">
@@ -11486,7 +11490,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
 
     ${newTasks.length > 0 ? `
       <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
-        <label style="font-size:0.78rem; font-weight:700; color:#f59e0b; display:flex; align-items:center; gap:5px;">${getWsIcon('checkSquare', 14)} Nouvelles tâches à créer :</label>
+        <div style="font-size:0.78rem; font-weight:700; color:#f59e0b; display:flex; align-items:center; gap:5px;">${getWsIcon('checkSquare', 14)} Nouvelles tâches à créer :</div>
         ${newTasks.map((t, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
             <input type="checkbox" checked class="chk-sync-task" data-index="${idx}">
@@ -12927,11 +12931,11 @@ function showCollaboratorModal(name) {
     <!-- Team & Role Settings -->
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.2rem; margin-bottom:1rem; border-bottom:1px solid var(--card-border); padding-bottom:1rem;">
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Team / Équipe</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Team / Équipe</div>
         <div id="collab-details-team-combobox-mount" style="position:relative;"></div>
       </div>
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Role / Rôle</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Role / Rôle</div>
         <label id="collab-details-is-manager-label" style="display:flex; align-items:center; gap:8px; cursor:${currentTeamId === 'team-other-bucket' ? 'default' : 'pointer'}; margin-top:8px; font-size:0.85rem; color:var(--text); opacity:${currentTeamId === 'team-other-bucket' ? 0.5 : 1}; pointer-events:${currentTeamId === 'team-other-bucket' ? 'none' : 'auto'};">
           <input type="checkbox" id="collab-details-is-manager" ${isManagerOfCurrentTeam ? 'checked' : ''} ${currentTeamId === 'team-other-bucket' ? 'disabled' : ''} style="width:16px; height:16px;">
           <span>${escH(t('team.managerLabel') || 'Manager')}</span>
@@ -12941,26 +12945,26 @@ function showCollaboratorModal(name) {
 
     <!-- Tags Editor -->
     <div style="margin-bottom:1rem; border-bottom:1px solid var(--card-border); padding-bottom:1rem;">
-      <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Tags (VIP, Important, Vite...)</label>
+      <label for="collab-details-tags-input" style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Tags (VIP, Important, Vite...)</label>
       <input type="text" id="collab-details-tags-input" value="${escA(collabTags.join(', '))}" placeholder="Enter tags separated by commas..." style="width:100%; box-sizing:border-box; padding:6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); font-size:0.85rem;">
     </div>
 
     <!-- Reporting Hierarchy -->
     <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1.2rem; margin-bottom:1rem; border-bottom:1px solid var(--card-border); padding-bottom:1rem;">
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Reports to / Manager</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Reports to / Manager</div>
         <div style="font-size:0.85rem; color:var(--text); margin-top:4px;">
           ${managerHtml}
         </div>
       </div>
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Peers / Pairs</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Peers / Pairs</div>
         <div style="font-size:0.85rem; color:var(--text); margin-top:4px; max-height: 80px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
           ${peersHtml}
         </div>
       </div>
       <div>
-        <label style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Direct Reports / Directs</label>
+        <div style="font-size:0.75rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:4px;">Direct Reports / Directs</div>
         <div style="font-size:0.85rem; color:var(--text); margin-top:4px; max-height: 80px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
           ${directsHtml}
         </div>
