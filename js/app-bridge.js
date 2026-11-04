@@ -72,14 +72,16 @@
         }
       },
       async close() {
-        const isStandaloneChild = !document.getElementById('topbar-main-row') && (
+        const isFocusedStandalone = ((typeof _isFocusedMode !== 'undefined' && _isFocusedMode) || document.body.classList.contains('focused-note-mode')) &&
+          !(typeof location !== 'undefined' && location.hash && location.hash.includes('tab='));
+        const isStandaloneChild = isFocusedStandalone || (!document.getElementById('topbar-main-row') && (
           (AppBridge.isStandaloneChildWindow && AppBridge.isStandaloneChildWindow()) ||
           document.body.classList.contains('note-window-standalone') ||
           document.body.classList.contains('secretary-window-standalone') ||
           document.body.classList.contains('chat-window-mode') ||
           document.body.classList.contains('focus-pip-mode') ||
           (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window')))
-        );
+        ));
 
         if (!isStandaloneChild && typeof window.handleMainWindowCloseRequest === 'function') {
           return await window.handleMainWindowCloseRequest();

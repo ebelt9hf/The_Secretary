@@ -1175,8 +1175,13 @@ async function _doSaveManifestDirect() {
   }
 
   _manifestSaveInFlight = true;
+  let initialError = null;
   try {
-    await _flushManifestFilesOnce();
+    try {
+      await _flushManifestFilesOnce();
+    } catch (firstErr) {
+      initialError = firstErr;
+    }
     while (_manifestSavePending) {
       _manifestSavePending = false;
       const waiters = _manifestSavePendingWaiters;
@@ -1188,6 +1193,7 @@ async function _doSaveManifestDirect() {
         for (const w of waiters) w.reject(err);
       }
     }
+    if (initialError) throw initialError;
   } finally {
     _manifestSaveInFlight = false;
   }

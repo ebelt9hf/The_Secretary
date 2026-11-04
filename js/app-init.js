@@ -4916,7 +4916,7 @@ async function mountFolder(handle) {
     await loadManifest();
 
     // Dedicated note window fast-path: immediately display main screen and load note without blocking on heavy main app assets
-    const isFocused = _isFocusedMode || (typeof isFocusedNoteWindow === 'function' && isFocusedNoteWindow()) || (location.hash && (location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
+    const isFocused = _isFocusedMode || (typeof isFocusedNoteWindow === 'function' && isFocusedNoteWindow()) || (location.hash && !location.hash.includes('tab=') && (location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
     if (isFocused) {
       _isFocusedMode = true;
       document.body.classList.add('focused-note-mode');
@@ -6216,7 +6216,7 @@ if (typeof isLocalFolderOptionAvailable === 'function' ? !isLocalFolderOptionAva
     }, 100);
   }
   const isPreloaded = hash.includes('preloaded=true');
-  const m = hash.match(/[#&](note|path)=([^&]+)/);
+  const m = !hash.includes('tab=') ? hash.match(/[#&](note|path)=([^&]+)/) : null;
   if (m || isPreloaded) {
     _isFocusedMode = true;
     document.body.classList.add('focused-note-mode');
@@ -6256,7 +6256,7 @@ function prefsWorkingDaysChanged() {
 window.addEventListener('hashchange', async () => {
   if (_isApplyingHash) return;
   const hash = location.hash;
-  if (hash && (hash.includes('note=') || hash.includes('path='))) {
+  if (hash && !hash.includes('tab=') && (hash.includes('note=') || hash.includes('path='))) {
     _isFocusedMode = true;
     document.body.classList.add('focused-note-mode');
   }
@@ -6423,14 +6423,16 @@ async function handleMainWindowCloseRequest() {
     _isClosePromptActive = false;
   }
 
-  const isStandalone = !document.getElementById('topbar-main-row') && (
+  const isFocusedStandalone = ((typeof _isFocusedMode !== 'undefined' && _isFocusedMode) || document.body.classList.contains('focused-note-mode')) &&
+    !(typeof location !== 'undefined' && location.hash && location.hash.includes('tab='));
+  const isStandalone = isFocusedStandalone || (!document.getElementById('topbar-main-row') && (
     (window.AppBridge?.isStandaloneChildWindow && window.AppBridge.isStandaloneChildWindow()) ||
     document.body.classList.contains('note-window-standalone') ||
     document.body.classList.contains('secretary-window-standalone') ||
     document.body.classList.contains('chat-window-mode') ||
     document.body.classList.contains('focus-pip-mode') ||
     (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window')))
-  );
+  ));
 
   if (isStandalone) {
     if (window.electronAPI?.closeWindow) {
@@ -6610,14 +6612,16 @@ async function executeSaveAndExitWithProgressBar(options = {}) {
 }
 
 window.addEventListener('beforeunload', (e) => {
-  const isStandalone = !document.getElementById('topbar-main-row') && (
+  const isFocusedStandalone = ((typeof _isFocusedMode !== 'undefined' && _isFocusedMode) || document.body.classList.contains('focused-note-mode')) &&
+    !(typeof location !== 'undefined' && location.hash && location.hash.includes('tab='));
+  const isStandalone = isFocusedStandalone || (!document.getElementById('topbar-main-row') && (
     (window.AppBridge?.isStandaloneChildWindow && window.AppBridge.isStandaloneChildWindow()) ||
     document.body.classList.contains('note-window-standalone') ||
     document.body.classList.contains('secretary-window-standalone') ||
     document.body.classList.contains('chat-window-mode') ||
     document.body.classList.contains('focus-pip-mode') ||
     (typeof location !== 'undefined' && location.pathname && (location.pathname.includes('secretary-window') || location.pathname.includes('note-window')))
-  );
+  ));
   if (isStandalone) {
     const hasUnsavedNote = typeof hasUnsavedNoteOverlayChanges === 'function' && hasUnsavedNoteOverlayChanges();
     if (hasUnsavedNote && typeof autoSaveNote === 'function') {

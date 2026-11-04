@@ -193,4 +193,119 @@ describe('Note Window in Browser Environment', () => {
     expect(globalThis.noteContentCache['notes/missing.html']).toBeDefined();
     expect(globalThis.noteContentCache['notes/missing.html'].notFound).toBe(true);
   });
+
+  it('closeNoteOverlay does not call renderInspectorPanel during final close save and always removes the Fermeture de la note progress dialog', async () => {
+    document.body.innerHTML = `
+      <div id="screen-main" class="active">
+        <div id="topbar-main-row"></div>
+        <div id="note-edit-overlay" class="active" style="display:flex;">
+          <div class="overlay-panel">
+            <input id="edit-title" value="Updated Title" />
+            <input id="edit-date" value="2026-11-04" />
+            <div id="edit-textarea"><p>Updated content</p></div>
+            <div id="edit-summary"></div>
+            <div id="overlay-right-panel"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    globalThis._isFocusedMode = false;
+    globalThis._noteCloseInProgress = false;
+    globalThis._isNoteLoading = false;
+    globalThis.currentNote = {
+      id: 'note-close-1',
+      path: 'notes/note-close-1.html',
+      title: 'Original Title',
+      date: '2026-11-04',
+      mainHTML: '<p>Original content</p>',
+      originalHTML: '<!DOCTYPE html><html><body><main><p>Original content</p></main></body></html>',
+      group_tags: [],
+      major_topic_tags: [],
+      topic_tags: [],
+      extra_tags: [],
+      summary: ''
+    };
+    globalThis.manifest = [{ id: 'note-close-1', path: 'notes/note-close-1.html', title: 'Original Title' }];
+    globalThis.hasUnsavedNoteOverlayChanges = vi.fn().mockReturnValue(true);
+
+    const inspectorSpy = vi.fn().mockImplementation(async () => {
+      // Simulate heavy or hung inspector backlink scan if called during close
+      await new Promise(() => {});
+    });
+    globalThis.renderInspectorPanel = inspectorSpy;
+
+    globalThis.StorageAPI = {
+      getStorageEngine: () => 'filesystem',
+      writeNoteContent: vi.fn().mockResolvedValue(true),
+      writeNotesManifest: vi.fn().mockResolvedValue(true),
+      writeNotesManifestJS: vi.fn().mockResolvedValue(true),
+      writeMetadataBuffer: vi.fn().mockResolvedValue(true),
+      hasMetadataShardsIndex: vi.fn().mockResolvedValue(false),
+      hasNoteContent: vi.fn().mockResolvedValue(false)
+    };
+
+    // Restore authentic autoSaveNote from app-overlay.js
+    loadScriptsIntoGlobal(['js/app-overlay.js']);
+    globalThis.renderInspectorPanel = inspectorSpy;
+    globalThis.hasUnsavedNoteOverlayChanges = vi.fn().mockReturnValue(true);
+
+    await globalThis.closeNoteOverlay(true);
+
+    expect(inspectorSpy).not.toHaveBeenCalled();
+    expect(document.getElementById('note-close-progress-overlay')).toBeNull();
+    expect(document.getElementById('note-edit-overlay').style.display).toBe('none');
+    expect(globalThis._noteCloseInProgress).toBe(false);
+  });
+
+  it('applyHashState with #tab=notes&note=<id> in main app window does not set _isFocusedMode or focused-note-mode', async () => {
+    document.body.className = '';
+    document.body.innerHTML = `
+      <div id="screen-main" class="active">
+        <div id="topbar-main-row"></div>
+        <div id="note-edit-overlay" style="display:none;"></div>
+      </div>
+    `;
+    globalThis._isFocusedMode = false;
+    globalThis._isApplyingHash = false;
+    globalThis.activeTab = 'notes';
+    globalThis.manifest = [{ id: 'note-in-app', path: 'notes/note-in-app.html', title: 'In App Note' }];
+    globalThis.switchTab = vi.fn().mockResolvedValue(undefined);
+    globalThis.openNoteOverlay = vi.fn().mockResolvedValue(undefined);
+
+    window.location.hash = '#tab=notes&note=note-in-app';
+    await window.applyHashState();
+
+    expect(globalThis._isFocusedMode).toBe(false);
+    expect(document.body.classList.contains('focused-note-mode')).toBe(false);
+    expect(globalThis.openNoteOverlay).toHaveBeenCalledWith('notes/note-in-app.html', null, null, false, null, { sameWindow: true });
+  });
+
+  it('saveManifest({ force: true }) settles pending waiters even if an in-flight manifest flush rejects', async () => {
+    let callCount = 0;
+    let rejectFirstFlush;
+    globalThis.StorageAPI = {
+      getStorageEngine: () => 'filesystem',
+      writeNotesManifest: vi.fn().mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return new Promise((_, reject) => {
+            rejectFirstFlush = reject;
+          });
+        }
+        return Promise.resolve(true);
+      }),
+      writeNotesManifestJS: vi.fn().mockResolvedValue(true),
+      writeMetadataBuffer: vi.fn().mockResolvedValue(true),
+      hasMetadataShardsIndex: vi.fn().mockResolvedValue(false)
+    };
+
+    const firstSave = globalThis.saveManifest({ force: true }).catch(() => 'first-rejected');
+    const secondSave = globalThis.saveManifest({ force: true });
+
+    rejectFirstFlush(new Error('Transient write failure'));
+
+    const [firstResult] = await Promise.all([firstSave, secondSave]);
+    expect(firstResult).toBe('first-rejected');
+    expect(callCount).toBe(2);
+  });
 });

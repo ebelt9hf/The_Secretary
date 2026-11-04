@@ -1816,8 +1816,16 @@ async function applyHashState() {
     const noteId = params.get('note');
     const notePathParam = params.get('path');
     if (noteId || notePathParam) {
-      _isFocusedMode = true;
-      document.body.classList.add('focused-note-mode');
+      const hasTabParam = params.has('tab') && !document.body.classList.contains('note-window-standalone');
+      if (!hasTabParam) {
+        _isFocusedMode = true;
+        document.body.classList.add('focused-note-mode');
+      } else {
+        const targetTab = params.get('tab') || 'notes';
+        if (activeTab !== targetTab && typeof switchTab === 'function') {
+          await switchTab(targetTab);
+        }
+      }
       if (window.checkSavedFolderPromise) {
         try { await window.checkSavedFolderPromise; } catch (e) {}
       }

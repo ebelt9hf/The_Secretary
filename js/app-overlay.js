@@ -830,7 +830,11 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
     if (resolvedId || resolvedPath) {
       broadcastSync({ type: 'NOTE_SAVED', noteId: resolvedId, path: resolvedPath, modified: new Date().toISOString() });
       if (isFinal) {
-        try { await updateNoteInCollabIndex(resolvedPath); } catch(e) {}
+        if (_noteCloseInProgress) {
+          Promise.resolve(updateNoteInCollabIndex(resolvedPath)).catch(() => {});
+        } else {
+          try { await updateNoteInCollabIndex(resolvedPath); } catch(e) {}
+        }
       }
       if (window.AppBridge?.noteWindow?.notifyActiveNote) {
         window.AppBridge.noteWindow.notifyActiveNote(resolvedId, resolvedPath);
@@ -841,7 +845,7 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
     }
     const isEditorActive = typeof document !== 'undefined' && document.activeElement && 
       (document.activeElement.id === 'edit-textarea' || document.activeElement.id === 'edit-summary' || document.activeElement.closest?.('#edit-textarea, #edit-summary'));
-    if (isFinal || !isEditorActive) {
+    if (!_noteCloseInProgress && (isFinal || !isEditorActive)) {
       const fn = (typeof globalThis !== 'undefined' && globalThis.renderInspectorPanel) || (typeof renderInspectorPanel === 'function' ? renderInspectorPanel : null);
       if (fn) await fn();
     }
@@ -992,7 +996,11 @@ async function _doFullNoteSave(changes, targetNote = null) {
   if (typeof lastActiveNoteForTab !== 'undefined') {
     lastActiveNoteForTab[activeTab] = noteObj?.path || null;
   }
-  try { await createMissingTodosForCurrentNote(); } catch(e) {}
+  if (_noteCloseInProgress) {
+    try { Promise.resolve(createMissingTodosForCurrentNote()).catch(() => {}); } catch(e) {}
+  } else {
+    try { await createMissingTodosForCurrentNote(); } catch(e) {}
+  }
   if (typeof rebuildIndexHTML === 'function') await rebuildIndexHTML();
   if (typeof renderFilterChips === 'function') renderFilterChips();
   if (typeof renderBoard === 'function') renderBoard();
@@ -1026,7 +1034,7 @@ async function openNoteOverlay(path, prefillGroup, prefillMajor, isPop = false, 
 }
 
 async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = false, prefillTopic = null, options = {}) {
-  const isDedicatedNoteWindow = (typeof isFocusedNoteWindow === 'function' ? isFocusedNoteWindow() : _isFocusedMode) || (location.hash && (location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
+  const isDedicatedNoteWindow = (typeof isFocusedNoteWindow === 'function' ? isFocusedNoteWindow() : _isFocusedMode) || (location.hash && !location.hash.includes('tab=') && (location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
   const isInDailyReview = (typeof activeTab !== 'undefined' && activeTab === 'daily-review') || !!options?.embeddedInDailyReview;
   if (window.AppBridge?.isElectron && window.AppBridge?.noteWindow && (!isDedicatedNoteWindow || options?.openInNewWindow) && !options?.sameWindow && !isInDailyReview) {
     let meta = null;
@@ -3244,10 +3252,16 @@ async function closeNoteOverlay(forceCloseAll = false) {
           if (progress) progress.update(t('editor.closingSaveStep') || 'Saving note...', 40);
         }, 350);
       }
+      let closeTimeoutId = null;
       try {
-        await autoSaveNote({ silent: true, isFinal: true, noteToSave: closingNoteRef });
+        await Promise.race([
+          autoSaveNote({ silent: true, isFinal: true, noteToSave: closingNoteRef }),
+          new Promise(resolve => { closeTimeoutId = setTimeout(resolve, 4000); })
+        ]);
       } catch (err) {
         console.warn('Save failed during overlay close:', err);
+      } finally {
+        if (closeTimeoutId) clearTimeout(closeTimeoutId);
       }
       if (progressTimer) {
         clearTimeout(progressTimer);
