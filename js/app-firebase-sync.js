@@ -912,6 +912,13 @@ const FirebaseSyncService = {
   _vaultRetryCount: 0,
   _vaultRetryTimer: null,
 
+  _isPermissionDeniedError(err) {
+    if (!err) return false;
+    const code = String(err.code || '').toUpperCase();
+    const msg = String(err.message || err || '');
+    return code === 'PERMISSION_DENIED' || /permission_denied|permission denied/i.test(msg);
+  },
+
   _scheduleRemoteVaultRetry() {
     if (this._vaultRetryTimer) return;
     this._vaultRetryCount = (this._vaultRetryCount || 0) + 1;
@@ -1078,7 +1085,6 @@ const FirebaseSyncService = {
         }
       },
       (err) => {
-        console.warn('Realtime Database listener error:', err);
         if (this._remoteUnsubscribe) {
           try { this._remoteUnsubscribe(); } catch (e) {}
           this._remoteUnsubscribe = null;
@@ -1087,6 +1093,11 @@ const FirebaseSyncService = {
           try { this._remoteDocsUnsubscribe(); } catch (e) {}
           this._remoteDocsUnsubscribe = null;
         }
+        if (this._isPermissionDeniedError(err)) {
+          this._vaultRetryCount = 0;
+          return;
+        }
+        console.warn('Realtime Database listener error:', err);
         this._scheduleRemoteVaultRetry();
       }
     );
@@ -1329,11 +1340,15 @@ const FirebaseSyncService = {
         this.applyVersionStatus(result);
       },
       (err) => {
-        console.warn('listenAppInfo error:', err);
         if (this._versionUnsubscribe) {
           try { this._versionUnsubscribe(); } catch (e) {}
           this._versionUnsubscribe = null;
         }
+        if (this._isPermissionDeniedError(err)) {
+          this._versionRetryCount = 0;
+          return;
+        }
+        console.warn('listenAppInfo error:', err);
         this._scheduleAppVersionRetry();
       }
     );

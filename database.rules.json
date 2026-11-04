@@ -1,5 +1,17 @@
 {
   "rules": {
+    "app_info": {
+      // Public read-only application version metadata for update & compatibility checks
+      ".read": true,
+      ".write": false
+    },
+    "invite_codes": {
+      // Invite codes checked during cloud vault setup
+      "$code": {
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
     "pairing_codes": {
       "$code": {
         // Pairing codes are short-lived tokens used to connect devices.

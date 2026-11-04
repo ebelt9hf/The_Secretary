@@ -596,6 +596,51 @@ describe('FirebaseSyncService Engine (js/app-firebase-sync.js)', () => {
     });
 
     /**
+     * 1. Protected Behavior: FirebaseSyncService.listenAppVersion halts retries and suppresses console warnings when /app_info returns permission_denied.
+     * 2. Regression Target: Repeated console.warn('listenAppInfo error:') and infinite backoff retry loops when Firebase RTDB rules deny unauthenticated /app_info reads.
+     * 3. Coverage Overlap / Redundancy: Complements the transient error backoff test by verifying terminal permission errors do not trigger retries.
+     * 4. Production Code Footprint: None.
+     */
+    it('does not retry or warn when listenAppInfo fails with permission_denied', () => {
+      vi.useFakeTimers();
+      let errorCb = null;
+      let unsubscribeCalled = false;
+
+      const mockBridge = {
+        app: {},
+        listenAppInfo: vi.fn().mockImplementation((_onData, onError) => {
+          errorCb = onError;
+          return () => { unsubscribeCalled = true; };
+        })
+      };
+
+      const bridgeSpy = vi.spyOn(window.FirebaseSyncService, '_getBridge').mockReturnValue(mockBridge);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const cancel = window.FirebaseSyncService.listenAppVersion();
+        expect(mockBridge.listenAppInfo).toHaveBeenCalledTimes(1);
+
+        const permErr = new Error("permission_denied at /app_info: Client doesn't have permission to access the desired data.");
+        errorCb(permErr);
+
+        expect(unsubscribeCalled).toBe(true);
+        expect(warnSpy).not.toHaveBeenCalled();
+        expect(window.FirebaseSyncService._versionRetryCount).toBe(0);
+        expect(window.FirebaseSyncService._versionRetryTimer).toBeNull();
+
+        vi.advanceTimersByTime(10000);
+        expect(mockBridge.listenAppInfo).toHaveBeenCalledTimes(1);
+
+        cancel();
+      } finally {
+        warnSpy.mockRestore();
+        bridgeSpy.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    /**
      * 1. Protected Behavior: FirebaseSyncService.listenRemoteVault uses exponential backoff delays on listener errors.
      * 2. Regression Target: Tight error loop when remote vault listener experiences network disconnects.
      * 3. Coverage Overlap / Redundancy: None.
