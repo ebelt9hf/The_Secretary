@@ -7,6 +7,8 @@ Synchronizes the application version across all project files:
 2. package-lock.json ("version": "X.Y.Z")
 3. app.html (landing page #connect-version-hint and ?v=X.Y.Z cache busters)
 4. README.md (release binary links and tags)
+5. sw.js (CACHE_NAME)
+6. manifest.webmanifest ("version": "X.Y.Z")
 
 Usage:
   python3 development/bump_version.py 2.7.1
@@ -113,6 +115,19 @@ def update_sw_js(version: str):
     sw_file.write_text(new_content, encoding="utf-8")
     print(f"  ✓ sw.js (CACHE_NAME) -> secretary-pwa-v{version}")
 
+def update_manifest_webmanifest(version: str):
+    manifest_file = ROOT / "manifest.webmanifest"
+    if not manifest_file.exists():
+        return
+    content = manifest_file.read_text(encoding="utf-8")
+    new_content = re.sub(
+        r'("version"\s*:\s*)"[0-9]+\.[0-9]+\.[0-9]+"',
+        rf'\g<1>"{version}"',
+        content
+    )
+    manifest_file.write_text(new_content, encoding="utf-8")
+    print(f"  ✓ manifest.webmanifest (version) -> {version}")
+
 def check_parity() -> bool:
     curr = get_current_version()
     mismatches = []
@@ -139,6 +154,15 @@ def check_parity() -> bool:
         sw_match = re.search(r"const CACHE_NAME = 'secretary-pwa-v([0-9]+\.[0-9]+\.[0-9]+)';", sw_content)
         if sw_match and sw_match.group(1) != curr:
             mismatches.append(f"sw.js CACHE_NAME is 'secretary-pwa-v{sw_match.group(1)}' but package.json is '{curr}'")
+
+    manifest_file = ROOT / "manifest.webmanifest"
+    if manifest_file.exists():
+        manifest_content = manifest_file.read_text(encoding="utf-8")
+        manifest_match = re.search(r'"version"\s*:\s*"([0-9]+\.[0-9]+\.[0-9]+)"', manifest_content)
+        if not manifest_match:
+            mismatches.append(f"manifest.webmanifest is missing 'version' property (expected '{curr}')")
+        elif manifest_match.group(1) != curr:
+            mismatches.append(f"manifest.webmanifest version is '{manifest_match.group(1)}' but package.json is '{curr}'")
         
     if mismatches:
         print(f"❌ Version discrepancies found (current package.json: {curr}):")
@@ -169,6 +193,7 @@ def main():
     update_app_html(new_ver)
     update_readme(new_ver)
     update_sw_js(new_ver)
+    update_manifest_webmanifest(new_ver)
     print(f"\n🎉 Successfully bumped project version to {new_ver} across all files!")
 
 if __name__ == "__main__":

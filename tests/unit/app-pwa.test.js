@@ -47,6 +47,12 @@ describe('Progressive Web App (PWA) Implementation (tests/unit/app-pwa.test.js)'
     const icon512 = manifest.icons.find((i) => i.sizes === '512x512');
     expect(icon192).toBeDefined();
     expect(icon512).toBeDefined();
+
+    const pkgPath = path.resolve(__dirname, '../../package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    // Ensures browser installation registers authentic app version instead of defaulting to 1.0
+    expect(manifest.version).toBe(pkg.version);
+    expect(manifest.version).not.toBe('1.0');
   });
 
   it('verifies app.html contains link to manifest.webmanifest and theme-color meta tags', () => {
