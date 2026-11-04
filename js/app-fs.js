@@ -8,6 +8,19 @@ function _getRootHandle() {
   return null;
 }
 
+const _dirHandleCacheByRoot = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+const _missingBackupDirByRoot = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
+
+function _getRootDirCache(root) {
+  if (!_dirHandleCacheByRoot || !root || typeof root !== 'object') return null;
+  let map = _dirHandleCacheByRoot.get(root);
+  if (!map) {
+    map = new Map();
+    _dirHandleCacheByRoot.set(root, map);
+  }
+  return map;
+}
+
 /** Navigate to a nested directory (read-only nav). Throws if not found. */
 async function getDirHandle(pathStr) {
   const root = _getRootHandle();
@@ -17,9 +30,22 @@ async function getDirHandle(pathStr) {
     err.name = 'NotFoundError';
     throw err;
   }
+  const cleanPath = String(pathStr || '').split('/').filter(Boolean).join('/');
+  if (!cleanPath) return root;
+  const cache = _getRootDirCache(root);
+  if (cache && cache.has(cleanPath)) {
+    return cache.get(cleanPath);
+  }
   let handle = root;
-  for (const part of pathStr.split('/').filter(Boolean)) {
-    handle = await handle.getDirectoryHandle(part);
+  let prefix = '';
+  for (const part of cleanPath.split('/')) {
+    prefix = prefix ? `${prefix}/${part}` : part;
+    if (cache && cache.has(prefix)) {
+      handle = cache.get(prefix);
+    } else {
+      handle = await handle.getDirectoryHandle(part);
+      if (cache) cache.set(prefix, handle);
+    }
   }
   return handle;
 }
@@ -33,9 +59,18 @@ async function getOrCreateDirHandle(pathStr) {
     err.name = 'NotFoundError';
     throw err;
   }
+  const cleanPath = String(pathStr || '').split('/').filter(Boolean).join('/');
+  if (!cleanPath) return root;
+  const cache = _getRootDirCache(root);
+  if (cache && cache.has(cleanPath)) {
+    return cache.get(cleanPath);
+  }
   let handle = root;
-  for (const part of pathStr.split('/').filter(Boolean)) {
+  let prefix = '';
+  for (const part of cleanPath.split('/')) {
+    prefix = prefix ? `${prefix}/${part}` : part;
     handle = await handle.getDirectoryHandle(part, { create: true });
+    if (cache) cache.set(prefix, handle);
   }
   return handle;
 }
@@ -53,8 +88,8 @@ async function readFile(pathStr) {
   const parts = pathStr.split('/').filter(Boolean);
   const name  = parts.pop();
   if (!name) throw new Error(`Invalid file path: ${pathStr}`);
+  const root = _getRootHandle();
   try {
-    const root = _getRootHandle();
     const dir = parts.length ? await getDirHandle(parts.join('/')) : root;
     if (dir && typeof dir.getFileHandle === 'function') {
       const fh = await dir.getFileHandle(name);
@@ -62,18 +97,29 @@ async function readFile(pathStr) {
     }
   } catch (e) {
     // If not found at direct path, try fallback to _migrated_to_cloud_backup/ if file was archived
-    if (!pathStr.startsWith('_migrated_to_cloud_backup/')) {
+    if (
+      !pathStr.startsWith('_migrated_to_cloud_backup/')
+      && !(root && _missingBackupDirByRoot && _missingBackupDirByRoot.has(root))
+    ) {
       try {
-        const backupPath = `_migrated_to_cloud_backup/${pathStr}`;
-        const bParts = backupPath.split('/').filter(Boolean);
-        const bName = bParts.pop();
-        const root = _getRootHandle();
-        const bDir = bParts.length ? await getDirHandle(bParts.join('/')) : root;
-        if (bDir && typeof bDir.getFileHandle === 'function') {
-          const bFh = await bDir.getFileHandle(bName);
-          return (await bFh.getFile()).text();
+        await getDirHandle('_migrated_to_cloud_backup');
+      } catch {
+        if (root && _missingBackupDirByRoot) {
+          _missingBackupDirByRoot.add(root);
         }
-      } catch (be) {}
+      }
+      if (!(root && _missingBackupDirByRoot && _missingBackupDirByRoot.has(root))) {
+        try {
+          const backupPath = `_migrated_to_cloud_backup/${pathStr}`;
+          const bParts = backupPath.split('/').filter(Boolean);
+          const bName = bParts.pop();
+          const bDir = bParts.length ? await getDirHandle(bParts.join('/')) : root;
+          if (bDir && typeof bDir.getFileHandle === 'function') {
+            const bFh = await bDir.getFileHandle(bName);
+            return (await bFh.getFile()).text();
+          }
+        } catch (be) {}
+      }
     }
   }
 
@@ -236,35 +282,72 @@ async function finalizeSaves(progress) {
   await Promise.all(promises);
 }
 
-/** Write a text file by path relative to root (creates dirs + file). */
+/** Write a text file by path relative to root (creates dirs + file).
+ *  Coalesces concurrent pending writes to the same path so a burst of writes
+ *  executes at most 1 follow-up disk write with the latest content.
+ */
 async function writeFile(pathStr, content) {
   if (!pathStr || !pathStr.trim()) throw new Error('Invalid file path');
-  // Serialize writes to the same path within this window
-  const prev = _writeQueues.get(pathStr) || Promise.resolve();
-  
+
+  let state = _writeQueues.get(pathStr);
+  if (state && state.running) {
+    state.hasPending = true;
+    state.pendingContent = content;
+    if (!state.pendingPromise) {
+      state.pendingPromise = new Promise((resolve, reject) => {
+        state.pendingResolve = resolve;
+        state.pendingReject = reject;
+      });
+    }
+    return state.pendingPromise;
+  }
+
+  state = {
+    running: true,
+    hasPending: false,
+    pendingContent: undefined,
+    pendingPromise: null,
+    pendingResolve: null,
+    pendingReject: null
+  };
+  _writeQueues.set(pathStr, state);
+
   let writeResolve;
   const writeTrackingPromise = new Promise(resolve => {
     writeResolve = resolve;
   });
   _activeWrites.add(writeTrackingPromise);
 
-  const next = prev.then(async () => {
+  const runLoop = async (initialContent) => {
     try {
-      await _writeFileDirect(pathStr, content);
+      await _writeFileDirect(pathStr, initialContent);
     } finally {
+      while (state.hasPending) {
+        const nextContent = state.pendingContent;
+        const nextResolve = state.pendingResolve;
+        const nextReject = state.pendingReject;
+        state.hasPending = false;
+        state.pendingContent = undefined;
+        state.pendingPromise = null;
+        state.pendingResolve = null;
+        state.pendingReject = null;
+        try {
+          await _writeFileDirect(pathStr, nextContent);
+          if (nextResolve) nextResolve();
+        } catch (err) {
+          if (nextReject) nextReject(err);
+        }
+      }
+      state.running = false;
+      if (_writeQueues.get(pathStr) === state) {
+        _writeQueues.delete(pathStr);
+      }
       _activeWrites.delete(writeTrackingPromise);
       writeResolve();
     }
-  });
-  
-  const wrapped = next.catch(() => {}).then(() => {
-    if (_writeQueues.get(pathStr) === wrapped) {
-      _writeQueues.delete(pathStr);
-    }
-  });
+  };
 
-  _writeQueues.set(pathStr, wrapped);
-  return next;
+  return runLoop(content);
 }
 
 function _dataUrlToBlob(dataUrl) {

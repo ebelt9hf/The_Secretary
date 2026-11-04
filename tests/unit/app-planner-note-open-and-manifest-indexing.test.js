@@ -366,4 +366,126 @@ describe('Planner Note Opening & Dual-Backend Manifest Indexing Pipeline', () =>
     expect(globalThis.openNoteOverlay).toHaveBeenCalledTimes(1);
     expect(closeProgressSpy).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * 1. Protected Behavior: `writeFile()` coalesces concurrent pending writes to the same file path so a burst of writes
+   *    while one write is in flight executes at most 2 physical disk writes (the in-flight write + 1 coalesced write with
+   *    the latest content) and resolves all callers once the latest payload is persisted.
+   * 2. Regression Target: Unbounded sequential write chaining in `_writeQueues` causing O(K) slow `createWritable/close`
+   *    disk operations for obsolete intermediate JSON snapshots.
+   * 3. Coverage Overlap / Redundancy: None; no existing test verifies write queue coalescing under concurrent load.
+   * 4. Production Code Footprint: None; exercises production `writeFile()` via `window.AppBridge.fs.writeFile`.
+   */
+  it('coalesces burst of concurrent writeFile calls for the same path into a single follow-up disk write with latest content', async () => {
+    const physicalWrites = [];
+    const origBridge = window.AppBridge;
+    window.AppBridge = {
+      fs: {
+        hasNativeFS: () => true,
+        writeFile: vi.fn(async (pathStr, content) => {
+          await new Promise((r) => setTimeout(r, 20));
+          physicalWrites.push({ pathStr, content });
+          return true;
+        })
+      }
+    };
+
+    try {
+      const p1 = writeFile('notes/metadata-buffer.json', '{"v":1}');
+      const p2 = writeFile('notes/metadata-buffer.json', '{"v":2}');
+      const p3 = writeFile('notes/metadata-buffer.json', '{"v":3}');
+      const p4 = writeFile('notes/metadata-buffer.json', '{"v":4}');
+      const p5 = writeFile('notes/metadata-buffer.json', '{"v":5}');
+
+      await Promise.all([p1, p2, p3, p4, p5]);
+
+      expect(physicalWrites).toHaveLength(2);
+      expect(physicalWrites[0]).toEqual({ pathStr: 'notes/metadata-buffer.json', content: '{"v":1}' });
+      expect(physicalWrites[1]).toEqual({ pathStr: 'notes/metadata-buffer.json', content: '{"v":5}' });
+    } finally {
+      window.AppBridge = origBridge;
+    }
+  });
+
+  /**
+   * 1. Protected Behavior: `saveManifest({ force: true })` updates in-memory metadata indexes synchronously before I/O
+   *    awaits, dispatches `writeNotesManifest`, `writeNotesManifestJS`, and `writeMetadataBuffer` in parallel, and
+   *    coalesces overlapping `saveManifest({ force: true })` calls into at most 2 flushes.
+   * 2. Regression Target: Sequential 3-file waiting in `_doSaveManifestDirect()` and overlapping uncoalesced full-manifest
+   *    disk flushes stalling the UI at 75%.
+   * 3. Coverage Overlap / Redundancy: None; first test validating parallel dispatch and single-flight coalescing of
+   *    `_doSaveManifestDirect()`.
+   * 4. Production Code Footprint: None; exercises production `saveManifest()`.
+   */
+  it('updates indexes synchronously, dispatches manifest/buffer writes in parallel, and coalesces concurrent saveManifest calls', async () => {
+    let manifestWriteCount = 0;
+    let bufferWriteCount = 0;
+    let inFlightManifestWrites = 0;
+    let parallelObserved = false;
+
+    vi.spyOn(StorageAPI, 'writeNotesManifest').mockImplementation(async () => {
+      manifestWriteCount += 1;
+      inFlightManifestWrites += 1;
+      await new Promise((r) => setTimeout(r, 25));
+      inFlightManifestWrites -= 1;
+    });
+    vi.spyOn(StorageAPI, 'writeNotesManifestJS').mockResolvedValue(true);
+    vi.spyOn(StorageAPI, 'writeMetadataBuffer').mockImplementation(async () => {
+      bufferWriteCount += 1;
+      if (inFlightManifestWrites > 0) {
+        parallelObserved = true;
+      }
+      await new Promise((r) => setTimeout(r, 25));
+    });
+
+    globalThis.manifest = [
+      { id: 'note-sync-1', path: 'notes/note-sync-1.html', title: 'Sync 1', date: '2026-11-04' }
+    ];
+
+    const s1 = saveManifest({ force: true });
+    // Synchronous index update before async disk I/O finishes:
+    expect(getNoteById('note-sync-1')?.title).toBe('Sync 1');
+
+    // Trigger 3 more force saves while s1 is in flight
+    globalThis.manifest.push({ id: 'note-sync-2', path: 'notes/note-sync-2.html', title: 'Sync 2', date: '2026-11-04' });
+    const s2 = saveManifest({ force: true });
+    globalThis.manifest.push({ id: 'note-sync-3', path: 'notes/note-sync-3.html', title: 'Sync 3', date: '2026-11-04' });
+    const s3 = saveManifest({ force: true });
+    const s4 = saveManifest({ force: true });
+
+    await Promise.all([s1, s2, s3, s4]);
+
+    expect(parallelObserved).toBe(true);
+    expect(manifestWriteCount).toBe(2);
+    expect(bufferWriteCount).toBe(2);
+    expect(getNoteById('note-sync-3')?.title).toBe('Sync 3');
+  });
+
+  /**
+   * 1. Protected Behavior: `StorageAPI.writeNotesManifest()` persists a Tier-1 copy in `VaultIDBStorage` (`meta` store)
+   *    and `StorageAPI.readNotesManifest()` reconciles any Tier-1 cached entries missing from `notes/manifest.json`.
+   * 2. Regression Target: Losing newly linked planner notes on startup if the app was reloaded after Tier-1 persistence
+   *    but before the local filesystem `notes/manifest.json` stream finished closing.
+   * 3. Coverage Overlap / Redundancy: None; tests Tier-1 IndexedDB manifest recovery in filesystem mode.
+   * 4. Production Code Footprint: None; exercises `StorageAPI.writeNotesManifest` and `StorageAPI.readNotesManifest`.
+   */
+  it('recovers newly written manifest entries from Tier-1 VaultIDBStorage if disk manifest.json was behind', async () => {
+    vi.spyOn(StorageAPI, '_writeJSON').mockResolvedValue(true);
+
+    const fullManifest = [
+      { id: 'note-disk-1', path: 'notes/note-disk-1.html', title: 'On Disk' },
+      { id: 'note-tier1-only', path: 'notes/note-tier1-only.html', title: 'Saved In Tier 1 Before Reload' }
+    ];
+    await StorageAPI.writeNotesManifest(fullManifest);
+
+    // Simulate reload where note HTML is present on disk/cache, but disk `notes/manifest.json` only had the first entry
+    StorageAPI.clearNoteCache();
+    StorageAPI._noteCache.set('notes/note-tier1-only.html', '<p>Saved note HTML</p>');
+    vi.spyOn(StorageAPI, '_readJSON').mockResolvedValue([
+      { id: 'note-disk-1', path: 'notes/note-disk-1.html', title: 'On Disk' }
+    ]);
+
+    const recovered = await StorageAPI.readNotesManifest();
+    expect(recovered.map((n) => n.id)).toEqual(['note-disk-1', 'note-tier1-only']);
+  });
 });

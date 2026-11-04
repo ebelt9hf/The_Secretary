@@ -340,11 +340,46 @@ const StorageAPI = {
       return mapped;
     }
     const diskManifest = await this._readJSON('notes/manifest.json', []);
-    this._seedLastManifestMap(diskManifest);
-    return diskManifest;
+    let resolvedManifest = Array.isArray(diskManifest) ? diskManifest : [];
+
+    // Reconcile Tier-1 IndexedDB manifest snapshot if disk write was interrupted before reload
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb && typeof idb.getMeta === 'function') {
+      try {
+        const tier1Manifest = await idb.getMeta('notes_manifest_cache');
+        if (Array.isArray(tier1Manifest) && tier1Manifest.length > 0) {
+          const byKey = new Map();
+          for (const entry of resolvedManifest) {
+            const key = entry?.path || entry?.id;
+            if (key) byKey.set(key, entry);
+          }
+          for (const cachedEntry of tier1Manifest) {
+            const key = cachedEntry?.path || cachedEntry?.id;
+            if (key && !byKey.has(key) && cachedEntry?.path) {
+              const contentExists = this._noteCache.has(cachedEntry.path) || await fileExists(cachedEntry.path);
+              if (contentExists) {
+                resolvedManifest.push(cachedEntry);
+                byKey.set(key, cachedEntry);
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    this._seedLastManifestMap(resolvedManifest);
+    return resolvedManifest;
   },
 
   async writeNotesManifest(manifest) {
+    // 1. Persist Tier-1 manifest snapshot to VaultIDBStorage immediately
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb && typeof idb.saveMeta === 'function' && Array.isArray(manifest)) {
+      try {
+        await idb.saveMeta('notes_manifest_cache', manifest);
+      } catch (e) {}
+    }
+
     if (this.getStorageEngine() !== 'firebase') {
       try {
         await this._writeJSON('notes/manifest.json', manifest);
@@ -355,6 +390,7 @@ const StorageAPI = {
 
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked && Array.isArray(manifest)) {
       if (!this._lastManifestMap) this._lastManifestMap = new Map();
+      const changedTasks = [];
       for (const item of manifest) {
         if (!item) continue;
         const noteId = item.id || (item.path ? item.path.replace(/^notes\//, '').replace(/\.html$/, '') : null);
@@ -376,8 +412,15 @@ const StorageAPI = {
         }
 
         if (typeof window.FirebaseSyncService.updateNoteMetadata === 'function') {
-          // Update local encrypted cache immediately and debounce cloud network flush
-          await window.FirebaseSyncService.updateNoteMetadata(noteId, {
+          changedTasks.push({ noteId, item, resolvedTags });
+        }
+      }
+
+      const BATCH_SIZE = 8;
+      for (let i = 0; i < changedTasks.length; i += BATCH_SIZE) {
+        const batch = changedTasks.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(({ noteId, item, resolvedTags }) =>
+          window.FirebaseSyncService.updateNoteMetadata(noteId, {
             title: item.title,
             tags: resolvedTags,
             workstream: item.workstream,
@@ -385,8 +428,8 @@ const StorageAPI = {
             archived: item.archived,
             favorite: item.favorite,
             date: item.date
-          }, 5000);
-        }
+          }, 5000)
+        ));
       }
     }
   },

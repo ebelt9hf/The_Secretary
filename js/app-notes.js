@@ -1119,31 +1119,78 @@ async function loadManifest() {
 
 let _saveManifestTimer = null;
 let _saveManifestResolveQueue = [];
+let _manifestSaveInFlight = false;
+let _manifestSavePending = false;
+let _manifestSavePendingWaiters = [];
+
+function _syncManifestAndMetadataInMemory() {
+  manifest = normalizeManifestEntries(manifest);
+  metadataBuffer = mergeManifestWithExistingMetadata(manifest);
+  metadataBuffer = normalizeManifestEntries(metadataBuffer.map(normalizeMetadataEntry).filter(Boolean));
+  syncMetadataIndexes();
+}
+
+async function _flushManifestFilesOnce() {
+  _syncManifestAndMetadataInMemory();
+  const manifestSnapshot = manifest.map(item => ({ ...item }));
+
+  const writeManifestPromise = (async () => {
+    broadcastSync({ type: 'WILL_WRITE', file: 'notes/manifest.json' });
+    await StorageAPI.writeNotesManifest(manifestSnapshot);
+    broadcastSync({ type: 'WRITE_DONE', file: 'notes/manifest.json' });
+  })();
+
+  const writeManifestJSPromise = (async () => {
+    try {
+      const jsContent = `window.MANIFEST_DATA = ${safeJSON(manifestSnapshot)};`;
+      broadcastSync({ type: 'WILL_WRITE', file: 'notes/manifest.js' });
+      await StorageAPI.writeNotesManifestJS(jsContent);
+      broadcastSync({ type: 'WRITE_DONE', file: 'notes/manifest.js' });
+    } catch (e) {
+      console.warn('Could not write notes/manifest.js:', e.message);
+    }
+  })();
+
+  const writeBufferPromise = (async () => {
+    try {
+      await saveMetadataBuffer();
+    } catch (e) {
+      console.warn('Could not write metadata buffer:', e.message);
+    }
+  })();
+
+  await Promise.all([writeManifestPromise, writeManifestJSPromise, writeBufferPromise]);
+  broadcastSync({ type: 'MANIFEST_UPDATED' });
+}
 
 async function _doSaveManifestDirect() {
-  manifest = normalizeManifestEntries(manifest);
-  broadcastSync({ type: 'WILL_WRITE', file: 'notes/manifest.json' });
-  await StorageAPI.writeNotesManifest(manifest);
-  broadcastSync({ type: 'WRITE_DONE', file: 'notes/manifest.json' });
+  // Always synchronize in-memory indexes immediately (0ms) so callers see consistent state
+  _syncManifestAndMetadataInMemory();
 
-  // Keep notes/manifest.js in sync
-  try {
-    const jsContent = `window.MANIFEST_DATA = ${safeJSON(manifest)};`;
-    broadcastSync({ type: 'WILL_WRITE', file: 'notes/manifest.js' });
-    await StorageAPI.writeNotesManifestJS(jsContent);
-    broadcastSync({ type: 'WRITE_DONE', file: 'notes/manifest.js' });
-  } catch (e) {
-    console.warn('Could not write notes/manifest.js:', e.message);
+  if (_manifestSaveInFlight) {
+    _manifestSavePending = true;
+    return new Promise((resolve, reject) => {
+      _manifestSavePendingWaiters.push({ resolve, reject });
+    });
   }
 
-  metadataBuffer = mergeManifestWithExistingMetadata(manifest);
+  _manifestSaveInFlight = true;
   try {
-    await saveMetadataBuffer();
-  } catch (e) {
-    console.warn('Could not write metadata buffer:', e.message);
+    await _flushManifestFilesOnce();
+    while (_manifestSavePending) {
+      _manifestSavePending = false;
+      const waiters = _manifestSavePendingWaiters;
+      _manifestSavePendingWaiters = [];
+      try {
+        await _flushManifestFilesOnce();
+        for (const w of waiters) w.resolve();
+      } catch (err) {
+        for (const w of waiters) w.reject(err);
+      }
+    }
+  } finally {
+    _manifestSaveInFlight = false;
   }
-
-  broadcastSync({ type: 'MANIFEST_UPDATED' });
 }
 
 async function saveManifest(options = {}) {
