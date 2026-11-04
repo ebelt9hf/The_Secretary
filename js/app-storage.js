@@ -884,10 +884,12 @@ const StorageAPI = {
     for (let i = 0; i < total; i += CONCURRENCY) {
       const chunk = list.slice(i, i + CONCURRENCY);
       await Promise.all(chunk.map(async (item) => {
-        if (!item || !item.path) return;
         try {
-          if (!this._noteCache.has(item.path)) {
-            const html = await this.readNoteContent(item.path);
+          if (item && item.path && !this._noteCache.has(item.path)) {
+            const html = await Promise.race([
+              this.readNoteContent(item.path),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Note read timeout')), 5000))
+            ]);
             this._noteCache.set(item.path, html);
           }
         } catch (e) {
@@ -895,7 +897,7 @@ const StorageAPI = {
         } finally {
           completed++;
           if (typeof onProgress === 'function') {
-            onProgress(completed, total, item.title || item.path);
+            onProgress(completed, total, item?.title || item?.path || '');
           }
         }
       }));

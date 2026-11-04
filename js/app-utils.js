@@ -1826,8 +1826,13 @@ async function applyHashState() {
           await switchTab(targetTab);
         }
       }
-      if (window.checkSavedFolderPromise) {
-        try { await window.checkSavedFolderPromise; } catch (e) {}
+      if (!rootHandle && !_isMountingFolder && window.checkSavedFolderPromise) {
+        try {
+          await Promise.race([
+            window.checkSavedFolderPromise,
+            new Promise(r => setTimeout(r, 2000))
+          ]);
+        } catch (e) {}
       }
       if (!rootHandle && window.AppBridge?.fs) {
         try {

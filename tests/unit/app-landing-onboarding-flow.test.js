@@ -310,6 +310,59 @@ describe('Landing Screen Onboarding & Language Flow', () => {
       expect(document.getElementById('screen-main').classList.contains('active')).toBe(true);
     });
 
+    it('mountFolder transitions to main screen without deadlocking when checkSavedFolderPromise is pending and hash contains note', async () => {
+      globalThis.switchTab = async () => {};
+      globalThis.loadManifest = async () => [];
+      globalThis.loadTodosManifest = async () => [];
+      globalThis.loadPlanner = async () => {};
+      globalThis.toast = () => {};
+      globalThis.openNoteOverlay = async () => {};
+      globalThis.getNoteById = () => null;
+      globalThis.getNoteByPath = () => null;
+
+      const demoHandle = createDemoVirtualDirectoryHandle();
+      window.location.hash = '#tab=notes&note=test-note';
+
+      // Simulate checkSavedFolder awaiting mountFolder
+      let resolveSavedFolder;
+      const pendingPromise = new Promise(resolve => {
+        resolveSavedFolder = resolve;
+      });
+      window.checkSavedFolderPromise = pendingPromise;
+      globalThis.checkSavedFolderPromise = pendingPromise;
+
+      const mountPromise = mountFolder(demoHandle);
+
+      // In the fixed architecture, mountFolder does not wait on pending checkSavedFolderPromise,
+      // avoiding deadlock and activating screen-main in under 400ms.
+      const raceResult = await Promise.race([
+        mountPromise.then(() => 'MOUNTED'),
+        new Promise(r => setTimeout(() => r('DEADLOCKED'), 400))
+      ]);
+
+      expect(raceResult).toBe('MOUNTED');
+      expect(document.getElementById('screen-main').classList.contains('active')).toBe(true);
+      expect(document.getElementById('screen-connect').style.display).toBe('none');
+
+      resolveSavedFolder();
+      await mountPromise;
+      window.location.hash = '';
+    });
+
+    it('verifies app.html contains LCP optimizations for landing logo icon.svg', () => {
+      const fs = require('fs');
+      const html = fs.readFileSync('app.html', 'utf8');
+
+      // Preload link in <head> for LCP discovery
+      expect(html).toMatch(/<link\s+rel="preload"\s+href="icon\.svg"\s+as="image"\s+type="image\/svg\+xml"\s+fetchpriority="high">/);
+
+      // landing-logo <img> has explicit width/height and fetchpriority="high"
+      expect(html).toMatch(/<img\s+class="landing-logo"\s+src="icon\.svg"\s+alt="Secretary Logo"\s+width="64"\s+height="64"\s+fetchpriority="high">/);
+
+      // katex.min.css is non-blocking on initial paint
+      expect(html).toMatch(/media="print"\s+onload="this\.media='all'"/);
+    });
+
     it('opens cloud sync modal with custom firebase section when openCustomFirebaseSetupFromLanding is called', () => {
       document.body.innerHTML += `
         <div class="modal-overlay" id="modal-cloud-sync-setup" style="display:none;">

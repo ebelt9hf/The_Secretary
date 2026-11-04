@@ -4815,6 +4815,7 @@ async function handleSyncMessage(e) {
 /** Mount a directory handle: load data and switch to the main screen. */
 // ═══ App Init ═══
 async function mountFolder(handle) {
+  _isMountingFolder = true;
   if (typeof showLandingStep === 'function') {
     showLandingStep('welcome');
   }
@@ -4822,6 +4823,7 @@ async function mountFolder(handle) {
     perfTelemetry.startup.mountStartedAt = performance.now();
   }
   setLandingBusy(true, typeof t === 'function' ? t('landing.loadingFolder') : 'Loading folder…');
+  updateStartupProgress(5, (typeof t === 'function' ? t('landing.loadingFolder') : null) || 'Loading folder…');
   setStartupState('BOOT_MINIMAL');
 
   // Reset folder-scoped runtime caches before loading a new workspace folder.
@@ -4975,11 +4977,18 @@ async function mountFolder(handle) {
 
     // Preload ALL notes into memory cache during startup progress bar phase
     if (StorageAPI && typeof StorageAPI.preloadAllNotes === 'function') {
-      await StorageAPI.preloadAllNotes((done, total, title) => {
-        const pct = 35 + Math.round((done / Math.max(1, total)) * 45);
-        const text = `${t('landing.preloadingNotes') || 'Preloading notes…'} (${done}/${total})`;
-        updateStartupProgress(pct, text);
-      });
+      try {
+        await Promise.race([
+          StorageAPI.preloadAllNotes((done, total, title) => {
+            const pct = 35 + Math.round((done / Math.max(1, total)) * 45);
+            const text = `${t('landing.preloadingNotes') || 'Preloading notes…'} (${done}/${total})`;
+            updateStartupProgress(pct, text);
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('preloadAllNotes startup timeout')), 15000))
+        ]);
+      } catch (preloadErr) {
+        console.warn('Preload notes encountered timeout or error:', preloadErr);
+      }
     }
     updateStartupProgress(82, t('landing.loadingWorkspace') || 'Loading workspace…');
 
@@ -5012,21 +5021,30 @@ async function mountFolder(handle) {
     try { await runFirstStartSetupIfNeeded(); } catch (e) { console.warn('First-run setup skipped', e); }
 
     updateStartupProgress(100, t('landing.readyProgress') || 'Ready!');
-    await new Promise(r => setTimeout(r, 180));
+    await new Promise(r => setTimeout(r, 120));
 
-    if (location.hash && location.hash.length > 1) {
-      await applyHashState();
-    } else {
-      await switchTab('planner');
+    try {
+      if (location.hash && location.hash.length > 1) {
+        await applyHashState();
+      } else {
+        await switchTab('planner');
+      }
+      if (typeof renderPlanner === 'function' && activeTab === 'planner') {
+        renderPlanner();
+      }
+    } catch (routeErr) {
+      console.warn('Post-startup route/tab initialization error:', routeErr);
+      if (typeof switchTab === 'function') {
+        try { await switchTab('planner'); } catch (e) {}
+      }
+    } finally {
+      _isMountingFolder = false;
+      const sc = document.getElementById('screen-connect');
+      if (sc) sc.style.display = 'none';
+      const sm = document.getElementById('screen-main');
+      if (sm) sm.classList.add('active');
+      setLandingBusy(false);
     }
-    if (typeof renderPlanner === 'function' && activeTab === 'planner') {
-      renderPlanner();
-    }
-
-    const sc = document.getElementById('screen-connect');
-    if (sc) sc.style.display = 'none';
-    const sm = document.getElementById('screen-main');
-    if (sm) sm.classList.add('active');
     if (!_isFocusedMode) {
       if (typeof setupGroupNavResize === 'function') setupGroupNavResize();
       if (typeof updateSubRowVisibility === 'function') updateSubRowVisibility();
@@ -5245,6 +5263,7 @@ async function checkSavedFolder() {
                         (location.hash && location.hash.includes('chat-window=true'));
     const isVirtual = Boolean(handle?.isVirtual || handle?.isDemo || handle?.name === 'Demo Workspace (Sandbox)');
     if (perm === 'granted' || isElectronEnv || isVirtual || ((_isFocusedMode || isCompanion) && perm === 'granted')) {
+      updateStartupProgress(3, (typeof t === 'function' ? t('landing.loadingFolder') : null) || 'Loading folder…');
       await saveHandleIDB(handle);
       await mountFolder(handle);
       return;
@@ -5279,6 +5298,7 @@ async function checkSavedFolder() {
         perm = await handle.requestPermission({ mode: 'readwrite' });
       }
       if (perm === 'granted') {
+        updateStartupProgress(3, (typeof t === 'function' ? t('landing.loadingFolder') : null) || 'Loading folder…');
         await saveHandleIDB(handle);
         await mountFolder(handle);
         return;
@@ -6287,8 +6307,13 @@ if (window.electronAPI?.onOpenNote) {
       }
     }
 
-    if (window.checkSavedFolderPromise) {
-      try { await window.checkSavedFolderPromise; } catch (e) {}
+    if (!rootHandle && !_isMountingFolder && window.checkSavedFolderPromise) {
+      try {
+        await Promise.race([
+          window.checkSavedFolderPromise,
+          new Promise(r => setTimeout(r, 2000))
+        ]);
+      } catch (e) {}
     }
     if (!rootHandle && window.AppBridge?.fs) {
       try {

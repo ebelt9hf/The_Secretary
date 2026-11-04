@@ -121,6 +121,7 @@ let cardClickTimers  = {};     // path → timeout for single/double-click detec
 
 // Multi-window support
 let _isFocusedMode = false;        // true when app loaded with #note=<id> in URL
+let _isMountingFolder = false;     // true while mountFolder is executing
 let _windowId = 'w-' + Date.now() + '-' + Math.random().toString(36).slice(2);
 let _syncChannel = null;           // BroadcastChannel, created in mountFolder
 let pendingDeletes = {};           // path -> { manifestEntry, timer } for undoable deletes
