@@ -937,7 +937,7 @@ async function saveMetadataBuffer() {
     updatedAt: new Date().toISOString(),
     items: metadataBuffer,
   };
-  if (metadataStorageMode === 'sharded' || await StorageAPI.hasMetadataShardsIndex()) {
+  if (metadataStorageMode === 'sharded' || metadataShardIndexCache) {
     await cleanupMetadataShards(metadataShardIndexCache);
     metadataShardIndexCache = null;
   }
@@ -972,7 +972,7 @@ async function getNoteHtmlOnDemand(path) {
   return await StorageAPI.readNoteContent(path);
 }
 
-function upsertMeta(meta) {
+function upsertMeta(meta, options = {}) {
   if (!meta) return;
   const idx = metadataBuffer.findIndex(m => m.path === meta.path || (meta.id && m.id === meta.id));
   const hasDecisions = Object.prototype.hasOwnProperty.call(meta, 'decisions');
@@ -990,8 +990,10 @@ function upsertMeta(meta) {
     if (!normalized) return;
     metadataBuffer.push(normalized);
   }
-  metadataBuffer = normalizeManifestEntries(metadataBuffer);
-  syncMetadataIndexes();
+  if (!options?.skipIndexSync) {
+    metadataBuffer = normalizeManifestEntries(metadataBuffer);
+    syncMetadataIndexes();
+  }
 }
 
 async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) {
@@ -1005,12 +1007,17 @@ async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) 
 
   metadataHydrationProgress = { done: 0, total: sourceEntries.length, running: true };
   let dirty = false;
+  let anyDirty = false;
   for (let i = 0; i < sourceEntries.length; i += normalizedChunk) {
     const chunk = sourceEntries.slice(i, i + normalizedChunk);
     for (const entry of chunk) {
       if (!entry?.path) continue;
       const current = getMetaByPath(entry.path);
-      const alreadyFresh = current && current.modified && current.modified === entry.modified && current.decisionsReady === true;
+      const alreadyFresh = Boolean(
+        current
+        && current.decisionsReady === true
+        && (current.modified || '') === (entry.modified || '')
+      );
       if (alreadyFresh) {
         metadataHydrationProgress.done += 1;
         continue;
@@ -1053,14 +1060,21 @@ async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) 
         decisionsReady,
         stats,
         summary: parsedSummary,
-      });
+      }, { skipIndexSync: true });
       dirty = true;
+      anyDirty = true;
       metadataHydrationProgress.done += 1;
     }
 
     if (dirty) {
-      manifest = metadataBuffer.map(item => ({ ...item }));
-      await saveMetadataBuffer();
+      metadataBuffer = normalizeManifestEntries(metadataBuffer);
+      syncMetadataIndexes();
+      manifest = normalizeManifestEntries([
+        ...metadataBuffer,
+        ...(Array.isArray(manifest) ? manifest : [])
+      ]);
+      metadataBuffer = mergeManifestWithExistingMetadata(manifest);
+      syncMetadataIndexes();
       if (typeof refreshDecisionListFromMetadataIfAvailable === 'function') {
         refreshDecisionListFromMetadataIfAvailable();
       }
@@ -1070,15 +1084,33 @@ async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) 
     await new Promise(resolve => setTimeout(resolve, 0));
   }
 
+  if (anyDirty) {
+    manifest = normalizeManifestEntries([
+      ...metadataBuffer,
+      ...(Array.isArray(manifest) ? manifest : [])
+    ]);
+    metadataBuffer = mergeManifestWithExistingMetadata(manifest);
+    await saveMetadataBuffer();
+  }
+
   metadataHydrationProgress.running = false;
 }
 // ═══ Manifest helpers ═══
 async function loadManifest() {
   const loadedMeta = await loadMetadataBuffer();
-  if (loadedMeta) return;
   try {
-    manifest = normalizeManifestEntries(await StorageAPI.readNotesManifest());
+    const diskEntries = normalizeManifestEntries(await StorageAPI.readNotesManifest());
+    if (loadedMeta) {
+      if (diskEntries.length > 0) {
+        manifest = normalizeManifestEntries([...metadataBuffer, ...diskEntries]);
+        metadataBuffer = mergeManifestWithExistingMetadata(manifest);
+        syncMetadataIndexes();
+      }
+      return;
+    }
+    manifest = diskEntries;
   } catch {
+    if (loadedMeta) return;
     manifest = [];
   }
   metadataBuffer = mergeManifestWithExistingMetadata(manifest);
@@ -1285,6 +1317,13 @@ async function ensureNoteStoragePaths() {
     let noteId = entry.id || '';
 
     try {
+      if (noteId && oldPath === getCanonicalNotePath(noteId)) {
+        if (currentNote?.path === oldPath) {
+          currentNote.id = noteId;
+        }
+        continue;
+      }
+
       const oldExists = await StorageAPI.hasNoteContent(oldPath);
 
       if (!noteId) {

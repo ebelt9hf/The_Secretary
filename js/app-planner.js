@@ -9767,7 +9767,7 @@ async function createNoteForPlannerTodo(todoId) {
             }
           });
         }
-        savePlanner();
+        await savePlanner();
       }
     }
 
@@ -9817,7 +9817,7 @@ async function associateNoteWithPlannerTodo(todoId, noteId) {
             }
           });
         }
-        savePlanner();
+        await savePlanner();
       }
     }
 
@@ -11824,7 +11824,7 @@ async function openNoteForEvent(event) {
 
         await saveManifest({ force: true });
         await rebuildIndexHTML();
-        savePlanner();
+        await savePlanner();
         renderPlanner();
         renderFilterChips();
         if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
@@ -11917,21 +11917,23 @@ async function openNoteForEvent(event) {
     closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
     await new Promise(r => setTimeout(r, 16));
 
-    await saveManifest({ force: true });
-    await rebuildIndexHTML();
-
     event.noteId = noteId;
+    event.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...(event.linkedNoteIds || [])], noteId);
 
-    // Propagate noteId to linked prep events
+    // Propagate noteId and linkedNoteIds to linked prep events
     if (event.type === 'call' || event.type === 'sync') {
       plannerEvents.forEach(pe => {
         if (pe.type === 'prep' && pe.prepForEventId === event.id) {
           pe.noteId = noteId;
+          pe.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...(pe.linkedNoteIds || [])], noteId);
         }
       });
     }
 
-    savePlanner();
+    await savePlanner();
+    await saveManifest({ force: true });
+    await rebuildIndexHTML();
+
     renderPlanner();
     renderFilterChips();
 

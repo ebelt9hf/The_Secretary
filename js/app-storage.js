@@ -287,14 +287,44 @@ const StorageAPI = {
   },
 
   // ── Notes Manifest ──
+  _getManifestItemTags(item) {
+    if (!item || typeof item !== 'object') return [];
+    if (Array.isArray(item.tags) && item.tags.length > 0) {
+      return [...new Set(item.tags.filter(Boolean))];
+    }
+    return [...new Set([
+      ...(Array.isArray(item.group_tags) ? item.group_tags : []),
+      ...(Array.isArray(item.major_topic_tags) ? item.major_topic_tags : []),
+      ...(Array.isArray(item.topic_tags) ? item.topic_tags : []),
+      ...(Array.isArray(item.extra_tags) ? item.extra_tags : [])
+    ].filter(Boolean))];
+  },
+
+  _getManifestMetaHash(item) {
+    const tags = this._getManifestItemTags(item);
+    return `${item?.title || ''}|${tags.join(',')}|${item?.workstream || ''}|${!!item?.pinned}|${!!item?.archived}|${!!item?.favorite}|${item?.date || ''}`;
+  },
+
+  _seedLastManifestMap(list) {
+    if (!this._lastManifestMap) this._lastManifestMap = new Map();
+    if (!Array.isArray(list)) return;
+    for (const item of list) {
+      if (!item) continue;
+      const noteId = item.id || (item.path ? item.path.replace(/^notes\//, '').replace(/\.html$/, '') : null);
+      if (!noteId) continue;
+      this._lastManifestMap.set(noteId, this._getManifestMetaHash(item));
+    }
+  },
+
   async readNotesManifest() {
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
       const manifestList = window.FirebaseSyncService.getManifest();
       if (manifestList && (manifestList.length > 0 || (window.FirebaseSyncService.state.localCache && window.FirebaseSyncService.state.localCache.size === 0))) {
+        this._seedLastManifestMap(manifestList);
         return manifestList;
       }
       const firebaseNotes = await window.FirebaseSyncService.getAllNotes();
-      return (firebaseNotes || []).map(n => ({
+      const mapped = (firebaseNotes || []).map(n => ({
         id: n.id,
         path: n.path || `notes/${n.id}.html`,
         title: n.title || 'Untitled',
@@ -306,8 +336,12 @@ const StorageAPI = {
         archived: !!n.archived,
         favorite: !!n.favorite
       }));
+      this._seedLastManifestMap(mapped);
+      return mapped;
     }
-    return await this._readJSON('notes/manifest.json', []);
+    const diskManifest = await this._readJSON('notes/manifest.json', []);
+    this._seedLastManifestMap(diskManifest);
+    return diskManifest;
   },
 
   async writeNotesManifest(manifest) {
@@ -326,22 +360,26 @@ const StorageAPI = {
         const noteId = item.id || (item.path ? item.path.replace(/^notes\//, '').replace(/\.html$/, '') : null);
         if (!noteId) continue;
 
+        const resolvedTags = this._getManifestItemTags(item);
         // Delta check: skip notes whose metadata has not changed to avoid O(N) crypto freeze
-        const metaHash = `${item.title || ''}|${(item.tags || []).join(',')}|${item.workstream || ''}|${!!item.pinned}|${!!item.archived}|${!!item.favorite}|${item.date || ''}`;
+        const metaHash = this._getManifestMetaHash(item);
         if (this._lastManifestMap.get(noteId) === metaHash) {
           continue;
         }
         this._lastManifestMap.set(noteId, metaHash);
 
         if (typeof window.FirebaseSyncService._updateManifestCache === 'function') {
-          window.FirebaseSyncService._updateManifestCache(noteId, item);
+          window.FirebaseSyncService._updateManifestCache(noteId, {
+            ...item,
+            tags: resolvedTags
+          });
         }
 
         if (typeof window.FirebaseSyncService.updateNoteMetadata === 'function') {
           // Update local encrypted cache immediately and debounce cloud network flush
           await window.FirebaseSyncService.updateNoteMetadata(noteId, {
             title: item.title,
-            tags: item.tags,
+            tags: resolvedTags,
             workstream: item.workstream,
             pinned: item.pinned,
             archived: item.archived,
