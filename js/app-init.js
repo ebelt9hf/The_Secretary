@@ -534,6 +534,11 @@ async function refreshOpenNoteIfChanged(reason = 'focus') {
   if (now - _lastFocusedNoteRefreshAt < 1000) return;
   _lastFocusedNoteRefreshAt = now;
 
+  const selfSavedAt = (typeof _lastNoteSelfSavedAt !== 'undefined' ? _lastNoteSelfSavedAt : 0) ||
+                      (typeof window !== 'undefined' && window._lastNoteSelfSavedAt ? window._lastNoteSelfSavedAt : 0) ||
+                      (typeof globalThis !== 'undefined' && globalThis._lastNoteSelfSavedAt ? globalThis._lastNoteSelfSavedAt : 0);
+  if (now - selfSavedAt < 3000) return;
+
   const overlayVisible = document.getElementById('note-edit-overlay')?.style.display !== 'none';
   const dailyReviewStepOpen = typeof DailyReviewController !== 'undefined'
     && DailyReviewController
@@ -545,12 +550,16 @@ async function refreshOpenNoteIfChanged(reason = 'focus') {
 
   try {
     const html = await StorageAPI.readNoteContent(currentNote.path);
-    if (html === currentNote.originalHTML) return;
     if (!html && (!currentNote.originalHTML || currentNote.originalHTML.trim() === '')) return;
+
+    const normDisk = (html || '').replace(/\r\n/g, '\n').trim();
+    const normCurrent = (currentNote.originalHTML || '').replace(/\r\n/g, '\n').trim();
+    if (normDisk === normCurrent) return;
+
+    const parsed = parseNoteHTML(html || '');
 
     const isViewMode = document.querySelector('.overlay-panel')?.classList.contains('overlay-view-mode');
     if (isViewMode) {
-      const parsed = parseNoteHTML(html);
       currentNote = { ...currentNote, originalHTML: html, ...parsed };
       const ta = document.getElementById('edit-textarea');
       if (ta) {
@@ -563,6 +572,34 @@ async function refreshOpenNoteIfChanged(reason = 'focus') {
       syncPreview();
       dismissReloadBanner();
     } else {
+      const cleanFn = (typeof window !== 'undefined' && typeof window.cleanHtmlBeforeSave === 'function')
+        ? window.cleanHtmlBeforeSave
+        : ((s) => String(s || '').trim());
+      const diskMainHTML = cleanFn(parsed.mainHTML || '').trim();
+      const currentMainHTML = cleanFn(currentNote.mainHTML || '').trim();
+      const diskTitle = (parsed.title || '').trim();
+      const currentTitle = (currentNote.title || '').trim();
+
+      if (diskMainHTML === currentMainHTML && diskTitle === currentTitle) {
+        // Only metadata or tags changed on disk (e.g. from planner sync)
+        currentNote.originalHTML = html;
+        currentNote.group_tags = parsed.group_tags || [];
+        currentNote.major_topic_tags = parsed.major_topic_tags || [];
+        currentNote.topic_tags = parsed.topic_tags || [];
+        currentNote.extra_tags = parsed.extra_tags || [];
+        if (typeof populateTagEditor === 'function') {
+          const activeEl = document.activeElement;
+          const isFocusingTags = activeEl && activeEl.closest && activeEl.closest('.tags-editor');
+          if (!isFocusingTags) {
+            populateTagEditor('editor-group', currentNote.group_tags, 'group');
+            populateTagEditor('editor-major', currentNote.major_topic_tags, 'major');
+            populateTagEditor('editor-topic', currentNote.topic_tags, 'topic');
+            populateTagEditor('editor-extra', currentNote.extra_tags, 'extra');
+          }
+        }
+        return;
+      }
+
       const banner = document.getElementById('overlay-reload-banner');
       if (banner) banner.classList.add('visible');
     }
@@ -4673,6 +4710,12 @@ async function handleSyncMessage(e) {
     
     const isCurrentNote = (noteId && currentNote?.id === noteId) || (path && currentNote?.path === path);
     if (isCurrentNote && currentNote) {
+      const now = Date.now();
+      const selfSavedAt = (typeof _lastNoteSelfSavedAt !== 'undefined' ? _lastNoteSelfSavedAt : 0) ||
+                          (typeof window !== 'undefined' && window._lastNoteSelfSavedAt ? window._lastNoteSelfSavedAt : 0) ||
+                          (typeof globalThis !== 'undefined' && globalThis._lastNoteSelfSavedAt ? globalThis._lastNoteSelfSavedAt : 0);
+      if (now - selfSavedAt < 3000) return;
+
       const isViewMode = document.querySelector('.overlay-panel')?.classList.contains('overlay-view-mode');
       if (isViewMode) {
         try {
@@ -4716,6 +4759,44 @@ async function handleSyncMessage(e) {
           if (typeof syncImageStrip === 'function') syncImageStrip();
         } catch(err) { console.warn('Sync reload failed', err); }
       } else {
+        try {
+          const html = await StorageAPI.readNoteContent(path || currentNote.path);
+          if (html) {
+            const normDisk = (html || '').replace(/\r\n/g, '\n').trim();
+            const normCurrent = (currentNote.originalHTML || '').replace(/\r\n/g, '\n').trim();
+            if (normDisk === normCurrent) return;
+
+            const parsed = parseNoteHTML(html);
+            const cleanFn = (typeof window !== 'undefined' && typeof window.cleanHtmlBeforeSave === 'function')
+              ? window.cleanHtmlBeforeSave
+              : ((s) => String(s || '').trim());
+            const diskMainHTML = cleanFn(parsed.mainHTML || '').trim();
+            const currentMainHTML = cleanFn(currentNote.mainHTML || '').trim();
+            const diskTitle = (parsed.title || '').trim();
+            const currentTitle = (currentNote.title || '').trim();
+
+            if (diskMainHTML === currentMainHTML && diskTitle === currentTitle) {
+              // Only tags or metadata changed on disk
+              currentNote.originalHTML = html;
+              currentNote.group_tags = parsed.group_tags || [];
+              currentNote.major_topic_tags = parsed.major_topic_tags || [];
+              currentNote.topic_tags = parsed.topic_tags || [];
+              currentNote.extra_tags = parsed.extra_tags || [];
+              if (typeof populateTagEditor === 'function') {
+                const activeEl = document.activeElement;
+                const isFocusingTags = activeEl && activeEl.closest && activeEl.closest('.tags-editor');
+                if (!isFocusingTags) {
+                  populateTagEditor('editor-group', currentNote.group_tags, 'group');
+                  populateTagEditor('editor-major', currentNote.major_topic_tags, 'major');
+                  populateTagEditor('editor-topic', currentNote.topic_tags, 'topic');
+                  populateTagEditor('editor-extra', currentNote.extra_tags, 'extra');
+                }
+              }
+              return;
+            }
+          }
+        } catch (err) {}
+
         const banner = document.getElementById('overlay-reload-banner');
         if (banner) banner.classList.add('visible');
       }

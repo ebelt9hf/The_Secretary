@@ -31441,6 +31441,23 @@ window.APP_TRANSLATIONS_BUNDLE = {
       "tr": "Planlayıcıda taslak olarak kaydedildi",
       "uk": "Збережено як чернетку в планувальнику"
     },
+    "planner.savingNoteContentLocal": {
+      "cs": "Ukládání obsahu poznámky...",
+      "de": "Notizinhalt wird gespeichert...",
+      "en": "Saving note content...",
+      "es": "Guardando el contenido de la nota...",
+      "fr": "Enregistrement du contenu de la note...",
+      "hu": "Jegyzet tartalmának mentése...",
+      "it": "Salvataggio del contenuto della nota...",
+      "nl": "Notitie-inhoud opslaan...",
+      "pl": "Zapisywanie zawartości notatki...",
+      "pt": "Salvando o conteúdo da nota...",
+      "ro": "Se salvează conținutul notei...",
+      "ru": "Сохранение содержимого заметки...",
+      "sv": "Sparar anteckningsinnehåll...",
+      "tr": "Not içeriği kaydediliyor...",
+      "uk": "Збереження вмісту нотатки..."
+    },
     "planner.schedulePrep": {
       "cs": "Naplánovat přípravu",
       "de": "Vorbereitung planen",

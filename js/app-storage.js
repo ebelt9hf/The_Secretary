@@ -766,8 +766,10 @@ const StorageAPI = {
       try {
         this.setConnectorStatus('syncing');
 
+        const failedKeysInThisRun = new Set();
         while (this._syncQueue.size > 0) {
-          const keys = Array.from(this._syncQueue.keys());
+          const keys = Array.from(this._syncQueue.keys()).filter(k => !failedKeysInThisRun.has(k));
+          if (keys.length === 0) break;
           let processedCount = 0;
 
           for (const key of keys) {
@@ -777,7 +779,10 @@ const StorageAPI = {
             try {
               if (item.action === 'save') {
                 if (this.getStorageEngine() !== 'firebase') {
-                  await writeFile(item.path, item.content);
+                  await Promise.race([
+                    writeFile(item.path, item.content),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout writing file to disk: ${item.path}`)), 10000))
+                  ]);
                 } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
                   const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
                   let resolvedTitle = item.meta?.title;
@@ -806,7 +811,10 @@ const StorageAPI = {
               } else if (item.action === 'delete') {
                 if (this.getStorageEngine() !== 'firebase') {
                   try {
-                    await deleteFile(item.path);
+                    await Promise.race([
+                      deleteFile(item.path),
+                      new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout deleting file from disk: ${item.path}`)), 10000))
+                    ]);
                   } catch (delErr) {
                     if (delErr?.name !== 'NotFoundError' && !delErr?.message?.includes('File not found')) {
                       throw delErr;
@@ -824,11 +832,20 @@ const StorageAPI = {
               }
               processedCount++;
             } catch (err) {
+              failedKeysInThisRun.add(key);
+              item.retries = (item.retries || 0) + 1;
+              item.error = err;
               const errorInfo = this.classifyConnectorError(err);
               this.setConnectorStatus('error', errorInfo);
               this.notifyConnectorError(errorInfo);
-              this._scheduleSyncRetry();
-              throw err;
+              if (item.retries >= 3) {
+                console.error(`[StorageAPI] Permanent failure for sync queue item ${key} after 3 attempts:`, err);
+                if (this._syncQueue.get(key) === item) {
+                  this._syncQueue.delete(key);
+                }
+              } else {
+                this._scheduleSyncRetry();
+              }
             }
           }
 
@@ -985,18 +1002,26 @@ const StorageAPI = {
     await this._persistNoteTier1(cleanId, path, content, meta);
 
     // 2. Second stage: Dispatch to Unique Connector Sync Queue
-    this._enqueueSync({
+    const syncItem = {
       id: cleanId,
       path,
       action: 'save',
       content,
       meta,
       createdAt: Date.now()
-    });
+    };
+    this._enqueueSync(syncItem);
 
     try {
-      await this._processSyncQueue();
+      await Promise.race([
+        this._processSyncQueue(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout processing sync queue for ${path}`)), 12000))
+      ]);
+      if (syncItem.error) {
+        throw syncItem.error;
+      }
     } catch (e) {
+      console.warn('[StorageAPI] writeNoteContent sync error/timeout:', e);
       throw e;
     }
 
@@ -1011,17 +1036,25 @@ const StorageAPI = {
     await this._deleteNoteTier1(cleanId, targetPath);
 
     // 2. Second stage: Enqueue and sync deletion to disk or Firebase
-    this._enqueueSync({
+    const syncItem = {
       id: cleanId,
       path: targetPath,
       action: 'delete',
       meta,
       createdAt: Date.now()
-    });
+    };
+    this._enqueueSync(syncItem);
 
     try {
-      await this._processSyncQueue();
+      await Promise.race([
+        this._processSyncQueue(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout processing sync queue for ${targetPath}`)), 12000))
+      ]);
+      if (syncItem.error) {
+        throw syncItem.error;
+      }
     } catch (e) {
+      console.warn('[StorageAPI] deleteNoteContent sync error/timeout:', e);
       throw e;
     }
 

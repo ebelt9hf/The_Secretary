@@ -4071,6 +4071,15 @@ function getPlannerEventNoteActionLabel(event) {
   return t('planner.generateNewNote') || 'Generate new note';
 }
 
+function getPlannerNoteSavingStageText() {
+  const isCloud = typeof StorageAPI !== 'undefined' && typeof StorageAPI.getStorageEngine === 'function' && StorageAPI.getStorageEngine() === 'firebase';
+  return isCloud
+    ? (t('planner.writingNoteContent') || 'Encrypting and saving note content...')
+    : (t('planner.savingNoteContentLocal') || 'Saving note content...');
+}
+if (typeof window !== 'undefined') window.getPlannerNoteSavingStageText = getPlannerNoteSavingStageText;
+if (typeof globalThis !== 'undefined') globalThis.getPlannerNoteSavingStageText = getPlannerNoteSavingStageText;
+
 function showPlannerNoteGenerationProgress(message, customTitle) {
   const overlay = document.createElement('div');
   overlay.className = 'dialog-overlay planner-progress-overlay';
@@ -7307,7 +7316,7 @@ function openPlanEventModal(prefill = {}) {
         mainHTML = mdToPreviewHTML(markdown);
       }
 
-      closeProgress.updateStage?.(t('planner.writingNoteContent') || 'Encrypting and saving note content...', '', 45);
+      closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
       await new Promise(r => setTimeout(r, 16));
 
       const note = {
@@ -7322,7 +7331,10 @@ function openPlanEventModal(prefill = {}) {
         mainHTML
       };
 
-      await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+      await Promise.race([
+        StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
+      ]);
       upsertManifest(note);
 
       closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
@@ -9855,7 +9867,7 @@ async function createNoteForPlannerTodo(todoId) {
   const markdown = `# Todo Details\n\n- Todo ID: ${todo.id}\n- Priority: ${todo.priority}\n- Status: ${todo.status}\n\n# Tasks / Checklist\n\n- `;
   const mainHTML = mdToPreviewHTML(markdown);
 
-  closeProgress.updateStage?.(t('planner.writingNoteContent') || 'Encrypting and saving note content...', '', 45);
+  closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
   await new Promise(r => setTimeout(r, 16));
 
   const note = {
@@ -9871,7 +9883,10 @@ async function createNoteForPlannerTodo(todoId) {
   };
 
   try {
-    await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+    await Promise.race([
+      StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
+    ]);
     upsertManifest(note);
 
     closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
@@ -11924,10 +11939,13 @@ async function openNoteForEvent(event) {
           mainHTML
         };
 
-        closeProgress.updateStage?.(t('planner.writingNoteContent') || 'Encrypting and saving note content...', '', 45);
+        closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
         await new Promise(r => setTimeout(r, 16));
 
-        await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+        await Promise.race([
+          StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
+        ]);
         upsertManifest(note);
 
         closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
@@ -12037,10 +12055,13 @@ async function openNoteForEvent(event) {
   };
 
   try {
-    closeProgress.updateStage?.(t('planner.writingNoteContent') || 'Encrypting and saving note content...', '', 45);
+    closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
     await new Promise(r => setTimeout(r, 16));
 
-    await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+    await Promise.race([
+      StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
+    ]);
     upsertManifest(note);
 
     closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);

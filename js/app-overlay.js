@@ -687,6 +687,9 @@ function updateNoteWindowTitle(note = null) {
 }
 
 let _activeSavePromise = null;
+let _lastNoteSelfSavedAt = 0;
+if (typeof window !== 'undefined') window._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
+if (typeof globalThis !== 'undefined') globalThis._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
 
 async function autoSaveNote(options = {}) {
   while (_activeSavePromise) {
@@ -771,6 +774,9 @@ async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSav
                               .some(t => !knownGroups.has(t) && !knownMajors.has(t));
         const updatedHTML = (typeof applyNoteEdits === 'function') ? applyNoteEdits(activeNote.originalHTML, changes) : (activeNote.originalHTML || '');
         await StorageAPI.writeNoteContent(activeNote.path, updatedHTML);
+        _lastNoteSelfSavedAt = Date.now();
+        if (typeof window !== 'undefined') window._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
+        if (typeof globalThis !== 'undefined') globalThis._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
         Object.assign(activeNote, changes, { originalHTML: updatedHTML });
         upsertManifest(activeNote);
         saveManifest();
@@ -963,6 +969,9 @@ async function _doFullNoteSave(changes, targetNote = null) {
     } else {
       await StorageAPI.writeNoteContent(path, updatedHTML);
     }
+    _lastNoteSelfSavedAt = Date.now();
+    if (typeof window !== 'undefined') window._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
+    if (typeof globalThis !== 'undefined') globalThis._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
     Object.assign(noteObj, changes, { originalHTML: updatedHTML });
     upsertManifest(noteObj);
     broadcastSync({ type: 'NOTE_SAVED', noteId: noteObj.id, path: noteObj.path, modified: new Date().toISOString() });
@@ -982,6 +991,9 @@ async function _doFullNoteSave(changes, targetNote = null) {
     };
     const html = buildNewNoteHTML(note);
     await StorageAPI.writeNoteContent(path, html);
+    _lastNoteSelfSavedAt = Date.now();
+    if (typeof window !== 'undefined') window._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
+    if (typeof globalThis !== 'undefined') globalThis._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
     Object.assign(noteObj, { path, originalHTML: html, ...note });
     if (!currentNote || currentNote === noteObj) {
       currentNote = noteObj;
