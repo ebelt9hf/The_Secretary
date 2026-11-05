@@ -285,14 +285,21 @@ async function finalizeSaves(progress) {
 /** Write a text file by path relative to root (creates dirs + file).
  *  Coalesces concurrent pending writes to the same path so a burst of writes
  *  executes at most 1 follow-up disk write with the latest content.
+ *  Supports options.signal (AbortSignal) for cooperative supersession.
  */
-async function writeFile(pathStr, content) {
+async function writeFile(pathStr, content, options = {}) {
   if (!pathStr || !pathStr.trim()) throw new Error('Invalid file path');
+  if (options?.signal?.aborted) {
+    const abortErr = new Error('The write operation was aborted');
+    abortErr.name = 'AbortError';
+    throw abortErr;
+  }
 
   let state = _writeQueues.get(pathStr);
   if (state && state.running) {
     state.hasPending = true;
     state.pendingContent = content;
+    state.pendingOptions = options;
     if (!state.pendingPromise) {
       state.pendingPromise = new Promise((resolve, reject) => {
         state.pendingResolve = resolve;
@@ -306,6 +313,7 @@ async function writeFile(pathStr, content) {
     running: true,
     hasPending: false,
     pendingContent: undefined,
+    pendingOptions: undefined,
     pendingPromise: null,
     pendingResolve: null,
     pendingReject: null
@@ -318,21 +326,23 @@ async function writeFile(pathStr, content) {
   });
   _activeWrites.add(writeTrackingPromise);
 
-  const runLoop = async (initialContent) => {
+  const runLoop = async (initialContent, initialOptions) => {
     try {
-      await _writeFileDirect(pathStr, initialContent);
+      await _writeFileDirect(pathStr, initialContent, initialOptions);
     } finally {
       while (state.hasPending) {
         const nextContent = state.pendingContent;
+        const nextOptions = state.pendingOptions;
         const nextResolve = state.pendingResolve;
         const nextReject = state.pendingReject;
         state.hasPending = false;
         state.pendingContent = undefined;
+        state.pendingOptions = undefined;
         state.pendingPromise = null;
         state.pendingResolve = null;
         state.pendingReject = null;
         try {
-          await _writeFileDirect(pathStr, nextContent);
+          await _writeFileDirect(pathStr, nextContent, nextOptions);
           if (nextResolve) nextResolve();
         } catch (err) {
           if (nextReject) nextReject(err);
@@ -347,7 +357,7 @@ async function writeFile(pathStr, content) {
     }
   };
 
-  return runLoop(content);
+  return runLoop(content, options);
 }
 
 function _dataUrlToBlob(dataUrl) {
@@ -376,7 +386,12 @@ if (typeof globalThis !== 'undefined') {
   globalThis._dataUrlToBlob = _dataUrlToBlob;
 }
 
-async function _writeFileDirect(pathStr, content) {
+async function _writeFileDirect(pathStr, content, options = {}) {
+  if (options?.signal?.aborted) {
+    const abortErr = new Error('The write operation was aborted');
+    abortErr.name = 'AbortError';
+    throw abortErr;
+  }
   if (typeof window !== 'undefined' && window.StorageAPI?.getStorageEngine() === 'firebase' && window.FirebaseSyncService?.saveAsset && pathStr.includes('_assets/')) {
     try {
       await window.FirebaseSyncService.saveAsset(pathStr, content);
@@ -402,11 +417,21 @@ async function _writeFileDirect(pathStr, content) {
   const fh    = await dir.getFileHandle(name, { create: true });
   const w     = await fh.createWritable();
   try {
+    if (options?.signal?.aborted) {
+      const abortErr = new Error('The write operation was aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
     if (typeof content === 'string' && content.startsWith('data:image/')) {
       const blob = _dataUrlToBlob(content);
       await w.write(blob);
     } else {
       await w.write(content);
+    }
+    if (options?.signal?.aborted) {
+      const abortErr = new Error('The write operation was aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
     }
     await w.close();
   } catch (err) {

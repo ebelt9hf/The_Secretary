@@ -337,4 +337,97 @@ describe('Note Generation Progress Localization & Editor Reload Banner Isolation
 
     expect(writtenFiles).toContain('notes/success-note-2.html');
   });
+
+  /**
+   * 1. Protected Behavior: `StorageAPI` cooperatively supersedes in-flight writes when a newer revision
+   *    arrives for the same note, aborting the earlier write signal and allowing the newer revision to save cleanly.
+   * 2. Regression Target: In-flight saves blocking or overwriting newer edits, or failing due to arbitrary timeouts.
+   * 3. Coverage Overlap & Redundancy: None; specifically tests cooperative AbortController-driven supersession in sync queue.
+   * 4. Production Code Footprint: None; exercises authentic `StorageAPI._enqueueSync` and `StorageAPI._processSyncQueue`.
+   */
+  it('cooperatively supersedes in-flight writes when a newer save arrives for the same note', async () => {
+    StorageAPI.clearSyncQueue();
+
+    let unblockFirstWrite;
+    const firstWriteStarted = new Promise(r => { unblockFirstWrite = r; });
+    let firstWriteSignalAborted = false;
+
+    vi.spyOn(globalThis, 'writeFile').mockImplementation(async (pathStr, content, options) => {
+      if (content === '<p>Version 1</p>') {
+        await firstWriteStarted;
+        if (options?.signal?.aborted) {
+          firstWriteSignalAborted = true;
+          const abortErr = new Error('The operation was aborted');
+          abortErr.name = 'AbortError';
+          throw abortErr;
+        }
+      }
+      return true;
+    });
+
+    const p1 = StorageAPI.writeNoteContent('notes/supersede-note.html', '<p>Version 1</p>', { id: 'supersede-note' });
+    const p2 = StorageAPI.writeNoteContent('notes/supersede-note.html', '<p>Version 2 (Latest)</p>', { id: 'supersede-note' });
+
+    unblockFirstWrite();
+    await Promise.all([p1, p2]);
+
+    expect(firstWriteSignalAborted).toBe(true);
+    expect(StorageAPI._noteCache.get('notes/supersede-note.html')).toBe('<p>Version 2 (Latest)</p>');
+  });
+
+  /**
+   * 1. Protected Behavior: When writing to disk connector fails (e.g. disk locked, EBUSY, permission error),
+   *    `StorageAPI` automatically preserves the unpersisted changes by creating an emergency snapshot in `.history/`.
+   * 2. Regression Target: Total data loss when disk write fails without creating a historic recovery point.
+   * 3. Coverage Overlap & Redundancy: None; tests emergency snapshot archiving on connector failure.
+   * 4. Production Code Footprint: None; exercises authentic `StorageAPI.saveSnapshot` with `reason: 'save-failed'`.
+   */
+  it('creates an emergency historic snapshot in .history/ when a note save fails', async () => {
+    StorageAPI.clearSyncQueue();
+    const snapshotSpy = vi.spyOn(StorageAPI, 'saveSnapshot').mockResolvedValue({ id: 'rev-test' });
+
+    const diskLockedError = new Error('EBUSY: resource busy or locked');
+    vi.spyOn(globalThis, 'writeFile').mockRejectedValue(diskLockedError);
+
+    await expect(
+      StorageAPI.writeNoteContent('notes/locked-note.html', '<p>Emergency Unsaved Content</p>', { id: 'locked-note' })
+    ).rejects.toThrow('EBUSY');
+
+    expect(snapshotSpy).toHaveBeenCalledWith('notes/locked-note.html', '<p>Emergency Unsaved Content</p>', 'save-failed');
+  });
+
+  /**
+   * 1. Protected Behavior: `StorageAPI.readNoteContent()` uses the staged source model to return in-flight
+   *    sync queue content and recovers from emergency history snapshots if canonical disk file is unreadable.
+   * 2. Regression Target: Reading outdated or blank content when a note is currently in-flight in sync queue
+   *    or when canonical disk file reading throws an error.
+   * 3. Coverage Overlap & Redundancy: None; tests staged source and emergency history fallback in read pipeline.
+   * 4. Production Code Footprint: None; exercises authentic `StorageAPI.readNoteContent`.
+   */
+  it('resolves staged in-flight content and fallback snapshots in readNoteContent when disk read fails', async () => {
+    StorageAPI.clearSyncQueue();
+    StorageAPI._noteCache.clear();
+
+    // 1. Staged in-flight queue test
+    StorageAPI._syncQueue.set('in-flight-note', {
+      id: 'in-flight-note',
+      path: 'notes/in-flight-note.html',
+      action: 'save',
+      content: '<p>In-Flight Staged Content</p>'
+    });
+
+    const stagedContent = await StorageAPI.readNoteContent('notes/in-flight-note.html');
+    expect(stagedContent).toBe('<p>In-Flight Staged Content</p>');
+
+    // 2. Fallback history snapshot test when canonical disk file fails
+    StorageAPI._noteCache.clear();
+    StorageAPI.clearSyncQueue();
+
+    vi.spyOn(globalThis, 'readFile').mockRejectedValue(new Error('Disk read lock'));
+    vi.spyOn(StorageAPI, 'listSnapshots').mockResolvedValue([{ id: 'rev-recent', reason: 'save-failed' }]);
+    vi.spyOn(StorageAPI, 'getSnapshotContent').mockResolvedValue('<p>Recovered Snapshot Content</p>');
+
+    const recoveredContent = await StorageAPI.readNoteContent('notes/recovered-note.html');
+    expect(recoveredContent).toBe('<p>Recovered Snapshot Content</p>');
+  });
 });

@@ -41,8 +41,8 @@ describe('Two-Tier Storage Pipeline Architecture (RAM + IndexedDB -> Connector)'
         title: 'Test Note'
       }));
 
-      // Check connector was called
-      expect(writeFileSpy).toHaveBeenCalledWith(path, content);
+      // Check connector was called with path, content and cooperative abort signal options
+      expect(writeFileSpy).toHaveBeenCalledWith(path, content, expect.objectContaining({ signal: expect.any(Object) }));
       expect(StorageAPI.getConnectorStatus().status).toBe('synced');
     });
 

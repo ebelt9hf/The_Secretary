@@ -7331,10 +7331,7 @@ function openPlanEventModal(prefill = {}) {
         mainHTML
       };
 
-      await Promise.race([
-        StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
-      ]);
+      await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
       upsertManifest(note);
 
       closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
@@ -9883,10 +9880,7 @@ async function createNoteForPlannerTodo(todoId) {
   };
 
   try {
-    await Promise.race([
-      StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
-    ]);
+    await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
     upsertManifest(note);
 
     closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
@@ -11942,10 +11936,7 @@ async function openNoteForEvent(event) {
         closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
         await new Promise(r => setTimeout(r, 16));
 
-        await Promise.race([
-          StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
-        ]);
+        await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
         upsertManifest(note);
 
         closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
@@ -12058,10 +12049,7 @@ async function openNoteForEvent(event) {
     closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
     await new Promise(r => setTimeout(r, 16));
 
-    await Promise.race([
-      StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note)),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing note content')), 15000))
-    ]);
+    await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
     upsertManifest(note);
 
     closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);

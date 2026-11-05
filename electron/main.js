@@ -438,13 +438,10 @@ ipcMain.handle('fs-write-file', async (event, relPath, content) => {
     try {
       await fs.promises.unlink(tempTarget);
     } catch (cleanErr) {}
-    // Fallback to direct write if rename fails
-    if (bufferToWrite) {
-      await fs.promises.writeFile(target, bufferToWrite);
-    } else {
-      await fs.promises.writeFile(target, content, 'utf8');
-    }
-    return true;
+    // Never fall back to direct in-place overwrite when atomic rename fails, as overwriting a locked
+    // or troubled target risks zero-byte truncation and corruption. Propagate the error so the
+    // storage layer can preserve the work by creating an emergency recovery snapshot in .history/.
+    throw atomicErr;
   }
 });
 

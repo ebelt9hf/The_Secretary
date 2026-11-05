@@ -714,7 +714,8 @@ const StorageAPI = {
   _noteCache: new Map(),
 
   // ── Unique Connector Sync Queue ──
-  _syncQueue: new Map(), // cleanId -> { id, path, action: 'save'|'delete', content?, meta?, createdAt }
+  _syncQueue: new Map(), // cleanId -> { id, path, action: 'save'|'delete', content?, meta?, createdAt, revId?, abortController?, superseded? }
+  _syncRevCounter: 0,
   _isProcessingSyncQueue: false,
   _activeSyncQueuePromise: null,
   _syncRetryTimer: null,
@@ -722,6 +723,18 @@ const StorageAPI = {
 
   _enqueueSync(item) {
     if (!item || !item.id) return;
+    const existing = this._syncQueue.get(item.id);
+    if (existing && existing !== item) {
+      existing.superseded = true;
+      if (existing.abortController) {
+        try {
+          existing.abortController.abort();
+        } catch (e) {}
+      }
+    }
+    this._syncRevCounter = (this._syncRevCounter || 0) + 1;
+    item.revId = this._syncRevCounter;
+    item.abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
     this._syncQueue.set(item.id, item);
   },
 
@@ -775,14 +788,17 @@ const StorageAPI = {
           for (const key of keys) {
             const item = this._syncQueue.get(key);
             if (!item) continue;
+            if (item.superseded) {
+              if (this._syncQueue.get(key) === item) {
+                this._syncQueue.delete(key);
+              }
+              continue;
+            }
 
             try {
               if (item.action === 'save') {
                 if (this.getStorageEngine() !== 'firebase') {
-                  await Promise.race([
-                    writeFile(item.path, item.content),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout writing file to disk: ${item.path}`)), 10000))
-                  ]);
+                  await writeFile(item.path, item.content, { signal: item.abortController?.signal });
                 } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
                   const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
                   let resolvedTitle = item.meta?.title;
@@ -811,10 +827,7 @@ const StorageAPI = {
               } else if (item.action === 'delete') {
                 if (this.getStorageEngine() !== 'firebase') {
                   try {
-                    await Promise.race([
-                      deleteFile(item.path),
-                      new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout deleting file from disk: ${item.path}`)), 10000))
-                    ]);
+                    await deleteFile(item.path);
                   } catch (delErr) {
                     if (delErr?.name !== 'NotFoundError' && !delErr?.message?.includes('File not found')) {
                       throw delErr;
@@ -832,9 +845,29 @@ const StorageAPI = {
               }
               processedCount++;
             } catch (err) {
+              if (item.superseded || err?.name === 'AbortError' || item.abortController?.signal?.aborted) {
+                // Safely discard superseded item without treating as failure
+                if (this._syncQueue.get(key) === item) {
+                  this._syncQueue.delete(key);
+                }
+                continue;
+              }
+
               failedKeysInThisRun.add(key);
               item.retries = (item.retries || 0) + 1;
               item.error = err;
+
+              // Automatic emergency historic point preservation:
+              // If write failed (e.g. disk locked, EBUSY, permission error), archive the user's
+              // work into .history/<key>/rev-<timestamp>.html so no data is ever lost.
+              if (item.action === 'save' && item.content) {
+                try {
+                  await this.saveSnapshot(item.path, item.content, 'save-failed');
+                } catch (snapErr) {
+                  console.warn('[StorageAPI] Failed to record emergency history snapshot:', snapErr);
+                }
+              }
+
               const errorInfo = this.classifyConnectorError(err);
               this.setConnectorStatus('error', errorInfo);
               this.notifyConnectorError(errorInfo);
@@ -943,7 +976,14 @@ const StorageAPI = {
       } catch (e) {}
     }
 
-    // 3. Check Connector
+    // 3. Check in-flight sync queue (Staged Source Model)
+    const inFlight = this._syncQueue.get(cleanId);
+    if (inFlight && inFlight.content && inFlight.action === 'save') {
+      this._noteCache.set(path, inFlight.content);
+      return inFlight.content;
+    }
+
+    // 4. Check Connector
     if (this.getStorageEngine() === 'firebase') {
       if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
         const noteId = window.FirebaseSyncService._normalizeId
@@ -988,6 +1028,17 @@ const StorageAPI = {
         this.setConnectorStatus('error', errInfo);
         this.notifyConnectorError(errInfo);
       }
+      // Check emergency snapshots in .history/ if canonical file read failed (e.g. file locked)
+      try {
+        const snaps = await this.listSnapshots(path);
+        if (snaps && snaps.length > 0) {
+          const snapContent = await this.getSnapshotContent(path, snaps[0].id);
+          if (snapContent && typeof snapContent === 'string') {
+            this._noteCache.set(path, snapContent);
+            return snapContent;
+          }
+        }
+      } catch (snapErr) {}
     }
 
     const err = new Error(`File not found: ${path}`);
@@ -1013,15 +1064,18 @@ const StorageAPI = {
     this._enqueueSync(syncItem);
 
     try {
-      await Promise.race([
-        this._processSyncQueue(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout processing sync queue for ${path}`)), 12000))
-      ]);
+      await this._processSyncQueue();
+      if (syncItem.superseded) {
+        return;
+      }
       if (syncItem.error) {
         throw syncItem.error;
       }
     } catch (e) {
-      console.warn('[StorageAPI] writeNoteContent sync error/timeout:', e);
+      if (syncItem.superseded) {
+        return;
+      }
+      console.warn('[StorageAPI] writeNoteContent sync error:', e);
       throw e;
     }
 
@@ -1046,15 +1100,18 @@ const StorageAPI = {
     this._enqueueSync(syncItem);
 
     try {
-      await Promise.race([
-        this._processSyncQueue(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout processing sync queue for ${targetPath}`)), 12000))
-      ]);
+      await this._processSyncQueue();
+      if (syncItem.superseded) {
+        return;
+      }
       if (syncItem.error) {
         throw syncItem.error;
       }
     } catch (e) {
-      console.warn('[StorageAPI] deleteNoteContent sync error/timeout:', e);
+      if (syncItem.superseded) {
+        return;
+      }
+      console.warn('[StorageAPI] deleteNoteContent sync error:', e);
       throw e;
     }
 
