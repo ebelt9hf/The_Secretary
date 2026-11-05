@@ -264,6 +264,23 @@ const StorageAPI = {
     }
   },
 
+  async _deleteDocTier1(kind, id) {
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb) {
+      try {
+        if (typeof idb.deleteRecord === 'function') {
+          await idb.deleteRecord('docs', `${kind}:${id}`);
+          await idb.deleteRecord('docs', id);
+        } else if (typeof idb.deleteDoc === 'function') {
+          await idb.deleteDoc(kind, id);
+        }
+      } catch (idbErr) {
+        this.notifyCriticalLocalFailure(idbErr, `${kind}:delete`, id);
+        throw idbErr;
+      }
+    }
+  },
+
   // ── Generic JSON Storage Helpers ──
   async _readJSON(filePath, fallback = null) {
     try {
@@ -339,8 +356,8 @@ const StorageAPI = {
       this._seedLastManifestMap(mapped);
       return mapped;
     }
-    const diskManifest = await this._readJSON('notes/manifest.json', []);
-    let resolvedManifest = Array.isArray(diskManifest) ? diskManifest : [];
+    const diskManifest = await this._readJSON('notes/manifest.json', null);
+    let resolvedManifest = Array.isArray(diskManifest) ? diskManifest : null;
 
     // Reconcile Tier-1 IndexedDB manifest snapshot if disk write was interrupted before reload
     const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
@@ -348,18 +365,22 @@ const StorageAPI = {
       try {
         const tier1Manifest = await idb.getMeta('notes_manifest_cache');
         if (Array.isArray(tier1Manifest) && tier1Manifest.length > 0) {
-          const byKey = new Map();
-          for (const entry of resolvedManifest) {
-            const key = entry?.path || entry?.id;
-            if (key) byKey.set(key, entry);
-          }
-          for (const cachedEntry of tier1Manifest) {
-            const key = cachedEntry?.path || cachedEntry?.id;
-            if (key && !byKey.has(key) && cachedEntry?.path) {
-              const contentExists = this._noteCache.has(cachedEntry.path) || await fileExists(cachedEntry.path);
-              if (contentExists) {
-                resolvedManifest.push(cachedEntry);
-                byKey.set(key, cachedEntry);
+          if (!resolvedManifest) {
+            resolvedManifest = tier1Manifest;
+          } else {
+            const byKey = new Map();
+            for (const entry of resolvedManifest) {
+              const key = entry?.path || entry?.id;
+              if (key) byKey.set(key, entry);
+            }
+            for (const cachedEntry of tier1Manifest) {
+              const key = cachedEntry?.path || cachedEntry?.id;
+              if (key && !byKey.has(key) && cachedEntry?.path) {
+                const contentExists = this._noteCache.has(cachedEntry.path) || await fileExists(cachedEntry.path);
+                if (contentExists) {
+                  resolvedManifest.push(cachedEntry);
+                  byKey.set(key, cachedEntry);
+                }
               }
             }
           }
@@ -367,6 +388,26 @@ const StorageAPI = {
       } catch (e) {}
     }
 
+    // Fallback to emergency recovery snapshots in .history/notes_manifest.json/ if missing or corrupt
+    if (!resolvedManifest || resolvedManifest.length === 0) {
+      try {
+        const snaps = await this.listSnapshots('notes/manifest.json');
+        if (Array.isArray(snaps) && snaps.length > 0) {
+          const snapRaw = await this.getSnapshotContent('notes/manifest.json', snaps[0].id);
+          if (snapRaw && typeof snapRaw === 'string') {
+            const parsed = JSON.parse(snapRaw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              resolvedManifest = parsed;
+              if (idb && typeof idb.saveMeta === 'function') {
+                idb.saveMeta('notes_manifest_cache', resolvedManifest).catch(() => {});
+              }
+            }
+          }
+        }
+      } catch (snapErr) {}
+    }
+
+    resolvedManifest = resolvedManifest || [];
     this._seedLastManifestMap(resolvedManifest);
     return resolvedManifest;
   },
@@ -384,6 +425,9 @@ const StorageAPI = {
       try {
         await this._writeJSON('notes/manifest.json', manifest);
       } catch (e) {
+        try {
+          await this.saveSnapshot('notes/manifest.json', JSON.stringify(manifest, null, 2), 'save-failed');
+        } catch (_snapErr) {}
         throw e;
       }
     }
@@ -446,6 +490,19 @@ const StorageAPI = {
 
   // ── Generic Document Entity Helpers ──
   async readDocEntity(docKind, docId, localFile, fallback = null) {
+    const queueKey = `doc:${docKind}:${docId}`;
+
+    // 0. Check in-flight sync queue (Staged Source Model)
+    const inFlight = this._syncQueue.get(queueKey);
+    if (inFlight) {
+      if (inFlight.action === 'save' && inFlight.payload !== undefined) {
+        return inFlight.payload;
+      }
+      if (inFlight.action === 'delete') {
+        return fallback;
+      }
+    }
+
     // 1. Check IndexedDB Persistent Layer (fast local)
     const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
     let idbResult = null;
@@ -460,57 +517,157 @@ const StorageAPI = {
 
     // 2. Check active connector
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      const doc = await window.FirebaseSyncService.getDoc(docKind, docId);
-      if (doc !== null && doc !== undefined) {
-        if (idb && typeof idb.putRecord === 'function') {
-          idb.putRecord('docs', { id: `${docKind}:${docId}`, kind: docKind, docId, data: doc, updatedAt: Date.now() }).catch(() => {});
+      try {
+        const doc = await window.FirebaseSyncService.getDoc(docKind, docId);
+        if (doc !== null && doc !== undefined) {
+          if (idb && typeof idb.putRecord === 'function') {
+            idb.putRecord('docs', { id: `${docKind}:${docId}`, kind: docKind, docId, data: doc, updatedAt: Date.now() }).catch(() => {});
+          }
+          return doc;
         }
-        return doc;
+      } catch (fbErr) {
+        console.warn(`[StorageAPI] readDocEntity Firebase getDoc(${docKind}, ${docId}) warning:`, fbErr);
       }
-      return idbResult !== null ? idbResult : fallback;
+      if (idbResult !== null) return idbResult;
+    } else {
+      // Local filesystem connector
+      try {
+        const localRes = await this._readJSON(localFile, null);
+        if (localRes !== null && localRes !== undefined) {
+          if (idb && typeof idb.putRecord === 'function') {
+            idb.putRecord('docs', { id: `${docKind}:${docId}`, kind: docKind, docId, data: localRes, updatedAt: Date.now() }).catch(() => {});
+          }
+          return localRes;
+        }
+      } catch (e) {
+        if (e?.name === 'NotAllowedError') {
+          const errInfo = this.classifyConnectorError(e);
+          this.setConnectorStatus('error', errInfo);
+          this.notifyConnectorError(errInfo);
+        }
+      }
     }
 
-    const localRes = await this._readJSON(localFile, null);
-    if (localRes !== null && localRes !== undefined) {
-      if (idb && typeof idb.putRecord === 'function') {
-        idb.putRecord('docs', { id: `${docKind}:${docId}`, kind: docKind, docId, data: localRes, updatedAt: Date.now() }).catch(() => {});
-      }
-      return localRes;
+    if (idbResult !== null) {
+      return idbResult;
     }
 
-    return idbResult !== null ? idbResult : fallback;
+    // 3. Emergency snapshot recovery from .history/<key>/
+    if (localFile) {
+      try {
+        const snaps = await this.listSnapshots(localFile);
+        if (Array.isArray(snaps) && snaps.length > 0) {
+          const snapRaw = await this.getSnapshotContent(localFile, snaps[0].id);
+          if (snapRaw && typeof snapRaw === 'string') {
+            try {
+              const recovered = JSON.parse(snapRaw);
+              if (recovered !== null && recovered !== undefined) {
+                if (idb && typeof idb.putRecord === 'function') {
+                  idb.putRecord('docs', { id: `${docKind}:${docId}`, kind: docKind, docId, data: recovered, updatedAt: Date.now() }).catch(() => {});
+                }
+                return recovered;
+              }
+            } catch (parseErr) {}
+          }
+        }
+      } catch (snapErr) {}
+    }
+
+    return fallback;
   },
 
   async writeDocEntity(docKind, docId, localFile, payload) {
-    // 1. Write to Tier 1 (IndexedDB) immediately
+    // 1. Stage in sync queue immediately (0ms synchronous in-memory staging)
+    const queueId = `doc:${docKind}:${docId}`;
+    const content = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+    const syncItem = {
+      id: queueId,
+      path: localFile,
+      action: 'save',
+      isDoc: true,
+      docKind,
+      docId,
+      payload,
+      content,
+      createdAt: Date.now()
+    };
+    this._enqueueSync(syncItem);
+
+    // 2. Persist to Tier 1 (IndexedDB) immediately (< 5ms)
     await this._persistDocTier1(docKind, docId, payload);
 
-    // 2. Dispatch to Asynchronous Connector
+    // 3. Dispatch to Connector Sync Queue
     try {
-      this.setConnectorStatus('syncing');
-
-      if (this.getStorageEngine() !== 'firebase') {
-        try {
-          await this._writeJSON(localFile, payload);
-        } catch (localErr) {
-          console.warn('StorageAPI writeDocEntity local filesystem write warning:', localFile, localErr);
-        }
-      } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-        await window.FirebaseSyncService.putDoc(docKind, docId, payload);
+      await this._processSyncQueue();
+      if (syncItem.superseded) {
+        return;
       }
-
-      this.setConnectorStatus('synced');
+      if (syncItem.error) {
+        if (!syncItem.error?.message?.includes('No root folder handle loaded') && !syncItem.error?.message?.includes('FileSystemDirectoryHandle not available')) {
+          throw syncItem.error;
+        }
+      }
     } catch (e) {
-      const errorInfo = this.classifyConnectorError(e);
-      this.setConnectorStatus('error', errorInfo);
-      this.notifyConnectorError(errorInfo);
-      throw e;
+      if (syncItem.superseded) {
+        return;
+      }
+      if (!e?.message?.includes('No root folder handle loaded') && !e?.message?.includes('FileSystemDirectoryHandle not available')) {
+        console.warn('[StorageAPI] writeDocEntity sync error:', e);
+        throw e;
+      }
     }
 
     this.emit('storage:change', { entity: 'docs', kind: docKind, id: docId, action: 'save' });
   },
 
+  async deleteDocEntity(docKind, docId, localFile) {
+    // 1. Stage deletion in sync queue immediately (0ms synchronous in-memory staging)
+    const queueId = `doc:${docKind}:${docId}`;
+    const syncItem = {
+      id: queueId,
+      path: localFile,
+      action: 'delete',
+      isDoc: true,
+      docKind,
+      docId,
+      createdAt: Date.now()
+    };
+    this._enqueueSync(syncItem);
+
+    // 2. Delete from Tier 1 (IndexedDB) immediately
+    await this._deleteDocTier1(docKind, docId);
+
+    // 3. Process sync queue
+    try {
+      await this._processSyncQueue();
+      if (syncItem.superseded) {
+        return;
+      }
+      if (syncItem.error) {
+        if (!syncItem.error?.message?.includes('No root folder handle loaded') && !syncItem.error?.message?.includes('FileSystemDirectoryHandle not available')) {
+          throw syncItem.error;
+        }
+      }
+    } catch (e) {
+      if (syncItem.superseded) {
+        return;
+      }
+      if (!e?.message?.includes('No root folder handle loaded') && !e?.message?.includes('FileSystemDirectoryHandle not available')) {
+        console.warn('[StorageAPI] deleteDocEntity sync error:', e);
+        throw e;
+      }
+    }
+
+    this.emit('storage:change', { entity: 'docs', kind: docKind, id: docId, action: 'delete' });
+  },
+
   async hasDocEntity(docKind, docId, localFile) {
+    const queueKey = `doc:${docKind}:${docId}`;
+    const inFlight = this._syncQueue.get(queueKey);
+    if (inFlight) {
+      if (inFlight.action === 'save') return true;
+      if (inFlight.action === 'delete') return false;
+    }
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
       const doc = await window.FirebaseSyncService.getDoc(docKind, docId);
       return doc !== null && doc !== undefined;
@@ -561,26 +718,17 @@ const StorageAPI = {
   },
 
   async writePlannerProposals(proposalsData) {
-    // 1. Persist to Tier 1 IndexedDB immediately
-    await this._persistDocTier1('planner', 'proposals', proposalsData);
+    // 1. Route through writeDocEntity for Tier-1 IDB, cooperative queue, atomic shadow save, and emergency snapshot
+    await this.writeDocEntity('planner', 'proposals', 'planner-proposals.json', proposalsData);
 
-    // 2. Always write to local planner-proposals.json on disk if available (for external agents & scripts)
-    try {
-      await this._writeJSON('planner-proposals.json', proposalsData);
-    } catch (e) {
-      // Expected in pure web mode when no local folder handle is loaded
-    }
-
-    // 3. If in Firebase mode, sync to encrypted cloud vault
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+    // 2. If in Firebase mode, also attempt to mirror to local disk so external agents on host machine detect changes
+    if (this.getStorageEngine() === 'firebase') {
       try {
-        await window.FirebaseSyncService.putDoc('planner', 'proposals', proposalsData);
+        await writeFile('planner-proposals.json', JSON.stringify(proposalsData, null, 2));
       } catch (e) {
-        console.warn('Firebase putDoc for proposals failed:', e);
+        // Expected in pure web mode when no local folder handle is loaded
       }
     }
-
-    this.emit('storage:change', { entity: 'docs', kind: 'planner', id: 'proposals', action: 'save' });
   },
 
   async hasPlannerProposals() {
@@ -645,7 +793,19 @@ const StorageAPI = {
   },
 
   async readSettings(path) {
-    const local = (await this._readJSON(path || 'secretary-settings.json', null)) || {};
+    const filePath = path || 'secretary-settings.json';
+    let local = await this._readJSON(filePath, null);
+    if (!local) {
+      const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+      if (idb && typeof idb.getRecord === 'function') {
+        try {
+          const rec = await idb.getRecord('docs', 'settings:config');
+          if (rec && rec.data) local = rec.data;
+        } catch (_e) {}
+      }
+    }
+    local = local || {};
+
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
       try {
         const cloudSettings = await window.FirebaseSyncService.getDoc('settings', 'config');
@@ -698,16 +858,11 @@ const StorageAPI = {
       }
     }
 
-    await this._writeJSON('secretary-settings.json', settingsToWrite);
-    if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      // Sync non-credential settings to encrypted cloud vault
-      const sanitized = this._sanitizeSettingsForCloud(settings);
-      await window.FirebaseSyncService.putDoc('settings', 'config', sanitized);
-    }
+    await this.writeDocEntity('settings', 'config', 'secretary-settings.json', settingsToWrite);
   },
 
   async hasSettings(path) {
-    return await fileExists(path);
+    return await this.hasDocEntity('settings', 'config', path || 'secretary-settings.json');
   },
 
   // ── Note / Todo Content (HTML or MD) & Cache ──
@@ -797,45 +952,78 @@ const StorageAPI = {
 
             try {
               if (item.action === 'save') {
-                if (this.getStorageEngine() !== 'firebase') {
-                  await writeFile(item.path, item.content, { signal: item.abortController?.signal });
-                } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-                  const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
-                  let resolvedTitle = item.meta?.title;
-                  if (isDummy(resolvedTitle, item.id) && item.content && typeof parseNoteHTML === 'function') {
-                    try {
-                      const parsed = parseNoteHTML(item.content);
-                      if (parsed.title && !isDummy(parsed.title, item.id)) {
-                        resolvedTitle = parsed.title;
-                      }
-                    } catch (e) {}
-                  }
-                  await window.FirebaseSyncService.queueSyncNote({
-                    id: item.id,
-                    path: item.path,
-                    contentHtml: item.content,
-                    title: resolvedTitle || item.meta?.title || item.id,
-                    date: item.meta?.date,
-                    tags: item.meta?.tags,
-                    workstream: item.meta?.workstream,
-                    pinned: item.meta?.pinned,
-                    archived: item.meta?.archived,
-                    favorite: item.meta?.favorite,
-                    updatedAt: Date.now()
-                  });
-                }
-              } else if (item.action === 'delete') {
-                if (this.getStorageEngine() !== 'firebase') {
-                  try {
-                    await deleteFile(item.path);
-                  } catch (delErr) {
-                    if (delErr?.name !== 'NotFoundError' && !delErr?.message?.includes('File not found')) {
-                      throw delErr;
+                if (item.isDoc) {
+                  if (this.getStorageEngine() !== 'firebase') {
+                    await writeFile(item.path, item.content);
+                  } else {
+                    if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+                      const cloudPayload = (item.docKind === 'settings' && item.docId === 'config')
+                        ? this._sanitizeSettingsForCloud(item.payload)
+                        : item.payload;
+                      await window.FirebaseSyncService.putDoc(item.docKind, item.docId, cloudPayload);
+                    }
+                    if (item.docKind === 'settings' || item.path === 'planner-proposals.json') {
+                      try {
+                        await writeFile(item.path, item.content);
+                      } catch (_fsErr) {}
                     }
                   }
+                } else {
+                  if (this.getStorageEngine() !== 'firebase') {
+                    await writeFile(item.path, item.content, { signal: item.abortController?.signal });
+                  } else if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+                    const isDummy = (t, id) => !t || t === id || t === 'Untitled' || t === 'Untitled Note' || /^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(t) || /^note[-_]/.test(t);
+                    let resolvedTitle = item.meta?.title;
+                    if (isDummy(resolvedTitle, item.id) && item.content && typeof parseNoteHTML === 'function') {
+                      try {
+                        const parsed = parseNoteHTML(item.content);
+                        if (parsed.title && !isDummy(parsed.title, item.id)) {
+                          resolvedTitle = parsed.title;
+                        }
+                      } catch (e) {}
+                    }
+                    await window.FirebaseSyncService.queueSyncNote({
+                      id: item.id,
+                      path: item.path,
+                      contentHtml: item.content,
+                      title: resolvedTitle || item.meta?.title || item.id,
+                      date: item.meta?.date,
+                      tags: item.meta?.tags,
+                      workstream: item.meta?.workstream,
+                      pinned: item.meta?.pinned,
+                      archived: item.meta?.archived,
+                      favorite: item.meta?.favorite,
+                      updatedAt: Date.now()
+                    });
+                  }
                 }
-                if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-                  await window.FirebaseSyncService.deleteNote(item.id);
+              } else if (item.action === 'delete') {
+                if (item.isDoc) {
+                  if (this.getStorageEngine() !== 'firebase') {
+                    try {
+                      await deleteFile(item.path);
+                    } catch (delErr) {
+                      if (delErr?.name !== 'NotFoundError' && !delErr?.message?.includes('File not found')) {
+                        throw delErr;
+                      }
+                    }
+                  }
+                  if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+                    await window.FirebaseSyncService.deleteDoc(item.docKind, item.docId);
+                  }
+                } else {
+                  if (this.getStorageEngine() !== 'firebase') {
+                    try {
+                      await deleteFile(item.path);
+                    } catch (delErr) {
+                      if (delErr?.name !== 'NotFoundError' && !delErr?.message?.includes('File not found')) {
+                        throw delErr;
+                      }
+                    }
+                  }
+                  if (typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
+                    await window.FirebaseSyncService.deleteNote(item.id);
+                  }
                 }
               }
 
@@ -847,6 +1035,14 @@ const StorageAPI = {
             } catch (err) {
               if (item.superseded || err?.name === 'AbortError' || item.abortController?.signal?.aborted) {
                 // Safely discard superseded item without treating as failure
+                if (this._syncQueue.get(key) === item) {
+                  this._syncQueue.delete(key);
+                }
+                continue;
+              }
+
+              // In pure web mode without a connected folder handle loaded, disk writes cannot occur
+              if (err?.message?.includes('No root folder handle loaded') || err?.message?.includes('FileSystemDirectoryHandle not available')) {
                 if (this._syncQueue.get(key) === item) {
                   this._syncQueue.delete(key);
                 }
@@ -1282,8 +1478,11 @@ const StorageAPI = {
 
   // ── Note Version History & Snapshots (.history/) ──
   _getHistoryKey(notePath) {
-    const raw = String(notePath || '').split('/').pop() || 'note';
-    return raw.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const clean = String(notePath || '').trim().replace(/\\/g, '/');
+    if (clean.startsWith('notes/') && clean.endsWith('.html')) {
+      return clean.slice(6).replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+    return clean.replace(/[^a-zA-Z0-9._-]/g, '_');
   },
 
   async listSnapshots(notePath) {
@@ -1302,12 +1501,13 @@ const StorageAPI = {
     const manifest = await this.listSnapshots(notePath);
 
     const snapshotId = 'rev-' + Date.now();
+    const payloadStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
     const meta = {
       id: snapshotId,
       timestamp: Date.now(),
       dateStr: new Date().toISOString(),
       reason: reason || 'manual',
-      size: content.length
+      size: payloadStr.length
     };
 
     manifest.unshift(meta);
@@ -1322,16 +1522,20 @@ const StorageAPI = {
       } else {
         for (const old of removed) {
           try { await deleteFile(`.history/${key}/${old.id}.html`); } catch (e) {}
+          try { await deleteFile(`.history/${key}/${old.id}.json`); } catch (e) {}
         }
       }
     }
 
+    const isJson = String(notePath).endsWith('.json');
+    const ext = isJson ? '.json' : '.html';
+
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc('history', `${key}_${snapshotId}`, { id: snapshotId, content, meta });
+      await window.FirebaseSyncService.putDoc('history', `${key}_${snapshotId}`, { id: snapshotId, content: payloadStr, meta });
       await window.FirebaseSyncService.putDoc('history', `${key}_manifest`, manifest);
     } else {
-      const filePath = `.history/${key}/${snapshotId}.html`;
-      await writeFile(filePath, String(content));
+      const filePath = `.history/${key}/${snapshotId}${ext}`;
+      await writeFile(filePath, payloadStr);
       await this._writeJSON(`.history/${key}/manifest.json`, manifest);
     }
 
@@ -1344,11 +1548,17 @@ const StorageAPI = {
       const doc = await window.FirebaseSyncService.getDoc('history', `${key}_${snapshotId}`);
       return doc?.content !== undefined ? doc.content : null;
     }
-    const filePath = `.history/${key}/${snapshotId}.html`;
+    const isJson = String(notePath).endsWith('.json');
+    const primaryExt = isJson ? '.json' : '.html';
+    const fallbackExt = isJson ? '.html' : '.json';
     try {
-      return await readFile(filePath);
+      return await readFile(`.history/${key}/${snapshotId}${primaryExt}`);
     } catch (err) {
-      return null;
+      try {
+        return await readFile(`.history/${key}/${snapshotId}${fallbackExt}`);
+      } catch (err2) {
+        return null;
+      }
     }
   },
 
@@ -1358,15 +1568,34 @@ const StorageAPI = {
       throw new Error('Snapshot not found');
     }
 
-    // Auto-save pre-rollback snapshot of current note
+    const isJson = String(notePath).endsWith('.json');
+
+    // Auto-save pre-rollback snapshot of current note or document
     try {
-      const current = await this.readNoteContent(notePath);
+      let current = null;
+      if (isJson) {
+        current = await readFile(notePath);
+      } else {
+        current = await this.readNoteContent(notePath);
+      }
       if (current) {
         await this.saveSnapshot(notePath, current, 'pre-rollback');
       }
     } catch (e) {}
 
-    await this.writeNoteContent(notePath, content);
+    if (isJson) {
+      let parsed = content;
+      try {
+        parsed = JSON.parse(content);
+      } catch (e) {}
+      const parts = String(notePath).replace(/\\/g, '/').split('/');
+      const fileName = parts.pop();
+      const docKind = parts[0] || fileName.replace(/\.json$/, '');
+      const docId = fileName.replace(/\.json$/, '');
+      await this.writeDocEntity(docKind, docId, notePath, parsed);
+    } else {
+      await this.writeNoteContent(notePath, content);
+    }
     return content;
   },
 
@@ -1821,9 +2050,15 @@ const StorageAPI = {
         const defaultFile = `${kind}.json`;
         return this.readDocEntity(kind, docId, defaultFile, fallback);
       },
-      save: (kind, docId, payload) => {
-        const defaultFile = `${kind}.json`;
-        return this.writeDocEntity(kind, docId, defaultFile, payload);
+      save: (kind, docId, fileOrPayload, maybePayload) => {
+        const hasFile = maybePayload !== undefined;
+        const targetFile = hasFile ? fileOrPayload : `${kind}.json`;
+        const payload = hasFile ? maybePayload : fileOrPayload;
+        return this.writeDocEntity(kind, docId, targetFile, payload);
+      },
+      delete: (kind, docId, localFile = null) => {
+        const defaultFile = localFile || `${kind}.json`;
+        return this.deleteDocEntity(kind, docId, defaultFile);
       },
       has: (kind, docId) => {
         const defaultFile = `${kind}.json`;
