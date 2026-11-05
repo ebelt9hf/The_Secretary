@@ -1,7 +1,7 @@
 // ── Secretary: Progressive Web App Service Worker ──
 // Provides installability criteria, background caching of shell assets, and transparent network bypass for E2EE cloud sync & AI APIs.
 
-const CACHE_NAME = 'secretary-pwa-v4.0.66';
+const CACHE_NAME = 'secretary-pwa-v4.0.67';
 
 const PRECACHE_ASSETS = [
   './',

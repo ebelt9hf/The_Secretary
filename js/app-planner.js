@@ -506,7 +506,7 @@ function openPlannerAutoBalanceModal() {
                   return `
                     <div class="planner-autobalance-item${isChecked ? ' is-selected' : ''}${assignment ? ' has-slot' : ' no-slot'}">
                       <label class="planner-autobalance-item-left" title="${escA(isChecked ? (t('planner.uncheckTaskTooltip') || 'Deselect this task from scheduling') : (t('planner.checkTaskTooltip') || 'Select this task for scheduling'))}">
-                        <input type="checkbox" class="autobalance-task-cb" data-todoid="${escA(todo.id)}"${isChecked ? ' checked' : ''} />
+                        <input type="checkbox" id="autobalance-task-${escA(todo.id)}" name="autobalance-task-${escA(todo.id)}" class="autobalance-task-cb" data-todoid="${escA(todo.id)}"${isChecked ? ' checked' : ''} />
                         <span class="planner-autobalance-quad-tag" style="background-color: ${quadColor}22; color: ${quadColor}; border-color: ${quadColor}55;">${escH(quad)}</span>
                         <div class="planner-autobalance-item-info">
                           <span class="planner-autobalance-item-title">${escH(taskTitle)}</span>
@@ -2944,7 +2944,7 @@ function renderPlanner() {
             <button class="planner-view-btn${plannerViewMode === '5days' ? ' active' : ''}" onclick="setPlannerViewMode('5days')" title="${escA(t('planner.view5DaysTooltip'))}">${t('planner.view5Days')}</button>
             <button class="planner-view-btn${plannerViewMode === 'week' ? ' active' : ''}" onclick="setPlannerViewMode('week')" title="${escA(t('planner.viewWeekTooltip'))}">${t('planner.viewWeek')}</button>
           </div>
-          <select class="planner-view-select" onchange="setPlannerViewMode(this.value)" title="${escA(t('planner.viewWeekTooltip') || 'Select calendar view range')}" aria-label="${escA(t('planner.viewWeekTooltip') || 'Select calendar view range')}">
+          <select id="planner-view-select" name="planner-view-select" class="planner-view-select" onchange="setPlannerViewMode(this.value)" title="${escA(t('planner.viewWeekTooltip') || 'Select calendar view range')}" aria-label="${escA(t('planner.viewWeekTooltip') || 'Select calendar view range')}">
             <option value="today"${plannerViewMode === 'today' ? ' selected' : ''}>${escH(t('planner.viewToday'))}</option>
             <option value="3days"${plannerViewMode === '3days' ? ' selected' : ''}>${escH(t('planner.view3Days'))}</option>
             <option value="5days"${plannerViewMode === '5days' ? ' selected' : ''}>${escH(t('planner.view5Days'))}</option>

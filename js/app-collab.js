@@ -8646,7 +8646,7 @@ function renderRegisterView(container) {
         const chkTooltip = isComp ? (t('tasks.markIncomplete') || 'Mark task as incomplete') : (t('tasks.markComplete') || 'Mark task as completed');
         item.innerHTML = `
           <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
-            <input type="checkbox" ${isComp ? 'checked' : ''} class="workstream-task-checkbox" style="cursor:pointer;" title="${escA(chkTooltip)}">
+            <input type="checkbox" id="workstream-task-${escA(tItem.id || 'chk')}" name="workstream-task-${escA(tItem.id || 'chk')}" ${isComp ? 'checked' : ''} class="workstream-task-checkbox" style="cursor:pointer;" title="${escA(chkTooltip)}">
             <span class="workstream-task-title" style="font-weight:600; color:var(--text); ${isComp ? 'text-decoration:line-through; opacity:0.7;' : ''}">${escH(tItem.title || tItem.text || 'Task')}</span>
           </div>
           <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
@@ -11458,7 +11458,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
         <div style="font-size:0.78rem; font-weight:700; color:#10b981; display:flex; align-items:center; gap:5px;">${getWsIcon('checkSquare', 14)} Clôturer les questions résolues :</div>
         ${resThreads.map((t, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
-            <input type="checkbox" checked class="chk-sync-thread" data-index="${idx}">
+            <input type="checkbox" id="chk-sync-thread-${idx}" name="chk-sync-thread-${idx}" checked class="chk-sync-thread" data-index="${idx}" title="${escA(t)}">
             <span>${escH(t)}</span>
           </label>
         `).join('')}
@@ -11470,7 +11470,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
         <div style="font-size:0.78rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:5px;">${getWsIcon('decision', 14)} Valider les décisions actées (Passer en active) :</div>
         ${valDecisions.map((d, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
-            <input type="checkbox" checked class="chk-sync-decision" data-index="${idx}">
+            <input type="checkbox" id="chk-sync-decision-${idx}" name="chk-sync-decision-${idx}" checked class="chk-sync-decision" data-index="${idx}" title="${escA(d)}">
             <span>${escH(d)}</span>
           </label>
         `).join('')}
@@ -11482,7 +11482,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
         <div style="font-size:0.78rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:5px;">${getWsIcon('pin', 14)} Nouveaux faits marquants à ajouter :</div>
         ${newFacts.map((f, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
-            <input type="checkbox" checked class="chk-sync-fact" data-index="${idx}">
+            <input type="checkbox" id="chk-sync-fact-${idx}" name="chk-sync-fact-${idx}" checked class="chk-sync-fact" data-index="${idx}" title="${escA(f)}">
             <span>${escH(f)}</span>
           </label>
         `).join('')}
@@ -11494,7 +11494,7 @@ async function openPostMeetingSyncModal(meetingEvent, topicName) {
         <div style="font-size:0.78rem; font-weight:700; color:#f59e0b; display:flex; align-items:center; gap:5px;">${getWsIcon('checkSquare', 14)} Nouvelles tâches à créer :</div>
         ${newTasks.map((t, idx) => `
           <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; color:var(--text); cursor:pointer;">
-            <input type="checkbox" checked class="chk-sync-task" data-index="${idx}">
+            <input type="checkbox" id="chk-sync-task-${idx}" name="chk-sync-task-${idx}" checked class="chk-sync-task" data-index="${idx}" title="${escA(typeof t === 'string' ? t : t.title)}">
             <span>${escH(typeof t === 'string' ? t : t.title)} ${t.assignee ? `(${escH(t.assignee)})` : ''}</span>
           </label>
         `).join('')}

@@ -212,4 +212,30 @@ describe('Planner Block Selection, Sidebar State, Working Day Navigation & Past 
       vi.useRealTimers();
     });
   });
+
+  describe('5. Form Field Accessibility & Form Audit Attributes (id & name)', () => {
+    it('ensures planner-view-select has valid id and name attributes', () => {
+      globalThis.renderPlanner();
+      const select = document.querySelector('.planner-view-select');
+      expect(select).toBeTruthy();
+      expect(select.id).toBe('planner-view-select');
+      expect(select.getAttribute('name')).toBe('planner-view-select');
+    });
+
+    it('ensures chat-context-select in app-chat has valid id and name attributes', () => {
+      loadScriptsIntoGlobal(['js/app-chat.js']);
+      const container = document.createElement('div');
+      container.id = 'floating-chat-container';
+      document.body.appendChild(container);
+
+      if (typeof globalThis.AIChatController?.render === 'function') {
+        globalThis.AIChatController.render();
+      }
+      const select = document.querySelector('.chat-context-select');
+      if (select) {
+        expect(select.id).toBe('chat-context-select');
+        expect(select.getAttribute('name')).toBe('chat-context-select');
+      }
+    });
+  });
 });

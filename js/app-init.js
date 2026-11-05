@@ -4343,7 +4343,7 @@ function renderCalendarSyncPrefs() {
     html += `
       <div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; padding:8px 12px; gap:8px;">
         <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
-          <input type="checkbox" ${f.enabled ? 'checked' : ''} onchange="toggleCalendarFeedFromPrefs('${fId}', this.checked)" title="${typeof escA === 'function' ? escA(toggleTooltip) : toggleTooltip}" style="cursor:pointer;">
+          <input type="checkbox" id="cal-feed-toggle-${fId}" name="cal-feed-toggle-${fId}" ${f.enabled ? 'checked' : ''} onchange="toggleCalendarFeedFromPrefs('${fId}', this.checked)" title="${typeof escA === 'function' ? escA(toggleTooltip) : toggleTooltip}" style="cursor:pointer;">
           <div style="min-width:0; flex:1;">
             <div style="font-weight:600; font-size:0.83rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${fName}</div>
             <div style="font-size:0.73rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">

@@ -1320,7 +1320,7 @@ const SetupWizardController = {
       `;
     });
     accentOptions += `
-      <input type="color" class="setup-wizard-accent-picker" value="${this.state.accent}" onchange="SetupWizardController.onAccentChange(this.value)" title="${t('setupWizard.accentTooltip') || 'Custom accent color'}">
+      <input type="color" id="setup-wizard-accent-picker" name="setup-wizard-accent-picker" class="setup-wizard-accent-picker" value="${this.state.accent}" onchange="SetupWizardController.onAccentChange(this.value)" title="${t('setupWizard.accentTooltip') || 'Custom accent color'}">
     </div>`;
 
     return `

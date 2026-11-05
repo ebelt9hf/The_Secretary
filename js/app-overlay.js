@@ -3916,7 +3916,7 @@ function openMathFormulaEditor(targetNode = null, editorEl = null) {
       <button type="button" class="math-sym-btn" data-insert="\\infty " title="Infinity">\\infty</button>
       <button type="button" class="math-sym-btn" data-insert="\\rightarrow " title="Right arrow">\\rightarrow</button>
     </div>
-    <textarea class="math-editor-textarea" placeholder="${escA(placeholderText)}" rows="2" spellcheck="false" title="LaTeX input">${escH(initialLatex)}</textarea>
+    <textarea id="math-editor-textarea" name="math-editor-textarea" class="math-editor-textarea" placeholder="${escA(placeholderText)}" rows="2" spellcheck="false" title="LaTeX input">${escH(initialLatex)}</textarea>
     <div style="display:flex;flex-direction:column;gap:4px;">
       <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">${escH(previewLabel)}</div>
       <div class="math-preview-box" id="math-preview-output"></div>
@@ -6777,8 +6777,8 @@ function selectEditorImage(imgEl, editorEl) {
   toolbar.className = 'img-resize-toolbar';
   toolbar.innerHTML = `
     <span style="font-weight:500;">${escH(typeof t === 'function' ? t('common.width') : 'Width')}</span>
-    <input type="range" min="80" max="1200" step="10" value="${currentW}">
-    <input type="number" min="80" max="1200" value="${currentW}"> px
+    <input type="range" id="img-width-range" name="img-width-range" min="80" max="1200" step="10" value="${currentW}" title="${escA(typeof t === 'function' ? t('common.width') : 'Width')}">
+    <input type="number" id="img-width-number" name="img-width-number" min="80" max="1200" value="${currentW}" title="${escA(typeof t === 'function' ? t('common.width') : 'Width')}"> px
     <button type="button" class="img-preset-btn" data-preset="25" title="25% width">25%</button>
     <button type="button" class="img-preset-btn" data-preset="50" title="50% width">50%</button>
     <button type="button" class="img-preset-btn" data-preset="75" title="75% width">75%</button>

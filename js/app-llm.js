@@ -9923,7 +9923,7 @@ const RefactorModalController = {
           <div style="display:flex; align-items:center; gap:8px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:6px; padding:6px 10px;" contenteditable="false">
             <input type="checkbox" class="refactor-check-dec" data-idx="${idx}" checked id="refactor-dec-chk-${tabKey}-${idx}" style="cursor:pointer;" />
             <span class="note-decision-badge" contenteditable="false" style="font-size:0.68rem;">🎯 Decision</span>
-            <input type="text" class="refactor-dec-input field-input" data-idx="${idx}" value="${escA(dec.text || '')}" style="flex:1; font-size:0.82rem; padding:2px 6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" />
+            <input type="text" id="refactor-dec-input-${tabKey}-${idx}" name="refactor-dec-input-${tabKey}-${idx}" class="refactor-dec-input field-input" data-idx="${idx}" value="${escA(dec.text || '')}" style="flex:1; font-size:0.82rem; padding:2px 6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" title="${escA(dec.text || 'Decision')}" />
           </div>
         `;
       });
@@ -9944,7 +9944,7 @@ const RefactorModalController = {
         markup += `
           <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; padding:8px 10px;" contenteditable="false">
             <input type="checkbox" class="refactor-check-todo" data-idx="${idx}" checked id="refactor-todo-chk-${tabKey}-${idx}" style="cursor:pointer;" />
-            <input type="text" class="refactor-todo-title field-input" data-idx="${idx}" value="${escA(todo.title || '')}" placeholder="Action item title..." style="flex:2; min-width:180px; font-size:0.82rem; padding:4px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" />
+            <input type="text" id="refactor-todo-title-${tabKey}-${idx}" name="refactor-todo-title-${tabKey}-${idx}" class="refactor-todo-title field-input" data-idx="${idx}" value="${escA(todo.title || '')}" placeholder="Action item title..." style="flex:2; min-width:180px; font-size:0.82rem; padding:4px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" title="${escA(todo.title || 'Action item title')}" />
             
             <div style="display:flex; align-items:center; gap:4px;" contenteditable="false">
               <span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;" contenteditable="false">👤</span>
@@ -9953,7 +9953,7 @@ const RefactorModalController = {
 
             <div style="display:flex; align-items:center; gap:4px;" contenteditable="false">
               <span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;" contenteditable="false">⚡ Imp:</span>
-              <select class="refactor-todo-imp field-select" data-idx="${idx}" style="font-size:0.78rem; padding:3px 6px; border-radius:4px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text);">
+              <select id="refactor-todo-imp-${tabKey}-${idx}" name="refactor-todo-imp-${tabKey}-${idx}" class="refactor-todo-imp field-select" data-idx="${idx}" style="font-size:0.78rem; padding:3px 6px; border-radius:4px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text);" title="${escA(t('refactor.importance') || 'Importance')}">
                 <option value="High" ${imp === 'High' ? 'selected' : ''}>High</option>
                 <option value="Medium" ${imp === 'Medium' ? 'selected' : ''}>Medium</option>
                 <option value="Low" ${imp === 'Low' ? 'selected' : ''}>Low</option>
@@ -9962,7 +9962,7 @@ const RefactorModalController = {
 
             <div style="display:flex; align-items:center; gap:4px;" contenteditable="false">
               <span style="font-size:0.72rem; color:var(--text-muted); font-weight:600;" contenteditable="false">⏳ Urg:</span>
-              <select class="refactor-todo-urg field-select" data-idx="${idx}" style="font-size:0.78rem; padding:3px 6px; border-radius:4px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text);">
+              <select id="refactor-todo-urg-${tabKey}-${idx}" name="refactor-todo-urg-${tabKey}-${idx}" class="refactor-todo-urg field-select" data-idx="${idx}" style="font-size:0.78rem; padding:3px 6px; border-radius:4px; border:1px solid var(--card-border); background:var(--card-bg); color:var(--text);" title="${escA(t('refactor.urgency') || 'Urgency')}">
                 <option value="High" ${urg === 'High' ? 'selected' : ''}>High</option>
                 <option value="Medium" ${urg === 'Medium' ? 'selected' : ''}>Medium</option>
                 <option value="Low" ${urg === 'Low' ? 'selected' : ''}>Low</option>

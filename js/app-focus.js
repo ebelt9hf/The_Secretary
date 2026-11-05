@@ -694,6 +694,9 @@ function _showInlineTagInput(row, refEl, path, type) {
   const input = document.createElement('input');
   input.type      = 'text';
   input.className = 'sl-card-tag-input';
+  input.id        = 'sl-card-tag-input-' + Date.now();
+  input.name      = 'sl-card-tag-input';
+  input.title     = t('focus.addTagPlaceholder') || 'Add tag';
   input.placeholder = t('focus.addTagPlaceholder');
   input.setAttribute('list', listId);
   row.insertBefore(list, refEl);

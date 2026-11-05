@@ -1531,7 +1531,7 @@ const OmnibarController = {
 
         <div class="omnibar-dt-time-row">
           <span class="omnibar-dt-time-label">🕒 ${escH(t('omnibar.sectionTime') || 'Time')}:</span>
-          <input type="time" class="omnibar-time-input" value="${escH(data.time || '15:30')}" onchange="OmnibarController.setDateTimeTime(this.value)" oninput="OmnibarController.setDateTimeTime(this.value)">
+          <input type="time" id="omnibar-time-input" name="omnibar-time-input" class="omnibar-time-input" value="${escH(data.time || '15:30')}" onchange="OmnibarController.setDateTimeTime(this.value)" oninput="OmnibarController.setDateTimeTime(this.value)" title="${escA(t('omnibar.sectionTime') || 'Time')}">
         </div>
 
         <div class="omnibar-dt-quick-times">

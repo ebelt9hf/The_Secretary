@@ -279,7 +279,7 @@ const AIChatController = {
               <!-- + Context Native Select Dropdown -->
               <div class="chat-input-context-select-wrap">
                 <span class="chat-context-label">${escH(t('chat.addContext') || 'Context')}</span>
-                <select class="chat-context-select" onchange="AIChatController.handleContextSelectChange(this)" title="${escA(t('chat.addContext') || 'Add context')}">
+                <select id="chat-context-select" name="chat-context-select" class="chat-context-select" onchange="AIChatController.handleContextSelectChange(this)" title="${escA(t('chat.addContext') || 'Add context')}">
                   <option value="" disabled selected>➕ Add</option>
                   <option value="notes">📝 ${escH(t('chat.attachNote') || 'Attach Note')}</option>
                   <option value="tasks">📋 ${escH(t('chat.attachTask') || 'Attach Task')}</option>
@@ -4185,7 +4185,7 @@ Directives importantes:
                 <strong style="font-size:var(--font-size-ui);">${escH(note.title)}</strong>
                 <div style="font-size:var(--font-size-caption); color:var(--text-muted);">${escH(note.date || '')} - ${(note.group_tags || []).join(', ')}</div>
               </div>
-              <input type="checkbox" ${checked} style="pointer-events:none;">
+              <input type="checkbox" id="chat-attach-note-${escA(note.path)}" name="chat-attach-note" ${checked} style="pointer-events:none;" title="${escA(note.title)}">
             </div>
           `;
         });
@@ -4208,13 +4208,12 @@ Directives importantes:
                 <strong style="font-size:var(--font-size-ui);">${escH(todo.title)}</strong>
                 <div style="font-size:var(--font-size-caption); color:var(--text-muted);">${escH(todo.priority)} - ${escH(todo.owner || '')}</div>
               </div>
-              <input type="checkbox" ${checked} style="pointer-events:none;">
+              <input type="checkbox" id="chat-attach-task-${escA(todo.id)}" name="chat-attach-task" ${checked} style="pointer-events:none;" title="${escA(todo.title)}">
             </div>
           `;
         });
       }
     } else if (this.modalTab === 'events') {
-      const eventsList = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents) ? plannerEvents : []);
       const filteredEvents = eventsList.filter(e =>
         (e.title && e.title.toLowerCase().includes(query)) ||
         (e.date && e.date.toLowerCase().includes(query)) ||
@@ -4233,7 +4232,7 @@ Directives importantes:
                 <strong style="font-size:var(--font-size-ui);">${escH(ev.title)}</strong>
                 <div style="font-size:var(--font-size-caption); color:var(--text-muted);">${escH(ev.date || '')} ${escH(ev.startTime || '')} - ${escH(ev.type || 'call')}</div>
               </div>
-              <input type="checkbox" ${checked} style="pointer-events:none;">
+              <input type="checkbox" id="chat-attach-event-${escA(ev.id)}" name="chat-attach-event" ${checked} style="pointer-events:none;" title="${escA(ev.title)}">
             </div>
           `;
         });
@@ -4264,7 +4263,7 @@ Directives importantes:
                 <strong style="font-size:var(--font-size-ui);">⚖️ ${escH(item.text)}</strong>
                 <div style="font-size:var(--font-size-caption); color:var(--text-muted);">📝 ${escH(item.noteTitle || item.notePath)}</div>
               </div>
-              <input type="checkbox" ${checked} style="pointer-events:none;">
+              <input type="checkbox" id="chat-attach-decision-${escA(item.notePath)}" name="chat-attach-decision" ${checked} style="pointer-events:none;" title="${escA(item.text)}">
             </div>
           `;
         });

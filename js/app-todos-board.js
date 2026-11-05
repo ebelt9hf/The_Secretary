@@ -902,7 +902,7 @@ function renderTodoCard(todo, rank) {
       urgeDelegateHtml = `
         <div class="todo-urge-delegate-box" onclick="event.stopPropagation();">
           <span>⚠️ ${escH(t('todo.urgeDelegate') || 'Urged to Delegate')}:</span>
-          <select class="todo-delegate-select" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onchange="event.stopPropagation();assignTodoToDirectReport(${jq(todo.id)}, this.value)" title="${escA(t('todo.assignToDirectReportTooltip') || 'Select a team member to delegate this task to')}">
+          <select id="todo-delegate-select-${escA(todo.id)}" name="todo-delegate-select-${escA(todo.id)}" class="todo-delegate-select" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onchange="event.stopPropagation();assignTodoToDirectReport(${jq(todo.id)}, this.value)" title="${escA(t('todo.assignToDirectReportTooltip') || 'Select a team member to delegate this task to')}">
             <option value="">-- ${escH(t('todo.assignToDirectReport') || 'Assign')} --</option>
             ${options}
           </select>
@@ -3511,7 +3511,7 @@ function renderDelegatedTasksGanttHtml() {
           <div class="delegated-task-row" data-todo-id="${escA(todo.id)}" ondblclick="openTodoOverlay('${escA(todo.id)}')">
             <!-- Left: Task Info & Checkbox -->
             <div class="delegated-task-info-col">
-              <input type="checkbox" class="delegated-task-done-chk" title="${escA(t('todo.markDoneTooltip') || 'Mark task as completed')}" onchange="toggleTodoDoneFromGantt('${escA(todo.id)}')">
+              <input type="checkbox" id="delegated-task-done-${escA(todo.id)}" name="delegated-task-done-${escA(todo.id)}" class="delegated-task-done-chk" title="${escA(t('todo.markDoneTooltip') || 'Mark task as completed')}" onchange="toggleTodoDoneFromGantt('${escA(todo.id)}')">
               <span class="delegated-quad-badge" style="background:${meta.color};" title="${escA(meta.actionTitle)}">${escH(quad)}</span>
               <div class="delegated-task-title-group" title="${escA(cleanTitle)}">
                 <div class="delegated-task-title-text">${escH(cleanTitle)}</div>

@@ -3791,7 +3791,7 @@ const DailyReviewController = {
           <div style="display:flex; align-items:center; gap:8px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:6px; padding:6px 10px;" contenteditable="false">
             <input type="checkbox" class="dr-int-check-dec" data-idx="${idx}" checked id="dr-int-dec-${tabKey}-${idx}" style="cursor:pointer;" />
             <span class="note-decision-badge" contenteditable="false" style="font-size:0.68rem;">🎯 Decision</span>
-            <input type="text" class="dr-int-dec-input field-input" data-idx="${idx}" value="${escA(dec.text || '')}" style="flex:1; font-size:0.82rem; padding:2px 6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" />
+            <input type="text" id="dr-int-dec-input-${tabKey}-${idx}" name="dr-int-dec-input-${tabKey}-${idx}" class="dr-int-dec-input field-input" data-idx="${idx}" value="${escA(dec.text || '')}" style="flex:1; font-size:0.82rem; padding:2px 6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" title="${escA(dec.text || 'Decision')}" />
           </div>
         `;
       });
@@ -3808,7 +3808,7 @@ const DailyReviewController = {
         markup += `
           <div style="display:flex; align-items:center; gap:8px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:6px; padding:6px 10px;" contenteditable="false">
             <input type="checkbox" class="dr-int-check-todo" data-idx="${idx}" checked id="dr-int-todo-${tabKey}-${idx}" style="cursor:pointer;" />
-            <input type="text" class="dr-int-todo-title field-input" data-idx="${idx}" value="${escA(todo.title || '')}" style="flex:1; font-size:0.82rem; padding:2px 6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" />
+            <input type="text" id="dr-int-todo-title-${tabKey}-${idx}" name="dr-int-todo-title-${tabKey}-${idx}" class="dr-int-todo-title field-input" data-idx="${idx}" value="${escA(todo.title || '')}" style="flex:1; font-size:0.82rem; padding:2px 6px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg-alt); color:var(--text);" title="${escA(todo.title || 'Task')}" />
           </div>
         `;
       });
