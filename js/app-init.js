@@ -4861,10 +4861,54 @@ async function handleSyncMessage(e) {
     }
 
     scheduleSyncRefresh({ manifest: true, filters: true, planner: true, changedNote: existingMeta || { path, noteId } });
+    if (window.AIChatController && typeof window.AIChatController.pruneNote === 'function') {
+      window.AIChatController.pruneNote(path, noteId);
+    }
     const isCurrentNote = (noteId && currentNote?.id === noteId) || (path && currentNote?.path === path);
     if (isCurrentNote) {
       closeNoteOverlay({ skipSave: true, forceCloseAll: true });
       toast(t('common.thisNoteDeletedElsewhere'));
+    }
+  }
+
+  if (type === 'TODO_DELETED') {
+    const todoId = e.data?.todoId;
+    if (todoId) {
+      if (typeof _todoOverlayFile !== 'undefined' && _todoOverlayFile === todoId && typeof closeTodoOverlay === 'function') {
+        closeTodoOverlay();
+        if (typeof toast === 'function') toast(t('common.thisTodoDeletedElsewhere') || 'This task was deleted in another window');
+      }
+
+      if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+        todosManifest = todosManifest.filter(t => t && String(t.id) !== String(todoId));
+      }
+
+      let plannerChanged = false;
+      if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+        plannerEvents.forEach(pe => {
+          if (!pe) return;
+          if (String(pe.todoId || '').trim() === String(todoId)) {
+            pe.todoId = '';
+            if (pe.type === 'todo') pe.type = 'work';
+            plannerChanged = true;
+          }
+          if (Array.isArray(pe.linkedTodoIds) && pe.linkedTodoIds.includes(todoId)) {
+            pe.linkedTodoIds = pe.linkedTodoIds.filter(id => id !== todoId);
+            plannerChanged = true;
+          }
+        });
+      }
+      if (plannerChanged) {
+        if (typeof savePlanner === 'function') savePlanner().catch(() => {});
+        if (typeof renderPlanner === 'function') renderPlanner();
+        if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+      }
+
+      if (window.AIChatController && typeof window.AIChatController.pruneTask === 'function') {
+        window.AIChatController.pruneTask(todoId);
+      }
+
+      scheduleSyncRefresh({ todos: true, planner: plannerChanged });
     }
   }
 
@@ -4913,6 +4957,8 @@ async function handleSyncMessage(e) {
     if (typeof rebuildCollaborativeAggregates === 'function') rebuildCollaborativeAggregates();
     if ((activeTab === 'team' || activeTab === 'decisions') && typeof renderTeamPanel === 'function') renderTeamPanel();
     if (typeof renderBoard === 'function') renderBoard();
+    if (typeof refreshTodoViews === 'function') refreshTodoViews();
+    if (typeof renderPlanner === 'function') renderPlanner();
   }
 
   if (type === 'AI_CHAT_UPDATED') {

@@ -2,7 +2,7 @@
   "name": "Secretary",
   "short_name": "Secretary",
   "description": "Private local-first personal note manager and task organizer",
-  "version": "4.0.71",
+  "version": "4.0.72",
   "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",

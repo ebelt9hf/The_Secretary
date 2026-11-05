@@ -13203,12 +13203,25 @@ window.renameCollaboratorGlobal = async function(oldName) {
   // 4. Update tasks in todosManifest
   let todosChanged = false;
   if (Array.isArray(todosManifest)) {
+    const oldKey = normalizeCollaboratorKey(oldName);
     todosManifest.forEach(todo => {
       if (!todo || typeof todo !== 'object') return;
       const ownerId = resolveColleagueId(todo.ownerId || todo.owner || 'me', { allowCreate: false, allowMe: true }) || 'me';
-      if (ownerId === targetId) {
+      if (ownerId === targetId || normalizeCollaboratorKey(todo.owner || '') === oldKey) {
         todo.owner = cleanNewName;
+        todo.ownerId = targetId;
         todosChanged = true;
+      }
+      if (todo.askedBy && (normalizeCollaboratorKey(todo.askedBy) === oldKey || resolveColleagueId(todo.askedBy, { allowCreate: false, allowMe: false }) === targetId)) {
+        todo.askedBy = cleanNewName;
+        todosChanged = true;
+      }
+      if (Array.isArray(todo.collaborators)) {
+        const idx = todo.collaborators.findIndex(c => normalizeCollaboratorKey(c) === oldKey || c === targetId);
+        if (idx !== -1) {
+          todo.collaborators[idx] = cleanNewName;
+          todosChanged = true;
+        }
       }
     });
   }
@@ -13216,11 +13229,16 @@ window.renameCollaboratorGlobal = async function(oldName) {
   // 5. Update calendar events in plannerEvents
   let plannerChanged = false;
   if (Array.isArray(plannerEvents)) {
+    const oldKey = normalizeCollaboratorKey(oldName);
     plannerEvents.forEach(event => {
       if (!event || typeof event !== 'object') return;
       let changed = false;
+      if (event.collaboratorName && normalizeCollaboratorKey(event.collaboratorName) === oldKey) {
+        event.collaboratorName = cleanNewName;
+        changed = true;
+      }
       if (Array.isArray(event.collaborators)) {
-        const idx = event.collaborators.findIndex(c => normalizeCollaboratorKey(c) === normalizeCollaboratorKey(oldName));
+        const idx = event.collaborators.findIndex(c => normalizeCollaboratorKey(c) === oldKey || c === targetId);
         if (idx !== -1) {
           event.collaborators[idx] = cleanNewName;
           changed = true;
@@ -13246,6 +13264,11 @@ window.renameCollaboratorGlobal = async function(oldName) {
   closeModal('modal-collab-details');
   renderTeamPanel();
   if (typeof renderBoard === 'function') renderBoard();
+  if (typeof refreshTodoViews === 'function') refreshTodoViews();
+  if (typeof renderPlanner === 'function') renderPlanner();
+  if (typeof broadcastSync === 'function') {
+    broadcastSync({ type: 'COLLEAGUES_UPDATED' });
+  }
 };
 
 window.deleteCollaboratorGlobal = async function(oldName) {
@@ -13255,10 +13278,68 @@ window.deleteCollaboratorGlobal = async function(oldName) {
   );
   if (!confirmed) return;
   
+  const oldKey = normalizeCollaboratorKey(oldName);
+  const targetId = resolveColleagueId(oldName, { allowCreate: false, allowMe: false });
+
+  // 1. Update HTML notes (mentions etc)
   await updateCollaboratorInAllNotes(oldName, null);
+
+  // 2. Prune tasks in todosManifest
+  let todosChanged = false;
+  if (Array.isArray(todosManifest)) {
+    todosManifest.forEach(todo => {
+      if (!todo || typeof todo !== 'object') return;
+      const ownerId = resolveColleagueId(todo.ownerId || todo.owner || 'me', { allowCreate: false, allowMe: true }) || 'me';
+      if ((targetId && ownerId === targetId) || normalizeCollaboratorKey(todo.owner || '') === oldKey) {
+        todo.owner = 'me';
+        todo.ownerId = 'me';
+        todosChanged = true;
+      }
+      if (todo.askedBy && (normalizeCollaboratorKey(todo.askedBy) === oldKey || (targetId && resolveColleagueId(todo.askedBy, { allowCreate: false, allowMe: false }) === targetId))) {
+        todo.askedBy = '';
+        todosChanged = true;
+      }
+      if (Array.isArray(todo.collaborators)) {
+        const beforeLen = todo.collaborators.length;
+        todo.collaborators = todo.collaborators.filter(c => normalizeCollaboratorKey(c) !== oldKey && (!targetId || c !== targetId));
+        if (todo.collaborators.length !== beforeLen) todosChanged = true;
+      }
+    });
+  }
+  if (todosChanged && typeof saveTodosManifest === 'function') {
+    await saveTodosManifest();
+  }
+
+  // 3. Prune calendar events in plannerEvents
+  let plannerChanged = false;
+  if (Array.isArray(plannerEvents)) {
+    plannerEvents.forEach(event => {
+      if (!event || typeof event !== 'object') return;
+      let changed = false;
+      if (event.collaboratorName && normalizeCollaboratorKey(event.collaboratorName) === oldKey) {
+        event.collaboratorName = '';
+        changed = true;
+      }
+      if (Array.isArray(event.collaborators)) {
+        const beforeLen = event.collaborators.length;
+        event.collaborators = event.collaborators.filter(c => normalizeCollaboratorKey(c) !== oldKey && (!targetId || c !== targetId));
+        if (event.collaborators.length !== beforeLen) changed = true;
+      }
+      if (changed) plannerChanged = true;
+    });
+  }
+  if (plannerChanged && typeof savePlanner === 'function') {
+    await savePlanner();
+  }
+
   closeModal('modal-collab-details');
   renderTeamPanel();
   if (typeof renderBoard === 'function') renderBoard();
+  if (typeof refreshTodoViews === 'function') refreshTodoViews();
+  if (typeof renderPlanner === 'function') renderPlanner();
+  if (typeof broadcastSync === 'function') {
+    broadcastSync({ type: 'COLLEAGUES_UPDATED' });
+  }
 };
 
 window.deleteColleagueEntirelyGlobal = async function(oldName) {
@@ -13316,15 +13397,68 @@ window.deleteColleagueEntirelyGlobal = async function(oldName) {
   // 4. Update HTML notes (mentions etc)
   await updateCollaboratorInAllNotes(oldName, null);
 
-  // 5. Update and save databases
+  // 5. Prune tasks in todosManifest
+  let todosChanged = false;
+  if (Array.isArray(todosManifest)) {
+    todosManifest.forEach(todo => {
+      if (!todo || typeof todo !== 'object') return;
+      const ownerId = resolveColleagueId(todo.ownerId || todo.owner || 'me', { allowCreate: false, allowMe: true }) || 'me';
+      if (ownerId === targetId || normalizeCollaboratorKey(todo.owner || '') === oldKey) {
+        todo.owner = 'me';
+        todo.ownerId = 'me';
+        todosChanged = true;
+      }
+      if (todo.askedBy && (normalizeCollaboratorKey(todo.askedBy) === oldKey || resolveColleagueId(todo.askedBy, { allowCreate: false, allowMe: false }) === targetId)) {
+        todo.askedBy = '';
+        todosChanged = true;
+      }
+      if (Array.isArray(todo.collaborators)) {
+        const beforeLen = todo.collaborators.length;
+        todo.collaborators = todo.collaborators.filter(c => normalizeCollaboratorKey(c) !== oldKey && c !== targetId);
+        if (todo.collaborators.length !== beforeLen) todosChanged = true;
+      }
+    });
+  }
+  if (todosChanged && typeof saveTodosManifest === 'function') {
+    await saveTodosManifest();
+  }
+
+  // 6. Prune calendar events in plannerEvents
+  let plannerChanged = false;
+  if (Array.isArray(plannerEvents)) {
+    plannerEvents.forEach(event => {
+      if (!event || typeof event !== 'object') return;
+      let changed = false;
+      if (event.collaboratorName && normalizeCollaboratorKey(event.collaboratorName) === oldKey) {
+        event.collaboratorName = '';
+        changed = true;
+      }
+      if (Array.isArray(event.collaborators)) {
+        const beforeLen = event.collaborators.length;
+        event.collaborators = event.collaborators.filter(c => normalizeCollaboratorKey(c) !== oldKey && c !== targetId);
+        if (event.collaborators.length !== beforeLen) changed = true;
+      }
+      if (changed) plannerChanged = true;
+    });
+  }
+  if (plannerChanged && typeof savePlanner === 'function') {
+    await savePlanner();
+  }
+
+  // 7. Update and save databases
   await saveColleaguesDb();
   reindexColleaguesDb();
   await dedupeColleaguesWorkspaceData({ persist: true });
 
-  // 6. Refresh UI
+  // 8. Refresh UI
   closeModal('modal-collab-details');
   renderTeamPanel();
   if (typeof renderBoard === 'function') renderBoard();
+  if (typeof refreshTodoViews === 'function') refreshTodoViews();
+  if (typeof renderPlanner === 'function') renderPlanner();
+  if (typeof broadcastSync === 'function') {
+    broadcastSync({ type: 'COLLEAGUES_UPDATED' });
+  }
   toast(t('team.deleteSuccessToast', { name: oldName }) || `Colleague ${oldName} deleted entirely.`);
 };
 

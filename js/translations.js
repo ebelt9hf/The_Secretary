@@ -6736,6 +6736,23 @@ window.APP_TRANSLATIONS_BUNDLE = {
       "tr": "Bu not başka bir pencerede silindi",
       "uk": "Цю нотатку було видалено в іншому вікні"
     },
+    "common.thisTodoDeletedElsewhere": {
+      "cs": "Tento úkol byl smazán v jiném okně",
+      "de": "Diese Aufgabe wurde in einem anderen Fenster gelöscht",
+      "en": "This task was deleted in another window",
+      "es": "Esta tarea fue eliminada en otra ventana",
+      "fr": "Cette tâche a été supprimée dans une autre fenêtre",
+      "hu": "Ezt a feladatot egy másik ablakban törölték",
+      "it": "Questa attività è stata eliminata in un'altra finestra",
+      "nl": "Deze taak is in een ander venster verwijderd",
+      "pl": "To zadanie zostało usunięte w innym oknie",
+      "pt": "Esta tarefa foi excluída em outra janela",
+      "ro": "Această sarcină a fost ștearsă într-o altă fereastră",
+      "ru": "Эта задача была удалена в другом окне",
+      "sv": "Denna uppgift raderades i ett annat fönster",
+      "tr": "Bu görev başka bir pencerede silindi",
+      "uk": "Цю задачу було видалено в іншому вікні"
+    },
     "common.thisTodo": {
       "cs": "tento úkol",
       "de": "diese Aufgabe",

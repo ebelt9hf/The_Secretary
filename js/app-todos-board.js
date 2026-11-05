@@ -1132,16 +1132,30 @@ async function updateTodoLinkedNote(todo, newTitle, newPriority, originalPriorit
   }
 }
 
-async function removeTodoFromAllNotes(todoId, fallbackTitle = 'todo') {
+async function removeTodoFromAllNotes(todoId, fallbackTitle = 'todo', todoRef = null) {
   if (typeof manifest === 'undefined' || !Array.isArray(manifest) || manifest.length === 0) return;
 
-  const totalNotes = manifest.length;
+  const todo = todoRef || (typeof getTodoById === 'function' ? getTodoById(todoId) : null);
+  // If todo is known and has no note associations at all, there are no note markers to remove
+  if (todo && !todo.noteId && (!Array.isArray(todo.linkedNoteIds) || !todo.linkedNoteIds.length) && !todo.notePath) {
+    return;
+  }
+
+  let notesToScan = manifest;
+  if (todo && (todo.noteId || (Array.isArray(todo.linkedNoteIds) && todo.linkedNoteIds.length) || todo.notePath)) {
+    const targetIds = new Set([todo.noteId, ...(todo.linkedNoteIds || [])].filter(Boolean));
+    const targetPaths = new Set([todo.notePath].filter(Boolean));
+    notesToScan = manifest.filter(entry => entry && (targetIds.has(entry.id) || targetPaths.has(entry.path)));
+    if (notesToScan.length === 0) return;
+  }
+
+  const totalNotes = notesToScan.length;
   const chunkSize = Math.max(1, Math.ceil(totalNotes / 10));
   const steps = [];
   const title = t('confirm.deleteTodoTitle') || 'Cleaning up note references...';
 
   for (let i = 0; i < totalNotes; i += chunkSize) {
-    const chunk = manifest.slice(i, i + chunkSize);
+    const chunk = notesToScan.slice(i, i + chunkSize);
     const percentage = Math.round(((i + chunk.length) / totalNotes) * 100);
     const label = (typeof t === 'function' && t('todo.scanningNotesProgress'))
       ? t('todo.scanningNotesProgress', { current: i + 1, total: totalNotes })
@@ -1205,7 +1219,7 @@ async function removeTodoFromAllNotes(todoId, fallbackTitle = 'todo') {
     });
   }
 
-  if (typeof showProgressDialog === 'function') {
+  if (totalNotes > 5 && typeof showProgressDialog === 'function') {
     await showProgressDialog(title, steps);
   } else {
     for (const step of steps) {
@@ -1222,13 +1236,50 @@ async function deleteTodoById(todoId, { confirmDelete = true } = {}) {
     if (!confirmed) return false;
   }
   
-  await removeTodoFromAllNotes(todoId, todo.title || 'todo');
-
-  todosManifest = todosManifest.filter(t => t.id !== todoId);
-  await saveTodosManifest({ deletedIds: [todoId] });
+  // 1. Instantaneous UI dismissal & memory updates
   if (_todoOverlayFile === todoId) closeTodoOverlay();
+  todosManifest = (todosManifest || []).filter(t => t && String(t.id) !== String(todoId));
+
+  // 2. Prune from planner events
+  let plannerChanged = false;
+  if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+    plannerEvents.forEach(pe => {
+      if (!pe) return;
+      if (String(pe.todoId || '').trim() === String(todoId)) {
+        pe.todoId = '';
+        if (pe.type === 'todo') pe.type = 'work';
+        plannerChanged = true;
+      }
+      if (Array.isArray(pe.linkedTodoIds) && pe.linkedTodoIds.includes(todoId)) {
+        pe.linkedTodoIds = pe.linkedTodoIds.filter(id => id !== todoId);
+        plannerChanged = true;
+      }
+    });
+  }
+
+  // 3. Prune from chat attachments
+  if (typeof AIChatController !== 'undefined' && typeof AIChatController.pruneTask === 'function') {
+    AIChatController.pruneTask(todoId);
+  }
+
+  // 4. Instant UI refresh & feedback
   toast(t('common.todoDeleted'));
   if (typeof refreshTodoViews === 'function') refreshTodoViews();
+  if (plannerChanged && typeof renderPlanner === 'function') renderPlanner();
+  if (plannerChanged && typeof renderPlannerInspector === 'function') renderPlannerInspector();
+
+  // 5. Broadcast deletion across windows
+  if (typeof broadcastSync === 'function') {
+    broadcastSync({ type: 'TODO_DELETED', todoId });
+  }
+
+  // 6. Persistence & background cleanup
+  if (plannerChanged && typeof savePlanner === 'function') {
+    await savePlanner();
+  }
+  await saveTodosManifest({ deletedIds: [todoId] });
+  await removeTodoFromAllNotes(todoId, todo.title || 'todo', todo);
+
   return true;
 }
 

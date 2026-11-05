@@ -2216,6 +2216,13 @@ async function applyLabelManagerAction() {
     await rebuildIndexHTML();
     renderFilterChips();
     renderBoard();
+    if (typeof renderPlanner === 'function') renderPlanner();
+    if (typeof refreshTodoViews === 'function') refreshTodoViews();
+    if (typeof broadcastSync === 'function') {
+      broadcastSync({ type: 'MANIFEST_UPDATED' });
+      broadcastSync({ type: 'TODOS_UPDATED' });
+      broadcastSync({ type: 'PLANNER_UPDATED' });
+    }
     toast(t('common.updatedNotes', { count: changed, noteWord: word('note', changed) }));
     closeLabelManager();
   } catch (e) {
@@ -2242,6 +2249,13 @@ async function removeLabelFromManager() {
     await rebuildIndexHTML();
     renderFilterChips();
     renderBoard();
+    if (typeof renderPlanner === 'function') renderPlanner();
+    if (typeof refreshTodoViews === 'function') refreshTodoViews();
+    if (typeof broadcastSync === 'function') {
+      broadcastSync({ type: 'MANIFEST_UPDATED' });
+      broadcastSync({ type: 'TODOS_UPDATED' });
+      broadcastSync({ type: 'PLANNER_UPDATED' });
+    }
     toast(t('common.labelManagerRemoved', { count: changed, noteWord: word('note', changed) }));
     closeLabelManager();
   } catch (e) {

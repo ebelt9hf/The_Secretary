@@ -1198,6 +1198,27 @@ const AIChatController = {
     const selectedEvent = (isPlannerActive && typeof selectedPlannerEventId !== 'undefined' && selectedPlannerEventId) ? plannerEvents.find(e => e.id === selectedPlannerEventId) : null;
     const suggestedEvent = (selectedEvent && !this.attachedEvents.includes(selectedPlannerEventId)) ? selectedEvent : null;
 
+    // Prune attachments whose underlying items no longer exist
+    let attachmentsPruned = false;
+    if (typeof manifest !== 'undefined' && Array.isArray(manifest) && manifest.length > 0) {
+      const beforeLen = this.attachedNotes.length;
+      this.attachedNotes = this.attachedNotes.filter(p => manifest.some(n => n && (n.path === p || n.id === p)));
+      if (this.attachedNotes.length !== beforeLen) attachmentsPruned = true;
+    }
+    if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+      const beforeLen = this.attachedTasks.length;
+      this.attachedTasks = this.attachedTasks.filter(id => todosManifest.some(t => t && String(t.id) === String(id)));
+      if (this.attachedTasks.length !== beforeLen) attachmentsPruned = true;
+    }
+    if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+      const beforeLen = this.attachedEvents.length;
+      this.attachedEvents = this.attachedEvents.filter(id => plannerEvents.some(e => e && String(e.id) === String(id)));
+      if (this.attachedEvents.length !== beforeLen) attachmentsPruned = true;
+    }
+    if (attachmentsPruned && typeof this.saveCurrentConversation === 'function') {
+      this.saveCurrentConversation();
+    }
+
     if (this.attachedNotes.length === 0 && this.attachedTasks.length === 0 && this.attachedEvents.length === 0 && !suggestedNote && !suggestedEvent) {
       container.innerHTML = '';
       container.style.display = 'none';
@@ -2802,6 +2823,94 @@ const AIChatController = {
     }
     this.renderAttachments();
     this.saveCurrentConversation();
+  },
+
+  pruneTask(todoId) {
+    if (!todoId) return;
+    const targetId = String(todoId).trim();
+    let changed = false;
+    if (Array.isArray(this.attachedTasks)) {
+      const before = this.attachedTasks.length;
+      this.attachedTasks = this.attachedTasks.filter(id => String(id).trim() !== targetId);
+      if (this.attachedTasks.length !== before) changed = true;
+    }
+    if (this.currentConversationId) {
+      const convKey = 'secretary_conv_tasks_' + this.currentConversationId;
+      try {
+        const stored = JSON.parse(localStorage.getItem(convKey) || '[]');
+        if (Array.isArray(stored)) {
+          const filtered = stored.filter(id => String(id).trim() !== targetId);
+          if (filtered.length !== stored.length) {
+            localStorage.setItem(convKey, JSON.stringify(filtered));
+          }
+        }
+      } catch (e) {}
+    }
+    if (changed) {
+      this.renderAttachments();
+    }
+  },
+
+  pruneNote(notePath, noteId) {
+    let changed = false;
+    const targetPath = notePath ? String(notePath).trim() : '';
+    const targetId = noteId ? String(noteId).trim() : '';
+    if (Array.isArray(this.attachedNotes)) {
+      const before = this.attachedNotes.length;
+      this.attachedNotes = this.attachedNotes.filter(p => {
+        const norm = String(p || '').trim();
+        if (targetPath && norm === targetPath) return false;
+        if (targetId && (norm === targetId || norm.includes(targetId))) return false;
+        return true;
+      });
+      if (this.attachedNotes.length !== before) changed = true;
+    }
+    if (this.currentConversationId) {
+      const convKey = 'secretary_conv_notes_' + this.currentConversationId;
+      try {
+        const stored = JSON.parse(localStorage.getItem(convKey) || '[]');
+        if (Array.isArray(stored)) {
+          const filtered = stored.filter(p => {
+            const norm = String(p || '').trim();
+            if (targetPath && norm === targetPath) return false;
+            if (targetId && (norm === targetId || norm.includes(targetId))) return false;
+            return true;
+          });
+          if (filtered.length !== stored.length) {
+            localStorage.setItem(convKey, JSON.stringify(filtered));
+          }
+        }
+      } catch (e) {}
+    }
+    if (changed) {
+      this.renderAttachments();
+    }
+  },
+
+  pruneEvent(eventId) {
+    if (!eventId) return;
+    const targetId = String(eventId).trim();
+    let changed = false;
+    if (Array.isArray(this.attachedEvents)) {
+      const before = this.attachedEvents.length;
+      this.attachedEvents = this.attachedEvents.filter(id => String(id).trim() !== targetId);
+      if (this.attachedEvents.length !== before) changed = true;
+    }
+    if (this.currentConversationId) {
+      const convKey = 'secretary_conv_events_' + this.currentConversationId;
+      try {
+        const stored = JSON.parse(localStorage.getItem(convKey) || '[]');
+        if (Array.isArray(stored)) {
+          const filtered = stored.filter(id => String(id).trim() !== targetId);
+          if (filtered.length !== stored.length) {
+            localStorage.setItem(convKey, JSON.stringify(filtered));
+          }
+        }
+      } catch (e) {}
+    }
+    if (changed) {
+      this.renderAttachments();
+    }
   },
 
   // Floating note link autocomplete triggered by '['

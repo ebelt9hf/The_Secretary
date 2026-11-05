@@ -1520,6 +1520,178 @@ function getSplitBuckets(sourceType, sourceLabel, partitionType) {
   });
 }
 
+async function syncLabelRenameAcrossEntities(type, fromLabel, toLabel) {
+  const source = String(fromLabel || '').trim();
+  const target = String(toLabel || '').trim();
+  if (!source || !target || source === target) return;
+  const field = getLabelField(type);
+
+  // 1. Planner events
+  let plannerChanged = false;
+  if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+    plannerEvents.forEach(evt => {
+      if (!evt) return;
+      if (Array.isArray(evt[field]) && evt[field].includes(source)) {
+        evt[field] = normalizeLabelList(evt[field].map(tag => tag === source ? target : tag));
+        plannerChanged = true;
+      }
+    });
+  }
+  if (plannerChanged && typeof savePlanner === 'function') {
+    await savePlanner();
+  }
+
+  // 2. Todos manifest
+  let todosChanged = false;
+  if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+    todosManifest.forEach(td => {
+      if (!td) return;
+      if (Array.isArray(td[field]) && td[field].includes(source)) {
+        td[field] = normalizeLabelList(td[field].map(tag => tag === source ? target : tag));
+        todosChanged = true;
+      }
+      if (type === 'major' || field === 'major_topic_tags') {
+        if (td.workstream === source) {
+          td.workstream = target;
+          todosChanged = true;
+        }
+      }
+    });
+  }
+  if (todosChanged && typeof saveTodosManifest === 'function') {
+    await saveTodosManifest();
+  }
+}
+
+async function syncLabelRemovalAcrossEntities(type, label) {
+  const source = String(label || '').trim();
+  if (!source) return;
+  const field = getLabelField(type);
+
+  // 1. Planner events
+  let plannerChanged = false;
+  if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+    plannerEvents.forEach(evt => {
+      if (!evt) return;
+      if (Array.isArray(evt[field]) && evt[field].includes(source)) {
+        evt[field] = normalizeLabelList(evt[field].filter(tag => tag !== source));
+        plannerChanged = true;
+      }
+    });
+  }
+  if (plannerChanged && typeof savePlanner === 'function') {
+    await savePlanner();
+  }
+
+  // 2. Todos manifest
+  let todosChanged = false;
+  if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+    todosManifest.forEach(td => {
+      if (!td) return;
+      if (Array.isArray(td[field]) && td[field].includes(source)) {
+        td[field] = normalizeLabelList(td[field].filter(tag => tag !== source));
+        todosChanged = true;
+      }
+      if ((type === 'major' || field === 'major_topic_tags') && td.workstream === source) {
+        td.workstream = '';
+        todosChanged = true;
+      }
+    });
+  }
+  if (todosChanged && typeof saveTodosManifest === 'function') {
+    await saveTodosManifest();
+  }
+}
+
+async function syncLabelPromotionAcrossEntities(sourceType, label, targetType, targetLabel) {
+  const source = String(label || '').trim();
+  const target = String(targetLabel || '').trim();
+  if (!source || !target || sourceType === targetType) return;
+  const sourceField = getLabelField(sourceType);
+  const targetField = getLabelField(targetType);
+
+  // 1. Planner events
+  let plannerChanged = false;
+  if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+    plannerEvents.forEach(evt => {
+      if (!evt) return;
+      if (Array.isArray(evt[sourceField]) && evt[sourceField].includes(source)) {
+        evt[sourceField] = normalizeLabelList(evt[sourceField].filter(tag => tag !== source));
+        evt[targetField] = normalizeLabelList([...(evt[targetField] || []), target]);
+        plannerChanged = true;
+      }
+    });
+  }
+  if (plannerChanged && typeof savePlanner === 'function') {
+    await savePlanner();
+  }
+
+  // 2. Todos manifest
+  let todosChanged = false;
+  if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+    todosManifest.forEach(td => {
+      if (!td) return;
+      if (Array.isArray(td[sourceField]) && td[sourceField].includes(source)) {
+        td[sourceField] = normalizeLabelList(td[sourceField].filter(tag => tag !== source));
+        td[targetField] = normalizeLabelList([...(td[targetField] || []), target]);
+        todosChanged = true;
+      }
+      if (sourceType === 'major' && td.workstream === source) {
+        td.workstream = (targetType === 'major' ? target : '');
+        todosChanged = true;
+      } else if (targetType === 'major' && Array.isArray(td.major_topic_tags) && td.major_topic_tags.includes(target) && !td.workstream) {
+        td.workstream = target;
+        todosChanged = true;
+      }
+    });
+  }
+  if (todosChanged && typeof saveTodosManifest === 'function') {
+    await saveTodosManifest();
+  }
+}
+
+async function syncLabelSplitAcrossEntities(sourceType, sourceLabel, bucketMappings) {
+  const source = String(sourceLabel || '').trim();
+  if (!source || !bucketMappings) return;
+  const field = getLabelField(sourceType);
+  const target = Object.values(bucketMappings).find(v => v && v !== source);
+  if (!target) return;
+
+  // 1. Planner events
+  let plannerChanged = false;
+  if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+    plannerEvents.forEach(evt => {
+      if (!evt) return;
+      if (Array.isArray(evt[field]) && evt[field].includes(source)) {
+        evt[field] = normalizeLabelList(evt[field].map(tag => tag === source ? target : tag));
+        plannerChanged = true;
+      }
+    });
+  }
+  if (plannerChanged && typeof savePlanner === 'function') {
+    await savePlanner();
+  }
+
+  // 2. Todos manifest
+  let todosChanged = false;
+  if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+    todosManifest.forEach(td => {
+      if (!td) return;
+      if (Array.isArray(td[field]) && td[field].includes(source)) {
+        td[field] = normalizeLabelList(td[field].map(tag => tag === source ? target : tag));
+        todosChanged = true;
+      }
+      if (sourceType === 'major' && td.workstream === source) {
+        td.workstream = target;
+        todosChanged = true;
+      }
+    });
+  }
+  if (todosChanged && typeof saveTodosManifest === 'function') {
+    await saveTodosManifest();
+  }
+}
+
 async function renameLabelAcrossNotes(type, fromLabel, toLabel) {
   const source = String(fromLabel || '').trim();
   const target = String(toLabel || '').trim();
@@ -1540,6 +1712,7 @@ async function renameLabelAcrossNotes(type, fromLabel, toLabel) {
     if (ok) changed++;
   }
   if (changed) await saveManifest({ force: true });
+  await syncLabelRenameAcrossEntities(type, source, target);
   return changed;
 }
 
@@ -1571,6 +1744,7 @@ async function promoteLabelAcrossNotes(sourceType, label, targetType, targetLabe
     if (ok) changed++;
   }
   if (changed) await saveManifest({ force: true });
+  await syncLabelPromotionAcrossEntities(sourceType, source, targetType, target);
   return changed;
 }
 
@@ -1613,6 +1787,7 @@ async function splitLabelAcrossNotes(sourceType, sourceLabel, partitionType, buc
   }
 
   if (changed) await saveManifest({ force: true });
+  await syncLabelSplitAcrossEntities(sourceType, source, bucketMappings);
   return changed;
 }
 
@@ -1633,6 +1808,7 @@ async function removeLabelAcrossNotes(type, label) {
     if (ok) changed++;
   }
   if (changed) await saveManifest({ force: true });
+  await syncLabelRemovalAcrossEntities(type, source);
   return changed;
 }
 
