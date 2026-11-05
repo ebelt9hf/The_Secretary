@@ -204,18 +204,18 @@ const TutorialController = {
     if (!note) {
       const noteSummaryHTML = `<p>${(typeof t === 'function' ? t('tutorial.introNoteSummary') : '') || '15-minute orientation session introducing Secretary planning, tasks, and decisions.'}</p>`;
       const noteMainHTML = `
-<h2>${(typeof t === 'function' ? t('tutorial.introNoteHeading') : '') || 'Welcome to Secretary'}</h2>
+<h1>${(typeof t === 'function' ? t('tutorial.introNoteHeading') : '') || 'Welcome to Secretary'}</h1>
 <p>${(typeof t === 'function' ? t('tutorial.introNoteP1') : '') || 'This 15-minute introductory block helps you discover how time blocking, notes, actionable tasks, and strategic decisions connect together seamlessly.'}</p>
 
-<h3>${(typeof t === 'function' ? t('tutorial.introNoteTasksHeading') : '') || 'Tasks and Action Items'}</h3>
+<h2>${(typeof t === 'function' ? t('tutorial.introNoteTasksHeading') : '') || 'Tasks and Action Items'}</h2>
 <p>${(typeof t === 'function' ? t('tutorial.introNoteTasksDesc') : '') || 'Secretary turns notes into tracked items. Try selecting the text below with your cursor and clicking the Task button to convert it into a Todo:'}</p>
 <p><strong>${(typeof t === 'function' ? t('tutorial.introNoteSampleTodo') : '') || 'Select and create a todo: Review weekly priorities'}</strong></p>
 
-<h3>${(typeof t === 'function' ? t('tutorial.introNoteDecisionHeading') : '') || 'Strategic Decisions'}</h3>
+<h2>${(typeof t === 'function' ? t('tutorial.introNoteDecisionHeading') : '') || 'Strategic Decisions'}</h2>
 <p>${(typeof t === 'function' ? t('tutorial.introNoteDecisionDesc') : '') || 'Whenever an agreement or decision is reached, select the sentence and click the Decision button:'}</p>
 <p><strong>${(typeof t === 'function' ? t('tutorial.introNoteSampleDecision') : '') || 'Select and define a decision (I will use the secretary from now on)'}</strong></p>
 
-<h3>${(typeof t === 'function' ? t('tutorial.introNoteTipsHeading') : '') || 'Next Steps'}</h3>
+<h2>${(typeof t === 'function' ? t('tutorial.introNoteTipsHeading') : '') || 'Next Steps'}</h2>
 <p>${(typeof t === 'function' ? t('tutorial.introNoteTipsDesc') : '') || 'Keep taking notes during your focus blocks. All action items and decisions will automatically sync across the Planner, Todos, and Workstreams tabs.'}</p>
       `.trim();
 

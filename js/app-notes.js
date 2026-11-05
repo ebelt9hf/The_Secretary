@@ -2648,66 +2648,66 @@ const NoteTemplateManager = {
     const l = lang || (typeof getWorkingLanguage === 'function' ? getWorkingLanguage() : (typeof getNoteLanguage === 'function' ? getNoteLanguage() : 'en'));
     const context = (typeof options === 'string' ? options : (options?.context || options?.description || '')).trim();
     const goalTitle = t('common.goal', { lang: l }) || 'Goal';
-    const goalSection = context ? `<h2>${escH(goalTitle)}</h2>\n<p>${escH(context)}</p>\n` : '';
+    const goalSection = context ? `<h1>${escH(goalTitle)}</h1>\n<p>${escH(context)}</p>\n` : '';
 
     switch (templateId) {
       case 'meeting_1on1':
-        return `${goalSection}<h2>${escH(t('templates.1on1CheckIn', { lang: l }))}</h2>
+        return `${goalSection}<h1>${escH(t('templates.1on1CheckIn', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('templates.1on1Feedback', { lang: l }))}</h2>
+<h1>${escH(t('templates.1on1Feedback', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('common.actions', { lang: l }))}</h2>
+<h1>${escH(t('common.actions', { lang: l }))}</h1>
 <ul>
   <li></li>
 </ul>`;
 
       case 'project_kickoff':
-        return `<h2>${escH(goalTitle)}</h2>
+        return `<h1>${escH(goalTitle)}</h1>
 <p>${context ? escH(context) : ''}</p>
-<h2>${escH(t('templates.kickoffScope', { lang: l }))}</h2>
+<h1>${escH(t('templates.kickoffScope', { lang: l }))}</h1>
 <ul>
   <li></li>
 </ul>
-<h2>${escH(t('common.decisions', { lang: l }))}</h2>
+<h1>${escH(t('common.decisions', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('common.actions', { lang: l }))}</h2>
+<h1>${escH(t('common.actions', { lang: l }))}</h1>
 <ul>
   <li></li>
 </ul>`;
 
       case 'decision_rfc':
-        return `${goalSection}<h2>${escH(t('templates.rfcContext', { lang: l }))}</h2>
+        return `${goalSection}<h1>${escH(t('templates.rfcContext', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('templates.rfcOptions', { lang: l }))}</h2>
+<h1>${escH(t('templates.rfcOptions', { lang: l }))}</h1>
 <ul>
   <li><strong>Option A:</strong> </li>
   <li><strong>Option B:</strong> </li>
 </ul>
-<h2>${escH(t('common.decisions', { lang: l }))}</h2>
+<h1>${escH(t('common.decisions', { lang: l }))}</h1>
 <p>!decision:active ""</p>
-<h2>${escH(t('common.actions', { lang: l }))}</h2>
+<h1>${escH(t('common.actions', { lang: l }))}</h1>
 <ul>
   <li></li>
 </ul>`;
 
       case 'postmortem':
-        return `${goalSection}<h2>${escH(t('templates.postmortemSummary', { lang: l }))}</h2>
+        return `${goalSection}<h1>${escH(t('templates.postmortemSummary', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('templates.postmortemRootCause', { lang: l }))}</h2>
+<h1>${escH(t('templates.postmortemRootCause', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('common.decisions', { lang: l }))}</h2>
+<h1>${escH(t('common.decisions', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('common.actions', { lang: l }))}</h2>
+<h1>${escH(t('common.actions', { lang: l }))}</h1>
 <ul>
   <li></li>
 </ul>`;
 
       case 'daily_standup':
-        return `<h2>${escH(goalTitle)}</h2>
+        return `<h1>${escH(goalTitle)}</h1>
 <p>${context ? escH(context) : ''}</p>
-<h2>${escH(t('templates.standupBlockers', { lang: l }))}</h2>
+<h1>${escH(t('templates.standupBlockers', { lang: l }))}</h1>
 <p></p>
-<h2>${escH(t('common.actions', { lang: l }))}</h2>
+<h1>${escH(t('common.actions', { lang: l }))}</h1>
 <ul>
   <li></li>
 </ul>`;
@@ -2715,7 +2715,7 @@ const NoteTemplateManager = {
       default:
         return typeof getDefaultNoteTemplateHTML === 'function'
           ? getDefaultNoteTemplateHTML(l, options)
-          : `<h2>${escH(goalTitle)}</h2><p>${context ? escH(context) : ''}</p><h2>${escH(t('common.notes', { lang: l }))}</h2><p></p><h2>${escH(t('common.decisions', { lang: l }))}</h2><p></p><h2>${escH(t('common.actions', { lang: l }))}</h2><p></p>`;
+          : `<h1>${escH(goalTitle)}</h1><p>${context ? escH(context) : ''}</p><h1>${escH(t('common.notes', { lang: l }))}</h1><p></p><h1>${escH(t('common.decisions', { lang: l }))}</h1><p></p><h1>${escH(t('common.actions', { lang: l }))}</h1><p></p>`;
     }
   }
 };

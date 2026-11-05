@@ -138,34 +138,34 @@ describe('Note Templates Working Language & Header Preview Engine', () => {
 
     it('generates HTML with localized headers for meeting_1on1 in different languages', () => {
       const enHtml = NoteTemplateManager.getTemplateHTML('meeting_1on1', 'en');
-      expect(enHtml).toContain('<h2>Personal Context &amp; Checkin</h2>');
-      expect(enHtml).toContain('<h2>Feedback &amp; Discussion Topic</h2>');
-      expect(enHtml).toContain('<h2>Action Items</h2>');
-      expect(enHtml).not.toContain('<h2>Agenda &amp; Priorities</h2>');
+      expect(enHtml).toContain('<h1>Personal Context &amp; Checkin</h1>');
+      expect(enHtml).toContain('<h1>Feedback &amp; Discussion Topic</h1>');
+      expect(enHtml).toContain('<h1>Action Items</h1>');
+      expect(enHtml).not.toContain('<h1>Agenda &amp; Priorities</h1>');
 
       const frHtml = NoteTemplateManager.getTemplateHTML('meeting_1on1', 'fr');
-      expect(frHtml).toContain('<h2>Contexte personnel et prise de contact</h2>');
-      expect(frHtml).toContain('<h2>Retours et thème de discussion</h2>');
-      expect(frHtml).toContain('<h2>Actions</h2>');
+      expect(frHtml).toContain('<h1>Contexte personnel et prise de contact</h1>');
+      expect(frHtml).toContain('<h1>Retours et thème de discussion</h1>');
+      expect(frHtml).toContain('<h1>Actions</h1>');
 
       const deHtml = NoteTemplateManager.getTemplateHTML('meeting_1on1', 'de');
-      expect(deHtml).toContain('<h2>Persönlicher Kontext und Check-in</h2>');
-      expect(deHtml).toContain('<h2>Feedback und Diskussionsthema</h2>');
-      expect(deHtml).toContain('<h2>Aktionspunkte</h2>');
+      expect(deHtml).toContain('<h1>Persönlicher Kontext und Check-in</h1>');
+      expect(deHtml).toContain('<h1>Feedback und Diskussionsthema</h1>');
+      expect(deHtml).toContain('<h1>Aktionspunkte</h1>');
     });
 
     it('generates HTML with localized headers for project_kickoff and postmortem', () => {
       const enKickoff = NoteTemplateManager.getTemplateHTML('project_kickoff', 'en');
-      expect(enKickoff).toContain('<h2>Goal</h2>');
-      expect(enKickoff).toContain('<h2>Scope &amp; Success Criteria</h2>');
-      expect(enKickoff).toContain('<h2>Decisions</h2>');
-      expect(enKickoff).toContain('<h2>Action Items</h2>');
+      expect(enKickoff).toContain('<h1>Goal</h1>');
+      expect(enKickoff).toContain('<h1>Scope &amp; Success Criteria</h1>');
+      expect(enKickoff).toContain('<h1>Decisions</h1>');
+      expect(enKickoff).toContain('<h1>Action Items</h1>');
 
       const frPostmortem = NoteTemplateManager.getTemplateHTML('postmortem', 'fr');
-      expect(frPostmortem).toContain('<h2>Résumé exécutif de l\'incident</h2>');
-      expect(frPostmortem).toContain('<h2>Analyse de la cause profonde</h2>');
-      expect(frPostmortem).toContain('<h2>Décisions</h2>');
-      expect(frPostmortem).toContain('<h2>Actions</h2>');
+      expect(frPostmortem).toContain('<h1>Résumé exécutif de l\'incident</h1>');
+      expect(frPostmortem).toContain('<h1>Analyse de la cause profonde</h1>');
+      expect(frPostmortem).toContain('<h1>Décisions</h1>');
+      expect(frPostmortem).toContain('<h1>Actions</h1>');
     });
   });
 
@@ -199,7 +199,7 @@ describe('Note Templates Working Language & Header Preview Engine', () => {
       ta.innerHTML = '';
 
       applyTemplateToCurrentNote('meeting_1on1', 'en', { merge: false });
-      expect(ta.innerHTML).toContain('<h2>Personal Context &amp; Checkin</h2>');
+      expect(ta.innerHTML).toContain('<h1>Personal Context &amp; Checkin</h1>');
       expect(globalThis.StorageAPI.saveSnapshot).not.toHaveBeenCalled();
     });
 
@@ -209,7 +209,7 @@ describe('Note Templates Working Language & Header Preview Engine', () => {
 
       applyTemplateToCurrentNote('meeting_1on1', 'en', { merge: true });
       expect(ta.innerHTML).toContain('<p>Initial notes taken before meeting starts.</p>');
-      expect(ta.innerHTML).toContain('<h2>Personal Context &amp; Checkin</h2>');
+      expect(ta.innerHTML).toContain('<h1>Personal Context &amp; Checkin</h1>');
       expect(globalThis.StorageAPI.saveSnapshot).toHaveBeenCalledWith(
         'notes/test-note-1.html',
         '<p>Initial notes taken before meeting starts.</p>',
@@ -224,7 +224,7 @@ describe('Note Templates Working Language & Header Preview Engine', () => {
 
       applyTemplateToCurrentNote('decision_rfc', 'en', { merge: true });
       expect(ta.value).toContain('Existing plain text notes\n\n');
-      expect(ta.value).toContain('<h2>Context &amp; Background</h2>');
+      expect(ta.value).toContain('<h1>Context &amp; Background</h1>');
     });
   });
 
@@ -271,10 +271,10 @@ describe('Note Templates Working Language & Header Preview Engine', () => {
 
       expect(globalThis.StorageAPI.writeNoteContent).toHaveBeenCalled();
       const writtenHTML = globalThis.StorageAPI.writeNoteContent.mock.calls[0][1];
-      expect(writtenHTML).toContain('<h2>Personal Context &amp; Checkin</h2>');
-      expect(writtenHTML).toContain('<h2>Feedback &amp; Discussion Topic</h2>');
-      expect(writtenHTML).toContain('<h2>Action Items</h2>');
-      expect(writtenHTML).not.toContain('<h2>Goal</h2>');
+      expect(writtenHTML).toContain('<h1>Personal Context &amp; Checkin</h1>');
+      expect(writtenHTML).toContain('<h1>Feedback &amp; Discussion Topic</h1>');
+      expect(writtenHTML).toContain('<h1>Action Items</h1>');
+      expect(writtenHTML).not.toContain('<h1>Goal</h1>');
     });
 
     it('always includes a Goal section when a planner block has additional context', async () => {
@@ -291,11 +291,11 @@ describe('Note Templates Working Language & Header Preview Engine', () => {
 
       expect(globalThis.StorageAPI.writeNoteContent).toHaveBeenCalled();
       const writtenHTML = globalThis.StorageAPI.writeNoteContent.mock.calls[0][1];
-      expect(writtenHTML).toContain('<h2>Goal</h2>');
+      expect(writtenHTML).toContain('<h1>Goal</h1>');
       expect(writtenHTML).toContain('<p>Quarterly review and discussing promotion path</p>');
-      expect(writtenHTML).toContain('<h2>Personal Context &amp; Checkin</h2>');
-      expect(writtenHTML).toContain('<h2>Feedback &amp; Discussion Topic</h2>');
-      expect(writtenHTML).toContain('<h2>Action Items</h2>');
+      expect(writtenHTML).toContain('<h1>Personal Context &amp; Checkin</h1>');
+      expect(writtenHTML).toContain('<h1>Feedback &amp; Discussion Topic</h1>');
+      expect(writtenHTML).toContain('<h1>Action Items</h1>');
     });
   });
 });

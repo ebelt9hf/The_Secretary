@@ -78,7 +78,7 @@ describe('Daily Review Final Step (Step 5) Note Editor & Summaries', () => {
     global.normalizeLanguageCode = (l) => l;
     global.formatLocalDateValue = (d) => (d instanceof Date ? d.toISOString().split('T')[0] : String(d));
     global.parseLocalDateValue = (s) => new Date(s);
-    global.getDefaultNoteTemplateHTML = () => '<h2>Objectif</h2><p></p><h2>Notes</h2><p></p><h2>Décisions</h2><p></p><h2>Actions</h2><p></p>';
+    global.getDefaultNoteTemplateHTML = () => '<h1>Objectif</h1><p></p><h1>Notes</h1><p></p><h1>Décisions</h1><p></p><h1>Actions</h1><p></p>';
     global.parseNoteHTML = (h) => {
       const match = /<title>([^<]*)<\/title>/.exec(h || '');
       const mainMatch = /<main>([\s\S]*?)<\/main>/.exec(h || '');

@@ -226,13 +226,13 @@ describe('Note Templates & Share/Export Formatter', () => {
 
     it('generates rich HTML for 1-on-1 meeting template', () => {
       const html = NoteTemplateManager.getTemplateHTML('meeting_1on1');
-      expect(html).toContain('<h2');
+      expect(html).toContain('<h1');
       expect(html.toLowerCase()).toMatch(/1-on-1|agenda|action/);
     });
 
     it('generates rich HTML for project kickoff template', () => {
       const html = NoteTemplateManager.getTemplateHTML('project_kickoff');
-      expect(html).toContain('<h2');
+      expect(html).toContain('<h1');
       expect(html.toLowerCase()).toMatch(/objective|scope|milestone/);
     });
   });

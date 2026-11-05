@@ -816,13 +816,13 @@ const DailyReviewController = {
     const noNotesText = (typeof t === 'function' ? t('dailyreview.noNotesReviewedToday') : null) || 'Aucune note créée ou révisée aujourd\'hui.';
     const largeBlockText = (typeof t === 'function' ? t('dailyreview.summaryLargeBlockFlag') : null) || 'bloc de temps important';
 
-    let html = `<h2>${summaryHeading} — ${dateDisplay}</h2>\n\n`;
+    let html = `<h1>${summaryHeading} — ${dateDisplay}</h1>\n\n`;
 
-    html += `<h3>${daySecHeading}</h3>\n<p></p>\n\n`;
-    html += `<h3>${projSecHeading}</h3>\n<p></p>\n\n`;
-    html += `<h3>${pendSecHeading}</h3>\n<ul>\n  <li></li>\n</ul>\n\n`;
+    html += `<h2>${daySecHeading}</h2>\n<p></p>\n\n`;
+    html += `<h2>${projSecHeading}</h2>\n<p></p>\n\n`;
+    html += `<h2>${pendSecHeading}</h2>\n<ul>\n  <li></li>\n</ul>\n\n`;
 
-    html += `<h3>${reviewedNotesHeading}</h3>\n`;
+    html += `<h2>${reviewedNotesHeading}</h2>\n`;
     if (notes.length === 0) {
       html += `<p><em>${noNotesText}</em></p>\n\n`;
     } else {
@@ -872,7 +872,7 @@ const DailyReviewController = {
     }
     const timeRows = Array.from(rowsByLabel.entries()).filter(([, mins]) => mins > 0).sort((a, b) => b[1] - a[1]);
     if (timeRows.length) {
-      html += `<h3>${timeSpentHeading}</h3>\n<ul>\n`;
+      html += `<h2>${timeSpentHeading}</h2>\n<ul>\n`;
       for (const [label, mins] of timeRows) {
         const flag = mins >= 90 ? ` — ${largeBlockText}` : '';
         html += `  <li><strong>${escH(label)}</strong>: ${escH(fmtDur(mins))}${escH(flag)}</li>\n`;

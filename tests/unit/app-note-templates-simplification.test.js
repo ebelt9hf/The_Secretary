@@ -63,25 +63,25 @@ describe('Note Templates Simplification and Overlap Architecture', () => {
 
     it('generates HTML containing only the 3 sections when no block context is provided', () => {
       const html = NoteTemplateManager.getTemplateHTML('meeting_1on1', 'en');
-      expect(html).toContain('<h2>Personal Context &amp; Checkin</h2>');
-      expect(html).toContain('<h2>Feedback &amp; Discussion Topic</h2>');
-      expect(html).toContain('<h2>Action Items</h2>');
-      expect(html).not.toContain('<h2>Goal</h2>');
-      expect(html).not.toContain('<h2>Agenda &amp; Priorities</h2>');
-      expect(html).not.toContain('<h2>Agreed Decisions</h2>');
+      expect(html).toContain('<h1>Personal Context &amp; Checkin</h1>');
+      expect(html).toContain('<h1>Feedback &amp; Discussion Topic</h1>');
+      expect(html).toContain('<h1>Action Items</h1>');
+      expect(html).not.toContain('<h1>Goal</h1>');
+      expect(html).not.toContain('<h1>Agenda &amp; Priorities</h1>');
+      expect(html).not.toContain('<h1>Agreed Decisions</h1>');
     });
 
     it('always adds additional context in a Goal section when context is provided', () => {
       const html = NoteTemplateManager.getTemplateHTML('meeting_1on1', 'en', {
         context: 'Align on Q4 career goals and promotion timeline'
       });
-      expect(html).toContain('<h2>Goal</h2>');
+      expect(html).toContain('<h1>Goal</h1>');
       expect(html).toContain('<p>Align on Q4 career goals and promotion timeline</p>');
-      expect(html).toContain('<h2>Personal Context &amp; Checkin</h2>');
-      expect(html).toContain('<h2>Feedback &amp; Discussion Topic</h2>');
-      expect(html).toContain('<h2>Action Items</h2>');
+      expect(html).toContain('<h1>Personal Context &amp; Checkin</h1>');
+      expect(html).toContain('<h1>Feedback &amp; Discussion Topic</h1>');
+      expect(html).toContain('<h1>Action Items</h1>');
       // Goal section should be at the top
-      expect(html.indexOf('<h2>Goal</h2>')).toBeLessThan(html.indexOf('<h2>Personal Context &amp; Checkin</h2>'));
+      expect(html.indexOf('<h1>Goal</h1>')).toBeLessThan(html.indexOf('<h1>Personal Context &amp; Checkin</h1>'));
     });
   });
 
@@ -176,11 +176,11 @@ describe('Note Templates Simplification and Overlap Architecture', () => {
 
       expect(globalThis.StorageAPI.writeNoteContent).toHaveBeenCalled();
       const writtenHTML = globalThis.StorageAPI.writeNoteContent.mock.calls[0][1];
-      expect(writtenHTML).toContain('<h2>Goal</h2>');
+      expect(writtenHTML).toContain('<h1>Goal</h1>');
       expect(writtenHTML).toContain('<p>Discuss release blockers and roadmap priorities</p>');
-      expect(writtenHTML).toContain('<h2>Personal Context &amp; Checkin</h2>');
-      expect(writtenHTML).toContain('<h2>Feedback &amp; Discussion Topic</h2>');
-      expect(writtenHTML).toContain('<h2>Action Items</h2>');
+      expect(writtenHTML).toContain('<h1>Personal Context &amp; Checkin</h1>');
+      expect(writtenHTML).toContain('<h1>Feedback &amp; Discussion Topic</h1>');
+      expect(writtenHTML).toContain('<h1>Action Items</h1>');
     });
 
     it('injects additional context into existing Goal section for kickoff block', async () => {
@@ -197,11 +197,11 @@ describe('Note Templates Simplification and Overlap Architecture', () => {
 
       expect(globalThis.StorageAPI.writeNoteContent).toHaveBeenCalled();
       const writtenHTML = globalThis.StorageAPI.writeNoteContent.mock.calls[0][1];
-      expect(writtenHTML).toContain('<h2>Goal</h2>');
+      expect(writtenHTML).toContain('<h1>Goal</h1>');
       expect(writtenHTML).toContain('<p>Migrate legacy APIs to microservices architecture</p>');
-      expect(writtenHTML).toContain('<h2>Scope &amp; Success Criteria</h2>');
-      expect(writtenHTML).toContain('<h2>Decisions</h2>');
-      expect(writtenHTML).toContain('<h2>Action Items</h2>');
+      expect(writtenHTML).toContain('<h1>Scope &amp; Success Criteria</h1>');
+      expect(writtenHTML).toContain('<h1>Decisions</h1>');
+      expect(writtenHTML).toContain('<h1>Action Items</h1>');
     });
 
     it('prepends a Goal section with context for RFC block', async () => {
@@ -218,12 +218,12 @@ describe('Note Templates Simplification and Overlap Architecture', () => {
 
       expect(globalThis.StorageAPI.writeNoteContent).toHaveBeenCalled();
       const writtenHTML = globalThis.StorageAPI.writeNoteContent.mock.calls[0][1];
-      expect(writtenHTML).toContain('<h2>Goal</h2>');
+      expect(writtenHTML).toContain('<h1>Goal</h1>');
       expect(writtenHTML).toContain('<p>Decide between Kafka and NATS for message bus</p>');
-      expect(writtenHTML).toContain('<h2>Context &amp; Background</h2>');
-      expect(writtenHTML).toContain('<h2>Options Considered &amp; Trade-offs</h2>');
-      expect(writtenHTML).toContain('<h2>Decisions</h2>');
-      expect(writtenHTML).toContain('<h2>Action Items</h2>');
+      expect(writtenHTML).toContain('<h1>Context &amp; Background</h1>');
+      expect(writtenHTML).toContain('<h1>Options Considered &amp; Trade-offs</h1>');
+      expect(writtenHTML).toContain('<h1>Decisions</h1>');
+      expect(writtenHTML).toContain('<h1>Action Items</h1>');
     });
   });
 });

@@ -666,13 +666,13 @@ function getDefaultNoteTemplateHTML(lang, options = {}) {
   const context = (typeof options === 'string' ? options : (options?.context || options?.description || '')).trim();
 
   return `
-<h2>${escH(goalHeader)}</h2>
+<h1>${escH(goalHeader)}</h1>
 <p>${context ? escH(context) : ''}</p>
-<h2>${escH(notesHeader)}</h2>
+<h1>${escH(notesHeader)}</h1>
 <p></p>
-<h2>${escH(decisionsHeader)}</h2>
+<h1>${escH(decisionsHeader)}</h1>
 <p></p>
-<h2>${escH(actionsHeader)}</h2>
+<h1>${escH(actionsHeader)}</h1>
 <p></p>
   `.trim();
 }
