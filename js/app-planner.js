@@ -1887,6 +1887,36 @@ function parsePlannerDuration(raw, fallback = null) {
 const MAX_PLANNER_PROPOSALS_CAP = 1000;
 
 /**
+ * Checks whether an unaccepted proposed event has elapsed into the past.
+ * If a proposal is for an earlier date, or earlier time today, it is considered past.
+ * All-day events today are considered active through today.
+ * @param {Object} proposal
+ * @param {Date} [now=new Date()]
+ * @returns {boolean}
+ */
+function isPlannerProposalInPast(proposal, now = new Date()) {
+  if (!proposal || !proposal.date) return false;
+  if (proposal.isDraft || proposal.source === 'Draft') return false;
+  const todayStr = (typeof formatLocalDateValue === 'function')
+    ? formatLocalDateValue(now)
+    : now.toISOString().slice(0, 10);
+  if (proposal.date < todayStr) return true;
+  if (proposal.date > todayStr) return false;
+  // If proposal.date === todayStr:
+  if (proposal.allDay) return false;
+  const end = proposal.endTime || proposal.startTime;
+  if (end && /^\d{1,2}:\d{2}$/.test(end)) {
+    const [h, m] = end.split(':').map(Number);
+    const nowH = now.getHours();
+    const nowM = now.getMinutes();
+    if (h < nowH || (h === nowH && m <= nowM)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Normalizes raw proposal data from planner-proposals.json.
  * Deduplicates by unique proposal ID so external agents can safely append entries.
  * Checks against existing plannerEvents to ensure already accepted proposals do not overlap or duplicate.
@@ -2385,6 +2415,42 @@ if (typeof window !== 'undefined') {
   window.hasPlannerDayGap = hasPlannerDayGap;
 }
 
+/**
+ * Calculates the previous working day before a given date based on activeWorkingDays.
+ * @param {Date|string} date - Base date
+ * @param {number[]} activeWorkingDays - Array of active day numbers (0=Sun, 1=Mon, ..., 6=Sat)
+ * @returns {Date}
+ */
+function getPreviousWorkingDay(date, activeWorkingDays = [1, 2, 3, 4, 5]) {
+  const d = (date instanceof Date) ? new Date(date) : ((typeof parseLocalDateValue === 'function') ? parseLocalDateValue(date) : new Date(date));
+  d.setHours(0, 0, 0, 0);
+  const validDays = (Array.isArray(activeWorkingDays) && activeWorkingDays.length > 0) ? activeWorkingDays : [1, 2, 3, 4, 5];
+  let iterations = 0;
+  do {
+    d.setDate(d.getDate() - 1);
+    iterations++;
+  } while (!validDays.includes(d.getDay()) && iterations < 14);
+  return d;
+}
+
+/**
+ * Calculates the next working day after a given date based on activeWorkingDays.
+ * @param {Date|string} date - Base date
+ * @param {number[]} activeWorkingDays - Array of active day numbers (0=Sun, 1=Mon, ..., 6=Sat)
+ * @returns {Date}
+ */
+function getNextWorkingDay(date, activeWorkingDays = [1, 2, 3, 4, 5]) {
+  const d = (date instanceof Date) ? new Date(date) : ((typeof parseLocalDateValue === 'function') ? parseLocalDateValue(date) : new Date(date));
+  d.setHours(0, 0, 0, 0);
+  const validDays = (Array.isArray(activeWorkingDays) && activeWorkingDays.length > 0) ? activeWorkingDays : [1, 2, 3, 4, 5];
+  let iterations = 0;
+  do {
+    d.setDate(d.getDate() + 1);
+    iterations++;
+  } while (!validDays.includes(d.getDay()) && iterations < 14);
+  return d;
+}
+
 function setPlannerViewMode(mode) {
   plannerViewMode = mode;
   try { localStorage.setItem('secretaryPlannerViewMode', mode); } catch (e) { }
@@ -2763,9 +2829,38 @@ function renderPlanner() {
   let prevTitle = t('planner.prevWeekTooltip');
   let nextTitle = t('planner.nextWeekTooltip');
 
+  const activeWorkingDays = (typeof plannerWorkingDays !== 'undefined' && Array.isArray(plannerWorkingDays) && plannerWorkingDays.length > 0) ? plannerWorkingDays : [1, 2, 3, 4, 5];
+
   if (plannerViewMode === 'week') {
     prevLabel = t('planner.prevWeek');
     nextLabel = t('planner.nextWeek');
+  } else if (plannerViewMode === '3days' || plannerViewMode === '5days') {
+    const prevWorkingDay = getPreviousWorkingDay(activeWeekStart, activeWorkingDays);
+    const nextWorkingDay = getNextWorkingDay(activeWeekStart, activeWorkingDays);
+
+    prevOffset = Math.round((prevWorkingDay.getTime() - activeWeekStart.getTime()) / (1000 * 60 * 60 * 24));
+    nextOffset = Math.round((nextWorkingDay.getTime() - activeWeekStart.getTime()) / (1000 * 60 * 60 * 24));
+
+    const yesterdayWorkingDay = getPreviousWorkingDay(today, activeWorkingDays);
+    const tomorrowWorkingDay = getNextWorkingDay(today, activeWorkingDays);
+
+    if (prevWorkingDay.getTime() === today.getTime()) {
+      prevLabel = `‹ ${t('planner.today')}`;
+    } else if (prevWorkingDay.getTime() === yesterdayWorkingDay.getTime()) {
+      prevLabel = `‹ ${t('planner.yesterday')}`;
+    } else {
+      prevLabel = `‹ ${new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(prevWorkingDay)}`;
+    }
+    prevTitle = t('planner.prevDayTooltip');
+
+    if (nextWorkingDay.getTime() === today.getTime()) {
+      nextLabel = `${t('planner.today')} ›`;
+    } else if (nextWorkingDay.getTime() === tomorrowWorkingDay.getTime()) {
+      nextLabel = `${t('planner.tomorrow')} ›`;
+    } else {
+      nextLabel = `${new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(nextWorkingDay)} ›`;
+    }
+    nextTitle = t('planner.nextDayTooltip');
   } else {
     prevOffset = -1;
     nextOffset = 1;
@@ -2792,6 +2887,18 @@ function renderPlanner() {
   // Clear context menus
   closePlannerContextMenu();
 
+  // Deselect block if it is not in one of the visible days
+  if (selectedPlannerEventId) {
+    const selectedEvt = (Array.isArray(plannerEvents) ? plannerEvents : []).find(e => e && e.id === selectedPlannerEventId);
+    const isVisibleInDays = selectedEvt && (
+      daysToDisplay.includes(selectedEvt.date) ||
+      (selectedEvt.endDate && daysToDisplay.some(d => d >= selectedEvt.date && d <= selectedEvt.endDate))
+    );
+    if (!isVisibleInDays) {
+      selectedPlannerEventId = null;
+    }
+  }
+
   const rightToggleText = plannerRightSidebarCollapsed ? '‹' : '›';
   const unassigned = getPlannerUnassignedTodos();
   const notDone = getPlannerNotDoneTodos();
@@ -2810,9 +2917,11 @@ function renderPlanner() {
 
   const stats = getPlannerWeeklyStats();
 
-  const pendingProposalsCount = (Array.isArray(plannerProposals) ? plannerProposals : []).filter(p => {
+  const allProposals = (typeof getPlannerProposals === 'function') ? getPlannerProposals() : plannerProposals;
+  const pendingProposalsCount = (Array.isArray(allProposals) ? allProposals : []).filter(p => {
     if (!p || p.status !== 'pending') return false;
     if ((plannerEvents || []).some(e => e && e.proposalId === p.id)) return false;
+    if (typeof isPlannerProposalInPast === 'function' && isPlannerProposalInPast(p)) return false;
     return true;
   }).length;
 
@@ -3059,9 +3168,22 @@ function _onPlannerWheelSwipe(e) {
   if (!res.handled) return;
   e.preventDefault();
   if (res.direction !== 0) {
-    const step = plannerViewMode === 'week' ? 7 : 1;
+    let step = res.direction;
+    if (plannerViewMode === 'week') {
+      step = res.direction * 7;
+    } else if (plannerViewMode === '3days' || plannerViewMode === '5days') {
+      const activeWorkingDays = (typeof plannerWorkingDays !== 'undefined' && Array.isArray(plannerWorkingDays) && plannerWorkingDays.length > 0) ? plannerWorkingDays : [1, 2, 3, 4, 5];
+      const activeStart = (typeof currentPlannerWeekStart !== 'undefined' && currentPlannerWeekStart) ? currentPlannerWeekStart : new Date();
+      if (res.direction < 0) {
+        const prevWork = getPreviousWorkingDay(activeStart, activeWorkingDays);
+        step = Math.round((prevWork.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
+      } else {
+        const nextWork = getNextWorkingDay(activeStart, activeWorkingDays);
+        step = Math.round((nextWork.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
+      }
+    }
     _plannerPendingSwipeAnim = res.direction;
-    navigatePlannerWeek(res.direction * step);
+    navigatePlannerWeek(step);
   }
 }
 
@@ -3649,6 +3771,7 @@ function renderPlannerEventsForDayHTML(dateStr) {
     let dayProposals = currentProposals.filter(p => {
       if (!p || p.status !== 'pending') return false;
       if (plannerEvents.some(e => e && e.proposalId === p.id)) return false;
+      if (typeof isPlannerProposalInPast === 'function' && isPlannerProposalInPast(p)) return false;
       return p.date === dateStr;
     });
     if (dayProposals.length > MAX_DAY_PROPOSALS_RENDERED) {
@@ -4630,9 +4753,7 @@ function selectPlannerEvent(eventId) {
   selectedPlannerEventId = selectedPlannerEventId === eventId ? null : eventId;
   if (selectedPlannerEventId) {
     plannerActivePaneTab = 'details';
-    plannerRightSidebarCollapsed = false;
     try { sessionStorage.setItem('secretaryPlannerActivePaneTab', plannerActivePaneTab); } catch (e) { }
-    try { localStorage.setItem('secretaryPlannerRightCollapsed', '0'); } catch (e) { }
   }
   renderPlanner();
 }
@@ -12193,10 +12314,10 @@ async function checkPlannerRefresh() {
       const propData = await StorageAPI.readPlannerProposals();
       const propJSON = JSON.stringify(propData || {});
       if (propJSON !== _lastProposalsJSON) {
-        const prevPendingCount = (Array.isArray(plannerProposals) ? plannerProposals : []).filter(p => p && p.status === 'pending').length;
+        const prevPendingCount = (Array.isArray(plannerProposals) ? plannerProposals : []).filter(p => p && p.status === 'pending' && (typeof isPlannerProposalInPast !== 'function' || !isPlannerProposalInPast(p)) && !(plannerEvents || []).some(e => e && e.proposalId === p.id)).length;
         _lastProposalsJSON = propJSON;
         await loadPlannerProposals();
-        const nextPendingCount = (Array.isArray(plannerProposals) ? plannerProposals : []).filter(p => p && p.status === 'pending').length;
+        const nextPendingCount = (Array.isArray(plannerProposals) ? plannerProposals : []).filter(p => p && p.status === 'pending' && (typeof isPlannerProposalInPast !== 'function' || !isPlannerProposalInPast(p)) && !(plannerEvents || []).some(e => e && e.proposalId === p.id)).length;
         
         // Anti-spam toast rate limiter (at most once every 5 seconds)
         if (nextPendingCount > prevPendingCount && (now - _lastProposalsToastAt >= 5000) && typeof toast === 'function') {
@@ -12345,6 +12466,9 @@ window.openPlanEventModalFromProposal = openPlanEventModalFromProposal;
 window.quickAcceptPlannerProposal = quickAcceptPlannerProposal;
 window.dismissPlannerProposal = dismissPlannerProposal;
 window.markPlannerProposalAccepted = markPlannerProposalAccepted;
+window.getPreviousWorkingDay = getPreviousWorkingDay;
+window.getNextWorkingDay = getNextWorkingDay;
+window.isPlannerProposalInPast = isPlannerProposalInPast;
 
 // ═══ Upcoming Event Desktop Reminders ═══
 const PlannerReminderEngine = {

@@ -4305,7 +4305,7 @@ function renderCalendarSyncPrefs() {
   const statusEl = document.getElementById('prefs-local-proposals-status');
   if (statusEl) {
     const pendingCount = (typeof plannerProposals !== 'undefined' && Array.isArray(plannerProposals))
-      ? plannerProposals.filter(p => p && p.status === 'pending').length
+      ? plannerProposals.filter(p => p && p.status === 'pending' && (typeof isPlannerProposalInPast !== 'function' || !isPlannerProposalInPast(p)) && !((typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents) ? plannerEvents : []).some(e => e && e.proposalId === p.id))).length
       : 0;
     const txtTemplate = (typeof t === 'function' ? t('prefs.proposalsWaiting') : '{count} proposal(s) waiting for review');
     statusEl.textContent = txtTemplate.replace('{count}', pendingCount);

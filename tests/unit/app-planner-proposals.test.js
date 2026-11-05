@@ -472,25 +472,31 @@ describe('Planner Agent Proposals Engine (app-planner.js & app-storage.js)', () 
 
     it('caps rendered proposal blocks per day to prevent DOM node explosion', () => {
       const dayProposals = [];
-      for (let i = 0; i < 150; i++) {
-        dayProposals.push({
-          id: `day-flood-${i}`,
-          title: `Day Flood ${i}`,
-          date: '2026-09-14',
-          startTime: '10:00',
-          endTime: '10:30',
-          duration: 30,
-          status: 'pending'
-        });
-      }
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-09-14T08:00:00'));
+      try {
+        for (let i = 0; i < 150; i++) {
+          dayProposals.push({
+            id: `day-flood-${i}`,
+            title: `Day Flood ${i}`,
+            date: '2026-09-14',
+            startTime: '10:00',
+            endTime: '10:30',
+            duration: 30,
+            status: 'pending'
+          });
+        }
 
-      plannerScope.showPlannerProposals = true;
-      plannerScope.setPlannerProposals(dayProposals);
-      const html = plannerScope.renderPlannerEventsForDayHTML('2026-09-14');
-      // Check that proposed-event count is capped at 50
-      const matches = html.match(/class="[^"]*proposed-event/g) || [];
-      expect(matches.length).toBeLessThanOrEqual(50);
-      expect(matches.length).toBe(50);
+        plannerScope.showPlannerProposals = true;
+        plannerScope.setPlannerProposals(dayProposals);
+        const html = plannerScope.renderPlannerEventsForDayHTML('2026-09-14');
+        // Check that proposed-event count is capped at 50
+        const matches = html.match(/class="[^"]*proposed-event/g) || [];
+        expect(matches.length).toBeLessThanOrEqual(50);
+        expect(matches.length).toBe(50);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
