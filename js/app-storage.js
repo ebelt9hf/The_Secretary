@@ -1129,13 +1129,27 @@ const StorageAPI = {
 
   async moveToTrash(path, meta = {}) {
     if (!path) return null;
-    const content = await this.readNoteContent(path);
-    const filename = path.split('/').pop() || 'note.html';
+    let content = meta.content || '';
+    if (!content) {
+      try {
+        content = await this.readNoteContent(path);
+      } catch (readErr) {
+        console.warn('[StorageAPI] Note content read before trash failed, continuing with empty content:', path, readErr);
+        content = '';
+      }
+    }
+    const filename = String(path).replace(/\\/g, '/').split('/').pop() || 'note.html';
     
-    const trashList = await this.listTrash();
+    let trashList = [];
+    try {
+      trashList = await this.listTrash();
+      if (!Array.isArray(trashList)) trashList = [];
+    } catch (e) {
+      trashList = [];
+    }
     let trashFilename = filename;
     let counter = 1;
-    while (trashList.some(item => item.filename === trashFilename)) {
+    while (trashList.some(item => item && item.filename === trashFilename)) {
       counter++;
       const dotIdx = filename.lastIndexOf('.');
       if (dotIdx !== -1) {
@@ -1154,18 +1168,30 @@ const StorageAPI = {
     trashList.unshift(trashEntry);
 
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked) {
-      await window.FirebaseSyncService.putDoc('trash', 'manifest', trashList);
-      await window.FirebaseSyncService.putDoc('trash', trashFilename, {
-        ...trashEntry,
-        content
-      });
+      try {
+        await window.FirebaseSyncService.putDoc('trash', 'manifest', trashList);
+        await window.FirebaseSyncService.putDoc('trash', trashFilename, {
+          ...trashEntry,
+          content
+        });
+      } catch (fbErr) {
+        console.warn('[StorageAPI] Firebase trash sync error:', fbErr);
+      }
     } else {
       const trashPath = `.trash/${trashFilename}`;
-      await writeFile(trashPath, content);
-      await this._writeJSON('.trash/manifest.json', trashList);
+      try {
+        await writeFile(trashPath, content);
+        await this._writeJSON('.trash/manifest.json', trashList);
+      } catch (fsErr) {
+        console.warn('[StorageAPI] Local filesystem trash write warning:', fsErr);
+      }
     }
 
-    await this.deleteNoteContent(path);
+    try {
+      await this.deleteNoteContent(path, meta);
+    } catch (delErr) {
+      console.warn('[StorageAPI] Note deletion from notes directory warning:', delErr);
+    }
     return trashEntry;
   },
 

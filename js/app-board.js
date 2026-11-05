@@ -146,10 +146,56 @@ async function deleteNoteFromCard(path) {
     // Move to Trash
     const deletedNoteId = meta.id || null;
     const targetPath = meta.path || String(path).replace(/\\/g, '/');
-    await StorageAPI.moveToTrash(targetPath, { title: meta.title });
+
+    // 1. Immediately delete from Tier 1 (RAM & IDB)
+    try {
+      if (typeof StorageAPI !== 'undefined' && StorageAPI._deleteNoteTier1) {
+        await StorageAPI._deleteNoteTier1(deletedNoteId, targetPath);
+      }
+    } catch (e) {}
+
     const idx = manifest.findIndex(m => m && (m.path === targetPath || m.path === path || m.id === meta.id));
     if (idx >= 0) manifest.splice(idx, 1);
-    await saveManifest();
+
+    // 2. Immediately clean up plannerEvents in memory
+    if (deletedNoteId && typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+      let plannerChanged = false;
+      plannerEvents.forEach(pe => {
+        if (!pe) return;
+        if (String(pe.noteId || '').trim() === deletedNoteId) {
+          pe.noteId = '';
+          plannerChanged = true;
+        }
+        if (Array.isArray(pe.linkedNoteIds) && pe.linkedNoteIds.includes(deletedNoteId)) {
+          pe.linkedNoteIds = pe.linkedNoteIds.filter(id => id !== deletedNoteId);
+          plannerChanged = true;
+        }
+      });
+      if (plannerChanged) {
+        if (typeof savePlanner === 'function') savePlanner().catch(() => {});
+        if (typeof renderPlanner === 'function') renderPlanner();
+        if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+      }
+    }
+
+    // 3. Immediately clean up todosManifest in memory
+    if (deletedNoteId && typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+      let todosChanged = false;
+      todosManifest.forEach(td => {
+        if (!td) return;
+        if (String(td.noteId || '').trim() === deletedNoteId) {
+          td.noteId = '';
+          todosChanged = true;
+        }
+        if (Array.isArray(td.linkedNoteIds) && td.linkedNoteIds.includes(deletedNoteId)) {
+          td.linkedNoteIds = td.linkedNoteIds.filter(id => id !== deletedNoteId);
+          todosChanged = true;
+        }
+      });
+      if (todosChanged && typeof saveTodosManifest === 'function') {
+        saveTodosManifest().catch(() => {});
+      }
+    }
 
     // Close overlay if open for this note
     try {
@@ -163,6 +209,10 @@ async function deleteNoteFromCard(path) {
     broadcastSync({ type: 'NOTE_DELETED', noteId: deletedNoteId, path: targetPath });
     toast(t('trash.noteMovedToTrash') || t('common.noteDeleted'));
     renderBoard();
+    if (typeof renderPlanner === 'function') renderPlanner();
+
+    await StorageAPI.moveToTrash(targetPath, { title: meta.title });
+    await saveManifest();
   } catch (e) { toast(t('common.deleteFailed', { message: e.message }), true); }
 }
 

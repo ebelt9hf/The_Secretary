@@ -575,6 +575,13 @@ ipcMain.on('window-close', (event) => {
   win.close();
 });
 
+ipcMain.on('window-hide', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win.hide();
+  }
+});
+
 ipcMain.on('app-close-confirmed', () => {
   isAppCloseConfirmed = true;
   isQuitting = true;

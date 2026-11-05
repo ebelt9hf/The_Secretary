@@ -430,4 +430,88 @@ describe('Note Generation Progress Localization & Editor Reload Banner Isolation
     const recoveredContent = await StorageAPI.readNoteContent('notes/recovered-note.html');
     expect(recoveredContent).toBe('<p>Recovered Snapshot Content</p>');
   });
+
+  /**
+   * 1. Protected Behavior: Creating a note for a planner bloc, deleting it, recreating it, and deleting it again
+   *    cleans up `plannerEvents` references (`event.noteId` and `event.linkedNoteIds`), removes the note from manifest
+   *    and Tier-1 storage instantaneously, and executes subsequent deletions cleanly without getting stuck.
+   * 2. Regression Target: Stale `event.noteId` and dead `event.linkedNoteIds` persisting after deletion, causing
+   *    recreated notes to fail deletion or leave the planner bloc pointing to deleted notes.
+   * 3. Coverage Overlap & Redundancy: None; tests full lifecycle of create -> delete -> recreate -> delete for bloc notes.
+   * 4. Production Code Footprint: None; exercises authentic `openNoteForEvent` and `deleteCurrentNote`.
+   */
+  it('allows creating, deleting, recreating, and deleting again a note for a planner bloc without failure or stale references', async () => {
+    StorageAPI.clearSyncQueue();
+    StorageAPI._noteCache.clear();
+    globalThis.manifest = [];
+
+    const closeProgressSpy = vi.fn();
+    closeProgressSpy.updateStage = vi.fn();
+    globalThis.showPlannerNoteGenerationProgress = vi.fn(() => closeProgressSpy);
+
+    const blocEvent = {
+      id: 'bloc-event-lifecycle',
+      title: 'Sprint Planning Session',
+      type: 'work',
+      date: '2026-11-05',
+      startTime: '10:00',
+      endTime: '11:00'
+    };
+    globalThis.plannerEvents = [blocEvent];
+
+    vi.spyOn(globalThis, 'showConfirmDialog').mockResolvedValue(true);
+    vi.spyOn(StorageAPI, 'writeNoteContent').mockImplementation(async (path, content, meta) => {
+      upsertManifest({ id: meta?.id || path, path, title: meta?.title || 'Note', date: '2026-11-05' });
+      return true;
+    });
+    vi.spyOn(StorageAPI, 'moveToTrash').mockResolvedValue({ filename: 'test.html' });
+
+    // Step 1: Create Note 1
+    await openNoteForEvent(blocEvent);
+    expect(blocEvent.noteId).toBeTruthy();
+    const note1Id = blocEvent.noteId;
+    const note1Path = getCanonicalNotePath(note1Id);
+    expect(manifest.some(m => m.id === note1Id)).toBe(true);
+
+    // Open Note 1 in overlay
+    globalThis.currentNote = {
+      id: note1Id,
+      path: note1Path,
+      title: blocEvent.title,
+      mainHTML: '<p>Note 1 Content</p>'
+    };
+
+    // Step 2: Delete Note 1
+    await deleteCurrentNote();
+    expect(manifest.some(m => m.id === note1Id)).toBe(false);
+    let currentBlocEvent = plannerEvents.find(e => e.id === 'bloc-event-lifecycle');
+    expect(currentBlocEvent.noteId).toBe('');
+    expect(currentBlocEvent.linkedNoteIds || []).not.toContain(note1Id);
+
+    // Step 3: Recreate note for that same bloc
+    await openNoteForEvent(currentBlocEvent);
+    currentBlocEvent = plannerEvents.find(e => e.id === 'bloc-event-lifecycle');
+    expect(currentBlocEvent.noteId).toBeTruthy();
+    const note2Id = currentBlocEvent.noteId;
+    expect(note2Id).not.toBe(note1Id);
+    const note2Path = getCanonicalNotePath(note2Id);
+    expect(manifest.some(m => m.id === note2Id)).toBe(true);
+    expect(currentBlocEvent.linkedNoteIds).not.toContain(note1Id);
+
+    // Open Note 2 in overlay
+    globalThis.currentNote = {
+      id: note2Id,
+      path: note2Path,
+      title: currentBlocEvent.title,
+      mainHTML: '<p>Note 2 Content</p>'
+    };
+
+    // Step 4: Delete Note 2
+    await deleteCurrentNote();
+    expect(manifest.some(m => m.id === note2Id)).toBe(false);
+    currentBlocEvent = plannerEvents.find(e => e.id === 'bloc-event-lifecycle');
+    expect(currentBlocEvent.noteId).toBe('');
+    expect(currentBlocEvent.linkedNoteIds || []).not.toContain(note2Id);
+    expect(globalThis.currentNote).toBeNull();
+  });
 });

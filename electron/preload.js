@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('window-maximized-change', handler);
   },
   closeWindow: () => ipcRenderer.send('window-close'),
+  hideWindow: () => ipcRenderer.send('window-hide'),
   onMainWindowCloseRequest: (callback) => {
     const handler = () => callback();
     ipcRenderer.on('main-window-close-request', handler);

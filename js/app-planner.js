@@ -11994,6 +11994,12 @@ async function openNoteForEvent(event) {
       }
       openNoteOverlay(note.path, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
       return;
+    } else {
+      // Stale note reference pointing to deleted note: clean up immediately
+      if (event.noteId === targetNoteId) event.noteId = '';
+      if (Array.isArray(event.linkedNoteIds)) {
+        event.linkedNoteIds = event.linkedNoteIds.filter(id => id !== targetNoteId);
+      }
     }
   }
 
@@ -12056,14 +12062,17 @@ async function openNoteForEvent(event) {
     await new Promise(r => setTimeout(r, 16));
 
     event.noteId = noteId;
-    event.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...(event.linkedNoteIds || [])], noteId);
+    const isNoteValid = id => id && (typeof getNoteById === 'function' ? !!getNoteById(id) : ((typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest.some(m => m && m.id === id) : false));
+    const validExistingLinked = (event.linkedNoteIds || []).filter(isNoteValid);
+    event.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...validExistingLinked], noteId);
 
     // Propagate noteId and linkedNoteIds to linked prep events
     if (event.type === 'call' || event.type === 'sync') {
       plannerEvents.forEach(pe => {
         if (pe.type === 'prep' && pe.prepForEventId === event.id) {
           pe.noteId = noteId;
-          pe.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...(pe.linkedNoteIds || [])], noteId);
+          const peValidLinked = (pe.linkedNoteIds || []).filter(isNoteValid);
+          pe.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...peValidLinked], noteId);
         }
       });
     }

@@ -61174,6 +61174,23 @@ window.APP_TRANSLATIONS_BUNDLE = {
       "tr": "Not Çöp Kutusu",
       "uk": "Кошик нотаток"
     },
+    "trash.deletingNote": {
+      "cs": "Mazání poznámky...",
+      "de": "Notiz wird gelöscht...",
+      "en": "Deleting note...",
+      "es": "Eliminando nota...",
+      "fr": "Suppression de la note...",
+      "hu": "Jegyzet törlése...",
+      "it": "Eliminazione della nota...",
+      "nl": "Notitie verwijderen...",
+      "pl": "Usuwanie notatki...",
+      "pt": "Excluindo nota...",
+      "ro": "Se șterge notița...",
+      "ru": "Удаление заметки...",
+      "sv": "Tar bort anteckning...",
+      "tr": "Not siliniyor...",
+      "uk": "Видалення нотатки..."
+    },
     "trash.noteMovedToTrash": {
       "cs": "Poznámka byla přesunuta do koše.",
       "de": "Notiz in den Papierkorb verschoben.",

@@ -67,32 +67,226 @@ function _tryCloseCurrentWindow() {
 }
 
 // ═══ Delete current note ═══
+let _isDeleting = false;
+if (typeof window !== 'undefined') window._isDeleting = false;
+if (typeof globalThis !== 'undefined') globalThis._isDeleting = false;
+
+function showNoteDeletionProgress(noteName) {
+  if (typeof document === 'undefined' || !document.createElement) {
+    return Object.assign(() => {}, { update: () => {} });
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'dialog-overlay planner-progress-overlay note-deletion-progress-overlay';
+  overlay.style.zIndex = '99999';
+
+  const box = document.createElement('div');
+  box.className = 'dialog-box planner-progress-dialog';
+
+  const spinner = document.createElement('div');
+  spinner.className = 'planner-progress-spinner';
+  spinner.setAttribute('aria-hidden', 'true');
+
+  const title = document.createElement('div');
+  title.className = 'planner-progress-title';
+  title.textContent = typeof t === 'function' ? (t('trash.deletingNote') || 'Deleting note...') : 'Deleting note...';
+
+  const body = document.createElement('div');
+  body.className = 'planner-progress-message';
+  body.textContent = noteName ? String(noteName) : '';
+
+  const barContainer = document.createElement('div');
+  barContainer.className = 'planner-progress-bar-container';
+
+  const barFill = document.createElement('div');
+  barFill.className = 'planner-progress-bar-fill';
+  barFill.style.width = '30%';
+
+  barContainer.appendChild(barFill);
+
+  box.appendChild(spinner);
+  box.appendChild(title);
+  if (noteName) box.appendChild(body);
+  box.appendChild(barContainer);
+  overlay.appendChild(box);
+  if (document.body) {
+    document.body.appendChild(overlay);
+  }
+
+  if (window.AppBridge?.setProgressBar) {
+    try { window.AppBridge.setProgressBar(0.3); } catch (e) {}
+  }
+
+  const closeFn = () => {
+    if (window.AppBridge?.setProgressBar) {
+      try { window.AppBridge.setProgressBar(-1); } catch (e) {}
+    }
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+  };
+
+  closeFn.update = (pct) => {
+    if (barFill && typeof pct === 'number') {
+      const clamped = Math.min(100, Math.max(0, pct));
+      barFill.style.width = clamped + '%';
+      if (window.AppBridge?.setProgressBar) {
+        try { window.AppBridge.setProgressBar(clamped / 100); } catch (e) {}
+      }
+    }
+  };
+
+  return closeFn;
+}
+if (typeof window !== 'undefined') window.showNoteDeletionProgress = showNoteDeletionProgress;
+if (typeof globalThis !== 'undefined') globalThis.showNoteDeletionProgress = showNoteDeletionProgress;
+
 async function deleteCurrentNote() {
   if (!currentNote?.path) return;
   const name = currentNote.title || currentNote.path;
   const confirmed = await showConfirmDialog(t('confirm.deleteNote', { name }), { isDanger: true, confirmLabel: t('common.delete') || 'Delete' });
   if (!confirmed) return;
+
+  _isDeleting = true;
+  if (typeof window !== 'undefined') window._isDeleting = true;
+  if (typeof globalThis !== 'undefined') globalThis._isDeleting = true;
+  clearAutoSave();
+
   const deletedId = currentNote.id;
   const deletedPath = currentNote.path;
-  try {
-    await StorageAPI.moveToTrash(currentNote.path, { title: currentNote.title });
-    const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : null);
-    if (curManifest) {
-      const idx = curManifest.findIndex(m => m.path === currentNote.path);
-      if (idx >= 0) curManifest.splice(idx, 1);
+  const deletedTitle = currentNote.title || name;
+  const deletedContent = currentNote.originalHTML || currentNote.mainHTML || '';
+
+  const isDedicatedNoteWindow = (typeof isFocusedNoteWindow === 'function' ? isFocusedNoteWindow() : _isFocusedMode) ||
+    (typeof document !== 'undefined' && document.body?.classList?.contains('focused-note-mode')) ||
+    (typeof document !== 'undefined' && document.body?.classList?.contains('note-window-standalone'));
+
+  let progressController = null;
+
+  // Instant visual feedback / dismissal
+  if (isDedicatedNoteWindow) {
+    let hidden = false;
+    if (window.AppBridge?.windowControls?.hide) {
+      try {
+        window.AppBridge.windowControls.hide();
+        hidden = true;
+      } catch (e) {}
     }
-    await saveManifest({ force: true });
-    toast(t('trash.noteMovedToTrash') || t('common.noteDeleted'));
-    broadcastSync({ type: 'NOTE_DELETED', noteId: deletedId, path: deletedPath });
+    if (!hidden) {
+      progressController = showNoteDeletionProgress(deletedTitle);
+      const overlayPanel = document.querySelector('.overlay-panel');
+      if (overlayPanel) overlayPanel.style.opacity = '0.1';
+    }
+  } else {
     const overlay = document.getElementById('note-edit-overlay');
     if (overlay) overlay.style.display = 'none';
     editMode = false;
-    currentNote = null;
-    if (_isFocusedMode) {
+    toast(t('trash.noteMovedToTrash') || t('common.noteDeleted'));
+  }
+
+  // 1. Immediately delete from Tier 1 (RAM & IDB)
+  try {
+    if (typeof StorageAPI !== 'undefined' && StorageAPI._deleteNoteTier1) {
+      await StorageAPI._deleteNoteTier1(deletedId, deletedPath);
+    }
+  } catch (e) {}
+
+  // 2. Immediately remove from manifest in memory
+  const curManifest = (typeof manifest !== 'undefined' && Array.isArray(manifest))
+    ? manifest
+    : ((typeof window !== 'undefined' && Array.isArray(window.manifest)) ? window.manifest : null);
+  if (curManifest) {
+    const normDeleted = deletedPath ? String(deletedPath).replace(/\\/g, '/') : '';
+    const idx = curManifest.findIndex(m => m && (
+      m.id === deletedId ||
+      m.path === deletedPath ||
+      (m.path && normDeleted && String(m.path).replace(/\\/g, '/') === normDeleted)
+    ));
+    if (idx >= 0) curManifest.splice(idx, 1);
+  }
+
+  // 3. Immediately clean up plannerEvents in memory
+  const allEventsLists = new Set();
+  if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) allEventsLists.add(plannerEvents);
+  if (typeof window !== 'undefined' && Array.isArray(window.plannerEvents)) allEventsLists.add(window.plannerEvents);
+  if (typeof globalThis !== 'undefined' && Array.isArray(globalThis.plannerEvents)) allEventsLists.add(globalThis.plannerEvents);
+
+  let plannerChanged = false;
+  for (const list of allEventsLists) {
+    list.forEach(pe => {
+      if (!pe) return;
+      if (String(pe.noteId || '').trim() === deletedId) {
+        pe.noteId = '';
+        plannerChanged = true;
+      }
+      if (Array.isArray(pe.linkedNoteIds) && pe.linkedNoteIds.includes(deletedId)) {
+        pe.linkedNoteIds = pe.linkedNoteIds.filter(id => id !== deletedId);
+        plannerChanged = true;
+      }
+    });
+  }
+  if (plannerChanged) {
+    if (typeof savePlanner === 'function') savePlanner().catch(() => {});
+    if (typeof renderPlanner === 'function') renderPlanner();
+    if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+  }
+
+  // 4. Immediately clean up todosManifest in memory
+  const allTodosLists = new Set();
+  if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) allTodosLists.add(todosManifest);
+  if (typeof window !== 'undefined' && Array.isArray(window.todosManifest)) allTodosLists.add(window.todosManifest);
+  if (typeof globalThis !== 'undefined' && Array.isArray(globalThis.todosManifest)) allTodosLists.add(globalThis.todosManifest);
+
+  let todosChanged = false;
+  for (const list of allTodosLists) {
+    list.forEach(td => {
+      if (!td) return;
+      if (String(td.noteId || '').trim() === deletedId) {
+        td.noteId = '';
+        todosChanged = true;
+      }
+      if (Array.isArray(td.linkedNoteIds) && td.linkedNoteIds.includes(deletedId)) {
+        td.linkedNoteIds = td.linkedNoteIds.filter(id => id !== deletedId);
+        todosChanged = true;
+      }
+    });
+  }
+  if (todosChanged && typeof saveTodosManifest === 'function') {
+    saveTodosManifest().catch(() => {});
+  }
+
+  // 5. Broadcast NOTE_DELETED immediately across windows
+  broadcastSync({ type: 'NOTE_DELETED', noteId: deletedId, path: deletedPath });
+
+  // 6. Reset current note and render views
+  currentNote = null;
+  editMode = false;
+  if (typeof renderBoard === 'function') renderBoard();
+  if (typeof renderPlanner === 'function') renderPlanner();
+
+  if (progressController) progressController.update(70);
+
+  // 7. Background persistence & window closure
+  try {
+    await StorageAPI.moveToTrash(deletedPath, { title: deletedTitle, content: deletedContent });
+    await saveManifest({ force: true });
+  } catch(e) {
+    console.warn('[deleteCurrentNote] Background trash persistence warning:', e);
+  } finally {
+    if (progressController) {
+      progressController.update(100);
+      progressController();
+    }
+    _isDeleting = false;
+    if (typeof window !== 'undefined') window._isDeleting = false;
+    if (typeof globalThis !== 'undefined') globalThis._isDeleting = false;
+    if (isDedicatedNoteWindow) {
+      if (window.AppBridge?.setProgressBar) {
+        try { window.AppBridge.setProgressBar(-1); } catch (e) {}
+      }
       _tryCloseCurrentWindow();
     }
-    renderBoard();
-  } catch(e) { toast(t('common.deleteFailed', { message: e.message }), true); }
+  }
 }
 // Auto-save
 let _autoSaveTimer = null;
@@ -692,6 +886,7 @@ if (typeof window !== 'undefined') window._lastNoteSelfSavedAt = _lastNoteSelfSa
 if (typeof globalThis !== 'undefined') globalThis._lastNoteSelfSavedAt = _lastNoteSelfSavedAt;
 
 async function autoSaveNote(options = {}) {
+  if (typeof _isDeleting !== 'undefined' && _isDeleting) return true;
   while (_activeSavePromise) {
     try { await _activeSavePromise; } catch (e) {}
   }
@@ -704,7 +899,7 @@ async function autoSaveNote(options = {}) {
 }
 
 async function _executeAutoSaveNote({ silent = false, isFinal = false, noteToSave = null } = {}) {
-  if (_isNoteLoading) return true;
+  if (_isNoteLoading || (typeof _isDeleting !== 'undefined' && _isDeleting)) return true;
   const activeNote = noteToSave || currentNote;
   if (!activeNote) return true;
 
@@ -3382,7 +3577,7 @@ function _noteArraysEqual(a, b) {
 }
 
 function hasUnsavedNoteOverlayChanges() {
-  if (_isNoteLoading || !currentNote) return false;
+  if (_isNoteLoading || !currentNote || (typeof _isDeleting !== 'undefined' && _isDeleting)) return false;
   const panel = document.querySelector('.overlay-panel');
   if (panel && panel.classList.contains('overlay-view-mode')) return false;
 

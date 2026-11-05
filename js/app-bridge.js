@@ -56,6 +56,11 @@
           global.electronAPI.unmaximizeWindow();
         }
       },
+      hide() {
+        if (global.electronAPI?.hideWindow) {
+          global.electronAPI.hideWindow();
+        }
+      },
       _lastToggle: 0,
       toggleMaximize() {
         const now = Date.now();
@@ -72,6 +77,18 @@
         }
       },
       async close() {
+        if (typeof _isDeleting !== 'undefined' && _isDeleting) {
+          if (global.electronAPI?.closeWindow) {
+            global.electronAPI.closeWindow();
+            return true;
+          }
+          try {
+            global.close();
+            return true;
+          } catch (e) {
+            return false;
+          }
+        }
         const isFocusedStandalone = ((typeof _isFocusedMode !== 'undefined' && _isFocusedMode) || document.body.classList.contains('focused-note-mode')) &&
           !(typeof location !== 'undefined' && location.hash && location.hash.includes('tab='));
         const isStandaloneChild = isFocusedStandalone || (!document.getElementById('topbar-main-row') && (

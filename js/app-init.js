@@ -4819,7 +4819,48 @@ async function handleSyncMessage(e) {
       if (typeof collabLRUCache !== 'undefined' && collabLRUCache) collabLRUCache.delete(path);
     }
     if (typeof metadataShardIndexCache !== 'undefined') metadataShardIndexCache = null;
-    scheduleSyncRefresh({ manifest: true, filters: true, changedNote: existingMeta || { path, noteId } });
+
+    if (noteId) {
+      let plannerChanged = false;
+      if (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) {
+        plannerEvents.forEach(pe => {
+          if (!pe) return;
+          if (String(pe.noteId || '').trim() === noteId) {
+            pe.noteId = '';
+            plannerChanged = true;
+          }
+          if (Array.isArray(pe.linkedNoteIds) && pe.linkedNoteIds.includes(noteId)) {
+            pe.linkedNoteIds = pe.linkedNoteIds.filter(id => id !== noteId);
+            plannerChanged = true;
+          }
+        });
+      }
+      if (plannerChanged) {
+        if (typeof savePlanner === 'function') savePlanner().catch(() => {});
+        if (typeof renderPlanner === 'function') renderPlanner();
+        if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+      }
+
+      let todosChanged = false;
+      if (typeof todosManifest !== 'undefined' && Array.isArray(todosManifest)) {
+        todosManifest.forEach(td => {
+          if (!td) return;
+          if (String(td.noteId || '').trim() === noteId) {
+            td.noteId = '';
+            todosChanged = true;
+          }
+          if (Array.isArray(td.linkedNoteIds) && td.linkedNoteIds.includes(noteId)) {
+            td.linkedNoteIds = td.linkedNoteIds.filter(id => id !== noteId);
+            todosChanged = true;
+          }
+        });
+      }
+      if (todosChanged && typeof saveTodosManifest === 'function') {
+        saveTodosManifest().catch(() => {});
+      }
+    }
+
+    scheduleSyncRefresh({ manifest: true, filters: true, planner: true, changedNote: existingMeta || { path, noteId } });
     const isCurrentNote = (noteId && currentNote?.id === noteId) || (path && currentNote?.path === path);
     if (isCurrentNote) {
       closeNoteOverlay({ skipSave: true, forceCloseAll: true });
