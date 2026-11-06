@@ -285,7 +285,7 @@ const StorageAPI = {
   async _readJSON(filePath, fallback = null) {
     try {
       const raw = await readFile(filePath);
-      if (typeof raw !== 'string') return fallback;
+      if (typeof raw !== 'string' || !raw.trim()) return fallback;
       if (raw.length > 10 * 1024 * 1024) {
         console.warn(`StorageAPI._readJSON(${filePath}) exceeded 10MB safety limit, returning fallback`);
         return fallback;
@@ -1957,10 +1957,21 @@ const StorageAPI = {
     try {
       this.setConnectorStatus('syncing');
 
-      if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset) {
-        await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
+      if (this.getStorageEngine() === 'firebase') {
+        if (typeof window !== 'undefined' && window.FirebaseSyncService?.saveAsset) {
+          await window.FirebaseSyncService.saveAsset(relPath, fullDataUrl);
+        }
+        // Mirror to local disk/bridge if available; gracefully ignore when running in pure web mode
+        try {
+          await writeFile(relPath, fullDataUrl);
+        } catch (fsErr) {
+          if (!fsErr?.message?.includes('No root folder handle loaded') && !fsErr?.message?.includes('FileSystemDirectoryHandle not available')) {
+            console.warn('[StorageAPI] Local asset mirror write error:', fsErr);
+          }
+        }
+      } else {
+        await writeFile(relPath, fullDataUrl);
       }
-      await writeFile(relPath, fullDataUrl);
 
       this.setConnectorStatus('synced');
     } catch (e) {
@@ -1971,6 +1982,88 @@ const StorageAPI = {
     }
 
     this.emit('storage:change', { entity: 'assets', id: relPath, action: 'save' });
+  },
+
+  async _deleteAssetTier1(relPath) {
+    const clean = String(relPath).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^(_assets|assets)\//, '');
+    const fileName = clean.split('/').pop() || clean;
+
+    // 1. RAM Cache (0ms)
+    const ramCache = (typeof _assetDataUrlCache !== 'undefined' ? _assetDataUrlCache : null) || (typeof window !== 'undefined' ? window._assetDataUrlCache : null);
+    if (ramCache && typeof ramCache.delete === 'function') {
+      ramCache.delete(relPath);
+      ramCache.delete(fileName);
+      ramCache.delete(`notes/_assets/${fileName}`);
+      ramCache.delete(`_assets/${fileName}`);
+    }
+
+    if (typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths && typeof _savedAssetPaths.delete === 'function') {
+      _savedAssetPaths.delete(relPath);
+      _savedAssetPaths.delete(fileName);
+      _savedAssetPaths.delete(`notes/_assets/${fileName}`);
+      _savedAssetPaths.delete(`_assets/${fileName}`);
+    }
+    if (typeof _savedAssetDataUrls !== 'undefined' && _savedAssetDataUrls && typeof _savedAssetDataUrls.delete === 'function') {
+      _savedAssetDataUrls.delete(relPath);
+      _savedAssetDataUrls.delete(fileName);
+      _savedAssetDataUrls.delete(`notes/_assets/${fileName}`);
+      _savedAssetDataUrls.delete(`_assets/${fileName}`);
+    }
+
+    // 2. IndexedDB Persistent Store
+    const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+    if (idb) {
+      try {
+        if (typeof idb.deleteAsset === 'function') {
+          await idb.deleteAsset(fileName);
+          await idb.deleteAsset(`notes/_assets/${fileName}`);
+        } else if (typeof idb.deleteRecord === 'function') {
+          await idb.deleteRecord('assets', fileName);
+          await idb.deleteRecord('assets', `notes/_assets/${fileName}`);
+          await idb.deleteRecord('assets', relPath);
+        }
+      } catch (idbErr) {
+        this.notifyCriticalLocalFailure(idbErr, 'asset:delete', fileName);
+        throw idbErr;
+      }
+    }
+  },
+
+  async deleteAsset(relPath) {
+    if (!relPath) return false;
+    const clean = String(relPath).replace(/^[./\\]+/, '').replace(/^notes\//, '').replace(/^(_assets|assets)\//, '');
+    const fileName = clean.split('/').pop() || clean;
+
+    // 1. Delete from Tier 1 (RAM & IndexedDB) immediately
+    await this._deleteAssetTier1(relPath);
+
+    // 2. Dispatch to Asynchronous Connector
+    try {
+      this.setConnectorStatus('syncing');
+
+      if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.deleteAsset) {
+        await window.FirebaseSyncService.deleteAsset(fileName);
+      }
+      if (typeof deleteFile === 'function') {
+        try {
+          await deleteFile(relPath);
+        } catch (fsErr) {
+          if (!fsErr?.message?.includes('No root folder handle loaded') && !fsErr?.message?.includes('FileSystemDirectoryHandle not available')) {
+            console.warn('[StorageAPI] deleteAsset local filesystem deletion warning:', fsErr);
+          }
+        }
+      }
+
+      this.setConnectorStatus('synced');
+    } catch (e) {
+      const errorInfo = this.classifyConnectorError(e);
+      this.setConnectorStatus('error', errorInfo);
+      this.notifyConnectorError(errorInfo);
+      throw e;
+    }
+
+    this.emit('storage:change', { entity: 'assets', id: relPath, action: 'delete' });
+    return true;
   },
 
   async readAsset(relPath) {
@@ -2026,7 +2119,16 @@ const StorageAPI = {
     }
     if (window.AppBridge?.fs?.readAsset) {
       const fromBridge = await window.AppBridge.fs.readAsset(relPath);
-      if (fromBridge) return fromBridge;
+      if (fromBridge) {
+        if (ramCache && typeof ramCache.set === 'function') {
+          ramCache.set(relPath, fromBridge);
+          ramCache.set(fileName, fromBridge);
+        }
+        if (idb && typeof idb.putRecord === 'function') {
+          idb.putRecord('assets', { id: fileName, data: String(fromBridge), updatedAt: Date.now() }).catch(() => {});
+        }
+        return fromBridge;
+      }
     }
     return null;
   },
@@ -2075,6 +2177,7 @@ const StorageAPI = {
     return {
       get: (relPath) => this.readAsset(relPath),
       save: (relPath, content) => this.writeAsset(relPath, content),
+      delete: (relPath) => this.deleteAsset(relPath),
       list: (subDir) => this.listAssetFiles(subDir)
     };
   },

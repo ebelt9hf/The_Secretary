@@ -639,6 +639,20 @@ function flushTagEditorInputs() {
 }
 
 const _savedAssetPaths = new Set();
+const _savedAssetDataUrls = new Map();
+const _origSavedAssetPathsClear = _savedAssetPaths.clear.bind(_savedAssetPaths);
+_savedAssetPaths.clear = function() {
+  _savedAssetDataUrls.clear();
+  return _origSavedAssetPathsClear();
+};
+if (typeof window !== 'undefined') {
+  window._savedAssetPaths = _savedAssetPaths;
+  window._savedAssetDataUrls = _savedAssetDataUrls;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis._savedAssetPaths = _savedAssetPaths;
+  globalThis._savedAssetDataUrls = _savedAssetDataUrls;
+}
 
 async function _ensureAssetSaved(relPath, fullDataUrl) {
   if (!relPath || !fullDataUrl) return false;
@@ -649,7 +663,7 @@ async function _ensureAssetSaved(relPath, fullDataUrl) {
     console.warn('Refusing to save placeholder SVG to asset file:', relPath);
     return false;
   }
-  if (_savedAssetPaths.has(relPath)) return true;
+  if (_savedAssetPaths.has(relPath) && _savedAssetDataUrls.get(relPath) === fullDataUrl) return true;
   try {
     if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.writeAsset === 'function') {
       await StorageAPI.writeAsset(relPath, fullDataUrl);
@@ -662,6 +676,7 @@ async function _ensureAssetSaved(relPath, fullDataUrl) {
       }
     }
     _savedAssetPaths.add(relPath);
+    _savedAssetDataUrls.set(relPath, fullDataUrl);
     return true;
   } catch (err) {
     console.warn('Failed to save image asset:', relPath, err);
@@ -736,6 +751,8 @@ async function processAndExternalizeImages(html) {
         let newTag = fullTag.replace(dataUrl, assetPath);
         if (!assetPathMatch) {
           newTag = newTag.replace(/<img\b/i, `<img data-asset-path="${assetPath}"`);
+        } else {
+          newTag = newTag.replace(/data-asset-path=["'][^"']*["']/i, `data-asset-path="${assetPath}"`);
         }
         replacements.push({ fullTag, newTag });
       }
@@ -6211,21 +6228,23 @@ function handleImagePaste(e) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const ext = (file.type.split('/')[1] || 'png').replace('+xml', '');
+      let ext = (file.type.split('/')[1] || 'png').replace('+xml', '');
       const id  = 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-      let assetPath = `notes/_assets/${id}.${ext}`;
       let dataUrl = reader.result;
       if (typeof window !== 'undefined' && window.ImageOptimizer?.compressImage) {
         try {
           dataUrl = await window.ImageOptimizer.compressImage(dataUrl, 'standard');
+          const mimeSub = (dataUrl.match(/^data:image\/([a-zA-Z0-9+]+)/)?.[1] || ext).replace('+xml', '');
+          ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
         } catch (compErr) {
           console.warn('ImageOptimizer paste compression fallback:', compErr);
         }
       }
+      let assetPath = `notes/_assets/${id}.${ext}`;
 
       // Check if identical image asset already exists to avoid duplicate upload
       const existingAssetPath = _findExistingAssetForDataUrl(rootEditor, dataUrl);
-      const alreadyUploaded = !!existingAssetPath || (assetPath && typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths.has(assetPath));
+      const alreadyUploaded = !!existingAssetPath || (assetPath && typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths.has(assetPath) && typeof _savedAssetDataUrls !== 'undefined' && _savedAssetDataUrls.get(assetPath) === dataUrl);
       if (existingAssetPath) {
         assetPath = existingAssetPath;
       }
@@ -6250,6 +6269,9 @@ function handleImagePaste(e) {
           }
           if (typeof _savedAssetPaths !== 'undefined') {
             _savedAssetPaths.add(assetPath);
+          }
+          if (typeof _savedAssetDataUrls !== 'undefined') {
+            _savedAssetDataUrls.set(assetPath, dataUrl);
           }
         } catch (err) {
           console.warn('Failed to write pasted image asset:', err);
@@ -6446,14 +6468,23 @@ function handleImageDrop(e) {
     
     const reader = new FileReader();
     reader.onload = async () => {
-      const ext = (imgFile.type.split('/')[1] || 'png').replace('+xml', '');
+      let ext = (imgFile.type.split('/')[1] || 'png').replace('+xml', '');
       const id  = 'img-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      let dataUrl = reader.result;
+      if (typeof window !== 'undefined' && window.ImageOptimizer?.compressImage) {
+        try {
+          dataUrl = await window.ImageOptimizer.compressImage(dataUrl, 'standard');
+          const mimeSub = (dataUrl.match(/^data:image\/([a-zA-Z0-9+]+)/)?.[1] || ext).replace('+xml', '');
+          ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
+        } catch (compErr) {
+          console.warn('ImageOptimizer drop compression fallback:', compErr);
+        }
+      }
       let assetPath = `notes/_assets/${id}.${ext}`;
-      const dataUrl = reader.result;
 
       // Check if identical image asset already exists to avoid duplicate upload
       const existingAssetPath = _findExistingAssetForDataUrl(rootEditor, dataUrl);
-      const alreadyUploaded = !!existingAssetPath || (assetPath && typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths.has(assetPath));
+      const alreadyUploaded = !!existingAssetPath || (assetPath && typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths.has(assetPath) && typeof _savedAssetDataUrls !== 'undefined' && _savedAssetDataUrls.get(assetPath) === dataUrl);
       if (existingAssetPath) {
         assetPath = existingAssetPath;
       }
@@ -6479,6 +6510,9 @@ function handleImageDrop(e) {
           if (typeof _savedAssetPaths !== 'undefined') {
             _savedAssetPaths.add(assetPath);
           }
+          if (typeof _savedAssetDataUrls !== 'undefined') {
+            _savedAssetDataUrls.set(assetPath, dataUrl);
+          }
         } catch (err) {
           console.warn('Failed to write dropped image asset:', err);
         }
@@ -6489,6 +6523,7 @@ function handleImageDrop(e) {
         img.dataset.id = id;
         img.dataset.assetPath = assetPath;
         img.src = dataUrl;
+        img.title = (typeof t === 'function' ? t('editor.imageDblClickFullscreen') : null) || 'Double-click to view fullscreen';
         img.style.maxWidth = '100%';
         img.style.width = '600px';
         img.style.display = 'block';
@@ -7050,6 +7085,15 @@ function selectEditorImage(imgEl, editorEl) {
           const newSrc = await window.ImageOptimizer.compressImage(imgEl, q);
           if (newSrc && (newSrc.startsWith('data:') || newSrc.startsWith('http') || newSrc.startsWith('blob:'))) {
             imgEl.src = newSrc;
+            const currentAssetPath = imgEl.dataset.assetPath;
+            if (currentAssetPath) {
+              if (typeof _savedAssetPaths !== 'undefined' && _savedAssetPaths) {
+                _savedAssetPaths.delete(currentAssetPath);
+              }
+              if (typeof _savedAssetDataUrls !== 'undefined' && _savedAssetDataUrls) {
+                _savedAssetDataUrls.delete(currentAssetPath);
+              }
+            }
             if (targetEditor) {
               targetEditor.dispatchEvent(new Event('input', { bubbles: true }));
             }

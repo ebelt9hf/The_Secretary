@@ -365,16 +365,25 @@ function _dataUrlToBlob(dataUrl) {
     const commaIdx = dataUrl.indexOf(',');
     if (commaIdx === -1) return new Blob([dataUrl]);
     const header = dataUrl.slice(0, commaIdx);
-    const base64Data = dataUrl.slice(commaIdx + 1).replace(/\s+/g, '');
+    const body = dataUrl.slice(commaIdx + 1);
     const mimeMatch = header.match(/^data:([^;]+)/);
     const mime = mimeMatch ? mimeMatch[1] : 'image/png';
-    const binary = atob(base64Data);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    if (header.includes(';base64')) {
+      const base64Data = body.replace(/\s+/g, '');
+      const binary = atob(base64Data);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mime });
+    } else {
+      let decoded = body;
+      try {
+        decoded = decodeURIComponent(body);
+      } catch (e) {}
+      return new Blob([decoded], { type: mime });
     }
-    return new Blob([bytes], { type: mime });
   } catch (err) {
     return new Blob([dataUrl]);
   }

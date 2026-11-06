@@ -419,10 +419,22 @@ ipcMain.handle('fs-write-file', async (event, relPath, content) => {
   const targetDir = path.dirname(target);
   await fs.promises.mkdir(targetDir, { recursive: true });
 
-  const isBase64Img = typeof content === 'string' && content.startsWith('data:image/');
-  const bufferToWrite = isBase64Img
-    ? Buffer.from(content.split(',')[1] || '', 'base64')
-    : null;
+  const isDataImg = typeof content === 'string' && content.startsWith('data:image/');
+  let bufferToWrite = null;
+  if (isDataImg) {
+    const commaIdx = content.indexOf(',');
+    const header = commaIdx >= 0 ? content.slice(0, commaIdx) : '';
+    const body = commaIdx >= 0 ? content.slice(commaIdx + 1) : '';
+    if (header.includes(';base64')) {
+      bufferToWrite = Buffer.from(body.replace(/\s+/g, ''), 'base64');
+    } else {
+      try {
+        bufferToWrite = Buffer.from(decodeURIComponent(body), 'utf8');
+      } catch (e) {
+        bufferToWrite = Buffer.from(body, 'utf8');
+      }
+    }
+  }
 
   // Use atomic temporary file rename to prevent zero-byte or corrupted note files on sudden interruptions
   const tempTarget = path.join(targetDir, `.tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);

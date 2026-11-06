@@ -463,7 +463,9 @@ const LLMService = {
         seen.add(normPath);
         try {
           let dataUrl = null;
-          if (typeof readAssetAsDataUrl === 'function') {
+          if (typeof StorageAPI !== 'undefined' && typeof StorageAPI.readAsset === 'function') {
+            dataUrl = await StorageAPI.readAsset(normPath);
+          } else if (typeof readAssetAsDataUrl === 'function') {
             dataUrl = await readAssetAsDataUrl(normPath);
           } else if (window._assetDataUrlCache?.get(normPath)) {
             dataUrl = window._assetDataUrlCache.get(normPath);
