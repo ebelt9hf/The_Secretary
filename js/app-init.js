@@ -4298,28 +4298,68 @@ async function copyAiJsonSchema() {
   }
 }
 
-function updateExternalAgentPromptDisplay() {
-  const textarea = document.getElementById('prefs-external-agent-prompt');
-  if (textarea) {
-    const activeUserName = (typeof settings !== 'undefined' && settings && settings.username) ||
-      (typeof window !== 'undefined' && window.settings && window.settings.username) || '';
-    const wsPath = (typeof currentWorkspacePath !== 'undefined' && currentWorkspacePath)
-      || (typeof rootHandle !== 'undefined' && rootHandle && (rootHandle.path || rootHandle.name))
-      || (typeof settings !== 'undefined' && settings && settings.folder && settings.folder.last)
-      || '';
-    if (typeof AppPrompts !== 'undefined' && typeof AppPrompts.buildExternalAgentEmailProposalPrompt === 'function') {
-      textarea.value = AppPrompts.buildExternalAgentEmailProposalPrompt({
-        userName: activeUserName,
-        workspacePath: wsPath
-      });
-    } else {
-      textarea.value = `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary\n\nTarget file: planner-proposals.json in the root workspace.\nAlways append new proposals to planner-proposals.json without deleting existing entries.\nInclude event timezone (e.g. "timezone": "Europe/Paris" or "America/New_York") so Secretary imports it into your local time.\nAsk user for their mail application if unknown.`;
+let _currentCalendarSyncTab = 'feeds';
+
+function switchCalendarSyncTab(tabId) {
+  _currentCalendarSyncTab = tabId || 'feeds';
+  const tabs = ['feeds', 'folder', 'agent'];
+  tabs.forEach(t => {
+    const tabBtn = document.getElementById(`prefs-sync-tab-${t}`);
+    const pane = document.getElementById(`prefs-cal-pane-${t}`);
+    const isActive = (t === _currentCalendarSyncTab);
+    if (tabBtn) {
+      tabBtn.classList.toggle('active', isActive);
+      tabBtn.setAttribute('aria-selected', isActive ? 'true' : 'false');
     }
+    if (pane) {
+      pane.style.display = isActive ? 'block' : 'none';
+    }
+  });
+
+  if (_currentCalendarSyncTab === 'folder' && typeof CalendarSyncService !== 'undefined') {
+    CalendarSyncService.updateExternalStatusUI();
+  } else if (_currentCalendarSyncTab === 'agent') {
+    updateExternalAgentPromptDisplay();
   }
 }
 
+function updateExternalAgentPromptDisplay() {
+  const textareas = [
+    document.getElementById('prefs-external-agent-prompt'),
+    document.getElementById('prefs-external-agent-prompt-ai'),
+    document.getElementById('wizard-external-agent-prompt')
+  ].filter(Boolean);
+  if (!textareas.length) return;
+
+  const activeUserName = (typeof settings !== 'undefined' && settings && settings.username) ||
+    (typeof window !== 'undefined' && window.settings && window.settings.username) || '';
+  const wsPath = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderPath === 'function' && CalendarSyncService.getWatchedFolderPath())
+    || (typeof currentWorkspacePath !== 'undefined' && currentWorkspacePath)
+    || (typeof rootHandle !== 'undefined' && rootHandle && (rootHandle.path || rootHandle.name))
+    || (typeof settings !== 'undefined' && settings && settings.folder && settings.folder.last)
+    || '';
+  const watchedInfo = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderInfo === 'function')
+    ? CalendarSyncService.getWatchedFolderInfo()
+    : null;
+  const watchedName = watchedInfo?.name || '';
+
+  let promptVal = '';
+  if (typeof AppPrompts !== 'undefined' && typeof AppPrompts.buildExternalAgentEmailProposalPrompt === 'function') {
+    promptVal = AppPrompts.buildExternalAgentEmailProposalPrompt({
+      userName: activeUserName,
+      workspacePath: wsPath,
+      watchedFolderName: watchedName,
+      isFirebase: watchedInfo?.mode === 'firebase',
+      isDefaultLocal: Boolean(watchedInfo?.isDefault)
+    });
+  } else {
+    promptVal = `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary\n\nTarget file: planner-proposals.json in the root workspace.\nAlways append new proposals to planner-proposals.json without deleting existing entries.\nInclude event timezone (e.g. "timezone": "Europe/Paris" or "America/New_York") so Secretary imports it into your local time.\nAsk user for their mail application if unknown.`;
+  }
+  textareas.forEach(t => t.value = promptVal);
+}
+
 async function copyExternalAgentPrompt() {
-  const textarea = document.getElementById('prefs-external-agent-prompt');
+  const textarea = document.getElementById('prefs-external-agent-prompt') || document.getElementById('prefs-external-agent-prompt-ai');
   if (!textarea) return;
   try {
     await navigator.clipboard.writeText(textarea.value);
@@ -4329,6 +4369,7 @@ async function copyExternalAgentPrompt() {
   }
 }
 
+window.switchCalendarSyncTab = switchCalendarSyncTab;
 window.updateAiJsonSchemaDisplay = updateAiJsonSchemaDisplay;
 window.copyAiJsonSchema = copyAiJsonSchema;
 window.updateExternalAgentPromptDisplay = updateExternalAgentPromptDisplay;
@@ -4348,12 +4389,12 @@ function renderCalendarSyncPrefs() {
     statusEl.textContent = txtTemplate.replace('{count}', pendingCount);
   }
 
-  if (typeof CalendarSyncService === 'undefined') return;
-
-  const cmdInput = document.getElementById('prefs-local-sync-cmd');
-  if (cmdInput && typeof CalendarSyncService.getLocalSyncCommand === 'function') {
-    cmdInput.value = CalendarSyncService.getLocalSyncCommand();
+  if (typeof CalendarSyncService !== 'undefined') {
+    CalendarSyncService.updateExternalStatusUI();
   }
+  switchCalendarSyncTab(_currentCalendarSyncTab);
+
+  if (typeof CalendarSyncService === 'undefined') return;
 
   const config = CalendarSyncService.getConfig();
   const feeds = config.feeds || [];

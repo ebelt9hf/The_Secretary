@@ -865,6 +865,37 @@ const SetupWizardController = {
     }
   },
 
+  async placeSyncScriptInWatchedFolder() {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.placeSyncScriptInWatchedFolder === 'function') {
+      await CalendarSyncService.placeSyncScriptInWatchedFolder();
+      this.render();
+    }
+  },
+
+  resetWatchedFolderToDefault() {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.resetWatchedFolderToDefault === 'function') {
+      CalendarSyncService.resetWatchedFolderToDefault();
+      this.render();
+    }
+  },
+
+  setPlatformOverride(platform) {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.setPlatformOverride === 'function') {
+      CalendarSyncService.setPlatformOverride(platform);
+      this.render();
+    }
+  },
+
+  handleCustomFolderPathInput(val) {
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.handleCustomFolderPathInput === 'function') {
+      CalendarSyncService.handleCustomFolderPathInput(val);
+      const cmdInput = document.getElementById('wizard-local-sync-cmd');
+      if (cmdInput && typeof CalendarSyncService.getLocalSyncCommand === 'function') {
+        cmdInput.value = CalendarSyncService.getLocalSyncCommand(val, CalendarSyncService._platformOverride, true);
+      }
+    }
+  },
+
   async connectCorporateFolder() {
     if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.linkExternalAgentFolder === 'function') {
       await CalendarSyncService.linkExternalAgentFolder();
@@ -896,13 +927,32 @@ const SetupWizardController = {
   },
 
   copyCorporateCmd() {
-    const cmd = './development/sync_local_calendar.sh';
+    const cmdInput = document.getElementById('wizard-local-sync-cmd');
+    const cmd = (cmdInput && cmdInput.value)
+      ? cmdInput.value
+      : (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getLocalSyncCommand === 'function')
+        ? CalendarSyncService.getLocalSyncCommand('', null, true)
+        : './development/sync_local_calendar.sh';
     if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(cmd).then(() => {
         if (typeof showToast === 'function') {
-          showToast((typeof t === 'function' ? t('common.copied') : '') || 'Copied to clipboard');
+          showToast((typeof t === 'function' ? t('prefs.localScriptCopied') : '') || 'Command copied to clipboard!');
         } else if (typeof toast === 'function') {
-          toast((typeof t === 'function' ? t('common.copied') : '') || 'Copied to clipboard');
+          toast((typeof t === 'function' ? t('prefs.localScriptCopied') : '') || 'Command copied to clipboard!');
+        }
+      }).catch(() => {});
+    }
+  },
+
+  copyAgentPrompt() {
+    const el = document.getElementById('wizard-external-agent-prompt');
+    if (!el) return;
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.value).then(() => {
+        if (typeof showToast === 'function') {
+          showToast((typeof t === 'function' ? t('prefs.agentPromptCopied') : '') || 'External agent guidelines copied to clipboard!');
+        } else if (typeof toast === 'function') {
+          toast((typeof t === 'function' ? t('prefs.agentPromptCopied') : '') || 'External agent guidelines copied to clipboard!');
         }
       }).catch(() => {});
     }
@@ -1286,6 +1336,10 @@ const SetupWizardController = {
       }
     }
 
+    if (this.currentStep === 2 && typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.updateExternalStatusUI === 'function') {
+      CalendarSyncService.updateExternalStatusUI();
+    }
+
     this.lastStep = this.currentStep;
   },
 
@@ -1486,6 +1540,18 @@ const SetupWizardController = {
     } else if (activeTab === 'corporate') {
       const extInfo = (typeof CalendarSyncService !== 'undefined') ? CalendarSyncService._externalLoadedInfo : null;
       const extFolder = (typeof CalendarSyncService !== 'undefined') ? CalendarSyncService._externalFolderHandle : null;
+      const watchedInfo = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderInfo === 'function')
+        ? CalendarSyncService.getWatchedFolderInfo()
+        : { type: 'notes', name: 'Local Notes Folder', isDefault: true, mode: 'local' };
+      const watchedPath = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderPath === 'function')
+        ? CalendarSyncService.getWatchedFolderPath()
+        : '';
+      const platformOverride = (typeof CalendarSyncService !== 'undefined') ? CalendarSyncService._platformOverride : null;
+      const isWin = (platformOverride === 'win') || (platformOverride !== 'mac' && (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.isWindows === 'function' && CalendarSyncService.isWindows()));
+      const localCmd = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getLocalSyncCommand === 'function')
+        ? CalendarSyncService.getLocalSyncCommand(watchedPath, platformOverride, true)
+        : (isWin ? 'powershell.exe -ExecutionPolicy Bypass -File "C:\\path\\to\\notes\\sync_local_calendar.ps1"' : 'bash "/path/to/notes/sync_local_calendar.sh"');
+
       let linkedDisplay = 'none';
       let linkedText = '';
       let badgeText = (typeof t === 'function') ? t('prefs.externalZeroProposals') : '0 proposals';
@@ -1512,28 +1578,43 @@ const SetupWizardController = {
             <p style="margin:0; font-size:0.82rem; line-height:1.45; color:var(--text-normal); font-weight:600;">
               ${t('setupWizard.corporateGuideIntro') || 'For locked-down corporate laptops where public links are blocked:'}
             </p>
-            <span id="wizard-local-proposals-status" class="badge" style="font-size:0.72rem; padding:2px 6px; border-radius:4px; background:${badgeBg}; color:${badgeColor};" title="Status of planner-proposals.json">
+            <span id="wizard-local-proposals-status" class="badge" style="font-size:0.72rem; padding:2px 6px; border-radius:4px; background:${badgeBg}; color:${badgeColor};" title="${t('prefs.statusProposalsTooltip') || 'Status of planner-proposals.json'}">
               ${badgeText}
             </span>
           </div>
           <p style="margin:0 0 0.5rem 0; font-size:0.78rem; line-height:1.4; color:var(--text-muted);">
-            ${t('prefs.localCalendarHelperDesc') || 'If corporate IT blocks cloud calendar feeds, run the local sync script directly on macOS to extract Outlook Desktop & Apple Calendar meetings into Secretary proposals.'}
+            ${t('prefs.localCalendarHelperDesc') || 'If corporate IT blocks cloud calendar feeds, run the local sync script directly on macOS or Windows to extract Outlook Desktop & Apple Calendar meetings into Secretary proposals.'}
           </p>
-          <div style="position:relative; width:100%; margin-bottom:0.6rem;">
-            <input type="text" id="wizard-local-sync-cmd" readonly value="./development/sync_local_calendar.sh" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="${t('prefs.localSyncCmdTooltip') || 'Command to run local calendar sync in Terminal'}">
-            <button type="button" class="btn" onclick="SetupWizardController.copyCorporateCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="${t('prefs.localSyncCmdTooltip') || 'Copy terminal command to clipboard'}">
-              <span>${t('common.copy') || 'Copy'}</span>
-            </button>
+
+          <!-- Watched Folder Status Banner -->
+          <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:4px; padding:6px 10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+            <div style="font-family:'Fira Code',monospace; font-size:0.75rem; font-weight:600; color:var(--text);" id="wizard-watched-folder-name">
+              📁 ${escH(watchedInfo.name)}
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <span id="wizard-watched-folder-badge" style="font-size:0.68rem; padding:1px 6px; border-radius:8px; font-weight:600; background:${watchedInfo.type === 'notes' ? 'var(--bg-tag)' : 'var(--accent)'}; color:${watchedInfo.type === 'notes' ? 'var(--accent)' : '#fff'};">
+                ${watchedInfo.type === 'notes' ? (t('prefs.watchedFolderNotesDefault') || 'Notes Folder (Default)') : (t('prefs.watchedFolderCustomLabel') || 'Custom Folder')}
+              </span>
+              <button type="button" class="btn btn-sm" id="wizard-btn-connect-agent-folder" onclick="SetupWizardController.connectCorporateFolder()" title="${t('prefs.changeWatchedFolderTooltip') || 'Select a different local folder on your computer'}" style="font-size:0.7rem; padding:2px 6px;">
+                <span>${t('prefs.changeWatchedFolderBtn') || 'Change'}</span>
+              </button>
+              ${watchedInfo.type === 'custom' && watchedInfo.mode === 'local' ? `
+                <button type="button" class="btn btn-sm btn-secondary" id="wizard-btn-reset-watched-folder" onclick="SetupWizardController.resetWatchedFolderToDefault()" title="${t('prefs.resetWatchedFolderTooltip') || 'Reset to default notes folder'}" style="font-size:0.7rem; padding:2px 6px;">
+                  <span>${t('prefs.resetWatchedFolderBtn') || 'Reset'}</span>
+                </button>
+              ` : ''}
+            </div>
           </div>
-          <!-- Web Action Controls: Download Script, Connect Results Folder, Select File -->
-          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
-            <button type="button" class="btn btn-sm" id="wizard-btn-download-sync-script" onclick="SetupWizardController.downloadSyncScript()" title="${t('prefs.downloadSyncScriptTooltip') || 'Download the local calendar sync script (.sh) to run on your Mac'}" style="font-size:0.73rem; padding:3px 8px;">
+
+          <!-- Script Action Controls: Place Script in Watched Folder, Download, Select File -->
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+            <button type="button" class="btn btn-sm btn-primary" id="wizard-btn-place-sync-script" onclick="SetupWizardController.placeSyncScriptInWatchedFolder()" title="${t('prefs.placeScriptInFolderTooltip') || 'Save sync script directly into the watched folder'}" style="font-size:0.73rem; padding:3px 8px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span>${t('prefs.placeScriptInFolderBtn') || 'Place Script in Folder'}</span>
+            </button>
+            <button type="button" class="btn btn-sm" id="wizard-btn-download-sync-script" onclick="SetupWizardController.downloadSyncScript()" title="${t('prefs.downloadSyncScriptTooltip') || 'Download the local calendar sync script (.sh / .ps1) to run on your computer'}" style="font-size:0.73rem; padding:3px 8px;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>${t('prefs.downloadSyncScriptBtn') || 'Download Script'}</span>
-            </button>
-            <button type="button" class="btn btn-sm" id="wizard-btn-connect-agent-folder" onclick="SetupWizardController.connectCorporateFolder()" title="${t('prefs.connectFolderTooltip') || 'Select the local folder containing the sync script and planner-proposals.json'}" style="font-size:0.73rem; padding:3px 8px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-              <span>${t('prefs.connectFolderBtn') || 'Connect Results Folder'}</span>
             </button>
             <button type="button" class="btn btn-sm" id="wizard-btn-select-agent-file" onclick="SetupWizardController.selectCorporateFile()" title="${t('prefs.selectFileTooltip') || 'Select a planner-proposals.json or calendar .ics file directly'}" style="font-size:0.73rem; padding:3px 8px;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -1541,6 +1622,28 @@ const SetupWizardController = {
             </button>
             <input type="file" id="wizard-external-file-picker" accept=".json,.ics" style="display:none;" onchange="SetupWizardController.handleCorporateFileInput(event)">
           </div>
+
+          <!-- Watched Folder Path Input -->
+          <div style="margin-bottom:8px;">
+            <label for="wizard-watched-folder-path-input" style="display:block; font-size:0.72rem; font-weight:600; color:var(--text-muted); margin-bottom:2px;">${t('prefs.watchedFolderPathLabel') || 'Watched Folder Absolute Path'}</label>
+            <input type="text" id="wizard-watched-folder-path-input" value="${escH(watchedPath)}" oninput="SetupWizardController.handleCustomFolderPathInput(this.value)" placeholder="${t('prefs.watchedFolderPathPlaceholder') || 'e.g. C:\\Users\\Username\\Notes or /Users/username/Notes'}" style="font-family:'Fira Code',monospace; font-size:0.74rem; width:100%; padding:4px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="${t('prefs.watchedFolderPathTooltip') || 'Enter your folder absolute path to generate a one-click command'}">
+          </div>
+
+          <!-- Command Platform Selector & Display -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
+            <span style="font-size:0.72rem; font-weight:600; color:var(--text-muted);">${t('prefs.localSyncCmdTooltip') || 'Command to run local calendar sync in Terminal'}</span>
+            <div style="display:flex; gap:4px;">
+              <button type="button" class="setup-wizard-tab-btn ${isWin ? 'active' : ''}" id="wizard-btn-cmd-platform-win" onclick="SetupWizardController.setPlatformOverride('win')" style="font-size:0.68rem; padding:2px 6px;" title="${t('prefs.cmdPlatformWinTooltip') || 'Display PowerShell command for Windows'}">${t('prefs.cmdPlatformWindows') || 'Windows (.ps1)'}</button>
+              <button type="button" class="setup-wizard-tab-btn ${!isWin ? 'active' : ''}" id="wizard-btn-cmd-platform-mac" onclick="SetupWizardController.setPlatformOverride('mac')" style="font-size:0.68rem; padding:2px 6px;" title="${t('prefs.cmdPlatformMacTooltip') || 'Display terminal command for macOS and Linux'}">${t('prefs.cmdPlatformMac') || 'macOS (.sh)'}</button>
+            </div>
+          </div>
+          <div style="position:relative; width:100%; margin-bottom:0.6rem;">
+            <input type="text" id="wizard-local-sync-cmd" readonly value="${escH(localCmd)}" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="${t('prefs.localSyncCmdTooltip') || 'Command to run local calendar sync in Terminal'}">
+            <button type="button" class="btn" id="wizard-btn-copy-cmd" onclick="SetupWizardController.copyCorporateCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="${t('prefs.localSyncCmdTooltip') || 'Copy terminal command to clipboard'}">
+              <span>${t('common.copy') || 'Copy'}</span>
+            </button>
+          </div>
+
           <!-- Linked Folder / File Active Indicator -->
           <div id="wizard-external-agent-linked-box" style="display:${linkedDisplay}; align-items:center; justify-content:space-between; margin-top:8px; background:var(--card-bg); border:1px solid var(--accent); border-radius:4px; padding:4px 8px; font-size:0.73rem;">
             <span id="wizard-external-agent-linked-label" style="font-family:'Fira Code',monospace; font-weight:500; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${linkedText}</span>
@@ -1550,6 +1653,44 @@ const SetupWizardController = {
           </div>
           <div style="margin-top:0.75rem; font-size:0.75rem; color:var(--text-muted);">
             ℹ️ ${t('setupWizard.corporateTip') || 'You can leave the link below blank and continue. The local helper works independently without requiring a WebCal URL.'}
+          </div>
+        </div>
+      `;
+    } else if (activeTab === 'agent') {
+      const watchedInfo = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderInfo === 'function')
+        ? CalendarSyncService.getWatchedFolderInfo()
+        : { name: 'Local Notes Folder' };
+      const watchedPath = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderPath === 'function')
+        ? CalendarSyncService.getWatchedFolderPath()
+        : '';
+      const activeUserName = (typeof settings !== 'undefined' && settings && settings.username) || '';
+      let promptVal = '';
+      if (typeof AppPrompts !== 'undefined' && typeof AppPrompts.buildExternalAgentEmailProposalPrompt === 'function') {
+        promptVal = AppPrompts.buildExternalAgentEmailProposalPrompt({
+          userName: activeUserName,
+          workspacePath: watchedPath,
+          watchedFolderName: watchedInfo.name,
+          isFirebase: watchedInfo.mode === 'firebase',
+          isDefaultLocal: Boolean(watchedInfo.isDefault)
+        });
+      }
+
+      guideContentHtml = `
+        <div class="setup-wizard-guide-box">
+          <p style="margin:0 0 0.5rem 0; font-size:0.82rem; line-height:1.45; color:var(--text-normal); font-weight:600;">
+            ${t('prefs.externalAgentPromptLabel') || 'External Agent Guidelines (Mail & Calendar)'}
+          </p>
+          <p style="margin:0 0 0.5rem 0; font-size:0.78rem; line-height:1.4; color:var(--text-muted);">
+            ${t('prefs.externalAgentPromptDesc') || 'Copy and paste these guidelines into an external AI agent or automation script to extract calendar events from your mail program into planner-proposals.json.'}
+          </p>
+          <div style="font-size:0.76rem; padding:6px 10px; background:var(--card-bg); border-left:3px solid var(--accent); border-radius:4px; margin-bottom:8px; font-weight:500; color:var(--text);">
+            ${(typeof t === 'function' ? t('prefs.agentWatchedFolderNotice', { folder: watchedInfo.name || 'Local Notes Folder' }) : null) || ('Guidelines configured to write directly into watched folder: ' + (watchedInfo.name || 'Local Notes Folder'))}
+          </div>
+          <div style="position:relative; width:100%;">
+            <textarea id="wizard-external-agent-prompt" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:120px;width:100%;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2rem;resize:vertical;box-sizing:border-box;">${escH(promptVal)}</textarea>
+            <button type="button" class="btn" id="wizard-btn-copy-agent-prompt" onclick="SetupWizardController.copyAgentPrompt()" title="${t('prefs.copyAgentPromptTooltip') || 'Copy guidelines to clipboard'}" style="position:absolute; top:6px; right:6px; padding:.2rem .55rem; font-size:.72rem; z-index:10; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:4px;">
+              <span>${t('common.copy') || 'Copy'}</span>
+            </button>
           </div>
         </div>
       `;
@@ -1571,6 +1712,9 @@ const SetupWizardController = {
           </button>
           <button type="button" class="setup-wizard-tab-btn ${activeTab === 'corporate' ? 'active' : ''}" onclick="SetupWizardController.selectCalendarGuide('corporate')" title="${t('setupWizard.guideTabCorporateTooltip') || 'Corporate / Local macOS instructions'}">
             🏢 ${t('setupWizard.guideTabCorporate') || 'Corporate / Local'}
+          </button>
+          <button type="button" class="setup-wizard-tab-btn ${activeTab === 'agent' ? 'active' : ''}" onclick="SetupWizardController.selectCalendarGuide('agent')" title="${t('setupWizard.guideTabAgentTooltip') || 'External AI Agent instructions'}">
+            🤖 ${t('setupWizard.guideTabAgent') || 'External Agent'}
           </button>
         </div>
 

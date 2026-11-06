@@ -768,8 +768,14 @@ Generate the complete structured JSON memory dossier for this Workstream with sc
     const p = (params && typeof params === 'object') ? params : {};
     const userName = p.userName || (typeof settings !== 'undefined' && settings && settings.username) || '';
     const userClause = userName ? ` on behalf of user "${userName}"` : '';
+    const watchedFolder = (p.watchedFolderName && typeof p.watchedFolderName === 'string') ? p.watchedFolderName.trim() : '';
     const wsPath = (p.workspacePath && typeof p.workspacePath === 'string') ? p.workspacePath.trim() : '';
-    const fullPathHint = wsPath ? `${wsPath.replace(/\/+$/, '')}/planner-proposals.json` : './planner-proposals.json';
+    const fullPathHint = wsPath
+      ? `${wsPath.replace(/\/+$/, '')}/planner-proposals.json`
+      : (watchedFolder ? `${watchedFolder}/planner-proposals.json` : './planner-proposals.json');
+    const folderLocationClause = watchedFolder
+      ? `watched folder "${watchedFolder}"`
+      : 'root Secretary workspace folder';
 
     const appVersion = p.version || (typeof getSecretaryVersion === 'function' ? getSecretaryVersion() : '') || (typeof document !== 'undefined' && document.getElementById('connect-version-hint')?.getAttribute('data-version')) || '';
     const versionHeader = appVersion ? ` (Secretary v${appVersion})` : '';
@@ -777,25 +783,26 @@ Generate the complete structured JSON memory dossier for this Workstream with sc
 
     return `# External AI Agent Guidelines: Extracting Calendar Events from Email into Secretary${versionHeader}
 
-You are an AI automation agent responsible for discovering and extracting upcoming meetings, calendar invitations, calls, and scheduled focus sessions from the user's email client${userClause}, and proposing them into Secretary.
+You are an AI automation agent responsible for discovering and extracting upcoming meetings, calendar invitations, calls, and scheduled focus sessions from the user's Microsoft Outlook (Desktop or Web) or email client${userClause}, and proposing them into Secretary.
 
 ## 1. Mail Discovery & User Interaction
-- Connect to or inspect the user's email program (e.g. Apple Mail, Microsoft Outlook, Mozilla Thunderbird, Gmail / Google Workspace, or exported .eml / .ics invitations).
+- Connect to or inspect the user's Microsoft Outlook (Desktop or Web application) or email program (e.g. Apple Mail, Mozilla Thunderbird, Gmail / Google Workspace, or exported .eml / .ics invitations).
 - If you do not know which mail application or account the user uses, ask them directly:
-  "Which email program or mailbox should I inspect to extract your upcoming calendar invitations and meetings?"
+  "Which email program or mailbox should I inspect to extract your upcoming calendar invitations and meetings?" (e.g. Microsoft Outlook Desktop/Web, Apple Mail).
 - **User's Local Timezone**: \`${userLocalTz}\` (Secretary will automatically normalize events to this timezone).
 
 ## 2. Target File Location & Path (FULLY IMPLEMENTED)
+- **Target Watched Folder**: \`${watchedFolder || 'Secretary Workspace / Notes Folder'}\`
 - **Target File**: \`planner-proposals.json\`
-- **Relative Path**: \`./planner-proposals.json\` (located directly at the root of the Secretary workspace folder).
+- **Relative Path**: \`./planner-proposals.json\` (located directly in the ${folderLocationClause}).
 - **Exact Path on Disk**: \`${fullPathHint}\`
-- **Feature Status**: This feature is fully implemented in Secretary. Secretary continuously watches \`planner-proposals.json\` and presents new proposals to the user for review.
+- **Feature Status**: This feature is fully implemented in Secretary. Secretary continuously watches this folder for \`planner-proposals.json\` and presents new proposals to the user for review.
 
 ## 3. How to Propose Events (Append-Only Rule)
 - NEVER overwrite, clear, or erase existing proposals in \`planner-proposals.json\`.
-- Always read \`planner-proposals.json\` from the root folder first. (Secretary automatically creates it if missing, with the standard schema).
+- Always read \`planner-proposals.json\` from the watched folder first. (Secretary automatically creates it if missing, with the standard schema).
 - Preserve all existing entries in the \`proposals\` array and append your newly extracted proposals to the end.
-- Write the updated JSON back to \`planner-proposals.json\`.
+- Write the updated JSON back to \`planner-proposals.json\` in the watched folder.
 
 ## 4. Required JSON Schema
 \`\`\`json

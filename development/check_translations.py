@@ -271,7 +271,8 @@ def check_identical_translations(translations, all_langs, used_keys=None):
         "-", "+", "AI Secretary", "Kanban", "15 min", "30 min", "45 min", "1 h",
         "2 h", "3 h", "1 h 30", "~{count} min", "Dur.", "Dossier", "CSV (.csv)",
         "JSON (.json)", "Markdown (.md)", "Mini HUD", "OpenAI", "Anthropic", "Custom",
-        "Microsoft Outlook", "Apple iCloud", "Outlook", "iCloud"
+        "Microsoft Outlook", "Apple iCloud", "Outlook", "iCloud",
+        "Windows PowerShell (.ps1)", "macOS / Linux (.sh)"
     }
 
     suspicious = []

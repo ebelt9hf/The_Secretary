@@ -634,6 +634,169 @@
     _externalFolderHandle: null,
     _externalFolderTimer: null,
     _externalLoadedInfo: null,
+    _platformOverride: null,
+    _customFolderPath: null,
+
+    /**
+     * Resolves the absolute path to the watched folder.
+     * Checks custom user input, saved configuration, external folder handles, Electron bridge, and workspace settings.
+     */
+    getWatchedFolderPath(workspacePath = '') {
+      if (workspacePath && typeof workspacePath === 'string' && workspacePath.trim()) {
+        return workspacePath.trim();
+      }
+      if (this._customFolderPath && typeof this._customFolderPath === 'string' && this._customFolderPath.trim()) {
+        return this._customFolderPath.trim();
+      }
+      const config = this.getConfig();
+      if (config && config.watchedFolderPath && typeof config.watchedFolderPath === 'string' && config.watchedFolderPath.trim()) {
+        return config.watchedFolderPath.trim();
+      }
+      if (this._externalFolderHandle && this._externalFolderHandle.path) {
+        return this._externalFolderHandle.path;
+      }
+      if (typeof rootHandle !== 'undefined' && rootHandle && rootHandle.path) {
+        return rootHandle.path;
+      }
+      if (typeof window !== 'undefined') {
+        if (window.folderPath) return window.folderPath;
+        if (window.currentWorkspacePath) return window.currentWorkspacePath;
+      }
+      if (typeof settings !== 'undefined') {
+        if (settings?.folder?.path) return settings.folder.path;
+        const last = settings?.folder?.last;
+        if (last && (last.includes('/') || last.includes('\\') || /^[a-zA-Z]:/.test(last))) {
+          return last;
+        }
+      }
+      const info = this.getWatchedFolderInfo();
+      if (info && info.name && info.name !== 'Local Notes Folder' && (info.name.includes('/') || info.name.includes('\\') || /^[a-zA-Z]:/.test(info.name))) {
+        return info.name;
+      }
+      return '';
+    },
+
+    /**
+     * Sets a custom absolute folder path for the watched folder (persisted in config).
+     */
+    async setWatchedFolderPath(newPath) {
+      this._customFolderPath = (typeof newPath === 'string') ? newPath.trim() : '';
+      const config = this.getConfig();
+      config.watchedFolderPath = this._customFolderPath;
+      await this.saveConfig(config);
+      this.updateExternalStatusUI();
+    },
+
+    /**
+     * Live handler for user typing or pasting into the watched folder path input.
+     */
+    handleCustomFolderPathInput(val) {
+      this._customFolderPath = (typeof val === 'string') ? val.trim() : '';
+      const config = this.getConfig();
+      config.watchedFolderPath = this._customFolderPath;
+      this.saveConfig(config).catch(() => {});
+      const cmdInput = (typeof document !== 'undefined') ? document.getElementById('prefs-local-sync-cmd') : null;
+      if (cmdInput) {
+        cmdInput.value = this.getLocalSyncCommand(this._customFolderPath, this._platformOverride, true);
+      }
+      if (typeof updateExternalAgentPromptDisplay === 'function') {
+        updateExternalAgentPromptDisplay();
+      }
+    },
+
+    /**
+     * Helper to format an absolute script path for Windows or macOS / Linux.
+     */
+    _formatScriptPath(folderPath, scriptFileName, platform) {
+      const isWin = platform === 'win';
+      let path = (typeof folderPath === 'string') ? folderPath.trim() : '';
+
+      if (path) {
+        if (path.toLowerCase().endsWith(scriptFileName.toLowerCase())) {
+          return isWin ? path.replace(/\//g, '\\') : path.replace(/\\/g, '/');
+        }
+        if (isWin) {
+          const winPath = path.replace(/\//g, '\\').replace(/\\+$/, '');
+          return `${winPath}\\${scriptFileName}`;
+        }
+        const macPath = path.replace(/\\/g, '/').replace(/\/+$/, '');
+        return `${macPath}/${scriptFileName}`;
+      }
+
+      // Fallback placeholder when no absolute folder path is known yet
+      const info = this.getWatchedFolderInfo();
+      const folderName = (info && info.name && info.name !== 'Local Notes Folder' && info.name !== 'Secretary Workspace')
+        ? info.name
+        : 'notes';
+      if (isWin) {
+        return `C:\\path\\to\\${folderName}\\${scriptFileName}`;
+      }
+      return `/path/to/${folderName}/${scriptFileName}`;
+    },
+
+    /**
+     * Determines current watched folder information based on active storage engine and folder handles.
+     * In local filesystem mode: default is local notes folder (rootHandle / settings.folder.last).
+     * In Firebase mode: requires explicit folder selection via linkExternalAgentFolder().
+     */
+    getWatchedFolderInfo() {
+      const isFirebase = (typeof StorageAPI !== 'undefined' && typeof StorageAPI.getStorageEngine === 'function' && StorageAPI.getStorageEngine() === 'firebase');
+      if (this._externalFolderHandle) {
+        return {
+          type: 'custom',
+          name: this._externalFolderHandle.name || 'Custom Folder',
+          handle: this._externalFolderHandle,
+          isDefault: false,
+          mode: isFirebase ? 'firebase' : 'local'
+        };
+      }
+      if (!isFirebase) {
+        const name = (typeof rootHandle !== 'undefined' && rootHandle && rootHandle.name)
+          || (typeof settings !== 'undefined' && settings?.folder?.last)
+          || (typeof window !== 'undefined' && window.folderPath)
+          || 'Local Notes Folder';
+        return {
+          type: 'notes',
+          name,
+          handle: (typeof rootHandle !== 'undefined' && rootHandle) ? rootHandle : null,
+          isDefault: true,
+          mode: 'local'
+        };
+      }
+      return {
+        type: 'none',
+        name: '',
+        handle: null,
+        isDefault: false,
+        mode: 'firebase'
+      };
+    },
+
+    /**
+     * Reverts custom watched folder back to default notes workspace (in local mode).
+     */
+    resetWatchedFolderToDefault() {
+      this.disconnectExternalAgentFolder();
+      this._customFolderPath = null;
+      const config = this.getConfig();
+      if (config.watchedFolderPath) {
+        delete config.watchedFolderPath;
+        this.saveConfig(config).catch(() => {});
+      }
+      if (typeof toast === 'function') {
+        const msg = (typeof t === 'function' ? t('prefs.resetWatchedFolderTooltip') : 'Reset to default notes folder');
+        toast(msg);
+      }
+      this.updateExternalStatusUI();
+    },
+
+    /**
+     * Sets platform override ('win' or 'mac') for command display.
+     */
+    setPlatformOverride(platform) {
+      this._platformOverride = (platform === 'win' || platform === 'mac') ? platform : null;
+      this.updateExternalStatusUI();
+    },
 
     /**
      * Detects if the current host environment is Windows.
@@ -652,9 +815,20 @@
 
     /**
      * Generates terminal command to execute zero-dependency local sync script (macOS or Windows).
+     * If inWatchedFolder is true, returns command with absolute path to the script in the watched folder.
      */
-    getLocalSyncCommand(workspacePath = '', targetPlatform = null) {
-      const isWin = targetPlatform === 'win' || (targetPlatform !== 'mac' && this.isWindows());
+    getLocalSyncCommand(workspacePath = '', targetPlatform = null, inWatchedFolder = false) {
+      const activePlatform = targetPlatform || this._platformOverride;
+      const isWin = activePlatform === 'win' || (activePlatform !== 'mac' && this.isWindows());
+      if (inWatchedFolder) {
+        const resolvedPath = this.getWatchedFolderPath(workspacePath);
+        if (isWin) {
+          const scriptPath = this._formatScriptPath(resolvedPath, 'sync_local_calendar.ps1', 'win');
+          return `powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`;
+        }
+        const scriptPath = this._formatScriptPath(resolvedPath, 'sync_local_calendar.sh', 'mac');
+        return `bash "${scriptPath}"`;
+      }
       if (isWin) {
         const wsArg = workspacePath ? ` -Workspace "${workspacePath}"` : '';
         return `powershell.exe -ExecutionPolicy Bypass -File .\\development\\sync_local_calendar.ps1${wsArg}`;
@@ -674,7 +848,12 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_DIR="\$(cd "\$SCRIPT_DIR/.." && pwd)"
+if [ -f "\$SCRIPT_DIR/../app.html" ]; then
+  WORKSPACE_DIR="\$(cd "\$SCRIPT_DIR/.." && pwd)"
+else
+  # Default to script directory when placed inside the watched notes folder
+  WORKSPACE_DIR="\$SCRIPT_DIR"
+fi
 
 if [ -n "$1" ] && [ -d "$1" ]; then
   WORKSPACE_DIR="\$(cd "\$1" && pwd)"
@@ -886,8 +1065,11 @@ if ([string]::IsNullOrWhiteSpace($Workspace)) {
     $Candidate = Split-Path -Parent $ScriptDir
     if (Test-Path -LiteralPath (Join-Path $Candidate "app.html")) {
         $WorkspaceDir = $Candidate
+    } elseif (Test-Path -LiteralPath (Join-Path $ScriptDir "app.html")) {
+        $WorkspaceDir = $ScriptDir
     } else {
-        $WorkspaceDir = (Get-Location).Path
+        # Default to script directory when placed inside the watched notes folder
+        $WorkspaceDir = $ScriptDir
     }
 } else {
     $WorkspaceDir = (Resolve-Path -LiteralPath $Workspace).Path
@@ -1079,6 +1261,52 @@ if ($NewEvents.Count -gt 0) {
 }
 Write-Host "✨ Sync complete!"
 `;
+    },
+
+    /**
+     * Places the sync script (sync_local_calendar.ps1 and sync_local_calendar.sh) directly into the watched folder.
+     * Falls back to browser download if the folder handle is not writable.
+     */
+    async placeSyncScriptInWatchedFolder(targetPlatform = null) {
+      const activePlatform = targetPlatform || this._platformOverride;
+      const isWin = activePlatform === 'win' || (activePlatform !== 'mac' && this.isWindows());
+      const info = this.getWatchedFolderInfo();
+
+      if (info.handle && typeof info.handle.getFileHandle === 'function') {
+        try {
+          const ps1Content = this.getWindowsSyncScriptContent();
+          const ps1Handle = await info.handle.getFileHandle('sync_local_calendar.ps1', { create: true });
+          if (ps1Handle && typeof ps1Handle.createWritable === 'function') {
+            const writable = await ps1Handle.createWritable();
+            await writable.write(ps1Content);
+            await writable.close();
+          }
+
+          try {
+            const shContent = this.getSyncScriptContent();
+            const shHandle = await info.handle.getFileHandle('sync_local_calendar.sh', { create: true });
+            if (shHandle && typeof shHandle.createWritable === 'function') {
+              const writable = await shHandle.createWritable();
+              await writable.write(shContent);
+              await writable.close();
+            }
+          } catch (_shErr) {}
+
+          if (typeof toast === 'function') {
+            const msg = (typeof t === 'function')
+              ? t('prefs.scriptPlacedSuccess', { folder: info.name })
+              : `Local calendar sync scripts saved into watched folder ${info.name}!`;
+            toast(msg);
+          }
+          this.updateExternalStatusUI();
+          return true;
+        } catch (err) {
+          console.warn('Could not write sync script directly to folder handle, falling back to download:', err);
+        }
+      }
+
+      await this.downloadSyncScript(isWin ? 'win' : 'mac');
+      return false;
     },
 
     /**
@@ -1343,6 +1571,7 @@ Write-Host "✨ Sync complete!"
       }
       this._externalFolderHandle = null;
       this._externalLoadedInfo = null;
+      this._customFolderPath = null;
       this.updateExternalStatusUI();
     },
 
@@ -1356,6 +1585,7 @@ Write-Host "✨ Sync complete!"
       }
       this._externalFolderHandle = null;
       this._externalLoadedInfo = null;
+      this._customFolderPath = null;
 
       const picker = (typeof document !== 'undefined') ? document.getElementById('external-agent-file-picker') : null;
       if (picker) picker.value = '';
@@ -1413,10 +1643,131 @@ Write-Host "✨ Sync complete!"
         });
       }
 
+      // Watched folder card updates in Settings > Agenda and Setup Wizard
+      const info = this.getWatchedFolderInfo();
+      const folderNameEls = [
+        document.getElementById('prefs-watched-folder-name'),
+        document.getElementById('wizard-watched-folder-name')
+      ].filter(Boolean);
+      const folderBadgeEls = [
+        document.getElementById('prefs-watched-folder-badge'),
+        document.getElementById('wizard-watched-folder-badge')
+      ].filter(Boolean);
+      const folderDescEl = document.getElementById('prefs-watched-folder-desc');
+      const resetBtns = [
+        document.getElementById('btn-reset-watched-folder'),
+        document.getElementById('wizard-btn-reset-watched-folder')
+      ].filter(Boolean);
+      const changeBtn = document.getElementById('btn-change-watched-folder');
+      const agentNoticeEls = [
+        document.getElementById('prefs-agent-watched-folder-notice'),
+        document.getElementById('wizard-agent-watched-folder-notice')
+      ].filter(Boolean);
+      const pathInputs = [
+        document.getElementById('prefs-watched-folder-path-input'),
+        document.getElementById('wizard-watched-folder-path-input')
+      ].filter(Boolean);
+      const cmdInputs = [
+        document.getElementById('prefs-local-sync-cmd'),
+        document.getElementById('wizard-local-sync-cmd')
+      ].filter(Boolean);
+
+      const isWin = (this._platformOverride === 'win') || (this._platformOverride !== 'mac' && this.isWindows());
+      const winCmdBtns = [
+        document.getElementById('btn-cmd-platform-win'),
+        document.getElementById('wizard-btn-cmd-platform-win')
+      ].filter(Boolean);
+      const macCmdBtns = [
+        document.getElementById('btn-cmd-platform-mac'),
+        document.getElementById('wizard-btn-cmd-platform-mac')
+      ].filter(Boolean);
+      winCmdBtns.forEach(btn => {
+        btn.classList.toggle('active', isWin);
+        btn.setAttribute('aria-selected', isWin ? 'true' : 'false');
+      });
+      macCmdBtns.forEach(btn => {
+        btn.classList.toggle('active', !isWin);
+        btn.setAttribute('aria-selected', !isWin ? 'true' : 'false');
+      });
+
+      const folderPath = this.getWatchedFolderPath();
+      pathInputs.forEach(input => {
+        if (document.activeElement !== input) {
+          input.value = folderPath || '';
+        }
+      });
+
+      const cmd = this.getLocalSyncCommand(folderPath, this._platformOverride, true);
+      cmdInputs.forEach(input => {
+        input.value = cmd;
+      });
+
+      if (folderNameEls.length) {
+        if (info.type === 'notes') {
+          folderNameEls.forEach(el => { el.textContent = `📁 ${info.name}`; });
+          folderBadgeEls.forEach(el => {
+            el.textContent = (typeof t === 'function') ? t('prefs.watchedFolderNotesDefault') : 'Notes Folder (Default)';
+            el.style.background = 'var(--bg-tag)';
+            el.style.color = 'var(--accent)';
+          });
+          if (folderDescEl) {
+            folderDescEl.textContent = (typeof t === 'function') ? t('prefs.watchedFolderNotesDesc') : 'In local mode, your notes folder is the default watched folder. Sync scripts and planner-proposals.json reside directly here.';
+          }
+          resetBtns.forEach(btn => { btn.style.display = 'none'; });
+          if (changeBtn) {
+            const btnSpan = changeBtn.querySelector('span');
+            if (btnSpan) btnSpan.textContent = (typeof t === 'function') ? t('prefs.changeWatchedFolderBtn') : 'Change Watched Folder';
+          }
+        } else if (info.type === 'custom') {
+          folderNameEls.forEach(el => { el.textContent = `📁 ${info.name}`; });
+          folderBadgeEls.forEach(el => {
+            el.textContent = (typeof t === 'function') ? t('prefs.watchedFolderCustomLabel') : 'Custom Watched Folder';
+            el.style.background = 'var(--accent)';
+            el.style.color = '#fff';
+          });
+          if (folderDescEl) {
+            folderDescEl.textContent = (typeof t === 'function') ? t('prefs.watchedFolderCustomDesc') : 'This custom folder is monitored for planner-proposals.json events generated by scripts or agents.';
+          }
+          resetBtns.forEach(btn => { btn.style.display = (info.mode === 'local') ? 'inline-flex' : 'none'; });
+          if (changeBtn) {
+            const btnSpan = changeBtn.querySelector('span');
+            if (btnSpan) btnSpan.textContent = (typeof t === 'function') ? t('prefs.changeWatchedFolderBtn') : 'Change Watched Folder';
+          }
+        } else {
+          // Firebase mode with no folder selected
+          folderNameEls.forEach(el => { el.textContent = (typeof t === 'function') ? t('prefs.watchedFolderNoneLabel') : 'No local folder connected'; });
+          folderBadgeEls.forEach(el => {
+            el.textContent = (typeof t === 'function') ? t('prefs.watchedFolderNoneBadge') : 'Selection required';
+            el.style.background = 'rgba(239,68,68,0.15)';
+            el.style.color = 'var(--danger)';
+          });
+          if (folderDescEl) {
+            folderDescEl.textContent = (typeof t === 'function') ? t('prefs.watchedFolderNoneDesc') : 'In Firebase mode, select a local folder to watch for calendar proposals and store sync scripts.';
+          }
+          resetBtns.forEach(btn => { btn.style.display = 'none'; });
+          if (changeBtn) {
+            const btnSpan = changeBtn.querySelector('span');
+            if (btnSpan) btnSpan.textContent = (typeof t === 'function') ? t('prefs.selectWatchedFolderBtn') : 'Select Watched Folder';
+          }
+        }
+      }
+
+      if (agentNoticeEls.length) {
+        const folderDisplayName = info.name || (typeof t === 'function' ? t('prefs.watchedFolderNoneLabel') : 'Secretary Workspace');
+        const noticeText = (typeof t === 'function')
+          ? t('prefs.agentWatchedFolderNotice', { folder: folderDisplayName })
+          : `Guidelines configured to write directly into watched folder: ${folderDisplayName}`;
+        agentNoticeEls.forEach(el => { el.textContent = noticeText; });
+      }
+
       const runBtn = document.getElementById('btn-run-local-sync');
       if (runBtn) {
         const isSupported = typeof window !== 'undefined' && window.AppBridge?.calendarSync?.isSupported?.();
         runBtn.style.display = isSupported ? 'inline-flex' : 'none';
+      }
+
+      if (typeof updateExternalAgentPromptDisplay === 'function') {
+        updateExternalAgentPromptDisplay();
       }
     },
 

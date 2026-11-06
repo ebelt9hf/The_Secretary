@@ -10,20 +10,20 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e1b4b">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.74">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.74">
-<link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.74" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.74"></noscript>
+<link rel="stylesheet" href="css/app-base.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.75">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.75">
+<link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.75" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.75"></noscript>
 <script>
   (function() {
     try {
@@ -163,7 +163,7 @@
       <div class="landing-badge"><span class="landing-badge-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span> Secretary Workspace</div>
       <h1>Secretary</h1>
       <p class="landing-desc" data-i18n="landing.description">Browse, edit, and manage your notes and todos — entirely in the browser, reading and writing directly to disk.</p>
-      <p id="connect-version-hint" data-version="4.0.74" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.74</p>
+      <p id="connect-version-hint" data-version="4.0.75" style="font-size:.72rem;color:var(--text-muted);margin-top:-.3rem">Version 4.0.75</p>
       <div id="landing-version-banner" class="app-version-banner landing-version-banner" style="display:none;" role="status"></div>
       
       <div class="landing-features">
@@ -536,96 +536,178 @@
         </div>
         <small style="display:block;color:#6b7280;margin-top:.3rem">Used by the Planner to show unplanned time during work hours</small>
 
-        <!-- Calendar Synchronization & Subscribed Feeds -->
+        <!-- Calendar Synchronization & Streamlined Multi-Method Engine -->
         <div style="margin-top:1.25rem; padding-top:1rem; border-top:1px solid var(--card-border);">
-          <h4 style="margin:0 0 6px 0; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <span data-i18n="prefs.calendarSyncTitle">Calendar Synchronization</span>
-          </h4>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
+            <h4 style="margin:0; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span data-i18n="prefs.calendarSyncTitle">Calendar Synchronization</span>
+            </h4>
+            <span id="prefs-local-proposals-status" class="badge" style="font-size:0.72rem; padding:2px 8px; border-radius:4px; background:var(--bg-tag); color:var(--text-muted);" title="Status of planner-proposals.json" data-i18n-title="prefs.statusProposalsTooltip">0 proposals</span>
+          </div>
           <p class="prefs-desc" style="color:var(--text-muted); font-size:0.8rem; margin:0 0 10px 0;" data-i18n="prefs.calendarSyncDesc">
             Subscribe to external calendar feeds (Google, Apple, Outlook) or extract local calendar events into Planner proposals.
           </p>
 
-          <!-- Feeds List Container -->
-          <div id="prefs-calendar-feeds-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
+          <!-- Method Selector Tabs (Streamlined Multi-Way Interface) -->
+          <div class="prefs-sync-methods-bar" style="display:flex; gap:6px; margin-bottom:12px; border-bottom:1px solid var(--card-border); padding-bottom:8px; flex-wrap:wrap;">
+            <button type="button" class="setup-wizard-tab-btn active" id="prefs-sync-tab-feeds" onclick="switchCalendarSyncTab('feeds')" title="Switch to external iCal and WebCal subscription feeds (Google, Apple, Outlook Web)" data-i18n-title="prefs.syncMethodFeedsTooltip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              <span data-i18n="prefs.syncMethodFeeds">Subscribed Feeds (iCal / WebCal)</span>
+            </button>
+            <button type="button" class="setup-wizard-tab-btn" id="prefs-sync-tab-folder" onclick="switchCalendarSyncTab('folder')" title="Configure a watched folder and local sync script (PowerShell or Bash)" data-i18n-title="prefs.syncMethodFolderTooltip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span data-i18n="prefs.syncMethodFolder">Watched Folder &amp; Script</span>
+            </button>
+            <button type="button" class="setup-wizard-tab-btn" id="prefs-sync-tab-agent" onclick="switchCalendarSyncTab('agent')" title="View guidelines for an external AI agent to extract Outlook meetings into the watched folder" data-i18n-title="prefs.syncMethodAgentTooltip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+              <span data-i18n="prefs.syncMethodAgent">External AI Agent (Outlook)</span>
+            </button>
+          </div>
 
-          <!-- Add Feed Form -->
-          <div style="background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:8px;">
-            <div style="font-weight:600; font-size:0.82rem;" data-i18n="prefs.addCalendarFeedTitle">Add Subscribed Calendar Feed</div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <input type="text" id="prefs-feed-name-input" class="prefs-input" placeholder="e.g. Work Calendar" style="flex:1; min-width:140px;" title="Display name for this calendar feed" data-i18n-placeholder="prefs.feedNamePlaceholder" data-i18n-title="prefs.feedNameTooltip">
-              <input type="url" id="prefs-feed-url-input" class="prefs-input" placeholder="webcal:// or https://.../basic.ics" style="flex:2; min-width:220px;" title="Direct iCal or WebCal subscription URL" data-i18n-placeholder="prefs.feedUrlPlaceholder" data-i18n-title="prefs.feedUrlTooltip">
-              <button type="button" class="btn btn-primary" onclick="addCalendarFeedFromPrefs()" title="Subscribe to feed and fetch initial events into Planner proposals" data-i18n-title="prefs.addFeedTooltip">
-                <span data-i18n="prefs.addFeedBtn">Add &amp; Sync</span>
-              </button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-              <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="prefs.feedUrlHint">
-                Paste the private iCal or WebCal address from Google Calendar, Outlook Web, or iCloud Calendar.
-              </small>
-              <button type="button" class="btn btn-subtle" id="btn-toggle-calendar-guide" onclick="toggleCalendarGuidePrefs()" style="font-size:0.75rem; padding:2px 8px;" title="Step-by-step instructions for finding your link" data-i18n-title="prefs.howToFindLinkTooltip">
-                <span data-i18n="prefs.howToFindLinkBtn">How to find your calendar link? ℹ️</span>
-              </button>
-            </div>
+          <!-- ── Pane 1: Subscribed Feeds (iCal / WebCal) ── -->
+          <div id="prefs-cal-pane-feeds" class="prefs-cal-pane" style="display:block;">
+            <!-- Feeds List Container -->
+            <div id="prefs-calendar-feeds-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
 
-            <!-- Collapsible Calendar Link Guide -->
-            <div id="prefs-calendar-guide-container" style="display:none; margin-top:8px; border-top:1px solid var(--card-border); padding-top:8px;">
-              <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
-                <button type="button" class="setup-wizard-tab-btn active" id="prefs-guide-tab-outlook" onclick="switchPrefsCalendarGuide('outlook')" title="Outlook Web instructions" data-i18n-title="setupWizard.guideTabOutlookTooltip">
-                  📧 <span data-i18n="setupWizard.guideTabOutlook">Outlook</span>
-                </button>
-                <button type="button" class="setup-wizard-tab-btn" id="prefs-guide-tab-google" onclick="switchPrefsCalendarGuide('google')" title="Google Calendar instructions" data-i18n-title="setupWizard.guideTabGoogleTooltip">
-                  📅 <span data-i18n="setupWizard.guideTabGoogle">Google Calendar</span>
-                </button>
-                <button type="button" class="setup-wizard-tab-btn" id="prefs-guide-tab-apple" onclick="switchPrefsCalendarGuide('apple')" title="Apple Calendar instructions" data-i18n-title="setupWizard.guideTabAppleTooltip">
-                  🍏 <span data-i18n="setupWizard.guideTabApple">Apple Calendar</span>
+            <!-- Add Feed Form -->
+            <div style="background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:8px;">
+              <div style="font-weight:600; font-size:0.82rem;" data-i18n="prefs.addCalendarFeedTitle">Add Subscribed Calendar Feed</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <input type="text" id="prefs-feed-name-input" class="prefs-input" placeholder="e.g. Work Calendar" style="flex:1; min-width:140px;" title="Display name for this calendar feed" data-i18n-placeholder="prefs.feedNamePlaceholder" data-i18n-title="prefs.feedNameTooltip">
+                <input type="url" id="prefs-feed-url-input" class="prefs-input" placeholder="webcal:// or https://.../basic.ics" style="flex:2; min-width:220px;" title="Direct iCal or WebCal subscription URL" data-i18n-placeholder="prefs.feedUrlPlaceholder" data-i18n-title="prefs.feedUrlTooltip">
+                <button type="button" class="btn btn-primary" onclick="addCalendarFeedFromPrefs()" title="Subscribe to feed and fetch initial events into Planner proposals" data-i18n-title="prefs.addFeedTooltip">
+                  <span data-i18n="prefs.addFeedBtn">Add &amp; Sync</span>
                 </button>
               </div>
-              <div id="prefs-calendar-guide-content" class="setup-wizard-guide-box"></div>
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                <small style="color:var(--text-muted); font-size:0.75rem;" data-i18n="prefs.feedUrlHint">
+                  Paste the private iCal or WebCal address from Google Calendar, Outlook Web, or iCloud Calendar.
+                </small>
+                <button type="button" class="btn btn-subtle" id="btn-toggle-calendar-guide" onclick="toggleCalendarGuidePrefs()" style="font-size:0.75rem; padding:2px 8px;" title="Step-by-step instructions for finding your link" data-i18n-title="prefs.howToFindLinkTooltip">
+                  <span data-i18n="prefs.howToFindLinkBtn">How to find your calendar link? ℹ️</span>
+                </button>
+              </div>
+
+              <!-- Collapsible Calendar Link Guide -->
+              <div id="prefs-calendar-guide-container" style="display:none; margin-top:8px; border-top:1px solid var(--card-border); padding-top:8px;">
+                <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+                  <button type="button" class="setup-wizard-tab-btn active" id="prefs-guide-tab-outlook" onclick="switchPrefsCalendarGuide('outlook')" title="Outlook Web instructions" data-i18n-title="setupWizard.guideTabOutlookTooltip">
+                    📧 <span data-i18n="setupWizard.guideTabOutlook">Outlook</span>
+                  </button>
+                  <button type="button" class="setup-wizard-tab-btn" id="prefs-guide-tab-google" onclick="switchPrefsCalendarGuide('google')" title="Google Calendar instructions" data-i18n-title="setupWizard.guideTabGoogleTooltip">
+                    📅 <span data-i18n="setupWizard.guideTabGoogle">Google Calendar</span>
+                  </button>
+                  <button type="button" class="setup-wizard-tab-btn" id="prefs-guide-tab-apple" onclick="switchPrefsCalendarGuide('apple')" title="Apple Calendar instructions" data-i18n-title="setupWizard.guideTabAppleTooltip">
+                    🍏 <span data-i18n="setupWizard.guideTabApple">Apple Calendar</span>
+                  </button>
+                </div>
+                <div id="prefs-calendar-guide-content" class="setup-wizard-guide-box"></div>
+              </div>
             </div>
           </div>
 
-          <!-- Local macOS Calendar & Corporate Outlook Helper -->
-          <div style="margin-top:12px; background:var(--card-bg-alt); border:1px dashed var(--card-border); border-radius:6px; padding:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <span style="font-weight:600; font-size:0.82rem;" data-i18n="prefs.localCalendarHelperTitle">Local macOS / Corporate Outlook Helper</span>
-              <span id="prefs-local-proposals-status" class="badge" style="font-size:0.72rem; padding:2px 6px; border-radius:4px; background:var(--bg-tag); color:var(--text-muted);" title="Status of planner-proposals.json" data-i18n-title="prefs.proposalsWaiting">0 proposals</span>
+          <!-- ── Pane 2: Watched Folder & Local Sync Script ── -->
+          <div id="prefs-cal-pane-folder" class="prefs-cal-pane" style="display:none;">
+            <!-- Watched Folder Card -->
+            <div style="background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; padding:12px; margin-bottom:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
+                <span style="font-weight:600; font-size:0.83rem; display:flex; align-items:center; gap:6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <span data-i18n="prefs.watchedFolderCardTitle">Watched Folder Configuration</span>
+                </span>
+                <span id="prefs-watched-folder-badge" class="badge" style="font-size:0.72rem; padding:2px 6px; border-radius:4px; background:var(--bg-tag); color:var(--accent);">Notes Folder (Default)</span>
+              </div>
+              <div style="font-family:'Fira Code',monospace; font-size:0.82rem; color:var(--text); font-weight:600; word-break:break-all; margin-bottom:4px;" id="prefs-watched-folder-name">
+                📁 Local Notes Folder
+              </div>
+              <p id="prefs-watched-folder-desc" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;" data-i18n="prefs.watchedFolderNotesDesc">
+                In local mode, your notes folder is the default watched folder. Sync scripts and planner-proposals.json reside directly here.
+              </p>
+              <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                <button type="button" class="btn btn-sm" id="btn-change-watched-folder" onclick="CalendarSyncService.linkExternalAgentFolder()" title="Select a different local folder on your computer to watch for calendar proposals" data-i18n-title="prefs.changeWatchedFolderTooltip" style="font-size:0.74rem; padding:3px 9px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <span data-i18n="prefs.changeWatchedFolderBtn">Change Watched Folder</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary" id="btn-reset-watched-folder" onclick="CalendarSyncService.resetWatchedFolderToDefault()" title="Revert to using your default local notes folder as the watched folder" data-i18n-title="prefs.resetWatchedFolderTooltip" style="display:none; font-size:0.74rem; padding:3px 9px;">
+                  <span data-i18n="prefs.resetWatchedFolderBtn">Reset to Notes Folder</span>
+                </button>
+                <button type="button" class="btn btn-sm" id="btn-select-agent-file" onclick="CalendarSyncService.selectExternalAgentFile()" title="Select a planner-proposals.json or calendar .ics file directly" data-i18n-title="prefs.selectFileTooltip" style="font-size:0.74rem; padding:3px 9px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span data-i18n="prefs.selectFileBtn">Select File</span>
+                </button>
+                <input type="file" id="external-agent-file-picker" accept=".json,.ics" style="display:none;" onchange="CalendarSyncService.handleFileInputChange(event)">
+              </div>
+              <!-- Linked Folder Indicator Box -->
+              <div id="prefs-external-agent-linked-box" style="display:none; align-items:center; justify-content:space-between; margin-top:8px; background:var(--card-bg); border:1px solid var(--accent); border-radius:4px; padding:4px 8px; font-size:0.73rem;">
+                <span id="prefs-external-agent-linked-label" style="font-family:'Fira Code',monospace; font-weight:500; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+                <button type="button" class="btn btn-sm" onclick="CalendarSyncService.disconnectExternalAgentFolder()" title="Disconnect linked external results folder" data-i18n-title="prefs.disconnectFolderTooltip" style="padding:1px 6px; font-size:0.7rem; color:var(--danger); border:none; background:transparent; cursor:pointer;">✕</button>
+              </div>
             </div>
-            <p style="margin:0 0 8px 0; font-size:0.78rem; color:var(--text-muted);" data-i18n="prefs.localCalendarHelperDesc">
-              If corporate IT blocks cloud calendar feeds, run the local sync script directly on macOS to extract Outlook Desktop &amp; Apple Calendar meetings into Secretary proposals.
-            </p>
-            <div style="position:relative; width:100%;">
-              <input type="text" id="prefs-local-sync-cmd" readonly value="./development/sync_local_calendar.sh" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="Command to run local calendar sync in Terminal" data-i18n-title="prefs.localSyncCmdTooltip">
-              <button type="button" class="btn" onclick="copyLocalCalendarSyncCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="Copy terminal command to clipboard" data-i18n-title="prefs.localSyncCmdTooltip">
-                <span data-i18n="common.copy">Copy</span>
-              </button>
+
+            <!-- Sync Script Helper (PowerShell / Bash) -->
+            <div style="background:var(--card-bg-alt); border:1px dashed var(--card-border); border-radius:6px; padding:12px;">
+              <div style="font-weight:600; font-size:0.83rem; margin-bottom:4px;" data-i18n="prefs.localCalendarHelperTitle">Local macOS / Corporate Outlook Helper</div>
+              <p style="margin:0 0 8px 0; font-size:0.78rem; color:var(--text-muted);" data-i18n="prefs.localCalendarHelperDesc">
+                If corporate IT blocks cloud calendar feeds, run the local sync script directly on macOS to extract Outlook Desktop &amp; Apple Calendar meetings into Secretary proposals.
+              </p>
+
+              <!-- Actions: Place Script in Watched Folder, Download, Run -->
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+                <button type="button" class="btn btn-sm btn-primary" id="btn-place-sync-script" onclick="CalendarSyncService.placeSyncScriptInWatchedFolder()" title="Save sync_local_calendar.ps1 and sync_local_calendar.sh directly into the watched folder" data-i18n-title="prefs.placeScriptInFolderTooltip" style="font-size:0.74rem; padding:4px 10px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  <span data-i18n="prefs.placeScriptInFolderBtn">Place Script in Watched Folder</span>
+                </button>
+                <button type="button" class="btn btn-sm" id="btn-download-sync-script" onclick="CalendarSyncService.downloadSyncScript()" title="Download the local calendar sync script (.sh / .ps1) to run on your computer" data-i18n-title="prefs.downloadSyncScriptTooltip" style="font-size:0.74rem; padding:4px 10px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span data-i18n="prefs.downloadSyncScriptBtn">Download Script</span>
+                </button>
+                <button type="button" class="btn btn-sm" id="btn-run-local-sync" onclick="CalendarSyncService.runLocalSyncScript()" title="Run local calendar sync script in background in a separate thread" data-i18n-title="prefs.runLocalSyncTooltip" style="font-size:0.74rem; padding:4px 10px; display:none;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  <span data-i18n="prefs.runLocalSyncBtn">Run Sync Now</span>
+                </button>
+              </div>
+
+              <!-- Watched Folder Path Input (Optional / Customizer) -->
+              <div style="margin-bottom:8px;">
+                <label for="prefs-watched-folder-path-input" style="display:block; font-size:0.74rem; font-weight:600; color:var(--text-muted); margin-bottom:3px;" data-i18n="prefs.watchedFolderPathLabel">Watched Folder Absolute Path</label>
+                <input type="text" id="prefs-watched-folder-path-input" oninput="CalendarSyncService.handleCustomFolderPathInput(this.value)" placeholder="e.g. C:\Users\Username\Notes or /Users/username/Notes" data-i18n-placeholder="prefs.watchedFolderPathPlaceholder" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:5px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="Enter your folder absolute path to generate a one-click command" data-i18n-title="prefs.watchedFolderPathTooltip">
+              </div>
+
+              <!-- Command Platform Selector & Display -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:4px;">
+                <span style="font-size:0.75rem; font-weight:600; color:var(--text-muted);" data-i18n="prefs.localSyncCmdTooltip">Command to run local calendar sync in Terminal</span>
+                <div style="display:flex; gap:4px;">
+                  <button type="button" class="setup-wizard-tab-btn" id="btn-cmd-platform-win" onclick="CalendarSyncService.setPlatformOverride('win')" style="font-size:0.7rem; padding:2px 6px;" title="Display PowerShell command for Windows" data-i18n-title="prefs.cmdPlatformWinTooltip" data-i18n="prefs.cmdPlatformWindows">Windows PowerShell (.ps1)</button>
+                  <button type="button" class="setup-wizard-tab-btn" id="btn-cmd-platform-mac" onclick="CalendarSyncService.setPlatformOverride('mac')" style="font-size:0.7rem; padding:2px 6px;" title="Display terminal command for macOS and Linux" data-i18n-title="prefs.cmdPlatformMacTooltip" data-i18n="prefs.cmdPlatformMac">macOS / Linux (.sh)</button>
+                </div>
+              </div>
+              <div style="position:relative; width:100%;">
+                <input type="text" id="prefs-local-sync-cmd" readonly value='powershell.exe -ExecutionPolicy Bypass -File "C:\path\to\notes\sync_local_calendar.ps1"' style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="Command to run local calendar sync in Terminal" data-i18n-title="prefs.localSyncCmdTooltip">
+                <button type="button" class="btn" onclick="copyLocalCalendarSyncCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="Copy terminal command to clipboard" data-i18n-title="prefs.localSyncCmdTooltip">
+                  <span data-i18n="common.copy">Copy</span>
+                </button>
+              </div>
             </div>
-            <!-- Web Action Controls: Download Script, Connect Results Folder, Select File -->
-            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
-              <button type="button" class="btn btn-sm" id="btn-run-local-sync" onclick="CalendarSyncService.runLocalSyncScript()" title="Run local calendar sync script in background in a separate thread" data-i18n-title="prefs.runLocalSyncTooltip" style="font-size:0.73rem; padding:3px 8px; display:none;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                <span data-i18n="prefs.runLocalSyncBtn">Run Sync Now</span>
-              </button>
-              <button type="button" class="btn btn-sm" id="btn-download-sync-script" onclick="CalendarSyncService.downloadSyncScript()" title="Download the local calendar sync script (.sh / .ps1) to run on your computer" data-i18n-title="prefs.downloadSyncScriptTooltip" style="font-size:0.73rem; padding:3px 8px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span data-i18n="prefs.downloadSyncScriptBtn">Download Script</span>
-              </button>
-              <button type="button" class="btn btn-sm" id="btn-connect-agent-folder" onclick="CalendarSyncService.linkExternalAgentFolder()" title="Select the local folder containing the sync script and planner-proposals.json" data-i18n-title="prefs.connectFolderTooltip" style="font-size:0.73rem; padding:3px 8px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                <span data-i18n="prefs.connectFolderBtn">Connect Results Folder</span>
-              </button>
-              <button type="button" class="btn btn-sm" id="btn-select-agent-file" onclick="CalendarSyncService.selectExternalAgentFile()" title="Select a planner-proposals.json or calendar .ics file directly" data-i18n-title="prefs.selectFileTooltip" style="font-size:0.73rem; padding:3px 8px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:3px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <span data-i18n="prefs.selectFileBtn">Select File</span>
-              </button>
-              <input type="file" id="external-agent-file-picker" accept=".json,.ics" style="display:none;" onchange="CalendarSyncService.handleFileInputChange(event)">
-            </div>
-            <!-- Linked Folder / File Active Indicator -->
-            <div id="prefs-external-agent-linked-box" style="display:none; align-items:center; justify-content:space-between; margin-top:8px; background:var(--card-bg); border:1px solid var(--accent); border-radius:4px; padding:4px 8px; font-size:0.73rem;">
-              <span id="prefs-external-agent-linked-label" style="font-family:'Fira Code',monospace; font-weight:500; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
-              <button type="button" class="btn btn-sm" onclick="CalendarSyncService.disconnectExternalAgentFolder()" title="Disconnect linked external results folder" data-i18n-title="prefs.disconnectFolderTooltip" style="padding:1px 6px; font-size:0.7rem; color:var(--danger); border:none; background:transparent; cursor:pointer;">
-                ✕
-              </button>
+          </div>
+
+          <!-- ── Pane 3: External AI Agent (Outlook & Mail) ── -->
+          <div id="prefs-cal-pane-agent" class="prefs-cal-pane" style="display:none;">
+            <div style="background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:6px; padding:12px;">
+              <div style="font-weight:600; font-size:0.83rem; margin-bottom:4px;" data-i18n="prefs.externalAgentPromptLabel">External Agent Guidelines (Mail &amp; Calendar)</div>
+              <p style="margin:0 0 8px 0; font-size:0.78rem; color:var(--text-muted);" data-i18n="prefs.externalAgentPromptDesc">
+                Copy and paste these guidelines into an external AI agent or automation script to extract calendar events from your mail program into planner-proposals.json.
+              </p>
+              <div id="prefs-agent-watched-folder-notice" style="font-size:0.76rem; padding:6px 10px; background:var(--card-bg); border-left:3px solid var(--accent); border-radius:4px; margin-bottom:8px; font-weight:500; color:var(--text);">
+                Guidelines configured to write directly into watched folder: Local Notes Folder
+              </div>
+              <div style="position:relative; width:100%;">
+                <textarea id="prefs-external-agent-prompt" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:140px;width:100%;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2.2rem;resize:vertical;box-sizing:border-box;"></textarea>
+                <button type="button" class="btn" onclick="copyExternalAgentPrompt()" id="btn-copy-agent-prompt" title="Copy external agent mail-to-planner instructions to clipboard" data-i18n-title="prefs.copyAgentPromptTooltip" style="position:absolute; top:6px; right:6px; padding:.2rem .55rem; font-size:.72rem; z-index:10; background:var(--card-bg-alt); border:1px solid var(--card-border); border-radius:4px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                  <span data-i18n="prefs.copyAgentPromptBtn">Copy Guidelines</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -921,11 +1003,16 @@
 
           <!-- External Agent Mail-to-Planner Instructions -->
           <div class="setup-wizard-form-group" style="margin-top:0.85rem; border-top:1px dashed var(--card-border); padding-top:0.85rem;">
-            <label class="setup-wizard-label" id="prefs-external-agent-prompt-label" for="prefs-external-agent-prompt" data-i18n="prefs.externalAgentPromptLabel">External Agent Guidelines (Mail & Calendar)</label>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:6px;">
+              <label class="setup-wizard-label" id="prefs-external-agent-prompt-label" for="prefs-external-agent-prompt-ai" data-i18n="prefs.externalAgentPromptLabel">External Agent Guidelines (Mail &amp; Calendar)</label>
+              <button type="button" class="btn btn-subtle btn-sm" onclick="switchPrefsTab('schedule'); switchCalendarSyncTab('agent');" title="Open Calendar Synchronization settings in the Agenda tab" data-i18n-title="prefs.syncMethodAgentTooltip" style="font-size:0.72rem; padding:2px 8px;">
+                <span data-i18n="prefs.tabSchedule">Agenda</span> ↗
+              </button>
+            </div>
             <small class="prefs-desc" style="display:block;color:var(--text-muted);font-size:0.78rem;margin-bottom:6px;" data-i18n="prefs.externalAgentPromptDesc">Copy and paste these guidelines into an external AI agent or automation script to extract calendar events from your mail program into planner-proposals.json.</small>
             <div style="position:relative; width:100%;">
-              <textarea id="prefs-external-agent-prompt" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:120px;width:100%;background:var(--card-bg-alt);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2.2rem;resize:vertical;box-sizing:border-box;"></textarea>
-              <button type="button" class="btn" onclick="copyExternalAgentPrompt()" id="btn-copy-agent-prompt" title="Copy external agent mail-to-planner instructions to clipboard" data-i18n-title="prefs.copyAgentPromptTooltip" style="position:absolute; top:6px; right:6px; padding:.2rem .55rem; font-size:.72rem; z-index:10; background:var(--card-bg); border:1px solid var(--card-border); border-radius:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> <span data-i18n="prefs.copyAgentPromptBtn">Copy Guidelines</span></button>
+              <textarea id="prefs-external-agent-prompt-ai" readonly style="font-family:'Fira Code',monospace;font-size:.72rem;line-height:1.35;height:120px;width:100%;background:var(--card-bg-alt);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:.5rem;padding-top:2.2rem;resize:vertical;box-sizing:border-box;"></textarea>
+              <button type="button" class="btn" onclick="copyExternalAgentPrompt()" id="btn-copy-agent-prompt-ai" title="Copy external agent mail-to-planner instructions to clipboard" data-i18n-title="prefs.copyAgentPromptTooltip" style="position:absolute; top:6px; right:6px; padding:.2rem .55rem; font-size:.72rem; z-index:10; background:var(--card-bg); border:1px solid var(--card-border); border-radius:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg> <span data-i18n="prefs.copyAgentPromptBtn">Copy Guidelines</span></button>
             </div>
           </div>
 
@@ -1559,12 +1646,12 @@
 <div class="toast" id="toast"></div>
 
 <!-- Vendor Markdown & LaTeX libraries -->
-<script src="js/vendor/katex.min.js?v=4.0.74"></script>
-<script src="js/vendor/katex-auto-render.min.js?v=4.0.74"></script>
-<script src="js/vendor/dompurify.min.js?v=4.0.74"></script>
-<script src="js/vendor/marked.min.js?v=4.0.74"></script>
-<script src="js/vendor/turndown.js?v=4.0.74"></script>
-<script src="js/vendor/turndown-plugin-gfm.js?v=4.0.74"></script>
+<script src="js/vendor/katex.min.js?v=4.0.75"></script>
+<script src="js/vendor/katex-auto-render.min.js?v=4.0.75"></script>
+<script src="js/vendor/dompurify.min.js?v=4.0.75"></script>
+<script src="js/vendor/marked.min.js?v=4.0.75"></script>
+<script src="js/vendor/turndown.js?v=4.0.75"></script>
+<script src="js/vendor/turndown-plugin-gfm.js?v=4.0.75"></script>
 <script>
   // Ensure marked options are securely set
   try {
@@ -1612,42 +1699,42 @@
   } catch (e) { console.warn('Could not add turndown math rules', e); }
 </script>
 
-<script src="js/app-state.js?v=4.0.74"></script>
-<script src="js/app-utils.js?v=4.0.74"></script>
-<script src="js/app-icons.js?v=4.0.74"></script>
-<script src="js/app-popover-manager.js?v=4.0.74"></script>
-<script src="js/translations.js?v=4.0.74"></script>
-<script src="js/app-i18n.js?v=4.0.74"></script>
-<script src="js/app-bridge.js?v=4.0.74"></script>
-<script src="js/app-pwa.js?v=4.0.74"></script>
-<script src="js/app-fs.js?v=4.0.74"></script>
-<script src="js/firebase-bundle.js?v=4.0.74"></script>
-<script src="js/firebase-config.js?v=4.0.74"></script>
-<script src="js/app-crypto.js?v=4.0.74"></script>
-<script src="js/app-image-optimizer.js?v=4.0.74"></script>
-<script src="js/app-idb.js?v=4.0.74"></script>
-<script src="js/app-firebase-sync.js?v=4.0.74"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.74"></script>
-<script src="js/app-storage.js?v=4.0.74"></script>
-<script src="js/storage-migration.js?v=4.0.74"></script>
-<script src="js/app-stash-service.js?v=4.0.74"></script>
-<script src="js/app-omnibar.js?v=4.0.74"></script>
-<script src="js/app-topic-memory.js?v=4.0.74"></script>
-<script src="js/app-prompts.js?v=4.0.74"></script>
-<script src="js/app-llm.js?v=4.0.74"></script>
-<script src="js/app-dailyreview.js?v=4.0.74"></script>
-<script src="js/app-notes.js?v=4.0.74"></script>
-<script src="js/app-todos-board.js?v=4.0.74"></script>
-<script src="js/app-board.js?v=4.0.74"></script>
-<script src="js/app-focus.js?v=4.0.74"></script>
-<script src="js/app-overlay.js?v=4.0.74"></script>
-<script src="js/app-calendar-sync.js?v=4.0.74"></script>
-<script src="js/app-planner.js?v=4.0.74"></script>
-<script src="js/app-collab.js?v=4.0.74"></script>
-<script src="js/app-retro.js?v=4.0.74"></script>
-<script src="js/app-tutorial.js?v=4.0.74"></script>
-<script src="js/app-graph-view.js?v=4.0.74"></script>
-<script src="js/app-chat.js?v=4.0.74"></script>
-<script src="js/app-init.js?v=4.0.74"></script>
+<script src="js/app-state.js?v=4.0.75"></script>
+<script src="js/app-utils.js?v=4.0.75"></script>
+<script src="js/app-icons.js?v=4.0.75"></script>
+<script src="js/app-popover-manager.js?v=4.0.75"></script>
+<script src="js/translations.js?v=4.0.75"></script>
+<script src="js/app-i18n.js?v=4.0.75"></script>
+<script src="js/app-bridge.js?v=4.0.75"></script>
+<script src="js/app-pwa.js?v=4.0.75"></script>
+<script src="js/app-fs.js?v=4.0.75"></script>
+<script src="js/firebase-bundle.js?v=4.0.75"></script>
+<script src="js/firebase-config.js?v=4.0.75"></script>
+<script src="js/app-crypto.js?v=4.0.75"></script>
+<script src="js/app-image-optimizer.js?v=4.0.75"></script>
+<script src="js/app-idb.js?v=4.0.75"></script>
+<script src="js/app-firebase-sync.js?v=4.0.75"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.75"></script>
+<script src="js/app-storage.js?v=4.0.75"></script>
+<script src="js/storage-migration.js?v=4.0.75"></script>
+<script src="js/app-stash-service.js?v=4.0.75"></script>
+<script src="js/app-omnibar.js?v=4.0.75"></script>
+<script src="js/app-topic-memory.js?v=4.0.75"></script>
+<script src="js/app-prompts.js?v=4.0.75"></script>
+<script src="js/app-llm.js?v=4.0.75"></script>
+<script src="js/app-dailyreview.js?v=4.0.75"></script>
+<script src="js/app-notes.js?v=4.0.75"></script>
+<script src="js/app-todos-board.js?v=4.0.75"></script>
+<script src="js/app-board.js?v=4.0.75"></script>
+<script src="js/app-focus.js?v=4.0.75"></script>
+<script src="js/app-overlay.js?v=4.0.75"></script>
+<script src="js/app-calendar-sync.js?v=4.0.75"></script>
+<script src="js/app-planner.js?v=4.0.75"></script>
+<script src="js/app-collab.js?v=4.0.75"></script>
+<script src="js/app-retro.js?v=4.0.75"></script>
+<script src="js/app-tutorial.js?v=4.0.75"></script>
+<script src="js/app-graph-view.js?v=4.0.75"></script>
+<script src="js/app-chat.js?v=4.0.75"></script>
+<script src="js/app-init.js?v=4.0.75"></script>
 </body>
 </html>

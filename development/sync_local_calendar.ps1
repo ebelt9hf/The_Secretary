@@ -30,8 +30,11 @@ if ([string]::IsNullOrWhiteSpace($Workspace)) {
     $Candidate = Split-Path -Parent $ScriptDir
     if (Test-Path -LiteralPath (Join-Path $Candidate "app.html")) {
         $WorkspaceDir = $Candidate
+    } elseif (Test-Path -LiteralPath (Join-Path $ScriptDir "app.html")) {
+        $WorkspaceDir = $ScriptDir
     } else {
-        $WorkspaceDir = (Get-Location).Path
+        # Default to script directory when placed inside the watched notes folder
+        $WorkspaceDir = $ScriptDir
     }
 } else {
     $WorkspaceDir = (Resolve-Path -LiteralPath $Workspace).Path

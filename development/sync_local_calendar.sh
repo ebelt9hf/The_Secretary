@@ -13,7 +13,12 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -f "$SCRIPT_DIR/../app.html" ]; then
+  WORKSPACE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+  # Default to script directory when placed inside the watched notes folder
+  WORKSPACE_DIR="$SCRIPT_DIR"
+fi
 
 # Check if a custom workspace directory was passed as argument
 if [ -n "$1" ] && [ -d "$1" ]; then

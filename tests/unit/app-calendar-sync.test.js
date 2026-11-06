@@ -322,7 +322,7 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       );
     });
 
-    it('renders corporate local sync controls (download script, folder, file) when corporate guide is selected', () => {
+    it('renders corporate local sync controls (download script, folder, file, path input, platform buttons) when corporate guide is selected', () => {
       const tutorialCode = fs.readFileSync(path.resolve(__dirname, '../../js/app-tutorial.js'), 'utf8');
       const mockWindow = {
         settings: { ui: { colors: { accent: '#4f46e5' } }, ai: {} },
@@ -341,15 +341,66 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       wizard.state.activeCalendarGuideTab = 'corporate';
       const html = wizard.renderStepCalendar();
 
+      // Download, place script, folder link, and file select
       expect(html).toContain('wizard-btn-download-sync-script');
       expect(html).toContain('SetupWizardController.downloadSyncScript()');
+      expect(html).toContain('SetupWizardController.placeSyncScriptInWatchedFolder()');
       expect(html).toContain('wizard-btn-connect-agent-folder');
       expect(html).toContain('SetupWizardController.connectCorporateFolder()');
       expect(html).toContain('wizard-btn-select-agent-file');
       expect(html).toContain('SetupWizardController.selectCorporateFile()');
-      expect(html).toContain('./development/sync_local_calendar.sh');
+
+      // Watched folder status card & absolute path input
+      expect(html).toContain('wizard-watched-folder-name');
+      expect(html).toContain('wizard-watched-folder-badge');
+      expect(html).toContain('wizard-watched-folder-path-input');
+      expect(html).toContain('SetupWizardController.handleCustomFolderPathInput(this.value)');
+
+      // Platform selection buttons and absolute command
+      expect(html).toContain('wizard-btn-cmd-platform-win');
+      expect(html).toContain('wizard-btn-cmd-platform-mac');
+      expect(html).toContain('SetupWizardController.setPlatformOverride(\'win\')');
+      expect(html).toContain('SetupWizardController.setPlatformOverride(\'mac\')');
+      expect(html).toContain('wizard-local-sync-cmd');
+      expect(html).toContain('wizard-btn-copy-cmd');
       expect(html).toContain('wizard-local-proposals-status');
       expect(html).toContain('wizard-external-agent-linked-box');
+
+      // Reset button appears when custom folder is configured
+      const spyInfo = vi.spyOn(CalendarSyncService, 'getWatchedFolderInfo').mockReturnValue({
+        type: 'custom',
+        name: 'My Custom Folder',
+        isDefault: false,
+        mode: 'local'
+      });
+      const customHtml = wizard.renderStepCalendar();
+      expect(customHtml).toContain('wizard-btn-reset-watched-folder');
+      expect(customHtml).toContain('SetupWizardController.resetWatchedFolderToDefault()');
+      spyInfo.mockRestore();
+    });
+
+    it('renders external AI agent guidelines prompt and copy button when agent guide is selected in wizard', () => {
+      const tutorialCode = fs.readFileSync(path.resolve(__dirname, '../../js/app-tutorial.js'), 'utf8');
+      const mockWindow = {
+        settings: { ui: { colors: { accent: '#4f46e5' } }, ai: {} },
+        t: (k) => k,
+        escH: (s) => s || '',
+        localStorage: { getItem: vi.fn(), setItem: vi.fn() },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        open: vi.fn()
+      };
+
+      const fn = new Function('window', 'document', 'settings', 't', 'escH', `${tutorialCode}; return window.SetupWizardController;`);
+      const wizard = fn(mockWindow, document, mockWindow.settings, mockWindow.t, mockWindow.escH);
+
+      wizard.currentStep = 2;
+      wizard.state.activeCalendarGuideTab = 'agent';
+      const html = wizard.renderStepCalendar();
+
+      expect(html).toContain('wizard-external-agent-prompt');
+      expect(html).toContain('wizard-btn-copy-agent-prompt');
+      expect(html).toContain('SetupWizardController.copyAgentPrompt()');
     });
 
     it('provides returning user sign-in entrypoint in modal header and opens cloud sync setup in signin tab', () => {
@@ -383,6 +434,10 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       const mockDownload = vi.spyOn(CalendarSyncService, 'downloadSyncScript').mockResolvedValue(true);
       const mockLink = vi.spyOn(CalendarSyncService, 'linkExternalAgentFolder').mockResolvedValue(true);
       const mockDisconnect = vi.spyOn(CalendarSyncService, 'disconnectExternalAgentFolder').mockImplementation(() => {});
+      const mockPlace = vi.spyOn(CalendarSyncService, 'placeSyncScriptInWatchedFolder').mockResolvedValue(true);
+      const mockReset = vi.spyOn(CalendarSyncService, 'resetWatchedFolderToDefault').mockImplementation(() => {});
+      const mockPlatform = vi.spyOn(CalendarSyncService, 'setPlatformOverride').mockImplementation(() => {});
+      const mockPath = vi.spyOn(CalendarSyncService, 'handleCustomFolderPathInput').mockImplementation(() => {});
 
       const mockWindow = {
         settings: { ui: { colors: { accent: '#4f46e5' } }, ai: {} },
@@ -401,12 +456,24 @@ describe('Calendar Synchronization Engine (WebCal & Local Helper)', () => {
       wizard.downloadSyncScript();
       expect(mockDownload).toHaveBeenCalled();
 
+      await wizard.placeSyncScriptInWatchedFolder();
+      expect(mockPlace).toHaveBeenCalled();
+
       await wizard.connectCorporateFolder();
       expect(mockLink).toHaveBeenCalled();
       expect(wizard.render).toHaveBeenCalled();
 
       wizard.disconnectCorporateFolder();
       expect(mockDisconnect).toHaveBeenCalled();
+
+      wizard.resetWatchedFolderToDefault();
+      expect(mockReset).toHaveBeenCalled();
+
+      wizard.setPlatformOverride('win');
+      expect(mockPlatform).toHaveBeenCalledWith('win');
+
+      wizard.handleCustomFolderPathInput('/custom/notes/path');
+      expect(mockPath).toHaveBeenCalledWith('/custom/notes/path');
     });
   });
 
