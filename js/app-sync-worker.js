@@ -92,6 +92,28 @@ const SyncWorkerEngine = {
     return String(id).replace(/\.json$/i, '').replace(/^[\\/]+/, '').trim();
   },
 
+  _generateSecureUid(prefix = 'ics-') {
+    const cryptoObj = (typeof crypto !== 'undefined')
+      ? crypto
+      : (typeof globalThis !== 'undefined' && globalThis.crypto ? globalThis.crypto : null);
+
+    if (cryptoObj) {
+      if (typeof cryptoObj.randomUUID === 'function') {
+        return prefix + cryptoObj.randomUUID();
+      }
+      if (typeof cryptoObj.getRandomValues === 'function') {
+        const bytes = new Uint8Array(8);
+        cryptoObj.getRandomValues(bytes);
+        let hex = '';
+        for (let i = 0; i < bytes.length; i++) {
+          hex += bytes[i].toString(16).padStart(2, '0');
+        }
+        return prefix + hex;
+      }
+    }
+    return prefix + Date.now().toString(36);
+  },
+
   _getCrypto() {
     if (typeof CryptoEngine !== 'undefined') return CryptoEngine;
     if (typeof self !== 'undefined' && self.CryptoEngine) return self.CryptoEngine;
@@ -825,6 +847,32 @@ const SyncWorkerEngine = {
 
     function pad(n) { return (n < 10 ? '0' : '') + n; }
 
+    const selfEngine = this;
+    function generateSecureUid(prefix = 'ics-') {
+      if (typeof selfEngine?._generateSecureUid === 'function') {
+        return selfEngine._generateSecureUid(prefix);
+      }
+      const cryptoObj = (typeof crypto !== 'undefined')
+        ? crypto
+        : (typeof globalThis !== 'undefined' && globalThis.crypto ? globalThis.crypto : null);
+
+      if (cryptoObj) {
+        if (typeof cryptoObj.randomUUID === 'function') {
+          return prefix + cryptoObj.randomUUID();
+        }
+        if (typeof cryptoObj.getRandomValues === 'function') {
+          const bytes = new Uint8Array(8);
+          cryptoObj.getRandomValues(bytes);
+          let hex = '';
+          for (let i = 0; i < bytes.length; i++) {
+            hex += bytes[i].toString(16).padStart(2, '0');
+          }
+          return prefix + hex;
+        }
+      }
+      return prefix + Date.now().toString(36);
+    }
+
     for (const line of unfolded) {
       const upper = line.trim().toUpperCase();
       if (upper === 'BEGIN:VEVENT') {
@@ -846,7 +894,7 @@ const SyncWorkerEngine = {
             const startTime = isAllDay ? '00:00' : `${pad(sDate.getHours())}:${pad(sDate.getMinutes())}`;
             const endTime = isAllDay ? '23:59' : `${pad(eDate.getHours())}:${pad(eDate.getMinutes())}`;
             const duration = isAllDay ? 1440 : Math.max(15, Math.round((eDate.getTime() - sDate.getTime()) / 60000));
-            const uid = cur.uid || ('ics-' + Math.random().toString(36).slice(2, 9));
+            const uid = cur.uid || generateSecureUid('ics-');
             const id = 'feed-' + String(uid).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
             const title = cur.summary || 'Calendar Event';
             const desc = cur.description || '';

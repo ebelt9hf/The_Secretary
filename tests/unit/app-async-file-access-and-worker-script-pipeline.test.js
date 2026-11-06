@@ -175,6 +175,69 @@ describe('Async File Access Architecture & Separate Worker Thread Script Pipelin
     });
 
     /**
+     * 1. Protected Behavior: Insecure randomness mitigation (CWE-338); ICS event parsing generates fallback UIDs using cryptographically secure random values instead of Math.random().
+     * 2. Regression Target: Insecure randomness alert (CodeQL CWE-338) caused by Math.random() in worker thread UID generation.
+     * 3. Coverage Overlap / Redundancy: None; directly asserts cryptographic random generation contract on UID fallback in worker thread.
+     * 4. Production Code Footprint: None; tests authentic SyncWorkerEngine.parseCalendarResults interface with missing UID.
+     */
+    it('SyncWorkerEngine generates fallback UIDs for ICS events without Math.random using secure crypto', async () => {
+      const mathRandomSpy = vi.spyOn(Math, 'random');
+      const cryptoUuidSpy = vi.spyOn(crypto, 'randomUUID');
+
+      const icsTextWithoutUid = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Secretary//Test//EN',
+        'BEGIN:VEVENT',
+        'DTSTART:20261026T090000Z',
+        'DTEND:20261026T100000Z',
+        'SUMMARY:Standup Sync Without UID',
+        'DESCRIPTION:Testing secure UID fallback',
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
+
+      const items = await SyncWorkerEngine.parseCalendarResults(icsTextWithoutUid, 'ics', { name: 'Work Outlook' });
+      expect(items).toHaveLength(1);
+      expect(items[0].title).toBe('Standup Sync Without UID');
+      expect(items[0].id).toMatch(/^feed-ics-[a-zA-Z0-9_-]+$/);
+      expect(mathRandomSpy).not.toHaveBeenCalled();
+      expect(cryptoUuidSpy).toHaveBeenCalled();
+    });
+
+    /**
+     * 1. Protected Behavior: Graceful crypto fallback in SyncWorkerEngine._generateSecureUid when randomUUID is unavailable.
+     * 2. Regression Target: Failure to generate fallback UID in older runtimes lacking crypto.randomUUID.
+     * 3. Coverage Overlap / Redundancy: None; directly exercises getRandomValues and timestamp degradation branches.
+     * 4. Production Code Footprint: None; exercises authentic public SyncWorkerEngine._generateSecureUid interface.
+     */
+    it('SyncWorkerEngine._generateSecureUid supports getRandomValues and timestamp fallback gracefully', () => {
+      // 1. randomUUID supported
+      const uid1 = SyncWorkerEngine._generateSecureUid('ics-');
+      expect(uid1).toMatch(/^ics-[a-f0-9-]+$/);
+
+      // 2. getRandomValues fallback when randomUUID is absent
+      const origUuid = crypto.randomUUID;
+      try {
+        crypto.randomUUID = undefined;
+        const uid2 = SyncWorkerEngine._generateSecureUid('ics-');
+        expect(uid2).toMatch(/^ics-[a-f0-9]{16}$/);
+      } finally {
+        crypto.randomUUID = origUuid;
+      }
+
+      // 3. Complete crypto absence fallback
+      const origCrypto = globalThis.crypto;
+      try {
+        delete globalThis.crypto;
+        const uid3 = SyncWorkerEngine._generateSecureUid('test-');
+        expect(uid3).toMatch(/^test-[a-z0-9]+$/);
+      } finally {
+        globalThis.crypto = origCrypto;
+      }
+    });
+
+    /**
      * 1. Protected Behavior: SyncPipeline exposes parseCalendarResults and dispatches message to worker.
      * 2. Regression Target: Protocol message name mismatch (PARSE_CALENDAR_RESULTS) or broken promise bridge.
      * 3. Coverage Overlap / Redundancy: None.
