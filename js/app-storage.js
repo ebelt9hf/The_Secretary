@@ -422,14 +422,7 @@ const StorageAPI = {
     }
 
     if (this.getStorageEngine() !== 'firebase') {
-      try {
-        await this._writeJSON('notes/manifest.json', manifest);
-      } catch (e) {
-        try {
-          await this.saveSnapshot('notes/manifest.json', JSON.stringify(manifest, null, 2), 'save-failed');
-        } catch (_snapErr) {}
-        throw e;
-      }
+      await this.writeDocEntity('notes', 'manifest', 'notes/manifest.json', manifest);
     }
 
     if (this.getStorageEngine() === 'firebase' && typeof window !== 'undefined' && window.FirebaseSyncService?.state?.isUnlocked && Array.isArray(manifest)) {
@@ -598,7 +591,10 @@ const StorageAPI = {
 
     // 3. Dispatch to Connector Sync Queue
     try {
-      await this._processSyncQueue();
+      await Promise.race([
+        this._processSyncQueue(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
+      ]);
       if (syncItem.superseded) {
         return;
       }
@@ -639,7 +635,10 @@ const StorageAPI = {
 
     // 3. Process sync queue
     try {
-      await this._processSyncQueue();
+      await Promise.race([
+        this._processSyncQueue(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
+      ]);
       if (syncItem.superseded) {
         return;
       }
@@ -1260,7 +1259,10 @@ const StorageAPI = {
     this._enqueueSync(syncItem);
 
     try {
-      await this._processSyncQueue();
+      await Promise.race([
+        this._processSyncQueue(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
+      ]);
       if (syncItem.superseded) {
         return;
       }
@@ -1296,7 +1298,10 @@ const StorageAPI = {
     this._enqueueSync(syncItem);
 
     try {
-      await this._processSyncQueue();
+      await Promise.race([
+        this._processSyncQueue(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
+      ]);
       if (syncItem.superseded) {
         return;
       }

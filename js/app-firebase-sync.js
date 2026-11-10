@@ -999,6 +999,7 @@ const FirebaseSyncService = {
                   }
 
                   let remoteContentHtml = '';
+                  let hasRemoteBody = false;
                   if (remoteDoc.body && remoteDoc.body.ciphertext) {
                     try {
                       const decBody = await CryptoEngine.decryptData(this.state.masterKey, {
@@ -1007,16 +1008,30 @@ const FirebaseSyncService = {
                       });
                       if (decBody) {
                         remoteContentHtml = decBody.contentHtml !== undefined ? decBody.contentHtml : (decBody.html || '');
+                        hasRemoteBody = true;
                       }
                     } catch (be) {}
                   }
+
+                  // Resolve existing local body defensively to prevent cold-cache body erasure on metadata updates
+                  let existingBody = localDoc ? (localDoc.contentHtml || localDoc.html || '') : '';
+                  if (!existingBody && !hasRemoteBody) {
+                    try {
+                      const idbDoc = await VaultIDBStorage.getNote(cleanId);
+                      if (idbDoc) {
+                        existingBody = idbDoc.contentHtml || idbDoc.html || '';
+                      }
+                    } catch (idbErr) {}
+                  }
+
+                  const finalBody = hasRemoteBody ? remoteContentHtml : existingBody;
 
                   const combined = {
                     ...finalMeta,
                     id: cleanId,
                     path: finalMeta.path || `notes/${cleanId}.html`,
-                    contentHtml: remoteContentHtml || (localDoc ? (localDoc.contentHtml || localDoc.html || '') : ''),
-                    html: remoteContentHtml || (localDoc ? (localDoc.contentHtml || localDoc.html || '') : ''),
+                    contentHtml: finalBody,
+                    html: finalBody,
                     updatedAt: finalMeta.updatedAt || remoteMetaUpdated,
                     deleted: false,
                     schemaVersion: this.SCHEMA_VERSION,
@@ -2103,6 +2118,9 @@ const FirebaseSyncService = {
     setTimeout(() => {
       if (this.state.isUnlocked) {
         this.repairManifestTitles().catch(() => {});
+        if (this.hasPendingCloudWrites()) {
+          this.flushQueue().catch(() => {});
+        }
       }
     }, 300);
     this._notifyStatus('Vault unlocked');
@@ -2123,6 +2141,11 @@ const FirebaseSyncService = {
       this._vaultRetryTimer = null;
     }
     this._vaultRetryCount = 0;
+    if (this.state.cloudRetryTimer) {
+      clearTimeout(this.state.cloudRetryTimer);
+      this.state.cloudRetryTimer = null;
+    }
+    this.state.cloudRetryCount = 0;
     this.state.masterKey = null;
     this.state.isUnlocked = false;
     this.setActivePassphrase(null);
@@ -3256,191 +3279,265 @@ const FirebaseSyncService = {
     const inFlightDocs = new Map(this.state.pendingDocsQueue || []);
     const inFlightAssets = new Map(this.state.pendingAssetsQueue || []);
 
-    try {
-      // Remove only items from pending queues whose updatedAt matches the in-flight snapshot
-      for (const [id, flushedRecord] of inFlightBatch.entries()) {
-        const current = this.state.pendingQueue.get(id);
-        if (current && current.updatedAt === flushedRecord.updatedAt) {
-          this.state.pendingQueue.delete(id);
-        }
-      }
-      if (this.state.pendingDocsQueue) {
-        for (const [id, flushedRecord] of inFlightDocs.entries()) {
-          const current = this.state.pendingDocsQueue.get(id);
-          if (current && current.updatedAt === flushedRecord.updatedAt) {
-            this.state.pendingDocsQueue.delete(id);
-          }
-        }
-      }
-      if (this.state.pendingAssetsQueue) {
-        for (const [id, flushedRecord] of inFlightAssets.entries()) {
-          const current = this.state.pendingAssetsQueue.get(id);
-          if (current && current.updatedAt === flushedRecord.updatedAt) {
-            this.state.pendingAssetsQueue.delete(id);
-          }
-        }
-      }
+    let hasFailures = false;
+    let lastCloudError = null;
 
+    try {
       // Persist latest manifest cache to IndexedDB
       try {
         await VaultIDBStorage.saveMeta('manifest_cache', Array.from(this.state.manifestCache.values()));
       } catch (e) {}
 
-      // Clear flushed WAL entries
-      try {
-        await VaultIDBStorage.clearWAL();
-      } catch (e) {}
-
       // Push flushed records to Firebase Realtime Database (Encrypt on the wire!)
       const bridge = this._getBridge();
-      if (bridge && this.state.userId && this.state.userId !== 'default_user' && this.state.masterKey) {
+      const isCloudUser = !!(this.state.userId && this.state.userId !== 'default_user');
+
+      if (this.state.engine === 'firebase' && isCloudUser && (!this.state.isUnlocked || !this.state.masterKey)) {
+        // Vault is locked; retain pending queue and wait for unlock before cloud sync
+        return;
+      }
+
+      const hasCloudBackend = !!(bridge && isCloudUser && this.state.masterKey);
+      if (hasCloudBackend) {
         for (const [id, flushedRecord] of inFlightBatch.entries()) {
           try {
-            if (flushedRecord.deleted || (flushedRecord.meta && flushedRecord.meta.deleted)) {
-              await bridge.deleteNote(this.state.userId, id);
-            } else {
-              // 1. Prepare and encrypt meta on the fly for the wire
-              const metaPayload = flushedRecord.metaPayload || {
-                id: flushedRecord.id,
-                path: flushedRecord.path || `notes/${flushedRecord.id}.html`,
-                title: flushedRecord.title || 'Untitled',
-                date: flushedRecord.date || '',
-                tags: flushedRecord.tags || [],
-                workstream: flushedRecord.workstream || '',
-                pinned: !!flushedRecord.pinned,
-                archived: !!flushedRecord.archived,
-                favorite: !!flushedRecord.favorite,
-                bodyHash: flushedRecord.bodyHash || this._hashContent(flushedRecord.contentHtml || flushedRecord.html || ''),
-                updatedAt: flushedRecord.updatedAt || Date.now(),
-                deleted: false,
-                schemaVersion: this.SCHEMA_VERSION,
-                appVersion: this.getCurrentVersion()
-              };
+            let noteTimer = null;
+            await Promise.race([
+              (async () => {
+                if (flushedRecord.deleted || (flushedRecord.meta && flushedRecord.meta.deleted)) {
+                  await bridge.deleteNote(this.state.userId, id);
+                } else {
+                  // 1. Prepare and encrypt meta on the fly for the wire
+                  const metaPayload = flushedRecord.metaPayload || {
+                    id: flushedRecord.id,
+                    path: flushedRecord.path || `notes/${flushedRecord.id}.html`,
+                    title: flushedRecord.title || 'Untitled',
+                    date: flushedRecord.date || '',
+                    tags: flushedRecord.tags || [],
+                    workstream: flushedRecord.workstream || '',
+                    pinned: !!flushedRecord.pinned,
+                    archived: !!flushedRecord.archived,
+                    favorite: !!flushedRecord.favorite,
+                    bodyHash: flushedRecord.bodyHash || this._hashContent(flushedRecord.contentHtml || flushedRecord.html || ''),
+                    updatedAt: flushedRecord.updatedAt || Date.now(),
+                    deleted: false,
+                    schemaVersion: this.SCHEMA_VERSION,
+                    appVersion: this.getCurrentVersion()
+                  };
 
-              let encMeta = flushedRecord.meta;
-              if (!encMeta || !encMeta.ciphertext) {
-                const enc = await CryptoEngine.encryptData(this.state.masterKey, metaPayload);
-                encMeta = {
-                  id,
-                  iv: enc.iv,
-                  ciphertext: enc.ciphertext,
-                  updatedAt: metaPayload.updatedAt,
-                  deleted: false,
-                  schemaVersion: this.SCHEMA_VERSION,
-                  appVersion: this.getCurrentVersion()
-                };
-              }
+                  let encMeta = flushedRecord.meta;
+                  if (!encMeta || !encMeta.ciphertext) {
+                    const enc = await CryptoEngine.encryptData(this.state.masterKey, metaPayload);
+                    encMeta = {
+                      id,
+                      iv: enc.iv,
+                      ciphertext: enc.ciphertext,
+                      updatedAt: metaPayload.updatedAt,
+                      deleted: false,
+                      schemaVersion: this.SCHEMA_VERSION,
+                      appVersion: this.getCurrentVersion()
+                    };
+                  }
 
-              // 2. Prepare and encrypt body on the fly for the wire if body changed or present
-              let encBody = flushedRecord.body;
-              const contentHtml = flushedRecord.contentHtml !== undefined ? flushedRecord.contentHtml : (flushedRecord.html !== undefined ? flushedRecord.html : null);
-              if (flushedRecord.bodyChanged !== false && contentHtml !== null && (!encBody || !encBody.ciphertext)) {
-                const bodyPayload = {
-                  id,
-                  contentHtml,
-                  updatedAt: metaPayload.updatedAt,
-                  schemaVersion: this.SCHEMA_VERSION,
-                  appVersion: this.getCurrentVersion()
-                };
-                const encB = await CryptoEngine.encryptData(this.state.masterKey, bodyPayload);
-                encBody = {
-                  id,
-                  iv: encB.iv,
-                  ciphertext: encB.ciphertext,
-                  updatedAt: metaPayload.updatedAt,
-                  schemaVersion: this.SCHEMA_VERSION,
-                  appVersion: this.getCurrentVersion()
-                };
-              }
+                  // 2. Prepare and encrypt body on the fly for the wire if body changed or present
+                  let encBody = flushedRecord.body;
+                  const contentHtml = flushedRecord.contentHtml !== undefined ? flushedRecord.contentHtml : (flushedRecord.html !== undefined ? flushedRecord.html : null);
+                  if (flushedRecord.bodyChanged !== false && contentHtml !== null && (!encBody || !encBody.ciphertext)) {
+                    const bodyPayload = {
+                      id,
+                      contentHtml,
+                      updatedAt: metaPayload.updatedAt,
+                      schemaVersion: this.SCHEMA_VERSION,
+                      appVersion: this.getCurrentVersion()
+                    };
+                    const encB = await CryptoEngine.encryptData(this.state.masterKey, bodyPayload);
+                    encBody = {
+                      id,
+                      iv: encB.iv,
+                      ciphertext: encB.ciphertext,
+                      updatedAt: metaPayload.updatedAt,
+                      schemaVersion: this.SCHEMA_VERSION,
+                      appVersion: this.getCurrentVersion()
+                    };
+                  }
 
-              if (typeof bridge.saveNoteMeta === 'function' && (encMeta || encBody)) {
-                if (encMeta) {
-                  await bridge.saveNoteMeta(this.state.userId, id, encMeta);
+                  if (typeof bridge.saveNoteMeta === 'function' && (encMeta || encBody)) {
+                    if (encMeta) {
+                      await bridge.saveNoteMeta(this.state.userId, id, encMeta);
+                    }
+                    if (encBody && typeof bridge.saveNoteBody === 'function') {
+                      await bridge.saveNoteBody(this.state.userId, id, encBody);
+                    }
+                  } else {
+                    const combinedWireRecord = {
+                      id,
+                      path: metaPayload.path,
+                      iv: encMeta.iv,
+                      ciphertext: encMeta.ciphertext,
+                      meta: encMeta,
+                      body: encBody || null,
+                      updatedAt: metaPayload.updatedAt,
+                      deleted: false,
+                      schemaVersion: this.SCHEMA_VERSION,
+                      appVersion: this.getCurrentVersion()
+                    };
+                    await bridge.saveNote(this.state.userId, id, combinedWireRecord);
+                  }
                 }
-                if (encBody && typeof bridge.saveNoteBody === 'function') {
-                  await bridge.saveNoteBody(this.state.userId, id, encBody);
-                }
-              } else {
-                const combinedWireRecord = {
-                  id,
-                  path: metaPayload.path,
-                  iv: encMeta.iv,
-                  ciphertext: encMeta.ciphertext,
-                  meta: encMeta,
-                  body: encBody || null,
-                  updatedAt: metaPayload.updatedAt,
-                  deleted: false,
-                  schemaVersion: this.SCHEMA_VERSION,
-                  appVersion: this.getCurrentVersion()
-                };
-                await bridge.saveNote(this.state.userId, id, combinedWireRecord);
-              }
+              })(),
+              new Promise((_, reject) => {
+                noteTimer = setTimeout(() => reject(new Error(`Timeout pushing note ${id} to cloud`)), 15000);
+              })
+            ]).finally(() => {
+              if (noteTimer) clearTimeout(noteTimer);
+            });
+
+            // Two-Phase Commit: Only delete from pending queue once bridge acknowledges success!
+            const current = this.state.pendingQueue.get(id);
+            if (current && current.updatedAt === flushedRecord.updatedAt) {
+              this.state.pendingQueue.delete(id);
             }
           } catch (cloudErr) {
+            hasFailures = true;
+            lastCloudError = cloudErr;
             console.warn(`[FirebaseSyncService] Cloud push error for note ${id}:`, cloudErr);
           }
         }
 
         for (const [id, flushedRecord] of inFlightDocs.entries()) {
           try {
-            if (flushedRecord.deleted) {
-              if (typeof bridge.deleteDoc === 'function') await bridge.deleteDoc(this.state.userId, id);
-            } else {
-              let encDoc = flushedRecord;
-              if (!encDoc.ciphertext) {
-                const payload = {
-                  kind: flushedRecord.kind,
-                  id: flushedRecord.docId,
-                  docKey: flushedRecord.id,
-                  data: flushedRecord.data,
-                  updatedAt: flushedRecord.updatedAt || Date.now()
-                };
-                const enc = await CryptoEngine.encryptData(this.state.masterKey, payload);
-                encDoc = {
-                  id: flushedRecord.id,
-                  kind: flushedRecord.kind,
-                  docId: flushedRecord.docId,
-                  iv: enc.iv,
-                  ciphertext: enc.ciphertext,
-                  updatedAt: payload.updatedAt,
-                  deleted: false,
-                  schemaVersion: this.SCHEMA_VERSION,
-                  appVersion: this.getCurrentVersion()
-                };
+            let docTimer = null;
+            await Promise.race([
+              (async () => {
+                if (flushedRecord.deleted) {
+                  if (typeof bridge.deleteDoc === 'function') await bridge.deleteDoc(this.state.userId, id);
+                } else {
+                  let encDoc = flushedRecord;
+                  if (!encDoc.ciphertext) {
+                    const payload = {
+                      kind: flushedRecord.kind,
+                      id: flushedRecord.docId,
+                      docKey: flushedRecord.id,
+                      data: flushedRecord.data,
+                      updatedAt: flushedRecord.updatedAt || Date.now()
+                    };
+                    const enc = await CryptoEngine.encryptData(this.state.masterKey, payload);
+                    encDoc = {
+                      id: flushedRecord.id,
+                      kind: flushedRecord.kind,
+                      docId: flushedRecord.docId,
+                      iv: enc.iv,
+                      ciphertext: enc.ciphertext,
+                      updatedAt: payload.updatedAt,
+                      deleted: false,
+                      schemaVersion: this.SCHEMA_VERSION,
+                      appVersion: this.getCurrentVersion()
+                    };
+                  }
+                  if (typeof bridge.saveDoc === 'function') await bridge.saveDoc(this.state.userId, id, encDoc);
+                }
+              })(),
+              new Promise((_, reject) => {
+                docTimer = setTimeout(() => reject(new Error(`Timeout pushing doc ${id} to cloud`)), 15000);
+              })
+            ]).finally(() => {
+              if (docTimer) clearTimeout(docTimer);
+            });
+
+            // Two-Phase Commit: Only delete from pendingDocsQueue on ACK
+            if (this.state.pendingDocsQueue) {
+              const current = this.state.pendingDocsQueue.get(id);
+              if (current && current.updatedAt === flushedRecord.updatedAt) {
+                this.state.pendingDocsQueue.delete(id);
               }
-              if (typeof bridge.saveDoc === 'function') await bridge.saveDoc(this.state.userId, id, encDoc);
             }
           } catch (cloudErr) {
+            hasFailures = true;
+            lastCloudError = cloudErr;
             console.warn(`[FirebaseSyncService] Cloud push error for doc ${id}:`, cloudErr);
           }
         }
 
         for (const [id, flushedRecord] of inFlightAssets.entries()) {
           try {
-            if (flushedRecord.deleted) {
-              if (typeof bridge.deleteAsset === 'function') await bridge.deleteAsset(this.state.userId, id);
-            } else {
-              let encAsset = flushedRecord;
-              if (!encAsset.ciphertext) {
-                const enc = await CryptoEngine.encryptData(this.state.masterKey, String(flushedRecord.data));
-                encAsset = {
-                  id: flushedRecord.id,
-                  iv: enc.iv,
-                  ciphertext: enc.ciphertext,
-                  mimeType: flushedRecord.mimeType || 'image/webp',
-                  updatedAt: flushedRecord.updatedAt || Date.now(),
-                  deleted: false,
-                  schemaVersion: this.SCHEMA_VERSION,
-                  appVersion: this.getCurrentVersion()
-                };
+            let assetTimer = null;
+            await Promise.race([
+              (async () => {
+                if (flushedRecord.deleted) {
+                  if (typeof bridge.deleteAsset === 'function') await bridge.deleteAsset(this.state.userId, id);
+                } else {
+                  let encAsset = flushedRecord;
+                  if (!encAsset.ciphertext) {
+                    const enc = await CryptoEngine.encryptData(this.state.masterKey, String(flushedRecord.data));
+                    encAsset = {
+                      id: flushedRecord.id,
+                      iv: enc.iv,
+                      ciphertext: enc.ciphertext,
+                      mimeType: flushedRecord.mimeType || 'image/webp',
+                      updatedAt: flushedRecord.updatedAt || Date.now(),
+                      deleted: false,
+                      schemaVersion: this.SCHEMA_VERSION,
+                      appVersion: this.getCurrentVersion()
+                    };
+                  }
+                  if (typeof bridge.saveAsset === 'function') await bridge.saveAsset(this.state.userId, id, encAsset);
+                }
+              })(),
+              new Promise((_, reject) => {
+                assetTimer = setTimeout(() => reject(new Error(`Timeout pushing asset ${id} to cloud`)), 15000);
+              })
+            ]).finally(() => {
+              if (assetTimer) clearTimeout(assetTimer);
+            });
+
+            // Two-Phase Commit: Only delete from pendingAssetsQueue on ACK
+            if (this.state.pendingAssetsQueue) {
+              const current = this.state.pendingAssetsQueue.get(id);
+              if (current && current.updatedAt === flushedRecord.updatedAt) {
+                this.state.pendingAssetsQueue.delete(id);
               }
-              if (typeof bridge.saveAsset === 'function') await bridge.saveAsset(this.state.userId, id, encAsset);
             }
           } catch (cloudErr) {
+            hasFailures = true;
+            lastCloudError = cloudErr;
             console.warn(`[FirebaseSyncService] Cloud push error for asset ${id}:`, cloudErr);
           }
         }
+      } else {
+        // Pure local or unauthenticated mode without cloud connector:
+        // Tier 1 IndexedDB persistence already succeeded above; commit queue removal
+        for (const [id, flushedRecord] of inFlightBatch.entries()) {
+          const current = this.state.pendingQueue.get(id);
+          if (current && current.updatedAt === flushedRecord.updatedAt) {
+            this.state.pendingQueue.delete(id);
+          }
+        }
+        if (this.state.pendingDocsQueue) {
+          for (const [id, flushedRecord] of inFlightDocs.entries()) {
+            const current = this.state.pendingDocsQueue.get(id);
+            if (current && current.updatedAt === flushedRecord.updatedAt) {
+              this.state.pendingDocsQueue.delete(id);
+            }
+          }
+        }
+        if (this.state.pendingAssetsQueue) {
+          for (const [id, flushedRecord] of inFlightAssets.entries()) {
+            const current = this.state.pendingAssetsQueue.get(id);
+            if (current && current.updatedAt === flushedRecord.updatedAt) {
+              this.state.pendingAssetsQueue.delete(id);
+            }
+          }
+        }
       }
+
+      if (hasFailures) {
+        throw (lastCloudError || new Error('One or more items failed to push to cloud'));
+      }
+
+      // Clear flushed WAL entries on complete success
+      try {
+        await VaultIDBStorage.clearWAL();
+      } catch (e) {}
 
       this.state.lastSyncTimestamp = Date.now();
       this.state.status = this.STATUS.SYNCED;
@@ -3457,15 +3554,19 @@ const FirebaseSyncService = {
       this._notifyStatus(err.message);
 
       // Background exponential retry for cloud sync (1s, 2s, 4s, 8s, 16s, 30s)
-      this.state.cloudRetryCount = (this.state.cloudRetryCount || 0) + 1;
-      const delays = [1000, 2000, 4000, 8000, 16000, 30000];
-      const delayMs = delays[Math.min(this.state.cloudRetryCount - 1, delays.length - 1)];
+      if (this.state.isUnlocked) {
+        this.state.cloudRetryCount = (this.state.cloudRetryCount || 0) + 1;
+        const delays = [1000, 2000, 4000, 8000, 16000, 30000];
+        const delayMs = delays[Math.min(this.state.cloudRetryCount - 1, delays.length - 1)];
 
-      if (this.state.cloudRetryTimer) clearTimeout(this.state.cloudRetryTimer);
-      this.state.cloudRetryTimer = setTimeout(() => {
-        this.state.cloudRetryTimer = null;
-        this.flushQueue();
-      }, delayMs);
+        if (this.state.cloudRetryTimer) clearTimeout(this.state.cloudRetryTimer);
+        this.state.cloudRetryTimer = setTimeout(() => {
+          this.state.cloudRetryTimer = null;
+          if (this.state.isUnlocked) {
+            this.flushQueue();
+          }
+        }, delayMs);
+      }
     }
   },
 

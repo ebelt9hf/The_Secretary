@@ -117,7 +117,18 @@ function showNoteDeletionProgress(noteName) {
     try { window.AppBridge.setProgressBar(0.3); } catch (e) {}
   }
 
+  let isClosed = false;
+  const watchdogTimer = setTimeout(() => {
+    if (!isClosed) {
+      console.warn('[showNoteDeletionProgress] Watchdog timer fired: auto-dismissing note deletion progress');
+      closeFn();
+    }
+  }, 8000);
+
   const closeFn = () => {
+    if (isClosed) return;
+    isClosed = true;
+    clearTimeout(watchdogTimer);
     if (window.AppBridge?.setProgressBar) {
       try { window.AppBridge.setProgressBar(-1); } catch (e) {}
     }
@@ -135,6 +146,8 @@ function showNoteDeletionProgress(noteName) {
       }
     }
   };
+
+  closeFn.close = closeFn;
 
   return closeFn;
 }
@@ -266,13 +279,22 @@ async function deleteCurrentNote() {
 
   if (progressController) progressController.update(70);
 
-  // 7. Background persistence & window closure
+  // 7. Background persistence & window closure (bounded with 3s timeout)
+  let deletePersistTimer = null;
   try {
-    await StorageAPI.moveToTrash(deletedPath, { title: deletedTitle, content: deletedContent });
-    await saveManifest({ force: true });
+    await Promise.race([
+      (async () => {
+        await StorageAPI.moveToTrash(deletedPath, { title: deletedTitle, content: deletedContent });
+        await saveManifest({ force: true });
+      })(),
+      new Promise(resolve => {
+        deletePersistTimer = setTimeout(resolve, 3000);
+      })
+    ]);
   } catch(e) {
     console.warn('[deleteCurrentNote] Background trash persistence warning:', e);
   } finally {
+    if (deletePersistTimer) clearTimeout(deletePersistTimer);
     if (progressController) {
       progressController.update(100);
       progressController();
@@ -905,11 +927,32 @@ if (typeof globalThis !== 'undefined') globalThis._lastNoteSelfSavedAt = _lastNo
 async function autoSaveNote(options = {}) {
   if (typeof _isDeleting !== 'undefined' && _isDeleting) return true;
   while (_activeSavePromise) {
-    try { await _activeSavePromise; } catch (e) {}
+    let waitTimer = null;
+    try {
+      await Promise.race([
+        _activeSavePromise,
+        new Promise(resolve => {
+          waitTimer = setTimeout(resolve, 5000);
+        })
+      ]);
+    } catch (e) {} finally {
+      if (waitTimer) clearTimeout(waitTimer);
+    }
   }
-  _activeSavePromise = _executeAutoSaveNote(options);
+  let saveTimer = null;
+  _activeSavePromise = Promise.race([
+    _executeAutoSaveNote(options),
+    new Promise((_, reject) => {
+      saveTimer = setTimeout(() => reject(new Error('autoSaveNote timeout')), 10000);
+    })
+  ]).finally(() => {
+    if (saveTimer) clearTimeout(saveTimer);
+  });
   try {
     return await _activeSavePromise;
+  } catch (err) {
+    console.warn('[autoSaveNote] Save bounded timeout or error:', err);
+    return false;
   } finally {
     _activeSavePromise = null;
   }
@@ -1290,7 +1333,9 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
   showDecisionPicker = false;
   decisionPickerQuery = '';
   _lastImageStripSignature = '';
-  document.removeEventListener('click', _dismissDecisionPicker);
+  if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    document.removeEventListener('click', _dismissDecisionPicker);
+  }
   closeLinkNotePicker();
 
   // Always ensure editor elements are properly restored to #note-edit-overlay .overlay-panel
@@ -3408,17 +3453,39 @@ function showNoteCloseProgressDialog(message) {
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  return {
-    update(nextMessage, percentage) {
-      if (body) body.textContent = nextMessage || body.textContent;
-      if (barFill && percentage !== undefined) {
-        barFill.style.width = percentage + '%';
-      }
-    },
-    close() {
-      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  let isClosed = false;
+  const watchdogTimer = setTimeout(() => {
+    if (!isClosed) {
+      console.warn('[showNoteCloseProgressDialog] Watchdog timer fired: auto-dismissing note close progress');
+      controller.close();
     }
-  };
+  }, 8000);
+
+  const controller = Object.assign(
+    () => controller.close(),
+    {
+      update(nextMessage, percentage) {
+        if (body) body.textContent = nextMessage || body.textContent;
+        if (barFill && percentage !== undefined) {
+          barFill.style.width = percentage + '%';
+          if (typeof percentage === 'number' && typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
+            try { window.AppBridge.setProgressBar(Math.min(1, Math.max(0, percentage / 100))); } catch (e) {}
+          }
+        }
+      },
+      close() {
+        if (isClosed) return;
+        isClosed = true;
+        clearTimeout(watchdogTimer);
+        if (typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
+          try { window.AppBridge.setProgressBar(-1); } catch (e) {}
+        }
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }
+    }
+  );
+
+  return controller;
 }
 
 async function closeNoteOverlay(forceCloseAll = false) {
@@ -3456,7 +3523,9 @@ async function closeNoteOverlay(forceCloseAll = false) {
     clearAutoSave();
     showDecisionPicker = false;
     decisionPickerQuery = '';
-    document.removeEventListener('click', _dismissDecisionPicker);
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('click', _dismissDecisionPicker);
+    }
     closeLinkNotePicker();
     const hint = document.getElementById('title-rename-hint');
     if (hint) hint.style.display = 'none';
@@ -13518,8 +13587,10 @@ function closeLinkNotePicker() {
     _linkNotePickerAnchor.removeAttribute('data-link-note-anchor');
     _linkNotePickerAnchor = null;
   }
-  document.removeEventListener('click', _dismissNoteLinkPicker);
-  document.removeEventListener('keydown', _escNoteLinkPicker);
+  if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    document.removeEventListener('click', _dismissNoteLinkPicker);
+    document.removeEventListener('keydown', _escNoteLinkPicker);
+  }
 }
 
 function _dismissNoteLinkPicker(e) {

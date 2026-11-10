@@ -279,7 +279,18 @@ async function finalizeSaves(progress) {
     });
   });
   
-  await Promise.all(promises);
+  // Guard with bounded 4s timeout so app closure never permanently freezes
+  let finalizeTimer = null;
+  try {
+    await Promise.race([
+      Promise.all(promises),
+      new Promise(resolve => {
+        finalizeTimer = setTimeout(resolve, 4000);
+      })
+    ]);
+  } finally {
+    if (finalizeTimer) clearTimeout(finalizeTimer);
+  }
 }
 
 /** Write a text file by path relative to root (creates dirs + file).
@@ -431,18 +442,30 @@ async function _writeFileDirect(pathStr, content, options = {}) {
       abortErr.name = 'AbortError';
       throw abortErr;
     }
-    if (typeof content === 'string' && content.startsWith('data:image/')) {
-      const blob = _dataUrlToBlob(content);
-      await w.write(blob);
-    } else {
-      await w.write(content);
+    let streamTimer = null;
+    try {
+      await Promise.race([
+        (async () => {
+          if (typeof content === 'string' && content.startsWith('data:image/')) {
+            const blob = _dataUrlToBlob(content);
+            await w.write(blob);
+          } else {
+            await w.write(content);
+          }
+          if (options?.signal?.aborted) {
+            const abortErr = new Error('The write operation was aborted');
+            abortErr.name = 'AbortError';
+            throw abortErr;
+          }
+          await w.close();
+        })(),
+        new Promise((_, reject) => {
+          streamTimer = setTimeout(() => reject(new Error(`Timeout writing stream to ${pathStr}`)), 10000);
+        })
+      ]);
+    } finally {
+      if (streamTimer) clearTimeout(streamTimer);
     }
-    if (options?.signal?.aborted) {
-      const abortErr = new Error('The write operation was aborted');
-      abortErr.name = 'AbortError';
-      throw abortErr;
-    }
-    await w.close();
   } catch (err) {
     if (w && typeof w.abort === 'function') {
       await w.abort().catch(() => {});

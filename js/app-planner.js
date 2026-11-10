@@ -1764,7 +1764,10 @@ async function savePlanner() {
       window.plannerEvents = plannerEvents;
     }
     const data = { events: plannerEvents };
-    await StorageAPI.writePlanner(data);
+    await Promise.race([
+      StorageAPI.writePlanner(data),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout writing planner data')), 10000))
+    ]);
     broadcastSync({ type: 'PLANNER_UPDATED' });
     if (typeof _renderPlannerBlocksForNote === 'function' && typeof currentNote !== 'undefined' && currentNote && currentNote.id) {
       const overlay = document.getElementById('note-edit-overlay');
@@ -4109,6 +4112,15 @@ function showPlannerNoteGenerationProgress(message, customTitle) {
 
   barContainer.appendChild(barFill);
 
+  const percentText = document.createElement('div');
+  percentText.className = 'planner-progress-percent';
+  percentText.textContent = '0%';
+  percentText.style.fontSize = '0.75rem';
+  percentText.style.fontWeight = '600';
+  percentText.style.color = 'var(--accent, #4f46e5)';
+  percentText.style.textAlign = 'right';
+  percentText.style.marginTop = '2px';
+
   const detail = document.createElement('div');
   detail.className = 'planner-progress-detail';
   detail.style.display = 'none';
@@ -4117,11 +4129,23 @@ function showPlannerNoteGenerationProgress(message, customTitle) {
   box.appendChild(title);
   box.appendChild(body);
   box.appendChild(barContainer);
+  box.appendChild(percentText);
   box.appendChild(detail);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
+  let isClosed = false;
+  const watchdogTimer = setTimeout(() => {
+    if (!isClosed) {
+      console.warn('[showPlannerNoteGenerationProgress] Watchdog timer fired: auto-dismissing progress dialog');
+      closeFn();
+    }
+  }, 10000);
+
   const closeFn = () => {
+    if (isClosed) return;
+    isClosed = true;
+    clearTimeout(watchdogTimer);
     if (typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
       try { window.AppBridge.setProgressBar(-1); } catch (_e) {}
     }
@@ -4146,6 +4170,9 @@ function showPlannerNoteGenerationProgress(message, customTitle) {
     if (barFill && percentage !== undefined) {
       const pct = Math.max(0, Math.min(100, typeof percentage === 'number' ? percentage : 0));
       barFill.style.width = pct + '%';
+      if (percentText) {
+        percentText.textContent = pct + '%';
+      }
       if (typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
         window.AppBridge.setProgressBar(pct / 100);
       }
@@ -4155,6 +4182,8 @@ function showPlannerNoteGenerationProgress(message, customTitle) {
   closeFn.update = (nextMessage, percentage) => {
     closeFn.updateStage(nextMessage, null, percentage);
   };
+
+  closeFn.close = closeFn;
 
   return closeFn;
 }
@@ -4188,6 +4217,15 @@ function showPlannerBlocCreationProgress(message, customTitle) {
 
   barContainer.appendChild(barFill);
 
+  const percentText = document.createElement('div');
+  percentText.className = 'planner-progress-percent';
+  percentText.textContent = '0%';
+  percentText.style.fontSize = '0.75rem';
+  percentText.style.fontWeight = '600';
+  percentText.style.color = 'var(--accent, #4f46e5)';
+  percentText.style.textAlign = 'right';
+  percentText.style.marginTop = '2px';
+
   const detail = document.createElement('div');
   detail.className = 'planner-progress-detail';
   detail.style.display = 'none';
@@ -4196,11 +4234,23 @@ function showPlannerBlocCreationProgress(message, customTitle) {
   box.appendChild(title);
   box.appendChild(body);
   box.appendChild(barContainer);
+  box.appendChild(percentText);
   box.appendChild(detail);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
+  let isClosed = false;
+  const watchdogTimer = setTimeout(() => {
+    if (!isClosed) {
+      console.warn('[showPlannerBlocCreationProgress] Watchdog timer fired: auto-dismissing progress dialog');
+      closeFn();
+    }
+  }, 10000);
+
   const closeFn = () => {
+    if (isClosed) return;
+    isClosed = true;
+    clearTimeout(watchdogTimer);
     if (typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
       try { window.AppBridge.setProgressBar(-1); } catch (_e) {}
     }
@@ -4225,6 +4275,9 @@ function showPlannerBlocCreationProgress(message, customTitle) {
     if (barFill && percentage !== undefined) {
       const pct = Math.max(0, Math.min(100, typeof percentage === 'number' ? percentage : 0));
       barFill.style.width = pct + '%';
+      if (percentText) {
+        percentText.textContent = pct + '%';
+      }
       if (typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
         window.AppBridge.setProgressBar(pct / 100);
       }
@@ -4234,6 +4287,8 @@ function showPlannerBlocCreationProgress(message, customTitle) {
   closeFn.update = (nextMessage, percentage) => {
     closeFn.updateStage(nextMessage, null, percentage);
   };
+
+  closeFn.close = closeFn;
 
   return closeFn;
 }
@@ -7417,8 +7472,6 @@ function openPlanEventModal(prefill = {}) {
     modalTitleHtml,
     modalHtml,
     async () => {
-      const closeCreateProgress = !isEdit ? showPlannerBlocCreationProgress() : null;
-      try {
       // Ensure any open recurrence popover is committed
       if (document.getElementById('pe-recurrence-overlay')?.style.display !== 'none') {
         if (typeof closePlannerRecurrenceOverlay === 'function') {
@@ -7452,8 +7505,13 @@ function openPlanEventModal(prefill = {}) {
         }
       }
 
-      event.type = type;
-      event.date = date;
+      const closeCreateProgress = !isEdit ? showPlannerBlocCreationProgress() : null;
+      try {
+        closeCreateProgress?.updateStage?.(t('planner.validatingBloc') || 'Validating schedule details...', '', 20);
+        await new Promise(r => setTimeout(r, 16));
+
+        event.type = type;
+        event.date = date;
       if (isAllDay) {
         delete event.startTime;
         delete event.endTime;
@@ -7681,6 +7739,9 @@ function openPlanEventModal(prefill = {}) {
         ? plannerEvents
         : ((typeof window !== 'undefined' && Array.isArray(window.plannerEvents)) ? window.plannerEvents : []);
 
+      closeCreateProgress?.updateStage?.(t('planner.schedulingBloc') || 'Scheduling block and linked associations...', '', 50);
+      await new Promise(r => setTimeout(r, 16));
+
       if (!isEdit) {
         if (recurrenceRule) {
           event.recurrenceRule = recurrenceRule;
@@ -7765,12 +7826,19 @@ function openPlanEventModal(prefill = {}) {
           d.setDate(baseDate.getDate() + i);
           horizonDays.add(formatFn(d));
         }
-        precreateRecurringEventsForWeek(Array.from(horizonDays));
+        precreateRecurringEventsForWeek(Array.from(horizonDays), { skipSave: true });
       }
 
       if (typeof window !== 'undefined') window.plannerEvents = targetList;
       if (typeof plannerEvents !== 'undefined') plannerEvents = targetList;
+
+      closeCreateProgress?.updateStage?.(t('planner.savingPlannerData') || 'Saving planner timeline to disk...', '', 75);
+      await new Promise(r => setTimeout(r, 16));
+
       await savePlanner();
+
+      closeCreateProgress?.updateStage?.(t('planner.finalizingBloc') || 'Finalizing schedule and updating view...', '', 95);
+      await new Promise(r => setTimeout(r, 16));
       if (isProposal || isDraft) {
         const pId = event.proposalId || event._proposalId;
         if (pId) {
@@ -11504,7 +11572,7 @@ function shouldEventOccurOnDate(parent, dateStr) {
   return false;
 }
 
-function precreateRecurringEventsForWeek(days) {
+function precreateRecurringEventsForWeek(days, options = {}) {
   let changed = false;
   const parents = plannerEvents.filter(e => e.recurrenceRule);
 
@@ -11562,9 +11630,10 @@ function precreateRecurringEventsForWeek(days) {
     }
   }
 
-  if (changed) {
-    savePlanner();
+  if (changed && !options?.skipSave) {
+    return savePlanner();
   }
+  return Promise.resolve(changed);
 }
 
 // ── Edit/Delete Series Scope Selection Dialog ──

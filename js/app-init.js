@@ -6995,21 +6995,39 @@ function showAppCloseProgressDialog(message) {
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  return {
-    update(nextMessage, percentage) {
-      if (body) body.textContent = nextMessage || body.textContent;
-      if (barFill && percentage !== undefined) {
-        barFill.style.width = percentage + '%';
-        if (typeof percentage === 'number') {
-          window.AppBridge?.setProgressBar(Math.min(1, Math.max(0, percentage / 100)));
-        }
-      }
-    },
-    close() {
-      window.AppBridge?.setProgressBar(-1);
-      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  let isClosed = false;
+  const watchdogTimer = setTimeout(() => {
+    if (!isClosed) {
+      console.warn('[showAppCloseProgressDialog] Watchdog timer fired: auto-dismissing app close progress');
+      controller.close();
     }
-  };
+  }, 10000);
+
+  const controller = Object.assign(
+    () => controller.close(),
+    {
+      update(nextMessage, percentage) {
+        if (body) body.textContent = nextMessage || body.textContent;
+        if (barFill && percentage !== undefined) {
+          barFill.style.width = percentage + '%';
+          if (typeof percentage === 'number' && typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
+            try { window.AppBridge.setProgressBar(Math.min(1, Math.max(0, percentage / 100))); } catch (e) {}
+          }
+        }
+      },
+      close() {
+        if (isClosed) return;
+        isClosed = true;
+        clearTimeout(watchdogTimer);
+        if (typeof window !== 'undefined' && window.AppBridge?.setProgressBar) {
+          try { window.AppBridge.setProgressBar(-1); } catch (e) {}
+        }
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }
+    }
+  );
+
+  return controller;
 }
 
 function makeDraggable(el, header) {
