@@ -61,4 +61,67 @@ describe('ImageOptimizer Engine (js/app-image-optimizer.js)', () => {
     expect(dimNeg.width).toBeGreaterThan(0);
     expect(dimNeg.height).toBeGreaterThan(0);
   });
+
+  /**
+   * 1. Protected Behavior: compressImage falls back to original source if canvas export yields empty or data:,.
+   * 2. Regression Target: If canvas.toDataURL returns data:, (e.g. unsupported WebP on Safari),
+   *    compressImage returned broken data:,, rendering the image invisible in notes.
+   * 3. Coverage Overlap: Protects compressImage data integrity contract.
+   * 4. Production Footprint: Authentic ImageOptimizer.compressImage execution.
+   */
+  it('compressImage returns original source if canvas export produces invalid data:,', async () => {
+    const rawData = 'data:image/png;base64,ORIGINAL_DATA_SOURCE';
+
+    const origCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const el = origCreateElement(tag);
+      if (tag === 'canvas') {
+        el.getContext = () => ({
+          drawImage: () => {}
+        });
+        el.toDataURL = () => 'data:,';
+      }
+      return el;
+    };
+
+    const res = await window.ImageOptimizer.compressImage(rawData, 'standard');
+    expect(res).toBe(rawData);
+
+    document.createElement = origCreateElement;
+  });
+
+  /**
+   * 1. Protected Behavior: _loadImage does not set crossOrigin on data: or blob: URIs to avoid CORS failures.
+   * 2. Regression Target: Setting crossOrigin on data: URIs taints canvas or triggers error in strict WebKit/Blink.
+   * 3. Coverage Overlap: Image loading origin safety.
+   * 4. Production Footprint: Authentic ImageOptimizer._loadImage.
+   */
+  it('_loadImage avoids setting crossOrigin on data: and blob: URIs', async () => {
+    const originalImage = global.Image;
+    let assignedCrossOrigin = null;
+    let assignedSrc = null;
+
+    global.Image = class {
+      set crossOrigin(val) { assignedCrossOrigin = val; }
+      get crossOrigin() { return assignedCrossOrigin; }
+      set src(val) {
+        assignedSrc = val;
+        setTimeout(() => { if (this.onload) this.onload(); }, 5);
+      }
+      get src() { return assignedSrc; }
+      get naturalWidth() { return 100; }
+      get naturalHeight() { return 100; }
+    };
+
+    const dataUri = 'data:image/png;base64,MOCK_DATA';
+    await window.ImageOptimizer._loadImage(dataUri);
+    expect(assignedCrossOrigin).toBeNull();
+
+    // But for remote http/https URLs, crossOrigin should be anonymous
+    assignedCrossOrigin = null;
+    await window.ImageOptimizer._loadImage('https://example.com/photo.png');
+    expect(assignedCrossOrigin).toBe('anonymous');
+
+    global.Image = originalImage;
+  });
 });

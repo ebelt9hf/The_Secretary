@@ -2063,7 +2063,7 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
   border: 2px solid var(--accent);
   border-radius: 4px;
   pointer-events: none;
-  z-index: 45;
+  z-index: 1500;
   box-sizing: border-box;
   transition: border-color 0.15s ease;
 }
@@ -2077,7 +2077,7 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
   border-radius: 2px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   pointer-events: auto;
-  z-index: 50;
+  z-index: 1505;
   transition: transform 0.12s ease, background-color 0.12s ease;
 }
 .editor-img-handle:hover,
@@ -2122,7 +2122,7 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
   justify-content: center;
   cursor: pointer;
   pointer-events: auto;
-  z-index: 52;
+  z-index: 1510;
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -2152,7 +2152,7 @@ body[data-theme='dark'] .insert-items-popover .popover-action-title,
   margin: 0.5rem 0 0.25rem;
   flex-wrap: wrap;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  z-index: 48;
+  z-index: 1508;
 }
 .img-resize-toolbar input[type=range] {
   accent-color: var(--accent);

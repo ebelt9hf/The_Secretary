@@ -127,14 +127,36 @@ const ImageOptimizer = {
 
     ctx.drawImage(img, 0, 0, width, height);
 
+    let result = '';
     if (canvas.toDataURL) {
-      return canvas.toDataURL(preset.mimeType, preset.quality);
+      try {
+        result = canvas.toDataURL(preset.mimeType, preset.quality);
+      } catch (toDataErr) {
+        result = '';
+      }
     } else if (canvas.convertToBlob) {
-      const blob = await canvas.convertToBlob({ type: preset.mimeType, quality: preset.quality });
-      return await this.blobToDataUrl(blob);
+      try {
+        const blob = await canvas.convertToBlob({ type: preset.mimeType, quality: preset.quality });
+        result = await this.blobToDataUrl(blob);
+      } catch (blobErr) {
+        result = '';
+      }
     }
 
-    return typeof imageSource === 'string' ? imageSource : '';
+    // Guard against environments where WebP export is unsupported or returns invalid "data:,"
+    if (!result || typeof result !== 'string' || result === 'data:,' || result.length < 50 || !result.startsWith('data:image/')) {
+      if (canvas.toDataURL) {
+        try {
+          result = canvas.toDataURL('image/png');
+        } catch (_) {}
+      }
+    }
+
+    if (!result || typeof result !== 'string' || result === 'data:,' || result.length < 50 || !result.startsWith('data:image/')) {
+      return typeof imageSource === 'string' ? imageSource : await this.blobToDataUrl(imageSource);
+    }
+
+    return result;
   },
 
   _loadImage(source) {
@@ -164,7 +186,10 @@ const ImageOptimizer = {
 
       const img = new Image();
       let createdUrl = null;
-      img.crossOrigin = 'anonymous';
+      // Only set crossOrigin on remote HTTP/HTTPS resources; setting crossOrigin on data: or blob: URIs causes CORS rejection or canvas tainting
+      if (typeof source === 'string' && /^https?:\/\//i.test(source)) {
+        img.crossOrigin = 'anonymous';
+      }
       img.onload = () => {
         if (createdUrl && typeof URL !== 'undefined' && URL.revokeObjectURL) {
           URL.revokeObjectURL(createdUrl);

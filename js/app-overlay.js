@@ -6233,9 +6233,12 @@ function handleImagePaste(e) {
       let dataUrl = reader.result;
       if (typeof window !== 'undefined' && window.ImageOptimizer?.compressImage) {
         try {
-          dataUrl = await window.ImageOptimizer.compressImage(dataUrl, 'standard');
-          const mimeSub = (dataUrl.match(/^data:image\/([a-zA-Z0-9+]+)/)?.[1] || ext).replace('+xml', '');
-          ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
+          const optimized = await window.ImageOptimizer.compressImage(dataUrl, 'standard');
+          if (optimized && typeof optimized === 'string' && optimized.startsWith('data:image/') && !optimized.startsWith('data:,') && optimized.length > 15) {
+            dataUrl = optimized;
+            const mimeSub = (dataUrl.match(/^data:image\/([a-zA-Z0-9+]+)/)?.[1] || ext).replace('+xml', '');
+            ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
+          }
         } catch (compErr) {
           console.warn('ImageOptimizer paste compression fallback:', compErr);
         }
@@ -6473,9 +6476,12 @@ function handleImageDrop(e) {
       let dataUrl = reader.result;
       if (typeof window !== 'undefined' && window.ImageOptimizer?.compressImage) {
         try {
-          dataUrl = await window.ImageOptimizer.compressImage(dataUrl, 'standard');
-          const mimeSub = (dataUrl.match(/^data:image\/([a-zA-Z0-9+]+)/)?.[1] || ext).replace('+xml', '');
-          ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
+          const optimized = await window.ImageOptimizer.compressImage(dataUrl, 'standard');
+          if (optimized && typeof optimized === 'string' && optimized.startsWith('data:image/') && !optimized.startsWith('data:,') && optimized.length > 15) {
+            dataUrl = optimized;
+            const mimeSub = (dataUrl.match(/^data:image\/([a-zA-Z0-9+]+)/)?.[1] || ext).replace('+xml', '');
+            ext = mimeSub === 'jpeg' ? 'jpg' : mimeSub;
+          }
         } catch (compErr) {
           console.warn('ImageOptimizer drop compression fallback:', compErr);
         }
@@ -6849,6 +6855,7 @@ let _activeEditorImage = null;
 let _activeImageOverlay = null;
 let _resizeToolbar = null;
 let _imageOverlayRepositionFn = null;
+let _activeImageResizeObserver = null;
 
 function hideImageActiveOverlay() {
   if (_activeImageOverlay) {
@@ -6863,6 +6870,10 @@ function hideImageActiveOverlay() {
     window.removeEventListener('resize', _imageOverlayRepositionFn);
     document.removeEventListener('scroll', _imageOverlayRepositionFn, true);
     _imageOverlayRepositionFn = null;
+  }
+  if (_activeImageResizeObserver) {
+    _activeImageResizeObserver.disconnect();
+    _activeImageResizeObserver = null;
   }
   if (_activeEditorImage) {
     _activeEditorImage.classList.remove('editor-img-selected');
@@ -6898,6 +6909,7 @@ function selectEditorImage(imgEl, editorEl) {
   // Create overlay for 4 corners and delete button
   const overlay = document.createElement('div');
   overlay.className = 'editor-img-active-overlay';
+  overlay.style.display = 'none';
   
   // 1. Top-right 'x' delete button
   const delBtn = document.createElement('button');
@@ -7017,6 +7029,7 @@ function selectEditorImage(imgEl, editorEl) {
   );
   const toolbar = document.createElement('div');
   toolbar.className = 'img-resize-toolbar';
+  toolbar.style.display = 'none';
   toolbar.innerHTML = `
     <span style="font-weight:500;">${escH(typeof t === 'function' ? t('common.width') : 'Width')}</span>
     <input type="range" id="img-width-range" name="img-width-range" min="80" max="1200" step="10" value="${currentW}" title="${escA(typeof t === 'function' ? t('common.width') : 'Width')}">
@@ -7136,10 +7149,13 @@ function selectEditorImage(imgEl, editorEl) {
       return;
     }
     const rect = imgEl.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) {
+    if (rect.width === 0 || rect.height === 0) {
       if (typeof window !== 'undefined' && window.getComputedStyle && window.getComputedStyle(imgEl).display === 'none') {
         hideImageActiveOverlay();
+        return;
       }
+      overlay.style.display = 'none';
+      toolbar.style.display = 'none';
       return;
     }
     const scrollX = window.scrollX || document.documentElement.scrollLeft;
@@ -7149,6 +7165,7 @@ function selectEditorImage(imgEl, editorEl) {
     overlay.style.left = `${rect.left + scrollX}px`;
     overlay.style.width = `${rect.width}px`;
     overlay.style.height = `${rect.height}px`;
+    overlay.style.display = 'block';
     
     // Position toolbar directly below image and its caption (if present)
     const captionEl = imgEl.closest('.note-image-figure')?.querySelector('.note-image-caption')
@@ -7163,6 +7180,7 @@ function selectEditorImage(imgEl, editorEl) {
     toolbar.style.position = 'absolute';
     toolbar.style.top = `${bottomY + scrollY + 8}px`;
     toolbar.style.left = `${rect.left + scrollX}px`;
+    toolbar.style.display = 'inline-flex';
   }
   
   document.body.appendChild(overlay);
@@ -7171,6 +7189,31 @@ function selectEditorImage(imgEl, editorEl) {
   _resizeToolbar = toolbar;
   
   updateOverlayPosition();
+
+  // If image is still loading or unmeasured, attach load/error listeners and schedule retries
+  if (!imgEl.complete || imgEl.naturalWidth === 0) {
+    imgEl.addEventListener('load', () => updateOverlayPosition(), { once: true });
+    imgEl.addEventListener('error', () => hideImageActiveOverlay(), { once: true });
+  }
+
+  if (typeof ResizeObserver !== 'undefined') {
+    if (_activeImageResizeObserver) {
+      _activeImageResizeObserver.disconnect();
+    }
+    _activeImageResizeObserver = new ResizeObserver(() => {
+      updateOverlayPosition();
+    });
+    _activeImageResizeObserver.observe(imgEl);
+    if (imgEl.parentElement) {
+      _activeImageResizeObserver.observe(imgEl.parentElement);
+    }
+  }
+
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => updateOverlayPosition());
+  }
+  setTimeout(() => updateOverlayPosition(), 50);
+  setTimeout(() => updateOverlayPosition(), 200);
   
   _imageOverlayRepositionFn = () => updateOverlayPosition();
   window.addEventListener('resize', _imageOverlayRepositionFn);

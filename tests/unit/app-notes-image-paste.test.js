@@ -201,6 +201,122 @@ describe('Note Editor Image Paste & Externalization (app-overlay.js)', () => {
     global.FileReader = originalFileReader;
   });
 
+  /**
+   * 1. Protected Behavior: When ImageOptimizer returns empty or invalid data (e.g. data:,),
+   *    handleImagePaste must preserve the valid reader.result so the image displays correctly.
+   * 2. Regression Target: If ImageOptimizer returns data:, or empty, img.src became broken/invisible.
+   * 3. Coverage Overlap: Protects image paste fallback contract.
+   * 4. Production Footprint: Authentic handleImagePaste and ImageOptimizer integration.
+   */
+  it('preserves original image dataUrl if ImageOptimizer returns empty or invalid data:,', async () => {
+    const editArea = document.getElementById('edit-textarea');
+    const validBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const blob = new Blob(['mock image data'], { type: 'image/png' });
+    const file = new File([blob], 'test.png', { type: 'image/png' });
+
+    const originalFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsDataURL() {
+        setTimeout(() => {
+          this.result = validBase64;
+          if (this.onload) this.onload();
+        }, 5);
+      }
+    };
+
+    // Mock ImageOptimizer returning invalid "data:,"
+    const originalCompress = window.ImageOptimizer?.compressImage;
+    if (window.ImageOptimizer) {
+      window.ImageOptimizer.compressImage = vi.fn().mockResolvedValue('data:,');
+    }
+
+    const pasteEvent = {
+      preventDefault: vi.fn(),
+      clipboardData: {
+        items: [{ type: 'image/png', getAsFile: () => file }]
+      },
+      currentTarget: editArea,
+      target: editArea
+    };
+
+    window.handleImagePaste(pasteEvent);
+    await new Promise(r => setTimeout(r, 30));
+
+    const img = editArea.querySelector('img');
+    expect(img).not.toBeNull();
+    // Must NOT be "data:,"
+    expect(img.src).toBe(validBase64);
+
+    if (window.ImageOptimizer && originalCompress) {
+      window.ImageOptimizer.compressImage = originalCompress;
+    }
+    global.FileReader = originalFileReader;
+  });
+
+  /**
+   * 1. Protected Behavior: selectEditorImage does not display unpositioned overlay (red x at top-left)
+   *    or toolbar at bottom-left when image dimensions are 0x0, and updates positioning when load fires.
+   * 2. Regression Target: Unpositioned active overlay had top-right delete button sitting at 0,0 (top-left)
+   *    and resize toolbar at bottom-left of the viewport.
+   * 3. Coverage Overlap: Unique test covering overlay positioning and asynchronous image load handling.
+   * 4. Production Footprint: Tests authentic selectEditorImage and updateOverlayPosition.
+   */
+  it('does not display overlay or toolbar at unpositioned coordinates (0,0) before image has non-zero dimensions', () => {
+    const editArea = document.getElementById('edit-textarea');
+    const img = document.createElement('img');
+    img.src = 'data:image/png;base64,mockImageZeroDim';
+    img.dataset.id = 'img-zero-dim';
+    editArea.appendChild(img);
+
+    // Default getBoundingClientRect in JSDOM returns 0x0
+    img.getBoundingClientRect = () => ({
+      width: 0,
+      height: 0,
+      top: 0,
+      left: 0,
+      bottom: 0,
+      right: 0
+    });
+
+    window.selectEditorImage(img, editArea);
+
+    const overlay = document.querySelector('.editor-img-active-overlay');
+    const toolbar = document.querySelector('.img-resize-toolbar');
+
+    expect(overlay).not.toBeNull();
+    expect(toolbar).not.toBeNull();
+
+    // When dimensions are 0x0, overlay and toolbar MUST NOT be visible at default 0,0 coordinates
+    expect(overlay.style.display).toBe('none');
+    expect(toolbar.style.display).toBe('none');
+
+    // When the image finishes loading and acquires dimensions:
+    img.getBoundingClientRect = () => ({
+      width: 400,
+      height: 300,
+      top: 150,
+      left: 100,
+      bottom: 450,
+      right: 500
+    });
+
+    // Fire load event on img
+    img.dispatchEvent(new Event('load'));
+
+    expect(overlay.style.display).not.toBe('none');
+    expect(overlay.style.width).toBe('400px');
+    expect(overlay.style.height).toBe('300px');
+    expect(overlay.style.top).toBe('150px');
+    expect(overlay.style.left).toBe('100px');
+
+    expect(toolbar.style.display).not.toBe('none');
+    expect(toolbar.style.position).toBe('absolute');
+    expect(toolbar.style.top).toBe('458px');
+    expect(toolbar.style.left).toBe('100px');
+
+    window.hideImageActiveOverlay();
+  });
+
   it('selectEditorImage selects image in DOM selection and copy event writes HTML and plain text', () => {
     const editArea = document.getElementById('edit-textarea');
     const img = document.createElement('img');
