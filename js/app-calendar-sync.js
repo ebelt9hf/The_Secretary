@@ -636,6 +636,32 @@
     _externalLoadedInfo: null,
     _platformOverride: null,
     _customFolderPath: null,
+    _detectedScriptPath: null,
+    _detectedWorkspacePath: null,
+
+    /**
+     * Sets the automatically detected workspace folder path (e.g. from Electron AppBridge).
+     */
+    setDetectedWorkspacePath(newPath) {
+      if (typeof newPath === 'string' && newPath.trim()) {
+        this._detectedWorkspacePath = newPath.trim();
+        if (typeof this.updateExternalStatusUI === 'function') {
+          this.updateExternalStatusUI();
+        }
+      }
+    },
+
+    /**
+     * Sets the detected sync script path on disk (e.g. from Electron AppBridge).
+     */
+    setDetectedScriptPath(scriptPath) {
+      if (typeof scriptPath === 'string' && scriptPath.trim()) {
+        this._detectedScriptPath = scriptPath.trim();
+        if (typeof this.updateExternalStatusUI === 'function') {
+          this.updateExternalStatusUI();
+        }
+      }
+    },
 
     /**
      * Resolves the absolute path to the watched folder.
@@ -654,6 +680,9 @@
       }
       if (this._externalFolderHandle && this._externalFolderHandle.path) {
         return this._externalFolderHandle.path;
+      }
+      if (this._detectedWorkspacePath && typeof this._detectedWorkspacePath === 'string' && this._detectedWorkspacePath.trim()) {
+        return this._detectedWorkspacePath.trim();
       }
       if (typeof rootHandle !== 'undefined' && rootHandle && rootHandle.path) {
         return rootHandle.path;
@@ -697,7 +726,13 @@
       this.saveConfig(config).catch(() => {});
       const cmdInput = (typeof document !== 'undefined') ? document.getElementById('prefs-local-sync-cmd') : null;
       if (cmdInput) {
-        cmdInput.value = this.getLocalSyncCommand(this._customFolderPath, this._platformOverride, true);
+        const cmd = this.getLocalSyncCommand(this._customFolderPath, this._platformOverride, true);
+        if ('value' in cmdInput && cmdInput.tagName === 'INPUT') {
+          cmdInput.value = cmd;
+        } else {
+          cmdInput.textContent = cmd;
+        }
+        if (cmdInput.dataset) cmdInput.dataset.cmd = cmd;
       }
       if (typeof updateExternalAgentPromptDisplay === 'function') {
         updateExternalAgentPromptDisplay();
@@ -706,32 +741,25 @@
 
     /**
      * Helper to format an absolute script path for Windows or macOS / Linux.
+     * Returns empty string if no valid folder path is provided, preventing dummy placeholder paths.
      */
     _formatScriptPath(folderPath, scriptFileName, platform) {
       const isWin = platform === 'win';
       let path = (typeof folderPath === 'string') ? folderPath.trim() : '';
 
-      if (path) {
-        if (path.toLowerCase().endsWith(scriptFileName.toLowerCase())) {
-          return isWin ? path.replace(/\//g, '\\') : path.replace(/\\/g, '/');
-        }
-        if (isWin) {
-          const winPath = path.replace(/\//g, '\\').replace(/\\+$/, '');
-          return `${winPath}\\${scriptFileName}`;
-        }
-        const macPath = path.replace(/\\/g, '/').replace(/\/+$/, '');
-        return `${macPath}/${scriptFileName}`;
+      if (!path) {
+        return '';
       }
 
-      // Fallback placeholder when no absolute folder path is known yet
-      const info = this.getWatchedFolderInfo();
-      const folderName = (info && info.name && info.name !== 'Local Notes Folder' && info.name !== 'Secretary Workspace')
-        ? info.name
-        : 'notes';
-      if (isWin) {
-        return `C:\\path\\to\\${folderName}\\${scriptFileName}`;
+      if (path.toLowerCase().endsWith(scriptFileName.toLowerCase())) {
+        return isWin ? path.replace(/\//g, '\\') : path.replace(/\\/g, '/');
       }
-      return `/path/to/${folderName}/${scriptFileName}`;
+      if (isWin) {
+        const winPath = path.replace(/\//g, '\\').replace(/\\+$/, '');
+        return `${winPath}\\${scriptFileName}`;
+      }
+      const macPath = path.replace(/\\/g, '/').replace(/\/+$/, '');
+      return `${macPath}/${scriptFileName}`;
     },
 
     /**
@@ -816,17 +844,42 @@
     /**
      * Generates terminal command to execute zero-dependency local sync script (macOS or Windows).
      * If inWatchedFolder is true, returns command with absolute path to the script in the watched folder.
+     * Returns empty string if no watched folder path is resolved, preventing fake placeholder paths.
      */
     getLocalSyncCommand(workspacePath = '', targetPlatform = null, inWatchedFolder = false) {
       const activePlatform = targetPlatform || this._platformOverride;
       const isWin = activePlatform === 'win' || (activePlatform !== 'mac' && this.isWindows());
+      const scriptFileName = isWin ? 'sync_local_calendar.ps1' : 'sync_local_calendar.sh';
+
       if (inWatchedFolder) {
         const resolvedPath = this.getWatchedFolderPath(workspacePath);
+        if (!resolvedPath) {
+          // If no folder path is observed, hide command (do not show fake C:\path\to\... paths)
+          return '';
+        }
+
+        // If we detected the authentic script path on disk (e.g. via Electron bridge)
+        if (this._detectedScriptPath && typeof this._detectedScriptPath === 'string') {
+          const normScript = isWin ? this._detectedScriptPath.replace(/\//g, '\\') : this._detectedScriptPath.replace(/\\/g, '/');
+          const normWs = isWin ? resolvedPath.replace(/\//g, '\\') : resolvedPath.replace(/\\/g, '/');
+          const scriptFolder = isWin ? normScript.substring(0, normScript.lastIndexOf('\\')) : normScript.substring(0, normScript.lastIndexOf('/'));
+
+          if (scriptFolder.toLowerCase() === normWs.toLowerCase()) {
+            return isWin
+              ? `powershell.exe -ExecutionPolicy Bypass -File "${normScript}"`
+              : `bash "${normScript}"`;
+          }
+          const wsArg = isWin ? ` -Workspace "${normWs}"` : ` "${normWs}"`;
+          return isWin
+            ? `powershell.exe -ExecutionPolicy Bypass -File "${normScript}"${wsArg}`
+            : `bash "${normScript}"${wsArg}`;
+        }
+
+        const scriptPath = this._formatScriptPath(resolvedPath, scriptFileName, isWin ? 'win' : 'mac');
+        if (!scriptPath) return '';
         if (isWin) {
-          const scriptPath = this._formatScriptPath(resolvedPath, 'sync_local_calendar.ps1', 'win');
           return `powershell.exe -ExecutionPolicy Bypass -File "${scriptPath}"`;
         }
-        const scriptPath = this._formatScriptPath(resolvedPath, 'sync_local_calendar.sh', 'mac');
         return `bash "${scriptPath}"`;
       }
       if (isWin) {
@@ -1697,9 +1750,52 @@ Write-Host "✨ Sync complete!"
         }
       });
 
+      const hasObservedPath = Boolean(folderPath && folderPath.trim());
+
+      // Update observed folder path display across Tab 2, Tab 3, and Setup Wizard
+      const pathDisplays = [
+        document.getElementById('prefs-watched-folder-path-display'),
+        document.getElementById('prefs-agent-watched-folder-path-display'),
+        document.getElementById('wizard-watched-folder-path-display')
+      ].filter(Boolean);
+      pathDisplays.forEach(el => {
+        el.textContent = hasObservedPath ? `📁 ${folderPath}` : '';
+        el.title = folderPath || '';
+      });
+
+      // Toggle observed folder path containers vs empty notices in both tabs
+      const pathContainers = [
+        document.getElementById('prefs-watched-folder-path-container'),
+        document.getElementById('prefs-agent-watched-folder-path-container')
+      ].filter(Boolean);
+      const emptyNotices = [
+        document.getElementById('prefs-watched-folder-empty-notice'),
+        document.getElementById('prefs-agent-watched-folder-empty-notice')
+      ].filter(Boolean);
+      pathContainers.forEach(el => { el.style.display = hasObservedPath ? 'flex' : 'none'; });
+      emptyNotices.forEach(el => { el.style.display = hasObservedPath ? 'none' : 'block'; });
+
+      // Tab 2: Hide script path / command when no path is observed; show notice
+      const scriptContentBox = document.getElementById('prefs-sync-script-content-box');
+      const scriptEmptyNotice = document.getElementById('prefs-sync-script-empty-notice');
+      if (scriptContentBox) scriptContentBox.style.display = hasObservedPath ? 'block' : 'none';
+      if (scriptEmptyNotice) scriptEmptyNotice.style.display = hasObservedPath ? 'none' : 'block';
+
+      // Tab 3: Hide agent disk path / instructions when no path is observed; show notice
+      const agentContentBox = document.getElementById('prefs-agent-instructions-content-box');
+      const agentEmptyNotice = document.getElementById('prefs-agent-instructions-empty-notice');
+      if (agentContentBox) agentContentBox.style.display = hasObservedPath ? 'block' : 'none';
+      if (agentEmptyNotice) agentEmptyNotice.style.display = hasObservedPath ? 'none' : 'block';
+
       const cmd = this.getLocalSyncCommand(folderPath, this._platformOverride, true);
-      cmdInputs.forEach(input => {
-        input.value = cmd;
+      cmdInputs.forEach(el => {
+        if ('value' in el && el.tagName === 'INPUT') {
+          el.value = cmd;
+        } else {
+          el.textContent = cmd;
+        }
+        if (el.dataset) el.dataset.cmd = cmd;
+        el.title = cmd || (typeof t === 'function' ? t('prefs.localSyncCmdTooltip') : 'Command to run local calendar sync in Terminal');
       });
 
       if (folderNameEls.length) {
@@ -1774,8 +1870,26 @@ Write-Host "✨ Sync complete!"
     /**
      * Initialize service on application start.
      */
-    init() {
+    async init() {
       this.startAutoSync();
+      if (typeof window !== 'undefined' && window.AppBridge) {
+        if (window.AppBridge.fs && typeof window.AppBridge.fs.getWorkspacePath === 'function') {
+          try {
+            const ws = await window.AppBridge.fs.getWorkspacePath();
+            if (ws && ws.path) {
+              this.setDetectedWorkspacePath(ws.path);
+            }
+          } catch (_wsErr) {}
+        }
+        if (window.AppBridge.calendarSync && typeof window.AppBridge.calendarSync.getSyncScriptPath === 'function') {
+          try {
+            const sp = await window.AppBridge.calendarSync.getSyncScriptPath();
+            if (sp) {
+              this.setDetectedScriptPath(sp);
+            }
+          } catch (_spErr) {}
+        }
+      }
     }
   };
 

@@ -458,6 +458,12 @@
       isSupported() {
         return !!(global.electronAPI && typeof global.electronAPI.runCalendarSyncScript === 'function');
       },
+      async getSyncScriptPath(workspacePath = '') {
+        if (global.electronAPI && typeof global.electronAPI.getSyncScriptPath === 'function') {
+          return await global.electronAPI.getSyncScriptPath(workspacePath);
+        }
+        return null;
+      },
       async runLocalSyncScript(workspacePath = '') {
         if (global.electronAPI && typeof global.electronAPI.runCalendarSyncScript === 'function') {
           return await global.electronAPI.runCalendarSyncScript(workspacePath);

@@ -770,12 +770,19 @@ Generate the complete structured JSON memory dossier for this Workstream with sc
     const userClause = userName ? ` on behalf of user "${userName}"` : '';
     const watchedFolder = (p.watchedFolderName && typeof p.watchedFolderName === 'string') ? p.watchedFolderName.trim() : '';
     const wsPath = (p.workspacePath && typeof p.workspacePath === 'string') ? p.workspacePath.trim() : '';
-    const fullPathHint = wsPath
-      ? `${wsPath.replace(/\/+$/, '')}/planner-proposals.json`
-      : (watchedFolder ? `${watchedFolder}/planner-proposals.json` : './planner-proposals.json');
-    const folderLocationClause = watchedFolder
-      ? `watched folder "${watchedFolder}"`
-      : 'root Secretary workspace folder';
+    const isWin = /^[a-zA-Z]:/.test(wsPath) || /^[a-zA-Z]:/.test(watchedFolder);
+    const sep = isWin ? '\\' : '/';
+    const cleanWs = wsPath.replace(/[/\\]+$/, '');
+    const cleanFolder = watchedFolder.replace(/[/\\]+$/, '');
+    const fullPathHint = cleanWs
+      ? `${cleanWs}${sep}planner-proposals.json`
+      : (cleanFolder && (cleanFolder.includes('/') || cleanFolder.includes('\\') || /^[a-zA-Z]:/.test(cleanFolder))
+          ? `${cleanFolder}${sep}planner-proposals.json`
+          : './planner-proposals.json');
+    const targetFolderDisplay = cleanWs || cleanFolder || (watchedFolder || 'Secretary Workspace / Notes Folder');
+    const folderLocationClause = cleanWs || (cleanFolder && (cleanFolder.includes('/') || cleanFolder.includes('\\') || /^[a-zA-Z]:/.test(cleanFolder)))
+      ? `watched folder "${cleanWs || cleanFolder}"`
+      : (watchedFolder ? `watched folder "${watchedFolder}"` : 'root Secretary workspace folder');
 
     const appVersion = p.version || (typeof getSecretaryVersion === 'function' ? getSecretaryVersion() : '') || (typeof document !== 'undefined' && document.getElementById('connect-version-hint')?.getAttribute('data-version')) || '';
     const versionHeader = appVersion ? ` (Secretary v${appVersion})` : '';
@@ -792,7 +799,7 @@ You are an AI automation agent responsible for discovering and extracting upcomi
 - **User's Local Timezone**: \`${userLocalTz}\` (Secretary will automatically normalize events to this timezone).
 
 ## 2. Target File Location & Path (FULLY IMPLEMENTED)
-- **Target Watched Folder**: \`${watchedFolder || 'Secretary Workspace / Notes Folder'}\`
+- **Target Watched Folder**: \`${targetFolderDisplay}\`
 - **Target File**: \`planner-proposals.json\`
 - **Relative Path**: \`./planner-proposals.json\` (located directly in the ${folderLocationClause}).
 - **Exact Path on Disk**: \`${fullPathHint}\`

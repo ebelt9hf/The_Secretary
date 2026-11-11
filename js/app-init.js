@@ -4335,13 +4335,13 @@ function updateExternalAgentPromptDisplay() {
     (typeof window !== 'undefined' && window.settings && window.settings.username) || '';
   const wsPath = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderPath === 'function' && CalendarSyncService.getWatchedFolderPath())
     || (typeof currentWorkspacePath !== 'undefined' && currentWorkspacePath)
-    || (typeof rootHandle !== 'undefined' && rootHandle && (rootHandle.path || rootHandle.name))
-    || (typeof settings !== 'undefined' && settings && settings.folder && settings.folder.last)
+    || (typeof rootHandle !== 'undefined' && rootHandle && rootHandle.path)
+    || (typeof settings !== 'undefined' && settings && settings.folder && settings.folder.path)
     || '';
   const watchedInfo = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderInfo === 'function')
     ? CalendarSyncService.getWatchedFolderInfo()
     : null;
-  const watchedName = watchedInfo?.name || '';
+  const watchedName = wsPath || watchedInfo?.name || '';
 
   let promptVal = '';
   if (typeof AppPrompts !== 'undefined' && typeof AppPrompts.buildExternalAgentEmailProposalPrompt === 'function') {
@@ -4496,16 +4496,42 @@ async function syncCalendarFeedFromPrefs(feedId) {
   }
 }
 
+async function copyWatchedFolderPath() {
+  const folderPath = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getWatchedFolderPath === 'function')
+    ? CalendarSyncService.getWatchedFolderPath()
+    : '';
+  if (!folderPath) {
+    const msg = (typeof t === 'function' ? t('prefs.noObservedFolderToast') : 'No observed folder configured');
+    if (typeof toast === 'function') toast(msg, true);
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(folderPath);
+    const msg = (typeof t === 'function' ? t('prefs.folderPathCopied') : 'Observed folder path copied to clipboard!');
+    if (typeof toast === 'function') toast(msg);
+  } catch (err) {
+    if (typeof toast === 'function') toast((typeof t === 'function' ? t('common.copyFailed', { message: err.message }) : `Copy failed: ${err.message}`), true);
+  }
+}
+window.copyWatchedFolderPath = copyWatchedFolderPath;
+
 async function copyLocalCalendarSyncCmd() {
   const cmdInput = document.getElementById('prefs-local-sync-cmd');
   if (!cmdInput) return;
+  const cmd = (cmdInput.value || cmdInput.textContent || cmdInput.dataset?.cmd || '').trim();
+  if (!cmd) {
+    const msg = (typeof t === 'function' ? t('prefs.noObservedFolderToast') : 'No observed folder configured');
+    if (typeof toast === 'function') toast(msg, true);
+    return;
+  }
   try {
-    await navigator.clipboard.writeText(cmdInput.value);
+    await navigator.clipboard.writeText(cmd);
     if (typeof toast === 'function') toast(t('prefs.localScriptCopied') || 'Command copied to clipboard!');
   } catch (err) {
     if (typeof toast === 'function') toast(t('common.copyFailed', { message: err.message }), true);
   }
 }
+window.copyLocalCalendarSyncCmd = copyLocalCalendarSyncCmd;
 
 let _currentPrefsGuideTab = 'outlook';
 
@@ -5055,6 +5081,16 @@ async function mountFolder(handle) {
   if (typeof settings !== 'undefined' && settings) {
     if (!settings.folder) settings.folder = {};
     settings.folder.last = handle?.name || '';
+    if (handle?.path) {
+      settings.folder.path = handle.path;
+    }
+  }
+  if (handle?.path) {
+    window.folderPath = handle.path;
+    window.currentWorkspacePath = handle.path;
+    if (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.setDetectedWorkspacePath === 'function') {
+      CalendarSyncService.setDetectedWorkspacePath(handle.path);
+    }
   }
   saveLocalSettings();
   if (handle?.path && window.AppBridge?.fs?.setWorkspacePath) {

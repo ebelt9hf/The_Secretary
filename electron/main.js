@@ -495,6 +495,29 @@ ipcMain.handle('fs-list-files', async (event, subDir) => {
 });
 
 // Run calendar sync shell script in separate background process/thread
+ipcMain.handle('get-sync-script-path', async (event, customWorkspace) => {
+  if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
+  const isWin = process.platform === 'win32';
+  const scriptName = isWin ? 'sync_local_calendar.ps1' : 'sync_local_calendar.sh';
+  const wsPath = (customWorkspace && typeof customWorkspace === 'string' && isSafeWorkspaceDirectory(customWorkspace))
+    ? path.resolve(customWorkspace)
+    : currentWorkspacePath;
+
+  if (wsPath) {
+    const wsScript = path.join(wsPath, scriptName);
+    if (fs.existsSync(wsScript)) {
+      return wsScript;
+    }
+  }
+
+  const appScript = path.resolve(__dirname, '..', 'development', scriptName);
+  if (fs.existsSync(appScript)) {
+    return appScript;
+  }
+
+  return wsPath ? path.join(wsPath, scriptName) : '';
+});
+
 ipcMain.handle('run-calendar-sync-script', async (event, customWorkspace) => {
   if (!isAuthorizedSender(event.sender)) throw new Error('Unauthorized sender');
   const wsPath = (customWorkspace && typeof customWorkspace === 'string' && isSafeWorkspaceDirectory(customWorkspace))

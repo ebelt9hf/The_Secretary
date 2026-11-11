@@ -928,11 +928,11 @@ const SetupWizardController = {
 
   copyCorporateCmd() {
     const cmdInput = document.getElementById('wizard-local-sync-cmd');
-    const cmd = (cmdInput && cmdInput.value)
-      ? cmdInput.value
-      : (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getLocalSyncCommand === 'function')
+    const cmd = (cmdInput?.value || cmdInput?.textContent || '').trim()
+      || ((typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getLocalSyncCommand === 'function')
         ? CalendarSyncService.getLocalSyncCommand('', null, true)
-        : './development/sync_local_calendar.sh';
+        : '');
+    if (!cmd) return;
     if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(cmd).then(() => {
         if (typeof showToast === 'function') {
@@ -1550,7 +1550,7 @@ const SetupWizardController = {
       const isWin = (platformOverride === 'win') || (platformOverride !== 'mac' && (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.isWindows === 'function' && CalendarSyncService.isWindows()));
       const localCmd = (typeof CalendarSyncService !== 'undefined' && typeof CalendarSyncService.getLocalSyncCommand === 'function')
         ? CalendarSyncService.getLocalSyncCommand(watchedPath, platformOverride, true)
-        : (isWin ? 'powershell.exe -ExecutionPolicy Bypass -File "C:\\path\\to\\notes\\sync_local_calendar.ps1"' : 'bash "/path/to/notes/sync_local_calendar.sh"');
+        : '';
 
       let linkedDisplay = 'none';
       let linkedText = '';
@@ -1637,9 +1637,10 @@ const SetupWizardController = {
               <button type="button" class="setup-wizard-tab-btn ${!isWin ? 'active' : ''}" id="wizard-btn-cmd-platform-mac" onclick="SetupWizardController.setPlatformOverride('mac')" style="font-size:0.68rem; padding:2px 6px;" title="${t('prefs.cmdPlatformMacTooltip') || 'Display terminal command for macOS and Linux'}">${t('prefs.cmdPlatformMac') || 'macOS (.sh)'}</button>
             </div>
           </div>
-          <div style="position:relative; width:100%; margin-bottom:0.6rem;">
-            <input type="text" id="wizard-local-sync-cmd" readonly value="${escH(localCmd)}" style="font-family:'Fira Code',monospace; font-size:0.75rem; width:100%; padding:6px 85px 6px 8px; border:1px solid var(--card-border); border-radius:4px; background:var(--card-bg); color:var(--text); box-sizing:border-box;" title="${t('prefs.localSyncCmdTooltip') || 'Command to run local calendar sync in Terminal'}">
-            <button type="button" class="btn" id="wizard-btn-copy-cmd" onclick="SetupWizardController.copyCorporateCmd()" style="position:absolute; right:4px; top:4px; padding:2px 8px; font-size:0.72rem;" title="${t('prefs.localSyncCmdTooltip') || 'Copy terminal command to clipboard'}">
+          <div style="display:flex; align-items:stretch; width:100%; border:1px solid var(--card-border); border-radius:6px; background:var(--card-bg); overflow:hidden; margin-bottom:0.6rem;">
+            <div id="wizard-local-sync-cmd" style="flex:1; font-family:'Fira Code',monospace; font-size:0.75rem; padding:7px 10px; color:var(--text); overflow-x:auto; white-space:nowrap; display:flex; align-items:center; user-select:all;" title="${t('prefs.localSyncCmdTooltip') || 'Command to run local calendar sync in Terminal'}">${escH(localCmd)}</div>
+            <button type="button" class="btn btn-secondary" id="wizard-btn-copy-cmd" onclick="SetupWizardController.copyCorporateCmd()" style="border:none; border-left:1px solid var(--card-border); border-radius:0; padding:0 12px; font-size:0.74rem; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; background:var(--card-bg-alt); flex-shrink:0; cursor:pointer;" title="${t('prefs.localSyncCmdTooltip') || 'Copy terminal command to clipboard'}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-right:4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               <span>${t('common.copy') || 'Copy'}</span>
             </button>
           </div>

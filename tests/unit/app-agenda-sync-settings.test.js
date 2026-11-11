@@ -131,7 +131,7 @@ describe('Streamlined Agenda Calendar Synchronization & Watched Folder Engine', 
   });
 
   describe('Pillar 2: Sync Script Placement & Command Formatting', () => {
-    it('generates PowerShell command with absolute path targeting sync_local_calendar.ps1 in the watched folder on Windows', () => {
+    it('generates PowerShell command with absolute path targeting sync_local_calendar.ps1 in the watched folder on Windows and hides command when no path is observed', () => {
       CalendarSyncService._platformOverride = 'win';
       window.rootHandle = { name: 'NotesFolder' };
 
@@ -139,13 +139,12 @@ describe('Streamlined Agenda Calendar Synchronization & Watched Folder Engine', 
       const cmdWithWs = CalendarSyncService.getLocalSyncCommand('C:\\Users\\alice\\Notes', 'win', true);
       expect(cmdWithWs).toBe('powershell.exe -ExecutionPolicy Bypass -File "C:\\Users\\alice\\Notes\\sync_local_calendar.ps1"');
 
-      // Resolved default folder path
+      // When no absolute folder path is observed, returns empty string to protect user from dummy C:\path\to placeholders
       const defaultCmd = CalendarSyncService.getLocalSyncCommand('', 'win', true);
-      expect(defaultCmd).toBe('powershell.exe -ExecutionPolicy Bypass -File "C:\\path\\to\\NotesFolder\\sync_local_calendar.ps1"');
-      expect(defaultCmd).not.toContain('.\\sync_local_calendar.ps1');
+      expect(defaultCmd).toBe('');
     });
 
-    it('generates bash command with absolute path targeting sync_local_calendar.sh in the watched folder on macOS / Linux', () => {
+    it('generates bash command with absolute path targeting sync_local_calendar.sh in the watched folder on macOS / Linux and hides command when no path is observed', () => {
       CalendarSyncService._platformOverride = 'mac';
       window.rootHandle = { name: 'NotesFolder' };
 
@@ -153,10 +152,9 @@ describe('Streamlined Agenda Calendar Synchronization & Watched Folder Engine', 
       const cmdWithWs = CalendarSyncService.getLocalSyncCommand('/Users/alice/Notes', 'mac', true);
       expect(cmdWithWs).toBe('bash "/Users/alice/Notes/sync_local_calendar.sh"');
 
-      // Resolved default folder path
+      // When no absolute folder path is observed, returns empty string to protect user from dummy /path/to placeholders
       const defaultCmd = CalendarSyncService.getLocalSyncCommand('', 'mac', true);
-      expect(defaultCmd).toBe('bash "/path/to/NotesFolder/sync_local_calendar.sh"');
-      expect(defaultCmd).not.toContain('./sync_local_calendar.sh');
+      expect(defaultCmd).toBe('');
     });
 
     it('updates absolute path and command dynamically when custom watched folder path is entered', async () => {

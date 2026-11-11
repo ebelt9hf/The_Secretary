@@ -97,6 +97,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteFile: (relativePath) => ipcRenderer.invoke('fs-delete-file', relativePath),
   fileExists: (relativePath) => ipcRenderer.invoke('fs-file-exists', relativePath),
   listFiles: (subDir) => ipcRenderer.invoke('fs-list-files', subDir),
+  getSyncScriptPath: (workspacePath) => ipcRenderer.invoke('get-sync-script-path', workspacePath),
   runCalendarSyncScript: (workspacePath) => ipcRenderer.invoke('run-calendar-sync-script', workspacePath),
   notifyThemeChanged: (theme) => ipcRenderer.send('theme-changed', theme),
   // Windows Taskbar & DWM System Integration
