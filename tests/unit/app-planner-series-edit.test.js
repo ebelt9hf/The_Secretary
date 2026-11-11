@@ -1460,7 +1460,9 @@ describe('Planner Series vs Bloc Edit Split & Series Modal', () => {
     const saveBtn = document.querySelector('#planner-dynamic-modal .modal-actions .btn-save');
     expect(saveBtn).not.toBeNull();
     saveBtn.click();
-    await new Promise(r => setTimeout(r, 50));
+    await vi.waitFor(() => {
+      expect(window.StorageAPI.writePlanner).toHaveBeenCalled();
+    }, { timeout: 2000 });
 
     // Verify plannerEvents was updated in place
     expect(window.plannerEvents.length).toBe(1);

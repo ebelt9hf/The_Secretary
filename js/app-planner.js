@@ -7507,8 +7507,10 @@ function openPlanEventModal(prefill = {}) {
 
       const closeCreateProgress = !isEdit ? showPlannerBlocCreationProgress() : null;
       try {
-        closeCreateProgress?.updateStage?.(t('planner.validatingBloc') || 'Validating schedule details...', '', 20);
-        await new Promise(r => setTimeout(r, 16));
+        if (closeCreateProgress) {
+          closeCreateProgress.updateStage?.(t('planner.validatingBloc') || 'Validating schedule details...', '', 20);
+          await new Promise(r => setTimeout(r, 16));
+        }
 
         event.type = type;
         event.date = date;
@@ -7739,8 +7741,10 @@ function openPlanEventModal(prefill = {}) {
         ? plannerEvents
         : ((typeof window !== 'undefined' && Array.isArray(window.plannerEvents)) ? window.plannerEvents : []);
 
-      closeCreateProgress?.updateStage?.(t('planner.schedulingBloc') || 'Scheduling block and linked associations...', '', 50);
-      await new Promise(r => setTimeout(r, 16));
+      if (closeCreateProgress) {
+        closeCreateProgress.updateStage?.(t('planner.schedulingBloc') || 'Scheduling block and linked associations...', '', 50);
+        await new Promise(r => setTimeout(r, 16));
+      }
 
       if (!isEdit) {
         if (recurrenceRule) {
@@ -7832,13 +7836,17 @@ function openPlanEventModal(prefill = {}) {
       if (typeof window !== 'undefined') window.plannerEvents = targetList;
       if (typeof plannerEvents !== 'undefined') plannerEvents = targetList;
 
-      closeCreateProgress?.updateStage?.(t('planner.savingPlannerData') || 'Saving planner timeline to disk...', '', 75);
-      await new Promise(r => setTimeout(r, 16));
+      if (closeCreateProgress) {
+        closeCreateProgress.updateStage?.(t('planner.savingPlannerData') || 'Saving planner timeline to disk...', '', 75);
+        await new Promise(r => setTimeout(r, 16));
+      }
 
       await savePlanner();
 
-      closeCreateProgress?.updateStage?.(t('planner.finalizingBloc') || 'Finalizing schedule and updating view...', '', 95);
-      await new Promise(r => setTimeout(r, 16));
+      if (closeCreateProgress) {
+        closeCreateProgress.updateStage?.(t('planner.finalizingBloc') || 'Finalizing schedule and updating view...', '', 95);
+        await new Promise(r => setTimeout(r, 16));
+      }
       if (isProposal || isDraft) {
         const pId = event.proposalId || event._proposalId;
         if (pId) {
