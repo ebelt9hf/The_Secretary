@@ -1301,7 +1301,7 @@ async function openNoteOverlay(path, prefillGroup, prefillMajor, isPop = false, 
 }
 
 async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = false, prefillTopic = null, options = {}) {
-  const isDedicatedNoteWindow = (typeof isFocusedNoteWindow === 'function' ? isFocusedNoteWindow() : _isFocusedMode) || (location.hash && !location.hash.includes('tab=') && (location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
+  const isDedicatedNoteWindow = (typeof isFocusedNoteWindow === 'function' ? isFocusedNoteWindow() : (typeof _isFocusedMode !== 'undefined' && _isFocusedMode)) || (location.hash && !location.hash.includes('tab=') && (location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
   const isInDailyReview = (typeof activeTab !== 'undefined' && activeTab === 'daily-review') || !!options?.embeddedInDailyReview;
   if (window.AppBridge?.isElectron && window.AppBridge?.noteWindow && (!isDedicatedNoteWindow || options?.openInNewWindow) && !options?.sameWindow && !isInDailyReview) {
     let meta = null;
@@ -1426,7 +1426,7 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
       openedFromBlocWithTags = true;
     }
     if (typeof syncTagsBetweenBlocAndNote === 'function') {
-      await syncTagsBetweenBlocAndNote(sourceBloc, currentNote);
+      syncTagsBetweenBlocAndNote(sourceBloc, currentNote).catch(err => console.warn('Tag sync failed:', err));
     }
   }
 
@@ -3911,16 +3911,17 @@ function applyEditorZoom() {
   const zoom = ZOOM_LEVELS[currentZoomIndex];
   
   // Set inline on documentElement, pane, textarea, and page wrapper to ensure inheritance
-  document.documentElement.style.setProperty('--editor-zoom', String(zoom));
-  
-  const pane = document.getElementById('edit-pane-left');
-  if (pane) pane.style.setProperty('--editor-zoom', String(zoom));
-  
-  const ta = document.getElementById('edit-textarea');
-  if (ta) ta.style.setProperty('--editor-zoom', String(zoom));
-  
-  const page = document.querySelector('.editor-page');
-  if (page) page.style.setProperty('--editor-zoom', String(zoom));
+  const zoomStr = String(zoom);
+  [
+    document.documentElement,
+    document.getElementById('edit-pane-left'),
+    document.getElementById('edit-textarea'),
+    document.querySelector('.editor-page')
+  ].forEach(el => {
+    if (typeof el?.style?.setProperty === 'function') {
+      el.style.setProperty('--editor-zoom', zoomStr);
+    }
+  });
 
   const label = document.getElementById('editor-zoom-label');
   if (label) {
@@ -9114,7 +9115,7 @@ function populateTagEditor(containerId, tags, type, onChange = null) {
   el._tagClickListener = () => input.focus();
   el.addEventListener('click', el._tagClickListener);
 
-  tags.forEach(t => {
+  (Array.isArray(tags) ? tags : []).forEach(t => {
     let cls = css;
     const todoCls = getTodoClassForTag(t);
     if (todoCls) cls += ' ' + todoCls;
@@ -9451,7 +9452,9 @@ function populateTagEditor(containerId, tags, type, onChange = null) {
     }, 200);
   });
 
-  el.appendChild(input);
+  if (typeof el.appendChild === 'function') {
+    el.appendChild(input);
+  }
   updateTodoButtonsState();
 }
 

@@ -307,15 +307,17 @@ describe('Planner Note Opening & Dual-Backend Manifest Indexing Pipeline', () =>
   });
 
   /**
-   * 1. Protected Behavior: `openNoteForEvent()` links both `event.noteId` and `event.linkedNoteIds` (and propagates to
-   *    linked `prep` events), awaits `savePlanner()`, closes the progress dialog, and opens the note overlay.
-   * 2. Regression Target: Failing to populate `event.linkedNoteIds` on regular planner events or leaving `savePlanner()`
-   *    unawaited before opening the note overlay.
-   * 3. Coverage Overlap / Redundancy: None; existing planner tests do not assert `linkedNoteIds` and `prep` propagation
-   *    during `openNoteForEvent()` on-demand note creation.
+   * 1. Protected Behavior: `openNoteForEvent()` stages the new note in memory (`StorageAPI.getNoteFromCache`),
+   *    links `event.noteId` and `event.linkedNoteIds` (and propagates to linked `prep` events), opens the
+   *    note overlay immediately without blocking on a progress dialog or disk/cloud persistence, and persists
+   *    `savePlanner()` and `StorageAPI.writeNoteContent()` in the background with zero warnings.
+   * 2. Regression Target: Reintroducing a blocking `showPlannerNoteGenerationProgress` modal, artificial timer
+   *    delays, or synchronous `await savePlanner()` / `writeNoteContent()` before opening the note overlay.
+   * 3. Coverage Overlap / Redundancy: None; existing planner tests do not assert instant in-memory opening
+   *    with background persistence and zero warnings during `openNoteForEvent()`.
    * 4. Production Code Footprint: None; exercises production `openNoteForEvent()`.
    */
-  it('links noteId and linkedNoteIds on event and prep blocks and awaits savePlanner in openNoteForEvent', async () => {
+  it('opens note immediately in memory without progress modal and persists event/prep links in background without warnings', async () => {
     const callEvent = {
       id: 'ev-call-1',
       type: 'call',
@@ -338,33 +340,45 @@ describe('Planner Note Opening & Dual-Backend Manifest Indexing Pipeline', () =>
     };
     globalThis.plannerEvents = [callEvent, prepEvent];
 
-    const closeProgressSpy = vi.fn();
-    closeProgressSpy.updateStage = vi.fn();
-    globalThis.showPlannerNoteGenerationProgress = vi.fn(() => closeProgressSpy);
+    const warnSpy = vi.spyOn(console, 'warn');
+    const errorSpy = vi.spyOn(console, 'error');
+    const showProgressSpy = vi.fn();
+    globalThis.showPlannerNoteGenerationProgress = showProgressSpy;
 
-    vi.spyOn(StorageAPI, 'writeNoteContent').mockResolvedValue(true);
+    const writeNoteSpy = vi.spyOn(StorageAPI, 'writeNoteContent').mockResolvedValue(true);
     vi.spyOn(StorageAPI, 'writeNotesManifest').mockResolvedValue(true);
     vi.spyOn(StorageAPI, 'writeNotesManifestJS').mockResolvedValue(true);
     vi.spyOn(StorageAPI, 'writeMetadataBuffer').mockResolvedValue(true);
 
     let savePlannerResolvedBeforeOverlay = false;
     globalThis.savePlanner = vi.fn(async () => {
-      await new Promise((r) => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 10));
       savePlannerResolvedBeforeOverlay = true;
     });
-    globalThis.openNoteOverlay = vi.fn(() => {
-      expect(savePlannerResolvedBeforeOverlay).toBe(true);
+
+    let cachedHtmlAtOpen = null;
+    globalThis.openNoteOverlay = vi.fn((notePath) => {
+      expect(savePlannerResolvedBeforeOverlay).toBe(false);
+      cachedHtmlAtOpen = StorageAPI.getNoteFromCache(notePath);
     });
 
     await openNoteForEvent(callEvent);
 
+    expect(showProgressSpy).not.toHaveBeenCalled();
     expect(callEvent.noteId).toBeTruthy();
     expect(callEvent.linkedNoteIds).toEqual([callEvent.noteId]);
     expect(prepEvent.noteId).toBe(callEvent.noteId);
     expect(prepEvent.linkedNoteIds).toEqual([callEvent.noteId]);
-    expect(globalThis.savePlanner).toHaveBeenCalledTimes(1);
     expect(globalThis.openNoteOverlay).toHaveBeenCalledTimes(1);
-    expect(closeProgressSpy).toHaveBeenCalledTimes(1);
+    expect(cachedHtmlAtOpen).toContain('Client Architecture Call');
+    expect(writeNoteSpy).toHaveBeenCalledTimes(1);
+
+    // Wait for background persistence to settle
+    await new Promise((r) => setTimeout(r, 25));
+    expect(globalThis.savePlanner).toHaveBeenCalledTimes(1);
+    expect(savePlannerResolvedBeforeOverlay).toBe(true);
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   /**

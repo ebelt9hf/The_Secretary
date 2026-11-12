@@ -7319,7 +7319,7 @@ function openPlanEventModal(prefill = {}) {
       const existing = manifest.find(n => String(n?.id || '').trim() === currentNoteId);
       if (existing?.path) {
         if (typeof syncTagsBetweenBlocAndNote === 'function') {
-          await syncTagsBetweenBlocAndNote(event, existing);
+          syncTagsBetweenBlocAndNote(event, existing).catch(err => console.warn('Tag sync failed:', err));
         }
         openNoteOverlay(existing.path, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
         return;
@@ -7337,7 +7337,7 @@ function openPlanEventModal(prefill = {}) {
         const existingMain = manifest.find(n => String(n?.id || '').trim() === mainNoteId);
         if (existingMain?.path) {
           if (typeof syncTagsBetweenBlocAndNote === 'function') {
-            await syncTagsBetweenBlocAndNote(mainEv || event, existingMain);
+            syncTagsBetweenBlocAndNote(mainEv || event, existingMain).catch(err => console.warn('Tag sync failed:', err));
           }
           openNoteOverlay(existingMain.path, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: mainEv || event });
           return;
@@ -7345,11 +7345,6 @@ function openPlanEventModal(prefill = {}) {
       }
     }
 
-    const closeProgress = showPlannerNoteGenerationProgress(
-      t('planner.preparingTemplate') || 'Preparing template and formatting content...'
-    );
-    closeProgress.updateStage?.(t('planner.preparingTemplate') || 'Preparing template and formatting content...', '', 15);
-    await new Promise(r => setTimeout(r, 16));
     try {
       const noteId = generateNoteId();
       const notePath = getCanonicalNotePath(noteId);
@@ -7371,9 +7366,6 @@ function openPlanEventModal(prefill = {}) {
         mainHTML = mdToPreviewHTML(markdown);
       }
 
-      closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
-      await new Promise(r => setTimeout(r, 16));
-
       const note = {
         id: noteId,
         path: notePath,
@@ -7385,16 +7377,28 @@ function openPlanEventModal(prefill = {}) {
         extra_tags: [],
         mainHTML
       };
+      const fullHTML = buildNewNoteHTML(note);
 
-      await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+      if (StorageAPI?._noteCache) StorageAPI._noteCache.set(notePath, fullHTML);
+      if (window.AppBridge?.isElectron && typeof StorageAPI?._persistNoteTier1 === 'function') {
+        await StorageAPI._persistNoteTier1(noteId, notePath, fullHTML, note);
+      }
+
+      const persistPromise = Promise.all([
+        StorageAPI.writeNoteContent(notePath, fullHTML),
+        saveManifest({ force: true }),
+        rebuildIndexHTML(),
+        mainEv ? savePlanner() : Promise.resolve()
+      ]).then(() => {
+        renderFilterChips();
+        if (mainEv) renderPlanner();
+      }).catch(err => {
+        console.error('Failed to persist planner modal note:', err);
+        toast(t('planner.createNoteFailed', { message: err.message }), true);
+      });
+      void persistPromise;
+
       upsertManifest(note);
-
-      closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
-      await new Promise(r => setTimeout(r, 16));
-
-      await saveManifest({ force: true });
-      await rebuildIndexHTML();
-      renderFilterChips();
 
       event.noteId = noteId;
       event.group_tags = [...groupTags];
@@ -7409,22 +7413,17 @@ function openPlanEventModal(prefill = {}) {
         mainEv.topic_tags = [...topicTags];
         mainEv.tags = [...new Set([...groupTags, ...majorTags, ...topicTags])];
         mainEv.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...(mainEv.linkedNoteIds || [])], noteId);
-        await savePlanner();
-        renderPlanner();
       }
       if (hiddenInput) hiddenInput.value = noteId;
       _updatePlannerModalNoteActionButton(noteId);
       window.populatePlannerNoteSelector(noteId);
 
-      closeProgress.updateStage?.(t('planner.openingNoteEditor') || 'Opening note editor...', '', 95);
-      await new Promise(r => setTimeout(r, 16));
-
-      openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
+      if (typeof openNoteOverlay === 'function') {
+        openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
+      }
     } catch (err) {
       console.error('Failed to create planner modal note:', err);
       toast(t('planner.createNoteFailed', { message: err.message }), true);
-    } finally {
-      closeProgress();
     }
   };
 
@@ -9927,21 +9926,12 @@ async function createNoteForPlannerTodo(todoId) {
   const todo = getTodoById(todoId);
   if (!todo) return;
 
-  const closeProgress = showPlannerNoteGenerationProgress(
-    t('planner.preparingTemplate') || 'Preparing template and formatting content...'
-  );
-  closeProgress.updateStage?.(t('planner.preparingTemplate') || 'Preparing template and formatting content...', '', 15);
-  await new Promise(r => setTimeout(r, 16));
-
   const noteId = generateNoteId();
   const notePath = getCanonicalNotePath(noteId);
   const noteTitle = todo.title || 'Todo Note';
 
   const markdown = `# Todo Details\n\n- Todo ID: ${todo.id}\n- Priority: ${todo.priority}\n- Status: ${todo.status}\n\n# Tasks / Checklist\n\n- `;
   const mainHTML = mdToPreviewHTML(markdown);
-
-  closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
-  await new Promise(r => setTimeout(r, 16));
 
   const note = {
     id: noteId,
@@ -9954,20 +9944,20 @@ async function createNoteForPlannerTodo(todoId) {
     extra_tags: [],
     mainHTML
   };
+  const fullHTML = buildNewNoteHTML(note);
 
   try {
-    await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+    if (StorageAPI?._noteCache) StorageAPI._noteCache.set(notePath, fullHTML);
+    if (window.AppBridge?.isElectron && typeof StorageAPI?._persistNoteTier1 === 'function') {
+      await StorageAPI._persistNoteTier1(noteId, notePath, fullHTML, note);
+    }
     upsertManifest(note);
-
-    closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
-    await new Promise(r => setTimeout(r, 16));
 
     // Link todo to note
     todo.noteId = noteId;
-    // Save todos manifest
-    await saveTodosManifest();
 
     // Link event to note too if the planner event was selected and matches
+    let linkedPlannerEvent = false;
     if (selectedPlannerEventId) {
       const event = plannerEvents.find(e => e.id === selectedPlannerEventId);
       if (event && event.todoId === todoId) {
@@ -9981,26 +9971,32 @@ async function createNoteForPlannerTodo(todoId) {
             }
           });
         }
-        await savePlanner();
+        linkedPlannerEvent = true;
       }
     }
 
-    await saveManifest({ force: true });
-    await rebuildIndexHTML();
-    renderFilterChips();
-    broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString() });
-
-    closeProgress.updateStage?.(t('planner.openingNoteEditor') || 'Opening note editor...', '', 95);
-    await new Promise(r => setTimeout(r, 16));
-
     toast(t('planner.noteCreatedLinkedTodo'));
+    renderFilterChips();
     renderPlannerInspector();
     renderPlanner();
+
+    Promise.all([
+      StorageAPI.writeNoteContent(notePath, fullHTML),
+      saveTodosManifest(),
+      linkedPlannerEvent ? savePlanner() : Promise.resolve(),
+      saveManifest({ force: true }),
+      rebuildIndexHTML()
+    ]).then(() => {
+      if (typeof broadcastSync === 'function') {
+        broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString() });
+      }
+    }).catch(e => {
+      console.error('Failed to persist note for todo:', e);
+      toast(t('planner.createNoteFailed', { message: e.message }) || ('Failed to create note: ' + e.message), true);
+    });
   } catch (e) {
     console.error('Failed to create note for todo:', e);
     toast(t('planner.createNoteFailed', { message: e.message }) || ('Failed to create note: ' + e.message), true);
-  } finally {
-    closeProgress();
   }
 }
 
@@ -11953,16 +11949,18 @@ async function openNoteForEvent(event) {
       }
 
       if (sharedNoteId) {
-        savePlanner();
-        renderPlanner();
         const note = getNoteById(sharedNoteId);
         if (note) {
           if (typeof syncTagsBetweenBlocAndNote === 'function') {
-            await syncTagsBetweenBlocAndNote(mainEv || event, note);
+            syncTagsBetweenBlocAndNote(mainEv || event, note).catch(err => console.warn('Tag sync failed:', err));
           }
           openNoteOverlay(note.path, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: mainEv || event });
+          savePlanner();
+          renderPlanner();
           return;
         }
+        savePlanner();
+        renderPlanner();
       } else {
         await openNoteForEvent(mainEv);
         return;
@@ -11978,20 +11976,14 @@ async function openNoteForEvent(event) {
         const note = getNoteById(event.noteId);
         if (note) {
           if (typeof syncTagsBetweenBlocAndNote === 'function') {
-            await syncTagsBetweenBlocAndNote(event, note);
+            syncTagsBetweenBlocAndNote(event, note).catch(err => console.warn('Tag sync failed:', err));
           }
           openNoteOverlay(note.path, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
           return;
         }
       }
 
-      // Otherwise generate a NEW note that becomes this bloc's primary note. The task's origin note
-      // (todo.noteId), if any, is demoted to an associated note on both the bloc and the task.
-      const closeProgress = showPlannerNoteGenerationProgress(
-        t('planner.generatingTodoNoteMessage') || t('planner.generatingNoteMessage') || 'Please wait while the note is being generated...'
-      );
-      closeProgress.updateStage?.(t('planner.preparingTemplate') || 'Preparing template and formatting content...', '', 15);
-      await new Promise(r => setTimeout(r, 20));
+      // Otherwise generate a NEW note in memory, open immediately, and persist in the background.
       try {
         const noteId = generateNoteId();
         const notePath = getCanonicalNotePath(noteId);
@@ -12009,15 +12001,33 @@ async function openNoteForEvent(event) {
           extra_tags: [],
           mainHTML
         };
+        const fullHTML = buildNewNoteHTML(note);
 
-        closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
-        await new Promise(r => setTimeout(r, 16));
+        if (StorageAPI?._noteCache) StorageAPI._noteCache.set(notePath, fullHTML);
+        if (window.AppBridge?.isElectron && typeof StorageAPI?._persistNoteTier1 === 'function') {
+          await StorageAPI._persistNoteTier1(noteId, notePath, fullHTML, note);
+        }
 
-        await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+        const persistPromise = Promise.all([
+          StorageAPI.writeNoteContent(notePath, fullHTML),
+          saveTodosManifest(),
+          saveManifest({ force: true }),
+          rebuildIndexHTML(),
+          savePlanner()
+        ]).then(() => {
+          renderPlanner();
+          renderFilterChips();
+          if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+          if (typeof broadcastSync === 'function') {
+            broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString() });
+          }
+        }).catch(e => {
+          console.error('Failed to persist new note for todo bloc:', e);
+          toast(t('planner.createNoteFailed', { message: e.message }) || ('Failed to create note: ' + e.message), true);
+        });
+        void persistPromise;
+
         upsertManifest(note);
-
-        closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
-        await new Promise(r => setTimeout(r, 16));
 
         // Bloc: new note becomes primary; the origin note (if any) is kept as an associated note.
         const originNoteId = String(todo.noteId || '').trim();
@@ -12026,6 +12036,11 @@ async function openNoteForEvent(event) {
           [noteId, ...(originNoteId ? [originNoteId] : []), ...(event.linkedNoteIds || [])],
           noteId
         );
+        const liveTodoEv = Array.isArray(plannerEvents) ? plannerEvents.find(e => e && e.id === event.id) : null;
+        if (liveTodoEv && liveTodoEv !== event) {
+          liveTodoEv.noteId = event.noteId;
+          liveTodoEv.linkedNoteIds = [...event.linkedNoteIds];
+        }
 
         // Task: keep the origin note as its primary; add the new note as an associated note.
         // (If the task had no origin note, the new note becomes its primary — prior behaviour.)
@@ -12035,27 +12050,13 @@ async function openNoteForEvent(event) {
           if (!Array.isArray(todo.linkedNoteIds)) todo.linkedNoteIds = [];
           if (!todo.linkedNoteIds.includes(noteId)) todo.linkedNoteIds.push(noteId);
         }
-        await saveTodosManifest();
 
-        await saveManifest({ force: true });
-        await rebuildIndexHTML();
-        await savePlanner();
-        renderPlanner();
-        renderFilterChips();
-        if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
-        if (typeof broadcastSync === 'function') {
-          broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString() });
+        if (typeof openNoteOverlay === 'function') {
+          openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
         }
-
-        closeProgress.updateStage?.(t('planner.openingNoteEditor') || 'Opening note editor...', '', 95);
-        await new Promise(r => setTimeout(r, 16));
-
-        openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
       } catch (e) {
         console.error('Failed to create new note for todo bloc:', e);
         toast(t('planner.createNoteFailed', { message: e.message }) || ('Failed to create note: ' + e.message), true);
-      } finally {
-        closeProgress();
       }
       return;
     }
@@ -12067,7 +12068,7 @@ async function openNoteForEvent(event) {
     if (note) {
       if (!event.noteId && note.id) event.noteId = note.id;
       if (typeof syncTagsBetweenBlocAndNote === 'function') {
-        await syncTagsBetweenBlocAndNote(event, note);
+        syncTagsBetweenBlocAndNote(event, note).catch(err => console.warn('Tag sync failed:', err));
       }
       openNoteOverlay(note.path, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
       return;
@@ -12085,12 +12086,7 @@ async function openNoteForEvent(event) {
     return;
   }
 
-  // Create Call/Sync/Work/Custom note on demand!
-  const closeProgress = showPlannerNoteGenerationProgress(
-    t('planner.generatingEventNoteMessage') || t('planner.generatingNoteMessage') || 'Please wait while the note is being generated...'
-  );
-  closeProgress.updateStage?.(t('planner.preparingTemplate') || 'Preparing template and formatting content...', '', 15);
-  await new Promise(r => setTimeout(r, 20));
+  // Create Call/Sync/Work/Custom note on demand in memory and persist in the background!
   const noteId = generateNoteId();
   const notePath = getCanonicalNotePath(noteId);
   const noteTitle = event.title || 'Untitled Session';
@@ -12127,21 +12123,39 @@ async function openNoteForEvent(event) {
     extra_tags: [],
     mainHTML
   };
+  const fullHTML = buildNewNoteHTML(note);
 
   try {
-    closeProgress.updateStage?.(getPlannerNoteSavingStageText(), '', 45);
-    await new Promise(r => setTimeout(r, 16));
+    if (StorageAPI?._noteCache) StorageAPI._noteCache.set(notePath, fullHTML);
+    if (window.AppBridge?.isElectron && typeof StorageAPI?._persistNoteTier1 === 'function') {
+      await StorageAPI._persistNoteTier1(noteId, notePath, fullHTML, note);
+    }
 
-    await StorageAPI.writeNoteContent(notePath, buildNewNoteHTML(note));
+    const persistPromise = Promise.all([
+      StorageAPI.writeNoteContent(notePath, fullHTML),
+      savePlanner(),
+      saveManifest({ force: true }),
+      rebuildIndexHTML()
+    ]).then(() => {
+      renderPlanner();
+      renderFilterChips();
+    }).catch(err => {
+      console.error('Failed to persist note on demand:', err);
+      toast('Failed to create note: ' + err.message, true);
+    });
+    void persistPromise;
+
     upsertManifest(note);
-
-    closeProgress.updateStage?.(t('planner.linkingToPlanner') || 'Linking note to planner and updating indexes...', '', 75);
-    await new Promise(r => setTimeout(r, 16));
 
     event.noteId = noteId;
     const isNoteValid = id => id && (typeof getNoteById === 'function' ? !!getNoteById(id) : ((typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest.some(m => m && m.id === id) : false));
     const validExistingLinked = (event.linkedNoteIds || []).filter(isNoteValid);
     event.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...validExistingLinked], noteId);
+    const liveEv = Array.isArray(plannerEvents) ? plannerEvents.find(e => e && e.id === event.id) : null;
+    if (liveEv && liveEv !== event) {
+      liveEv.noteId = event.noteId;
+      liveEv.linkedNoteIds = [...event.linkedNoteIds];
+    }
 
     // Propagate noteId and linkedNoteIds to linked prep events
     if (event.type === 'call' || event.type === 'sync') {
@@ -12154,22 +12168,12 @@ async function openNoteForEvent(event) {
       });
     }
 
-    await savePlanner();
-    await saveManifest({ force: true });
-    await rebuildIndexHTML();
-
-    renderPlanner();
-    renderFilterChips();
-
-    closeProgress.updateStage?.(t('planner.openingNoteEditor') || 'Opening note editor...', '', 95);
-    await new Promise(r => setTimeout(r, 16));
-
-    openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
+    if (typeof openNoteOverlay === 'function') {
+      openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
+    }
   } catch (err) {
     console.error('Failed to create note on demand:', err);
     toast('Failed to create note: ' + err.message, true);
-  } finally {
-    closeProgress();
   }
 }
 
