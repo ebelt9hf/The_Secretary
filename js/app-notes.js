@@ -335,7 +335,15 @@ async function ensureTodosManifestFullyLoaded() {
   }
 }
 
+let _saveTodosQueue = Promise.resolve();
 async function saveTodosManifest(options = {}) {
+  const deletedIds = Array.isArray(options?.deletedIds) ? [...options.deletedIds] : [];
+  const run = _saveTodosQueue.then(() => _doSaveTodosManifest({ ...options, deletedIds }));
+  _saveTodosQueue = run.catch(() => {});
+  return run;
+}
+
+async function _doSaveTodosManifest(options = {}) {
   try {
     const deletedTodoIds = new Set((options.deletedIds || []).map(id => String(id)));
     // Advisory: signal intent to write so other windows can yield

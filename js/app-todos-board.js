@@ -2574,8 +2574,12 @@ async function confirmExecuteTodoMerge() {
           plannerChanged = true;
         }
       });
-      if (plannerChanged && typeof StorageAPI !== 'undefined' && StorageAPI.writePlanner) {
-        await StorageAPI.writePlanner({ events: window.plannerEvents });
+      if (plannerChanged) {
+        if (typeof savePlanner === 'function') {
+          await savePlanner();
+        } else if (typeof StorageAPI !== 'undefined' && StorageAPI.writePlanner) {
+          await StorageAPI.writePlanner({ events: window.plannerEvents });
+        }
       }
     }
 
@@ -4625,14 +4629,13 @@ function initScatterplotDragAndDrop() {
           todo.priority = (typeof EisenhowerUtils !== 'undefined')
             ? EisenhowerUtils.getPriorityForQuadrant(newQuad)
             : (newQuad === 'Q1' ? 'High' : newQuad === 'Q2' ? 'Medium' : 'Low');
-          try {
-            if (typeof StorageAPI !== 'undefined' && StorageAPI.writeTodosManifest) {
-              await StorageAPI.writeTodosManifest(todosManifest);
-            }
-          } catch (err) {
+          const persistTodos = typeof saveTodosManifest === 'function'
+            ? saveTodosManifest()
+            : (typeof StorageAPI !== 'undefined' && StorageAPI.writeTodosManifest ? StorageAPI.writeTodosManifest(todosManifest) : Promise.resolve());
+          persistTodos.catch(err => {
             console.warn('Could not write todos manifest', err);
             if (typeof toast === 'function') toast(t('common.saveFailed', { message: err.message }), true);
-          }
+          });
         }
 
       } else if (activeIsClusterCenter && clusterInitialTodos.length > 0) {
@@ -4657,14 +4660,13 @@ function initScatterplotDragAndDrop() {
             ? EisenhowerUtils.getPriorityForQuadrant(newQuad)
             : (newQuad === 'Q1' ? 'High' : newQuad === 'Q2' ? 'Medium' : 'Low');
         }
-        try {
-          if (typeof StorageAPI !== 'undefined' && StorageAPI.writeTodosManifest) {
-            await StorageAPI.writeTodosManifest(todosManifest);
-          }
-        } catch (err) {
+        const persistTodos = typeof saveTodosManifest === 'function'
+          ? saveTodosManifest()
+          : (typeof StorageAPI !== 'undefined' && StorageAPI.writeTodosManifest ? StorageAPI.writeTodosManifest(todosManifest) : Promise.resolve());
+        persistTodos.catch(err => {
           console.warn('Could not write todos manifest', err);
           if (typeof toast === 'function') toast(t('common.saveFailed', { message: err.message }), true);
-        }
+        });
 
       } else if (!activeIsClusterCenter) {
         // Solo dot drag (unchanged behaviour)
@@ -4686,14 +4688,13 @@ function initScatterplotDragAndDrop() {
           todo.priority = (typeof EisenhowerUtils !== 'undefined')
             ? EisenhowerUtils.getPriorityForQuadrant(newQuad)
             : (newQuad === 'Q1' ? 'High' : newQuad === 'Q2' ? 'Medium' : 'Low');
-          try {
-            if (typeof StorageAPI !== 'undefined' && StorageAPI.writeTodosManifest) {
-              await StorageAPI.writeTodosManifest(todosManifest);
-            }
-          } catch (err) {
+          const persistTodos = typeof saveTodosManifest === 'function'
+            ? saveTodosManifest()
+            : (typeof StorageAPI !== 'undefined' && StorageAPI.writeTodosManifest ? StorageAPI.writeTodosManifest(todosManifest) : Promise.resolve());
+          persistTodos.catch(err => {
             console.warn('Could not write todos manifest', err);
             if (typeof toast === 'function') toast(t('common.saveFailed', { message: err.message }), true);
-          }
+          });
         }
       }
 

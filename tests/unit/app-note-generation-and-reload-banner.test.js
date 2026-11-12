@@ -514,4 +514,54 @@ describe('Note Generation Progress Localization & Editor Reload Banner Isolation
     expect(currentBlocEvent.linkedNoteIds || []).not.toContain(note2Id);
     expect(globalThis.currentNote).toBeNull();
   });
+
+  /**
+   * 1. Protected Behavior: `handleSyncMessage` skips cache invalidation and reload warning banners for
+   *    `NOTE_SAVED` broadcasts with `isInitialCreate: true` or within 5 seconds of `_lastNoteOpenedAt`.
+   * 2. Regression Target: Background persistence of a newly created calendar note broadcasting `NOTE_SAVED`
+   *    to a freshly opened note window and triggering a false reload warning banner or cache eviction.
+   * 3. Coverage Overlap & Redundancy: None; existing reload banner tests only check `_lastNoteSelfSavedAt`.
+   * 4. Production Code Footprint: None; exercises authentic `handleSyncMessage` contract.
+   */
+  it('suppresses cache invalidation and reload warning on NOTE_SAVED when isInitialCreate is true or note was just opened', async () => {
+    const notePath = 'notes/note-cal-init-1.html';
+    const noteId = 'note-cal-init-1';
+    StorageAPI._noteCache.set(notePath, '<html><body>cached</body></html>');
+    globalThis.currentNote = { id: noteId, path: notePath, title: 'Cal Note', mainHTML: '<p>Body</p>' };
+    globalThis._lastNoteSelfSavedAt = 0;
+    globalThis._lastNoteOpenedAt = 0;
+
+    const invalidateSpy = vi.spyOn(StorageAPI, 'invalidateNoteCache');
+    const banner = document.getElementById('overlay-reload-banner');
+    banner.classList.remove('active');
+
+    await handleSyncMessage({
+      data: {
+        type: 'NOTE_SAVED',
+        senderId: 'other-window',
+        noteId,
+        path: notePath,
+        isInitialCreate: true,
+        msgId: 'msg-init-create-1'
+      }
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(StorageAPI.getNoteFromCache(notePath)).toBe('<html><body>cached</body></html>');
+    expect(banner.classList.contains('active')).toBe(false);
+
+    globalThis._lastNoteOpenedAt = Date.now();
+    await handleSyncMessage({
+      data: {
+        type: 'NOTE_SAVED',
+        senderId: 'other-window',
+        noteId,
+        path: notePath,
+        msgId: 'msg-just-opened-2'
+      }
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+    expect(banner.classList.contains('active')).toBe(false);
+  });
 });

@@ -3257,8 +3257,36 @@ const FirebaseSyncService = {
   },
 
   async flushQueue() {
+    if (this._activeFlushPromise) {
+      this._flushAgainRequested = true;
+      return this._activeFlushPromise;
+    }
+
+    this._flushAgainRequested = false;
+    this._activeFlushPromise = (async () => {
+      try {
+        do {
+          this._flushAgainRequested = false;
+          await this._doFlushQueue();
+        } while (
+          this._flushAgainRequested &&
+          (this.state.pendingQueue.size > 0 ||
+            (this.state.pendingDocsQueue && this.state.pendingDocsQueue.size > 0) ||
+            (this.state.pendingAssetsQueue && this.state.pendingAssetsQueue.size > 0))
+        );
+      } finally {
+        this._activeFlushPromise = null;
+        this._flushAgainRequested = false;
+      }
+    })();
+
+    return this._activeFlushPromise;
+  },
+
+  async _doFlushQueue() {
     if (this.state.syncTimer) clearTimeout(this.state.syncTimer);
     if (this.state.status === this.STATUS.DECLINED) {
+      this._flushAgainRequested = false;
       return;
     }
     if (this.state.pendingQueue.size === 0 && (!this.state.pendingDocsQueue || this.state.pendingDocsQueue.size === 0) && (!this.state.pendingAssetsQueue || this.state.pendingAssetsQueue.size === 0)) {
@@ -3269,6 +3297,7 @@ const FirebaseSyncService = {
 
     const isOnline = typeof navigator !== 'undefined' && navigator.onLine !== undefined ? navigator.onLine : true;
     if (!isOnline) {
+      this._flushAgainRequested = false;
       this.state.status = this.STATUS.OFFLINE;
       this._notifyStatus('Saved to local Firebase cache (offline)');
       return;

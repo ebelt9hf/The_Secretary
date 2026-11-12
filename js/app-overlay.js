@@ -1280,6 +1280,9 @@ let decisionPickerQuery = '';
 let _activeOpenNotePath = null;
 let _activeOpenNotePromise = null;
 let _isNoteLoading = false;
+let _lastNoteOpenedAt = 0;
+if (typeof window !== 'undefined') window._lastNoteOpenedAt = _lastNoteOpenedAt;
+if (typeof globalThis !== 'undefined') globalThis._lastNoteOpenedAt = _lastNoteOpenedAt;
 
 async function openNoteOverlay(path, prefillGroup, prefillMajor, isPop = false, prefillTopic = null, options = {}) {
   const normKey = String(path || '__new__');
@@ -1402,6 +1405,12 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
         extra_tags: (parsed.extra_tags && parsed.extra_tags.length) ? parsed.extra_tags : (meta.extra_tags || []),
         summary: parsed.summary || meta.summary || ''
       };
+      if (typeof upsertManifest === 'function' && currentNote.path) {
+        const curMan = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : [];
+        if (!curMan.some(m => m && m.path === currentNote.path)) {
+          upsertManifest(currentNote);
+        }
+      }
     } catch(e) {
       console.error('Could not open note content:', path, e);
       toast(t('common.couldNotOpenNote', { message: e.message }), true);
@@ -1542,6 +1551,11 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
   } else {
     overlay.style.zIndex = '1000';
   }
+
+  _isNoteLoading = false;
+  _lastNoteOpenedAt = Date.now();
+  if (typeof window !== 'undefined') window._lastNoteOpenedAt = _lastNoteOpenedAt;
+  if (typeof globalThis !== 'undefined') globalThis._lastNoteOpenedAt = _lastNoteOpenedAt;
 
   overlay.classList.remove('closing');
   overlay.classList.add('active');

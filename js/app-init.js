@@ -4744,7 +4744,7 @@ let _unsubscribeElectronSync = null;
 const _processedSyncMsgIds = new Set();
 
 async function handleSyncMessage(e) {
-  const { type, senderId, noteId, path, modified, msgId } = e.data || {};
+  const { type, senderId, noteId, path, modified, msgId, isInitialCreate } = e.data || {};
   if (senderId === _windowId) return; // ignore own messages
 
   // De-duplicate broadcast messages received via both BroadcastChannel and Electron IPC
@@ -4758,6 +4758,13 @@ async function handleSyncMessage(e) {
   }
 
   if (type === 'NOTE_SAVED') {
+    const isCurrentNote = (noteId && currentNote?.id === noteId) || (path && currentNote?.path === path);
+    const openedAt = (typeof _lastNoteOpenedAt !== 'undefined' ? _lastNoteOpenedAt : 0) ||
+                     (typeof window !== 'undefined' && window._lastNoteOpenedAt ? window._lastNoteOpenedAt : 0) ||
+                     (typeof globalThis !== 'undefined' && globalThis._lastNoteOpenedAt ? globalThis._lastNoteOpenedAt : 0);
+    if (isCurrentNote && currentNote && (isInitialCreate || (Date.now() - openedAt < 5000))) {
+      return;
+    }
     let existingMeta = (path && typeof metadataByPath !== 'undefined' && metadataByPath ? metadataByPath.get(path) : null) ||
                        (noteId && typeof metadataById !== 'undefined' && metadataById ? metadataById.get(noteId) : null);
     if (path) {
@@ -4775,7 +4782,6 @@ async function handleSyncMessage(e) {
     scheduleSyncRefresh({ manifest: true, filters: true, changedNote: existingMeta || { path, noteId } });
     try { await updateNoteInCollabIndex(path); } catch(err) {}
     
-    const isCurrentNote = (noteId && currentNote?.id === noteId) || (path && currentNote?.path === path);
     if (isCurrentNote && currentNote) {
       const now = Date.now();
       const selfSavedAt = (typeof _lastNoteSelfSavedAt !== 'undefined' ? _lastNoteSelfSavedAt : 0) ||

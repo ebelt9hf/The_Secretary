@@ -382,6 +382,40 @@ describe('Planner Note Opening & Dual-Backend Manifest Indexing Pipeline', () =>
   });
 
   /**
+   * 1. Protected Behavior: Concurrent `saveTodosManifest()` calls are serialized so an overlapping save
+   *    with a deletion (`deletedIds`) never races with an earlier in-flight save and resurrects the deleted todo.
+   * 2. Regression Target: Concurrent `readTodosManifest()` -> `writeTodosManifest()` calls interleaving and
+   *    clobbering deletions or updates made by the other call.
+   * 3. Coverage Overlap / Redundancy: None; no existing test verifies `saveTodosManifest()` serialization.
+   * 4. Production Code Footprint: None; exercises authentic `saveTodosManifest()` contract.
+   */
+  it('serializes concurrent saveTodosManifest calls so deletions are not clobbered by in-flight saves', async () => {
+    let persistedTodos = [
+      { id: 'todo-keep', title: 'Keep me', priority: 'Medium', status: 'todo' },
+      { id: 'todo-del', title: 'Delete me', priority: 'Low', status: 'todo' }
+    ];
+    globalThis.todosManifest = persistedTodos.map(t => ({ ...t }));
+
+    vi.spyOn(StorageAPI, 'readTodosManifest').mockImplementation(async () => {
+      await new Promise(r => setTimeout(r, 8));
+      return persistedTodos.map(t => ({ ...t }));
+    });
+    const writeSpy = vi.spyOn(StorageAPI, 'writeTodosManifest').mockImplementation(async (next) => {
+      await new Promise(r => setTimeout(r, 10));
+      persistedTodos = next.map(t => ({ ...t }));
+    });
+
+    const p1 = saveTodosManifest();
+    globalThis.todosManifest = globalThis.todosManifest.filter(t => t.id !== 'todo-del');
+    const p2 = saveTodosManifest({ deletedIds: ['todo-del'] });
+
+    await Promise.all([p1, p2]);
+
+    expect(writeSpy).toHaveBeenCalledTimes(2);
+    expect(persistedTodos.map(t => t.id)).toEqual(['todo-keep']);
+  });
+
+  /**
    * 1. Protected Behavior: `writeFile()` coalesces concurrent pending writes to the same file path so a burst of writes
    *    while one write is in flight executes at most 2 physical disk writes (the in-flight write + 1 coalesced write with
    *    the latest content) and resolves all callers once the latest payload is persisted.

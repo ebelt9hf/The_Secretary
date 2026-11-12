@@ -9988,7 +9988,7 @@ async function createNoteForPlannerTodo(todoId) {
       rebuildIndexHTML()
     ]).then(() => {
       if (typeof broadcastSync === 'function') {
-        broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString() });
+        broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString(), isInitialCreate: true });
       }
     }).catch(e => {
       console.error('Failed to persist note for todo:', e);
@@ -12019,7 +12019,7 @@ async function openNoteForEvent(event) {
           renderFilterChips();
           if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
           if (typeof broadcastSync === 'function') {
-            broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString() });
+            broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString(), isInitialCreate: true });
           }
         }).catch(e => {
           console.error('Failed to persist new note for todo bloc:', e);

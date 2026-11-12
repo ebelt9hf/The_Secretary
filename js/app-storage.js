@@ -590,28 +590,8 @@ const StorageAPI = {
     await this._persistDocTier1(docKind, docId, payload);
 
     // 3. Dispatch to Connector Sync Queue
-    try {
-      await Promise.race([
-        this._processSyncQueue(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
-      ]);
-      if (syncItem.superseded) {
-        return;
-      }
-      if (syncItem.error) {
-        if (!syncItem.error?.message?.includes('No root folder handle loaded') && !syncItem.error?.message?.includes('FileSystemDirectoryHandle not available')) {
-          throw syncItem.error;
-        }
-      }
-    } catch (e) {
-      if (syncItem.superseded) {
-        return;
-      }
-      if (!e?.message?.includes('No root folder handle loaded') && !e?.message?.includes('FileSystemDirectoryHandle not available')) {
-        console.warn('[StorageAPI] writeDocEntity sync error:', e);
-        throw e;
-      }
-    }
+    const shouldEmit = await this._awaitSyncItem(syncItem, { operation: 'writeDocEntity', ignoreMissingRoot: true });
+    if (!shouldEmit) return;
 
     this.emit('storage:change', { entity: 'docs', kind: docKind, id: docId, action: 'save' });
   },
@@ -634,28 +614,8 @@ const StorageAPI = {
     await this._deleteDocTier1(docKind, docId);
 
     // 3. Process sync queue
-    try {
-      await Promise.race([
-        this._processSyncQueue(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
-      ]);
-      if (syncItem.superseded) {
-        return;
-      }
-      if (syncItem.error) {
-        if (!syncItem.error?.message?.includes('No root folder handle loaded') && !syncItem.error?.message?.includes('FileSystemDirectoryHandle not available')) {
-          throw syncItem.error;
-        }
-      }
-    } catch (e) {
-      if (syncItem.superseded) {
-        return;
-      }
-      if (!e?.message?.includes('No root folder handle loaded') && !e?.message?.includes('FileSystemDirectoryHandle not available')) {
-        console.warn('[StorageAPI] deleteDocEntity sync error:', e);
-        throw e;
-      }
-    }
+    const shouldEmit = await this._awaitSyncItem(syncItem, { operation: 'deleteDocEntity', ignoreMissingRoot: true });
+    if (!shouldEmit) return;
 
     this.emit('storage:change', { entity: 'docs', kind: docKind, id: docId, action: 'delete' });
   },
@@ -1097,6 +1057,44 @@ const StorageAPI = {
     return this._activeSyncQueuePromise;
   },
 
+  async _awaitSyncItem(syncItem, { operation = 'sync', ignoreMissingRoot = false } = {}) {
+    let timeoutId = null;
+    try {
+      await Promise.race([
+        this._processSyncQueue(),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000);
+        })
+      ]);
+      if (syncItem.superseded) {
+        return false;
+      }
+      if (syncItem.error) {
+        const msg = syncItem.error?.message || '';
+        const isMissingRoot = msg.includes('No root folder handle loaded') || msg.includes('FileSystemDirectoryHandle not available');
+        if (!ignoreMissingRoot || !isMissingRoot) {
+          throw syncItem.error;
+        }
+      }
+      return true;
+    } catch (e) {
+      if (syncItem.superseded) {
+        return false;
+      }
+      const msg = e?.message || '';
+      const isMissingRoot = msg.includes('No root folder handle loaded') || msg.includes('FileSystemDirectoryHandle not available');
+      if (ignoreMissingRoot && isMissingRoot) {
+        return true;
+      }
+      console.warn(`[StorageAPI] ${operation} sync error:`, e);
+      throw e;
+    } finally {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    }
+  },
+
   clearNoteCache() {
     this._noteCache.clear();
     this.clearSyncQueue();
@@ -1258,24 +1256,8 @@ const StorageAPI = {
     };
     this._enqueueSync(syncItem);
 
-    try {
-      await Promise.race([
-        this._processSyncQueue(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
-      ]);
-      if (syncItem.superseded) {
-        return;
-      }
-      if (syncItem.error) {
-        throw syncItem.error;
-      }
-    } catch (e) {
-      if (syncItem.superseded) {
-        return;
-      }
-      console.warn('[StorageAPI] writeNoteContent sync error:', e);
-      throw e;
-    }
+    const shouldEmit = await this._awaitSyncItem(syncItem, { operation: 'writeNoteContent' });
+    if (!shouldEmit) return;
 
     this.emit('storage:change', { entity: 'notes', id: cleanId, path, action: 'save' });
   },
@@ -1297,24 +1279,8 @@ const StorageAPI = {
     };
     this._enqueueSync(syncItem);
 
-    try {
-      await Promise.race([
-        this._processSyncQueue(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000))
-      ]);
-      if (syncItem.superseded) {
-        return;
-      }
-      if (syncItem.error) {
-        throw syncItem.error;
-      }
-    } catch (e) {
-      if (syncItem.superseded) {
-        return;
-      }
-      console.warn('[StorageAPI] deleteNoteContent sync error:', e);
-      throw e;
-    }
+    const shouldEmit = await this._awaitSyncItem(syncItem, { operation: 'deleteNoteContent' });
+    if (!shouldEmit) return;
 
     this.emit('storage:change', { entity: 'notes', id: cleanId, path: targetPath, action: 'delete' });
   },

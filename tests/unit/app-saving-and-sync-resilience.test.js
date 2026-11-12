@@ -91,6 +91,84 @@ describe('Saving, Synchronization & Progress Resilience Architecture (Track A)',
     });
 
     /**
+     * 1. Protected Behavior: Concurrent flushQueue() invocations are serialized so an in-flight cloud upload is never duplicated in parallel and newly queued revisions are flushed in order after the active pass completes.
+     * 2. Regression Target: Two concurrent flushQueue() calls snapshotting and uploading the same item simultaneously or overwriting a newer revision out of order.
+     * 3. Coverage Overlap: None; tests concurrency serialization of FirebaseSyncService.flushQueue.
+     * 4. Production Code Footprint: Tests authentic FirebaseSyncService.flushQueue without test-only production flags.
+     */
+    it('serializes concurrent flushQueue calls so overlapping flushes do not upload the same note in parallel or out of order', async () => {
+      FirebaseSyncService.state.engine = 'firebase';
+      FirebaseSyncService.state.isUnlocked = true;
+      FirebaseSyncService.state.userId = 'user_test_123';
+      FirebaseSyncService.state.masterKey = 'mock_key';
+      FirebaseSyncService.state.status = FirebaseSyncService.STATUS.SYNCING;
+      FirebaseSyncService.state.pendingQueue = new Map();
+      FirebaseSyncService.state.pendingDocsQueue = new Map();
+      FirebaseSyncService.state.pendingAssetsQueue = new Map();
+
+      let inFlightUploads = 0;
+      let maxConcurrentUploads = 0;
+      const uploadedOrder = [];
+      let releaseFirstUpload = null;
+      let markFirstUploadStarted = null;
+      const firstUploadStarted = new Promise(resolve => { markFirstUploadStarted = resolve; });
+      const firstUploadGate = new Promise(resolve => { releaseFirstUpload = resolve; });
+      let callCount = 0;
+
+      const mockBridge = {
+        saveNoteMeta: vi.fn(async (_uid, id, encMeta) => {
+          callCount++;
+          inFlightUploads++;
+          maxConcurrentUploads = Math.max(maxConcurrentUploads, inFlightUploads);
+          uploadedOrder.push(`${id}@${encMeta.updatedAt}`);
+          if (callCount === 1) {
+            markFirstUploadStarted();
+            await firstUploadGate;
+          }
+          inFlightUploads--;
+        }),
+        saveNoteBody: vi.fn().mockResolvedValue(undefined)
+      };
+      vi.spyOn(FirebaseSyncService, '_getBridge').mockReturnValue(mockBridge);
+      vi.spyOn(CryptoEngine, 'encryptData').mockResolvedValue({ iv: 'mock_iv', ciphertext: 'mock_cipher' });
+
+      FirebaseSyncService.state.pendingQueue.set('note-race-1', {
+        id: 'note-race-1',
+        title: 'Rev 1',
+        contentHtml: '<p>v1</p>',
+        updatedAt: 1000
+      });
+
+      const firstFlush = FirebaseSyncService.flushQueue();
+      try {
+        await firstUploadStarted;
+
+        // Queue a newer revision while first flush is still in flight and trigger a second flush
+        FirebaseSyncService.state.pendingQueue.set('note-race-1', {
+          id: 'note-race-1',
+          title: 'Rev 2',
+          contentHtml: '<p>v2</p>',
+          updatedAt: 2000
+        });
+        const secondFlush = FirebaseSyncService.flushQueue();
+
+        // Neither should overlap concurrently
+        expect(maxConcurrentUploads).toBe(1);
+        expect(callCount).toBe(1);
+
+        releaseFirstUpload();
+        await Promise.all([firstFlush, secondFlush]);
+
+        expect(maxConcurrentUploads).toBe(1);
+        expect(uploadedOrder).toEqual(['note-race-1@1000', 'note-race-1@2000']);
+        expect(FirebaseSyncService.state.pendingQueue.size).toBe(0);
+      } finally {
+        releaseFirstUpload();
+        await firstFlush.catch(() => {});
+      }
+    });
+
+    /**
      * 1. Protected Behavior: flushQueue() removes items from pendingQueue only upon successful cloud write acknowledgement.
      * 2. Regression Target: Items never being removed or corrupting queue state on success.
      * 3. Coverage Overlap: None; verifies successful two-phase flush commit.

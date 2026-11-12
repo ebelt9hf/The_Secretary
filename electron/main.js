@@ -632,12 +632,40 @@ ipcMain.on('app-close-confirmed', () => {
 
 ipcMain.handle('request-save-all-windows', async () => {
   const noteWins = Array.from(new Set(Array.from(openNoteWindows.values()))).filter(w => w && !w.isDestroyed());
-  for (const win of noteWins) {
-    try {
-      win.webContents.send('request-save-window');
-    } catch (e) {}
-  }
-  await new Promise(r => setTimeout(r, 150));
+  if (noteWins.length === 0) return true;
+
+  const pendingIds = new Set(noteWins.map(w => w.webContents.id));
+  await new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      ipcMain.removeListener('note-save-complete', onComplete);
+      resolve();
+    };
+    const onComplete = (event) => {
+      if (event?.sender?.id != null) {
+        pendingIds.delete(event.sender.id);
+      }
+      if (pendingIds.size === 0) {
+        finish();
+      }
+    };
+    ipcMain.on('note-save-complete', onComplete);
+    timer = setTimeout(finish, 2000);
+    for (const win of noteWins) {
+      try {
+        win.webContents.send('request-save-window');
+      } catch (e) {
+        pendingIds.delete(win.webContents.id);
+      }
+    }
+    if (pendingIds.size === 0) {
+      finish();
+    }
+  });
   return true;
 });
 
