@@ -37,7 +37,7 @@
   "author": "Etienne Beltzung <etienne.beltzung@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.2",
+    "concurrently": "^10.0.7",
     "electron": "^42.11.16",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
