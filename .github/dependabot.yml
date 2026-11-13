@@ -8,11 +8,27 @@ updates:
       day: "monday"
     open-pull-requests-limit: 10
     groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
       dev-dependencies:
         dependency-type: "development"
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # Avoid noisy automated major framework bumps; handle major upgrades intentionally
+      - dependency-name: "electron"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "electron-builder"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "happy-dom"
+        update-types: ["version-update:semver-major"]
 
   # Keep GitHub Actions workflows up to date
   - package-ecosystem: "github-actions"
@@ -25,4 +41,3 @@ updates:
       github-actions:
         patterns:
           - "*"
-
