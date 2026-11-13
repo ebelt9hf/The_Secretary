@@ -79,7 +79,7 @@ def update_app_html(version: str):
         new_content = re.sub(r'\?v=[0-9]+\.[0-9]+\.[0-9]+', f'?v={version}', content)
         
         # 2. Update landing page connect-version-hint if present
-        hint_pattern = r'(<p\s+id="connect-version-hint"\s+data-version=")[^"]*(".*?>)Version\s+[^<]*(</p>)'
+        hint_pattern = r'(<(?:p|span)\s+id="connect-version-hint"\s+data-version=")[^"]*(".*?>)Version\s+[^<]*(</(?:p|span)>)'
         new_content = re.sub(
             hint_pattern,
             rf'\g<1>{version}\g<2>Version {version}\g<3>',
