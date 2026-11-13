@@ -2651,6 +2651,26 @@ async function rebuildNoteGraphIndex(options = {}) {
     }
   });
 
+  const idb = (typeof VaultIDBStorage !== 'undefined' ? VaultIDBStorage : null) || (typeof window !== 'undefined' ? window.VaultIDBStorage : null);
+  const wikiLinkRegex = /\[\[([^\]]+)\]\]/g;
+
+  const extractLinksForNote = (note, content) => {
+    const outgoing = new Set();
+    // Exclude code and pre blocks from wikilink parsing
+    const cleanContent = String(content || '').replace(/<pre[\s\S]*?<\/pre>/gi, '').replace(/<code[\s\S]*?<\/code>/gi, '');
+    wikiLinkRegex.lastIndex = 0;
+    let m;
+    while ((m = wikiLinkRegex.exec(cleanContent)) !== null) {
+      const targetTitle = m[1].trim().toLowerCase();
+      const targetPath = titleToPathMap.get(targetTitle);
+      if (targetPath && targetPath !== note.path) {
+        outgoing.add(targetPath);
+      }
+    }
+    forwardLinks.set(note.path, outgoing);
+  };
+
+  const missingNotes = [];
   for (const note of manifest) {
     if (!note || !note.path) continue;
     const path = note.path;
@@ -2661,27 +2681,37 @@ async function rebuildNoteGraphIndex(options = {}) {
     if (!content && typeof currentNote !== 'undefined' && currentNote && currentNote.path === path) {
       content = currentNote.mainHTML || currentNote.originalHTML || '';
     }
-    if (!content && options?.fetchDisk && typeof StorageAPI !== 'undefined' && StorageAPI.readNoteContent) {
-      try {
-        const raw = await StorageAPI.readNoteContent(path);
-        content = typeof raw === 'string' ? raw : (raw?.text || '');
-        if (content) noteContentCache[path] = { modified: note.modified || '', text: content };
-      } catch(e) {}
-    }
 
-    const outgoing = new Set();
-    // Exclude code and pre blocks from wikilink parsing
-    const cleanContent = String(content || '').replace(/<pre[\s\S]*?<\/pre>/gi, '').replace(/<code[\s\S]*?<\/code>/gi, '');
-    const wikiLinkRegex = /\[\[([^\]]+)\]\]/g;
-    let m;
-    while ((m = wikiLinkRegex.exec(cleanContent)) !== null) {
-      const targetTitle = m[1].trim().toLowerCase();
-      const targetPath = titleToPathMap.get(targetTitle);
-      if (targetPath && targetPath !== path) {
-        outgoing.add(targetPath);
-      }
+    if (!content && options?.fetchDisk) {
+      missingNotes.push(note);
+      continue;
     }
-    forwardLinks.set(path, outgoing);
+    extractLinksForNote(note, content);
+  }
+
+  if (missingNotes.length > 0) {
+    const CONCURRENCY = 16;
+    for (let i = 0; i < missingNotes.length; i += CONCURRENCY) {
+      const chunk = missingNotes.slice(i, i + CONCURRENCY);
+      await Promise.all(chunk.map(async (note) => {
+        const path = note.path;
+        let content = '';
+        if (idb && typeof idb.getNote === 'function') {
+          try {
+            const cleanId = path.replace(/^notes\//, '').replace(/\.html$/, '');
+            const rec = await idb.getNote(cleanId) || await idb.getNote(path);
+            if (rec && rec.content) content = rec.content;
+          } catch (e) {}
+        }
+        if (!content && typeof StorageAPI !== 'undefined' && StorageAPI.readNoteContent) {
+          try {
+            const raw = await StorageAPI.readNoteContent(path);
+            content = typeof raw === 'string' ? raw : (raw?.text || '');
+          } catch (e) {}
+        }
+        extractLinksForNote(note, content);
+      }));
+    }
   }
 
   forwardLinks.forEach((targets, sourcePath) => {
@@ -2697,7 +2727,8 @@ async function rebuildNoteGraphIndex(options = {}) {
     forwardLinks,
     backlinks,
     titleToPathMap,
-    isHydrated: true
+    isHydrated: true,
+    includesDiskScan: Boolean(options?.fetchDisk)
   };
 
   if (typeof StateBus !== 'undefined') {

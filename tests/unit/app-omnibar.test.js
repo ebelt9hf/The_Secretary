@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { loadScriptsIntoGlobal } from '../helpers/load-globals.js';
 
@@ -957,6 +959,38 @@ describe('Omnibar Engine & Parameter Indicator (app-omnibar.js)', () => {
       expect(globalThis.todosManifest).toHaveLength(2);
       expect(globalThis.todosManifest[1].eisenhowerQuadrant).toBe('Q3');
       expect(globalThis.todosManifest[1].priority).toBe('Low');
+    });
+
+    it('avoids duplicate IDs, toggles segmented-mode class, focuses segmented input, and keeps .omnibar-input-area unclipped', () => {
+      OmnibarController.open();
+
+      const container = document.getElementById('omnibar-container');
+      expect(container.classList.contains('segmented-mode')).toBe(true);
+
+      // Must not create duplicate IDs in the DOM
+      expect(document.querySelectorAll('#omnibar-input').length).toBe(1);
+      expect(document.querySelectorAll('#omnibar-type-btn').length).toBe(1);
+
+      OmnibarController.openCombo(0);
+      expect(document.querySelectorAll('#omnibar-type-menu').length).toBe(1);
+
+      // focusSection(1) must focus the segmented bar input, not the hidden legacy input
+      OmnibarController.focusSection(1);
+      const segmentedInput = document.querySelector('#omnibar-segmented-bar .omnibar-section-input');
+      expect(segmentedInput).not.toBeNull();
+      expect(document.activeElement).toBe(segmentedInput);
+
+      // setType('block') in segmented mode must update the segmented bar sections
+      OmnibarController.setType('block');
+      const sections = document.querySelectorAll('#omnibar-segmented-bar .omnibar-section');
+      expect(sections.length).toBeGreaterThan(2);
+
+      // CSS .omnibar-input-area must allow overflow so dropdowns and wrapped rows are not clipped
+      const omnibarCss = fs.readFileSync(path.resolve(process.cwd(), 'css/app-omnibar.css'), 'utf8');
+      const inputAreaMatch = omnibarCss.match(/\.omnibar-input-area\s*\{[^}]*\}/);
+      expect(inputAreaMatch).not.toBeNull();
+      expect(inputAreaMatch[0]).not.toMatch(/overflow\s*:\s*hidden/);
+      expect(inputAreaMatch[0]).not.toMatch(/(?:^|[\s;])height\s*:\s*38px/);
     });
   });
 });

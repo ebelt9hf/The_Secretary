@@ -224,9 +224,15 @@
   flex: 1;
   display: flex;
   align-items: center;
-  overflow: hidden;
+  overflow: visible;
   min-height: 38px;
-  height: 38px;
+  height: auto;
+}
+
+.omnibar-container.segmented-mode .omnibar-type-selector-wrapper,
+.omnibar-container.segmented-mode .omnibar-ghost-layer,
+.omnibar-container.segmented-mode .omnibar-input-area > .omnibar-input {
+  display: none !important;
 }
 
 .omnibar-param-indicator {

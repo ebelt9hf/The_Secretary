@@ -227,7 +227,7 @@ const OmnibarController = {
         overlay.classList.remove('active', 'closing');
         overlay._closeTimer = null;
         if (container) {
-          container.classList.remove('wide', 'theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call');
+          container.classList.remove('wide', 'segmented-mode', 'theme-decision', 'theme-todo', 'theme-block', 'theme-note', 'theme-call');
           container.removeAttribute('data-urgency');
         }
         if (results) results.style.display = 'none';
@@ -327,8 +327,13 @@ const OmnibarController = {
     }
 
     if (typeId === 'search') {
+      const container = document.getElementById('omnibar-container');
+      const segmentedBar = document.getElementById('omnibar-segmented-bar');
+      if (container) container.classList.remove('segmented-mode', 'wide');
+      if (segmentedBar) segmentedBar.style.display = 'none';
       this.performLiveSearch();
     } else {
+      this.translateSectionState(typeId);
       this.renderLivePreview();
     }
   },
@@ -1111,6 +1116,7 @@ const OmnibarController = {
 
     if (segmentedBar) segmentedBar.style.display = 'flex';
     if (container) {
+      container.classList.add('segmented-mode');
       if (['block', 'call'].includes(action)) {
         container.classList.add('wide');
       } else {
@@ -1434,7 +1440,7 @@ const OmnibarController = {
         // Free-text section
         html += `
           <div class="omnibar-section omnibar-section-freetext${isActive ? ' active' : ''}" data-section-index="${idx}" onclick="OmnibarController.onSectionClick(${idx})" role="textbox">
-            <input type="text" class="omnibar-section-input" id="omnibar-input" value="${escH(sec.value || '')}" placeholder="${escH(sec.placeholder || '')}" autocomplete="off" spellcheck="false" oninput="OmnibarController.onFreeTextInput(this.value)" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})">
+            <input type="text" class="omnibar-section-input" id="omnibar-segmented-input" value="${escH(sec.value || '')}" placeholder="${escH(sec.placeholder || '')}" autocomplete="off" spellcheck="false" oninput="OmnibarController.onFreeTextInput(this.value)" onkeydown="OmnibarController.onSectionKeyDown(event, ${idx})">
           </div>
         `;
       } else {
@@ -1455,7 +1461,7 @@ const OmnibarController = {
           } else {
             const items = sec.options || [];
             dropdownHtml = `
-              <div class="omnibar-section-combo" id="${idx === 0 ? 'omnibar-type-menu' : `omnibar-combo-${idx}`}" role="listbox">
+              <div class="omnibar-section-combo" id="omnibar-combo-${idx}" role="listbox">
                 ${items.map((opt, oIdx) => `
                   <div class="omnibar-combo-item${oIdx === this.segmentedState.comboSelectedIndex ? ' selected' : ''}" onclick="event.stopPropagation(); OmnibarController.selectComboOption(${idx}, '${escH(opt.id)}')">
                     <span>${opt.icon || '•'}</span>
@@ -1468,8 +1474,8 @@ const OmnibarController = {
           }
         }
 
-        const idAttr = idx === 0 ? ' id="omnibar-type-btn"' : '';
-        const labelIdAttr = idx === 0 ? ' id="omnibar-type-btn-label"' : '';
+        const idAttr = '';
+        const labelIdAttr = '';
         const titleTooltip = sec.type === 'action' ? (t('omnibar.typeSelectorTooltip') || 'Select entry type') : `${sec.label}: ${sec.displayValue || sec.value || ''}`;
 
         html += `
@@ -1599,7 +1605,7 @@ const OmnibarController = {
     } else {
       this.closeCombo();
       this.renderSegmentedBar();
-      const inputEl = document.getElementById('omnibar-input');
+      const inputEl = document.getElementById('omnibar-segmented-input') || document.getElementById('omnibar-input');
       if (inputEl) inputEl.focus();
     }
   },
@@ -1730,7 +1736,7 @@ const OmnibarController = {
     if (!sec.isSelective) {
       this.closeCombo();
       this.renderSegmentedBar();
-      const inputEl = document.getElementById('omnibar-input');
+      const inputEl = document.getElementById('omnibar-segmented-input') || document.getElementById('omnibar-input');
       if (inputEl) {
         inputEl.focus();
         inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;

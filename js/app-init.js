@@ -650,16 +650,55 @@ function bindResponsiveLayoutHooks() {
   }
 }
 
+let _themeMediaListenerBound = false;
+let _themeStorageListenerBound = false;
+
+function _syncThemeAttributes(themeVal) {
+  const normalized = (themeVal === 'dark' || themeVal === 'light') ? themeVal : 'system';
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  if (meta) {
+    meta.content = normalized === 'system' ? 'light dark' : normalized;
+  }
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const resolved = normalized === 'system' ? (prefersDark ? 'dark' : 'light') : normalized;
+  document.documentElement.setAttribute('data-theme', resolved);
+  if (document.body) {
+    document.body.setAttribute('data-theme', resolved);
+  }
+}
+
 function applySettings() {
   // theme attribute (dark/light/system)
   const themeVal = (settings.ui && settings.ui.theme) || 'system';
-  if (themeVal === 'system') {
-    document.body.removeAttribute('data-theme');
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.body.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-  } else {
-    document.body.setAttribute('data-theme', themeVal === 'dark' ? 'dark' : 'light');
+  _syncThemeAttributes(themeVal);
+
+  if (!_themeMediaListenerBound && window.matchMedia) {
+    _themeMediaListenerBound = true;
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const onSchemeChange = () => {
+        const curTheme = (settings.ui && settings.ui.theme) || 'system';
+        if (curTheme === 'system') _syncThemeAttributes('system');
+      };
+      if (typeof mq.addEventListener === 'function') mq.addEventListener('change', onSchemeChange);
+      else if (typeof mq.addListener === 'function') mq.addListener(onSchemeChange);
+    } catch (e) {}
   }
+
+  if (!_themeStorageListenerBound && typeof window !== 'undefined') {
+    _themeStorageListenerBound = true;
+    window.addEventListener('storage', (ev) => {
+      if (ev.key === 'secretaryLocalSettings' && ev.newValue) {
+        try {
+          const parsed = JSON.parse(ev.newValue);
+          const nextTheme = (parsed && parsed.ui && parsed.ui.theme) || 'system';
+          if (settings.ui) settings.ui.theme = nextTheme;
+          _syncThemeAttributes(nextTheme);
+        } catch (e) {}
+      }
+    });
+  }
+
   if (window.AppBridge?.theme?.notifyChanged) {
     window.AppBridge.theme.notifyChanged(themeVal);
   }
