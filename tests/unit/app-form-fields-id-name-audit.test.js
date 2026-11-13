@@ -26,11 +26,16 @@ describe('Form Fields id and name Deployment Audit', () => {
 
       const rawContent = fs.readFileSync(fullPath, 'utf8');
 
-      // Strip comments (multi-line, single-line, HTML comments)
-      const cleanContent = rawContent
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/\/\/.*$/gm, '')
-        .replace(/<!--[\s\S]*?-->/g, '');
+      // Strip comments (multi-line, single-line, HTML comments) iteratively until fixed point
+      let cleanContent = rawContent;
+      let prevContent;
+      do {
+        prevContent = cleanContent;
+        cleanContent = cleanContent
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+          .replace(/\/\/.*$/gm, '')
+          .replace(/<!--[\s\S]*?-->/g, '');
+      } while (cleanContent !== prevContent);
 
       let match;
       while ((match = pattern.exec(cleanContent)) !== null) {
