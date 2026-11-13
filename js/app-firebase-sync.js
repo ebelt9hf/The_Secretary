@@ -134,6 +134,44 @@ const FirebaseSyncService = {
     return (hash >>> 0).toString(16);
   },
 
+  RECENT_NOTES_WINDOW_MS: 28 * 24 * 60 * 60 * 1000, // 4 weeks
+  LOCAL_CACHE_LIMIT: 250,
+
+  _isRecentNoteTimestamp(tsOrEntry, windowMs = null) {
+    const win = windowMs || this.RECENT_NOTES_WINDOW_MS;
+    const cutoff = Date.now() - win;
+    if (typeof tsOrEntry === 'number') {
+      return tsOrEntry >= cutoff;
+    }
+    if (tsOrEntry && typeof tsOrEntry === 'object') {
+      const candidates = [tsOrEntry.updatedAt, tsOrEntry.modified, tsOrEntry.date];
+      for (const val of candidates) {
+        if (!val) continue;
+        const ms = typeof val === 'number' ? val : Date.parse(String(val));
+        if (!Number.isNaN(ms) && ms >= cutoff) return true;
+      }
+      return false;
+    }
+    return false;
+  },
+
+  _setLocalCache(cleanId, record) {
+    if (!cleanId || !this.state?.localCache) return;
+    if (this.state.localCache.has(cleanId)) {
+      this.state.localCache.delete(cleanId);
+    }
+    this.state.localCache.set(cleanId, record);
+    const limit = this.LOCAL_CACHE_LIMIT || 250;
+    if (this.state.localCache.size > limit) {
+      for (const oldestKey of this.state.localCache.keys()) {
+        if (this.state.localCache.size <= limit) break;
+        if (oldestKey === cleanId) continue;
+        if (this.state.pendingQueue && this.state.pendingQueue.has(oldestKey)) continue;
+        this.state.localCache.delete(oldestKey);
+      }
+    }
+  },
+
   validateSchemaCompatibility(recordOrMeta) {
     if (!recordOrMeta || typeof recordOrMeta !== 'object') return true;
     const ver = recordOrMeta.schemaVersion;
@@ -945,6 +983,160 @@ const FirebaseSyncService = {
       clearTimeout(this._vaultRetryTimer);
       this._vaultRetryTimer = null;
     }
+    if (typeof bridge.listenVaultIndex === 'function') {
+      let legacyFallbackChecked = false;
+      this._remoteUnsubscribe = bridge.listenVaultIndex(
+        this.state.userId,
+        async (remoteIndexMap) => {
+          this._vaultRetryCount = 0;
+          if (this._vaultRetryTimer) {
+            clearTimeout(this._vaultRetryTimer);
+            this._vaultRetryTimer = null;
+          }
+          const entries = remoteIndexMap && typeof remoteIndexMap === 'object' ? Object.entries(remoteIndexMap) : [];
+          if (entries.length === 0 && !legacyFallbackChecked) {
+            legacyFallbackChecked = true;
+            // One-time migration for existing vaults that haven't populated vault_index yet
+            if (typeof bridge.getAllNotes === 'function') {
+              try {
+                const legacyNotes = await bridge.getAllNotes(this.state.userId);
+                if (Array.isArray(legacyNotes) && legacyNotes.length > 0) {
+                  for (const n of legacyNotes) {
+                    const nid = this._normalizeId(n?.id || '');
+                    if (!nid) continue;
+                    if (n.meta && typeof bridge.saveNoteIndex === 'function') {
+                      bridge.saveNoteIndex(this.state.userId, nid, {
+                        id: nid,
+                        meta: n.meta,
+                        updatedAt: n.meta.updatedAt || n.updatedAt || Date.now(),
+                        deleted: !!n.meta.deleted,
+                        schemaVersion: n.meta.schemaVersion || 2
+                      }).catch(() => {});
+                    }
+                  }
+                  await this._processRemoteNotesMap(
+                    Object.fromEntries(legacyNotes.filter(n => n?.id).map(n => [n.id, n]))
+                  );
+                  return;
+                }
+              } catch (e) {}
+            }
+          }
+          if (entries.length === 0) return;
+
+          let hasChanges = false;
+          for (const [id, indexEntry] of entries) {
+            if (!indexEntry) continue;
+            const cleanId = this._normalizeId(id);
+            const metaNode = indexEntry.meta && typeof indexEntry.meta === 'object' ? indexEntry.meta : indexEntry;
+            if (!this.validateSchemaCompatibility(metaNode)) continue;
+
+            const remoteMetaUpdated = metaNode.updatedAt || indexEntry.updatedAt || 0;
+            const existingManifest = this.state.manifestCache.get(cleanId);
+            const localDoc = this.state.localCache.get(cleanId);
+            const localMetaUpdated = localDoc
+              ? (localDoc.meta ? (localDoc.meta.updatedAt || localDoc.updatedAt || 0) : (localDoc.updatedAt || 0))
+              : (existingManifest?.updatedAt || 0);
+            const isPendingLocal = this.state.pendingQueue && this.state.pendingQueue.has(cleanId);
+
+            if ((localDoc || existingManifest) && localMetaUpdated >= remoteMetaUpdated && !isPendingLocal) {
+              continue;
+            }
+
+            if (metaNode.deleted || indexEntry.deleted) {
+              const delRecord = { id: cleanId, deleted: true, updatedAt: remoteMetaUpdated };
+              this._setLocalCache(cleanId, delRecord);
+              if (this.state.manifestCache) this.state.manifestCache.delete(cleanId);
+              try { await VaultIDBStorage.putNote(delRecord); } catch (e) {}
+              hasChanges = true;
+              continue;
+            }
+
+            if (metaNode.ciphertext && this.state.masterKey) {
+              try {
+                const decMeta = await CryptoEngine.decryptData(this.state.masterKey, {
+                  iv: metaNode.iv,
+                  ciphertext: metaNode.ciphertext
+                });
+                if (!decMeta) continue;
+                let finalMeta = decMeta;
+                if (isPendingLocal && localDoc) {
+                  try {
+                    const localMetaDec = localDoc.contentHtml !== undefined ? localDoc : null;
+                    if (localMetaDec) finalMeta = this._mergeMeta(localMetaDec, decMeta);
+                  } catch (e) {}
+                }
+
+                this._updateManifestCache(cleanId, finalMeta);
+
+                // Only download body if the note is recent (last few weeks) or already active in localCache
+                const isRecent = this._isRecentNoteTimestamp(finalMeta.updatedAt || finalMeta.modified || finalMeta.date || remoteMetaUpdated);
+                const isActiveInRam = Boolean(localDoc && !localDoc.deleted);
+                if (isRecent || isActiveInRam) {
+                  let remoteContentHtml = '';
+                  let hasRemoteBody = false;
+                  if (typeof bridge.getNoteBody === 'function') {
+                    try {
+                      const remoteBody = await bridge.getNoteBody(this.state.userId, cleanId);
+                      if (remoteBody && remoteBody.ciphertext) {
+                        const decBody = await CryptoEngine.decryptData(this.state.masterKey, {
+                          iv: remoteBody.iv,
+                          ciphertext: remoteBody.ciphertext
+                        });
+                        if (decBody) {
+                          remoteContentHtml = decBody.contentHtml !== undefined ? decBody.contentHtml : (decBody.html || '');
+                          hasRemoteBody = true;
+                        }
+                      }
+                    } catch (be) {}
+                  }
+                  let existingBody = localDoc ? (localDoc.contentHtml || localDoc.html || '') : '';
+                  if (!existingBody && !hasRemoteBody) {
+                    try {
+                      const idbDoc = await VaultIDBStorage.getNote(cleanId);
+                      if (idbDoc) existingBody = idbDoc.contentHtml || idbDoc.html || '';
+                    } catch (idbErr) {}
+                  }
+                  const finalBody = hasRemoteBody ? remoteContentHtml : existingBody;
+                  const combined = {
+                    ...finalMeta,
+                    id: cleanId,
+                    path: finalMeta.path || `notes/${cleanId}.html`,
+                    contentHtml: finalBody,
+                    html: finalBody,
+                    updatedAt: finalMeta.updatedAt || remoteMetaUpdated,
+                    deleted: false,
+                    schemaVersion: this.SCHEMA_VERSION,
+                    appVersion: this.getCurrentVersion(),
+                    origin: 'remote_cloud'
+                  };
+                  this._setLocalCache(cleanId, combined);
+                  try { await VaultIDBStorage.putNote(combined); } catch (e) {}
+                }
+                hasChanges = true;
+              } catch (err) {
+                console.warn(`Failed to decrypt remote note index ${cleanId}:`, err);
+              }
+            }
+          }
+
+          if (hasChanges) {
+            try {
+              await VaultIDBStorage.saveMeta('manifest_cache', Array.from(this.state.manifestCache.values()));
+            } catch (e) {}
+            if (typeof this._notifyListeners === 'function') {
+              this._notifyListeners('remote_sync');
+            }
+          }
+        },
+        (err) => {
+          this._handleVaultListenerError(err);
+        }
+      );
+      this._listenRemoteDocs(bridge);
+      return this._remoteUnsubscribe;
+    }
+
     this._remoteUnsubscribe = bridge.listenVault(
       this.state.userId,
       async (remoteNotesMap) => {
@@ -953,6 +1145,56 @@ const FirebaseSyncService = {
           clearTimeout(this._vaultRetryTimer);
           this._vaultRetryTimer = null;
         }
+        await this._processRemoteNotesMap(remoteNotesMap);
+      },
+      (err) => {
+        this._handleVaultListenerError(err);
+      }
+    );
+    this._listenRemoteDocs(bridge);
+    return this._remoteUnsubscribe;
+  },
+
+  _handleVaultListenerError(err) {
+    if (this._remoteUnsubscribe) {
+      try { this._remoteUnsubscribe(); } catch (e) {}
+      this._remoteUnsubscribe = null;
+    }
+    if (this._remoteDocsUnsubscribe) {
+      try { this._remoteDocsUnsubscribe(); } catch (e) {}
+      this._remoteDocsUnsubscribe = null;
+    }
+    if (this._isPermissionDeniedError(err)) {
+      this._vaultRetryCount = 0;
+      return;
+    }
+    console.warn('Realtime Database listener error:', err);
+    this._scheduleRemoteVaultRetry();
+  },
+
+  _listenRemoteDocs(bridge) {
+    if (!bridge || typeof bridge.listenDocs !== 'function') return;
+    if (this._remoteDocsUnsubscribe) {
+      try { this._remoteDocsUnsubscribe(); } catch (e) {}
+      this._remoteDocsUnsubscribe = null;
+    }
+    this._remoteDocsUnsubscribe = bridge.listenDocs(
+      this.state.userId,
+      async (remoteDocsMap) => {
+        this._vaultRetryCount = 0;
+        if (this._vaultRetryTimer) {
+          clearTimeout(this._vaultRetryTimer);
+          this._vaultRetryTimer = null;
+        }
+        await this._processRemoteDocsMap(remoteDocsMap);
+      },
+      (err) => {
+        this._handleVaultListenerError(err);
+      }
+    );
+  },
+
+  async _processRemoteNotesMap(remoteNotesMap) {
         if (!remoteNotesMap || typeof remoteNotesMap !== 'object') return;
         let hasChanges = false;
         for (const [id, remoteDoc] of Object.entries(remoteNotesMap)) {
@@ -1098,39 +1340,9 @@ const FirebaseSyncService = {
             window.renderBoard();
           }
         }
-      },
-      (err) => {
-        if (this._remoteUnsubscribe) {
-          try { this._remoteUnsubscribe(); } catch (e) {}
-          this._remoteUnsubscribe = null;
-        }
-        if (this._remoteDocsUnsubscribe) {
-          try { this._remoteDocsUnsubscribe(); } catch (e) {}
-          this._remoteDocsUnsubscribe = null;
-        }
-        if (this._isPermissionDeniedError(err)) {
-          this._vaultRetryCount = 0;
-          return;
-        }
-        console.warn('Realtime Database listener error:', err);
-        this._scheduleRemoteVaultRetry();
-      }
-    );
+  },
 
-    // Listen to generic & itemized documents
-    if (typeof bridge.listenDocs === 'function') {
-      if (this._remoteDocsUnsubscribe) {
-        try { this._remoteDocsUnsubscribe(); } catch (e) {}
-        this._remoteDocsUnsubscribe = null;
-      }
-      this._remoteDocsUnsubscribe = bridge.listenDocs(
-        this.state.userId,
-        async (remoteDocsMap) => {
-          this._vaultRetryCount = 0;
-          if (this._vaultRetryTimer) {
-            clearTimeout(this._vaultRetryTimer);
-            this._vaultRetryTimer = null;
-          }
+  async _processRemoteDocsMap(remoteDocsMap) {
           if (!remoteDocsMap || typeof remoteDocsMap !== 'object') return;
           const processDocEntry = async (docKey, remoteDoc) => {
             if (!remoteDoc || !remoteDoc.updatedAt) return;
@@ -1182,28 +1394,6 @@ const FirebaseSyncService = {
               }
             }
           }
-        },
-        (err) => {
-          console.warn('Realtime Database docs listener error:', err);
-        }
-      );
-    }
-
-    return () => {
-      if (this._remoteUnsubscribe) {
-        try { this._remoteUnsubscribe(); } catch (e) {}
-        this._remoteUnsubscribe = null;
-      }
-      if (this._remoteDocsUnsubscribe) {
-        try { this._remoteDocsUnsubscribe(); } catch (e) {}
-        this._remoteDocsUnsubscribe = null;
-      }
-      if (this._vaultRetryTimer) {
-        clearTimeout(this._vaultRetryTimer);
-        this._vaultRetryTimer = null;
-      }
-      this._vaultRetryCount = 0;
-    };
   },
 
   // ── Version Compatibility & Autodetection ──
@@ -2064,17 +2254,20 @@ const FirebaseSyncService = {
     this.state.status = this.STATUS.SYNCED;
     this.state.lastError = null;
 
-    // 1. Hydrate localCache from IndexedDB if in-memory cache is empty
+    // 1. Hydrate localCache with only recent notes from IndexedDB (bounded RAM usage)
     if (this.state.localCache.size === 0) {
       try {
-        const idbNotes = await VaultIDBStorage.getAllNotes();
+        const cutoffMs = Date.now() - this.RECENT_NOTES_WINDOW_MS;
+        const idbNotes = typeof VaultIDBStorage.getRecentNotes === 'function'
+          ? await VaultIDBStorage.getRecentNotes(cutoffMs, this.LOCAL_CACHE_LIMIT)
+          : await VaultIDBStorage.getAllNotes();
         for (const n of idbNotes) {
           if (n && n.id) {
-            this.state.localCache.set(n.id, n);
+            this._setLocalCache(n.id, n);
           }
         }
       } catch (err) {
-        console.warn('Failed to hydrate notes from IndexedDB', err);
+        console.warn('Failed to hydrate recent notes from IndexedDB', err);
       }
     }
 
@@ -2615,9 +2808,21 @@ const FirebaseSyncService = {
       try {
         docRecord = await VaultIDBStorage.getNote(cleanId);
         if (docRecord) {
-          this.state.localCache.set(cleanId, docRecord);
+          this._setLocalCache(cleanId, docRecord);
         }
       } catch (e) {}
+    }
+
+    if (!docRecord) {
+      const bridge = this._getBridge();
+      if (bridge && this.state.userId && this.state.userId !== 'default_user' && typeof bridge.getNote === 'function') {
+        try {
+          const remoteDoc = await bridge.getNote(this.state.userId, cleanId);
+          if (remoteDoc) {
+            docRecord = { id: cleanId, ...remoteDoc };
+          }
+        } catch (e) {}
+      }
     }
 
     if (!docRecord) return null;

@@ -1108,9 +1108,83 @@ const StorageAPI = {
     }
   },
 
+  NOTE_CACHE_LIMIT: 250,
+
+  _setNoteCache(path, content) {
+    if (!path || !this._noteCache) return;
+    if (this._noteCache.has(path)) {
+      this._noteCache.delete(path);
+    }
+    this._noteCache.set(path, content);
+    const limit = this.NOTE_CACHE_LIMIT || 250;
+    while (this._noteCache.size > limit) {
+      const oldestKey = this._noteCache.keys().next().value;
+      if (oldestKey === undefined || oldestKey === path) break;
+      this._noteCache.delete(oldestKey);
+    }
+  },
+
+  isRecentNoteEntry(entry, weeks = 4) {
+    if (!entry || typeof entry !== 'object') return false;
+    const days = Math.max(1, Number(weeks) || 4) * 7;
+    const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+    const candidates = [entry.updatedAt, entry.modified, entry.date, entry.created];
+    for (const val of candidates) {
+      if (!val) continue;
+      const ms = typeof val === 'number' ? val : Date.parse(String(val));
+      if (!Number.isNaN(ms) && ms >= cutoffMs) return true;
+    }
+    return false;
+  },
+
   getNoteFromCache(path) {
     if (!path) return null;
-    return this._noteCache.get(path) || null;
+    if (!this._noteCache.has(path)) return null;
+    const val = this._noteCache.get(path);
+    // Refresh LRU order on hit
+    this._noteCache.delete(path);
+    this._noteCache.set(path, val);
+    return val;
+  },
+
+  async preloadRecentNotes({ weeks = 4, maxNotes = 200, onProgress = null } = {}) {
+    const all = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : [];
+    const recent = all
+      .filter(item => item && item.path && this.isRecentNoteEntry(item, weeks))
+      .slice(0, Math.max(1, Number(maxNotes) || 200));
+    const total = recent.length;
+    if (total === 0) {
+      if (typeof onProgress === 'function') onProgress(0, 0, '');
+      return { loaded: 0, total: 0 };
+    }
+
+    const CONCURRENCY = 8;
+    let completed = 0;
+    let loaded = 0;
+
+    for (let i = 0; i < total; i += CONCURRENCY) {
+      const chunk = recent.slice(i, i + CONCURRENCY);
+      await Promise.all(chunk.map(async (item) => {
+        try {
+          if (item && item.path && !this._noteCache.has(item.path)) {
+            const html = await Promise.race([
+              this.readNoteContent(item.path),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Note read timeout')), 5000))
+            ]);
+            this._setNoteCache(item.path, html);
+            loaded++;
+          }
+        } catch (e) {
+          // File might not exist or error
+        } finally {
+          completed++;
+          if (typeof onProgress === 'function') {
+            onProgress(completed, total, item?.title || item?.path || '');
+          }
+        }
+      }));
+    }
+    return { loaded, total };
   },
 
   async preloadAllNotes(onProgress = null) {
@@ -1133,7 +1207,7 @@ const StorageAPI = {
               this.readNoteContent(item.path),
               new Promise((_, reject) => setTimeout(() => reject(new Error('Note read timeout')), 5000))
             ]);
-            this._noteCache.set(item.path, html);
+            this._setNoteCache(item.path, html);
           }
         } catch (e) {
           // File might not exist or error
@@ -1152,7 +1226,7 @@ const StorageAPI = {
 
     // 1. Check RAM Cache (0ms)
     if (this._noteCache.has(path)) {
-      return this._noteCache.get(path);
+      return this.getNoteFromCache(path);
     }
 
     const cleanId = path.replace(/^notes\//, '').replace(/\.html$/, '');
@@ -1163,7 +1237,7 @@ const StorageAPI = {
       try {
         const rec = await idb.getNote(cleanId) || await idb.getNote(path);
         if (rec && rec.content) {
-          this._noteCache.set(path, rec.content);
+          this._setNoteCache(path, rec.content);
           return rec.content;
         }
       } catch (e) {}
@@ -1172,7 +1246,7 @@ const StorageAPI = {
     // 3. Check in-flight sync queue (Staged Source Model)
     const inFlight = this._syncQueue.get(cleanId);
     if (inFlight && inFlight.content && inFlight.action === 'save') {
-      this._noteCache.set(path, inFlight.content);
+      this._setNoteCache(path, inFlight.content);
       return inFlight.content;
     }
 
@@ -1185,7 +1259,7 @@ const StorageAPI = {
         const firebaseNote = await window.FirebaseSyncService.getNote(noteId);
         if (firebaseNote) {
           const content = firebaseNote.contentHtml || firebaseNote.html || '';
-          this._noteCache.set(path, content);
+          this._setNoteCache(path, content);
           if (idb && typeof idb.putNote === 'function') {
             idb.putNote(cleanId, { id: cleanId, path, content, ...firebaseNote }).catch(() => {});
           }
@@ -1195,7 +1269,7 @@ const StorageAPI = {
       try {
         const content = await readFile(path);
         if (content && typeof content === 'string') {
-          this._noteCache.set(path, content);
+          this._setNoteCache(path, content);
           if (idb && typeof idb.putNote === 'function') {
             idb.putNote(cleanId, { id: cleanId, path, content }).catch(() => {});
           }
@@ -1209,7 +1283,7 @@ const StorageAPI = {
     try {
       const content = await readFile(path);
       if (content && typeof content === 'string') {
-        this._noteCache.set(path, content);
+        this._setNoteCache(path, content);
         if (idb && typeof idb.putNote === 'function') {
           idb.putNote(cleanId, { id: cleanId, path, content }).catch(() => {});
         }
@@ -1227,7 +1301,7 @@ const StorageAPI = {
         if (snaps && snaps.length > 0) {
           const snapContent = await this.getSnapshotContent(path, snaps[0].id);
           if (snapContent && typeof snapContent === 'string') {
-            this._noteCache.set(path, snapContent);
+            this._setNoteCache(path, snapContent);
             return snapContent;
           }
         }

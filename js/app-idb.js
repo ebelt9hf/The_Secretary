@@ -259,6 +259,50 @@ const VaultIDBStorage = {
     return this.getAllRecords('notes');
   },
 
+  async getRecentNotes(sinceMs = 0, maxCount = 250) {
+    const cutoff = Number(sinceMs) || 0;
+    const limit = Math.max(1, Number(maxCount) || 250);
+    const db = await this.getDB();
+    if (!db) {
+      const list = Array.from(this._memFallback.notes.values())
+        .filter(r => r && !r.deleted && (Number(r.updatedAt) || 0) >= cutoff)
+        .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+      return list.slice(0, limit);
+    }
+    return this._runTx('notes', 'readonly', (tx, store, done) => {
+      try {
+        const index = store.index('updatedAt');
+        const range = cutoff > 0 && typeof IDBKeyRange !== 'undefined' ? IDBKeyRange.lowerBound(cutoff) : null;
+        const req = index.openCursor(range, 'prev');
+        const results = [];
+        req.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (!cursor || results.length >= limit) {
+            done(results);
+            return;
+          }
+          const val = cursor.value;
+          if (val && !val.deleted) {
+            results.push(val);
+          }
+          cursor.continue();
+        };
+        req.onerror = () => done(results);
+      } catch (err) {
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const all = Array.isArray(req.result) ? req.result : [];
+          const filtered = all
+            .filter(r => r && !r.deleted && (Number(r.updatedAt) || 0) >= cutoff)
+            .sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0))
+            .slice(0, limit);
+          done(filtered);
+        };
+        req.onerror = () => done([]);
+      }
+    }, [], 4000);
+  },
+
   async deleteNote(cleanId) {
     return this.deleteRecord('notes', cleanId);
   },

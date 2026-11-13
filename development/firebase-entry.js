@@ -230,6 +230,16 @@ export const FirebaseBridge = {
       appVersion: record?.appVersion || '4.0.0'
     };
     await set(metaRef, payload);
+    try {
+      const indexRef = ref(this.db, `users/${userId}/vault_index/${noteId}`);
+      await set(indexRef, {
+        id: noteId,
+        meta: payload,
+        updatedAt: payload.updatedAt || Date.now(),
+        deleted: !!payload.deleted,
+        schemaVersion: payload.schemaVersion
+      });
+    } catch (e) {}
     return true;
   },
 
@@ -265,14 +275,33 @@ export const FirebaseBridge = {
   async deleteNote(userId, noteId, appVersion = '4.0.0') {
     if (!this.db || !userId || !noteId) return false;
     // Mark deleted on meta node (and also base note for legacy listeners)
-    const metaRef = ref(this.db, `users/${userId}/vault/${noteId}/meta`);
-    await set(metaRef, {
+    const now = Date.now();
+    const delPayload = {
       id: noteId,
       deleted: true,
-      updatedAt: Date.now(),
+      updatedAt: now,
       schemaVersion: 2,
       appVersion
-    });
+    };
+    const metaRef = ref(this.db, `users/${userId}/vault/${noteId}/meta`);
+    await set(metaRef, delPayload);
+    try {
+      const indexRef = ref(this.db, `users/${userId}/vault_index/${noteId}`);
+      await set(indexRef, {
+        id: noteId,
+        meta: delPayload,
+        updatedAt: now,
+        deleted: true,
+        schemaVersion: 2
+      });
+    } catch (e) {}
+    return true;
+  },
+
+  async saveNoteIndex(userId, noteId, record) {
+    if (!this.db || !userId || !noteId || !record) return false;
+    const indexRef = ref(this.db, `users/${userId}/vault_index/${noteId}`);
+    await set(indexRef, record);
     return true;
   },
 
@@ -400,6 +429,38 @@ export const FirebaseBridge = {
     return () => {
       unsubscribe();
       this._activeListeners.delete(userId);
+    };
+  },
+
+  async getVaultIndex(userId, timeoutMs = 25000) {
+    if (!this.db || !userId) return {};
+    const indexRef = ref(this.db, `users/${userId}/vault_index`);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Firebase network request timed out while fetching vault index.')), timeoutMs);
+    });
+    const snapshot = await Promise.race([get(indexRef), timeoutPromise]);
+    return snapshot.exists() ? snapshot.val() : {};
+  },
+
+  listenVaultIndex(userId, onUpdate, onError) {
+    if (!this.db || !userId) return () => {};
+    const indexRef = ref(this.db, `users/${userId}/vault_index`);
+    const unsubscribe = onValue(
+      indexRef,
+      (snapshot) => {
+        const val = snapshot.exists() ? snapshot.val() : {};
+        if (typeof onUpdate === 'function') {
+          onUpdate(val);
+        }
+      },
+      (err) => {
+        if (typeof onError === 'function') onError(err);
+      }
+    );
+    this._activeListeners.set(`index:${userId}`, unsubscribe);
+    return () => {
+      unsubscribe();
+      this._activeListeners.delete(`index:${userId}`);
     };
   },
 

@@ -5220,48 +5220,12 @@ async function mountFolder(handle) {
     updateStartupProgress(15, t('landing.loadingWorkspace') || 'Loading workspace…');
 
     await loadTodosManifest({ nonDoneOnly: true });
-    updateStartupProgress(25, t('landing.loadingWorkspace') || 'Loading workspace…');
+    updateStartupProgress(40, t('landing.loadingWorkspace') || 'Loading workspace…');
 
     if (typeof rebuildCollaborativeAggregates === 'function') rebuildCollaborativeAggregates();
     try { await loadPlanner(); } catch(e) { console.warn('Planner load failed', e); }
-    updateStartupProgress(35, t('landing.preloadingNotes') || 'Preloading notes into memory…');
+    updateStartupProgress(75, t('landing.loadingWorkspace') || 'Loading workspace…');
 
-    // Preload ALL notes into memory cache during startup progress bar phase
-    if (StorageAPI && typeof StorageAPI.preloadAllNotes === 'function') {
-      try {
-        await Promise.race([
-          StorageAPI.preloadAllNotes((done, total, title) => {
-            const pct = 35 + Math.round((done / Math.max(1, total)) * 45);
-            const text = `${t('landing.preloadingNotes') || 'Preloading notes…'} (${done}/${total})`;
-            updateStartupProgress(pct, text);
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('preloadAllNotes startup timeout')), 15000))
-        ]);
-      } catch (preloadErr) {
-        console.warn('Preload notes encountered timeout or error:', preloadErr);
-      }
-    }
-    updateStartupProgress(82, t('landing.loadingWorkspace') || 'Loading workspace…');
-
-    // Preload workstream topic memories into memory cache during startup progress bar phase
-    try {
-      if (typeof preloadAllWorkstreamMemories === 'function') {
-        await preloadAllWorkstreamMemories();
-      } else if (window.WorkstreamMemoryEngine && typeof window.WorkstreamMemoryEngine.preloadAllWorkstreamMemories === 'function') {
-        await window.WorkstreamMemoryEngine.preloadAllWorkstreamMemories();
-      }
-    } catch (e) {
-      console.warn('Failed preloading workstream memories on mount', e);
-    }
-
-    // Restore chat history from workspace folder
-    try {
-      if (window.AIChatController && typeof window.AIChatController.loadChatHistoryFromFolder === 'function') {
-        await window.AIChatController.loadChatHistoryFromFolder();
-      }
-    } catch (e) {
-      console.warn('Failed restoring chat history on mount', e);
-    }
     try {
       if (typeof ensureColleaguesWorkspaceReady === 'function') {
         await ensureColleaguesWorkspaceReady();
@@ -5272,7 +5236,6 @@ async function mountFolder(handle) {
     try { await runFirstStartSetupIfNeeded(); } catch (e) { console.warn('First-run setup skipped', e); }
 
     updateStartupProgress(100, t('landing.readyProgress') || 'Ready!');
-    await new Promise(r => setTimeout(r, 120));
 
     try {
       if (location.hash && location.hash.length > 1) {
@@ -5341,13 +5304,42 @@ async function mountFolder(handle) {
 function queueBackgroundHydration(isNewWorkspaceFolder = false) {
   setTimeout(async () => {
     try {
+      // Preload only notes from the last 4 weeks in the background (older notes load on demand)
+      if (typeof StorageAPI !== 'undefined' && StorageAPI) {
+        try {
+          if (typeof StorageAPI.preloadRecentNotes === 'function') {
+            await Promise.race([
+              StorageAPI.preloadRecentNotes({ weeks: 4, maxNotes: 200 }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('preloadRecentNotes timeout')), 15000))
+            ]);
+          }
+        } catch (preloadErr) {
+          console.warn('Background recent notes preload encountered timeout or error:', preloadErr);
+        }
+      }
+      try {
+        if (typeof preloadAllWorkstreamMemories === 'function') {
+          await preloadAllWorkstreamMemories();
+        } else if (window.WorkstreamMemoryEngine && typeof window.WorkstreamMemoryEngine.preloadAllWorkstreamMemories === 'function') {
+          await window.WorkstreamMemoryEngine.preloadAllWorkstreamMemories();
+        }
+      } catch (e) {
+        console.warn('Failed preloading workstream memories in background', e);
+      }
+      try {
+        if (window.AIChatController && typeof window.AIChatController.loadChatHistoryFromFolder === 'function') {
+          await window.AIChatController.loadChatHistoryFromFolder();
+        }
+      } catch (e) {
+        console.warn('Failed restoring chat history in background', e);
+      }
       await ensureNoteStoragePaths();
       if (typeof ensureTodosManifestFullyLoaded === 'function') {
         await ensureTodosManifestFullyLoaded();
       }
-      await hydrateMetadataFromManifestIncremental({ chunkSize: 100 });
+      await hydrateMetadataFromManifestIncremental({ chunkSize: 100, maxAgeDays: 28 });
       if (typeof indexCollaborativeData === 'function') {
-        await indexCollaborativeData({ chunkSize: 60 });
+        await indexCollaborativeData({ maxAgeDays: 28 });
       }
       await migrateFavicons();
     } catch (e) {

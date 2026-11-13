@@ -2382,7 +2382,7 @@ function renderCollaboratorManagerSidebar(parent, allNames, visibleNames, hidden
 }
 
 // Re-index all notes when mounting a folder, using cached results where possible
-async function indexCollaborativeData() {
+async function indexCollaborativeData({ maxAgeDays = null } = {}) {
   const currentPaths = new Set(manifest.map(n => n.path));
   
   // Clean cache of deleted files
@@ -2391,10 +2391,19 @@ async function indexCollaborativeData() {
       delete collaborativeDataCache[path];
     }
   }
+
+  const cutoffMs = maxAgeDays && Number(maxAgeDays) > 0
+    ? Date.now() - Number(maxAgeDays) * 24 * 60 * 60 * 1000
+    : null;
   
   // Filter entries that actually need indexing
   const entriesToProcess = manifest.filter(entry => {
     if (!entry.path) return false;
+    if (cutoffMs !== null) {
+      const tsVal = entry.updatedAt || entry.modified || entry.date || entry.created;
+      const ms = tsVal ? (typeof tsVal === 'number' ? tsVal : Date.parse(String(tsVal))) : NaN;
+      if (!Number.isNaN(ms) && ms < cutoffMs) return false;
+    }
     const cached = collaborativeDataCache[entry.path];
     if (cached && cached.modified === entry.modified) {
       return false;

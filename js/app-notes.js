@@ -1004,7 +1004,7 @@ function upsertMeta(meta, options = {}) {
   }
 }
 
-async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) {
+async function hydrateMetadataFromManifestIncremental({ chunkSize = 100, maxAgeDays = null } = {}) {
   const normalizedChunk = Math.max(10, Number(chunkSize) || 100);
   let sourceEntries = manifest;
   try {
@@ -1013,6 +1013,10 @@ async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) 
     // Fall back to in-memory list when canonical manifest file is missing.
   }
 
+  const cutoffMs = maxAgeDays && Number(maxAgeDays) > 0
+    ? Date.now() - Number(maxAgeDays) * 24 * 60 * 60 * 1000
+    : null;
+
   metadataHydrationProgress = { done: 0, total: sourceEntries.length, running: true };
   let dirty = false;
   let anyDirty = false;
@@ -1020,6 +1024,14 @@ async function hydrateMetadataFromManifestIncremental({ chunkSize = 100 } = {}) 
     const chunk = sourceEntries.slice(i, i + normalizedChunk);
     for (const entry of chunk) {
       if (!entry?.path) continue;
+      if (cutoffMs !== null) {
+        const tsVal = entry.updatedAt || entry.modified || entry.date || entry.created;
+        const ms = tsVal ? (typeof tsVal === 'number' ? tsVal : Date.parse(String(tsVal))) : NaN;
+        if (!Number.isNaN(ms) && ms < cutoffMs) {
+          metadataHydrationProgress.done += 1;
+          continue;
+        }
+      }
       const current = getMetaByPath(entry.path);
       const alreadyFresh = Boolean(
         current
