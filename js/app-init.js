@@ -665,6 +665,14 @@ function _syncThemeAttributes(themeVal) {
   if (document.body) {
     document.body.setAttribute('data-theme', resolved);
   }
+  if (window.PwaManager && typeof window.PwaManager.syncThemeColor === 'function') {
+    window.PwaManager.syncThemeColor(resolved);
+  } else {
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', resolved === 'dark' ? '#090e18' : '#1e1b4b');
+    }
+  }
 }
 
 function applySettings() {

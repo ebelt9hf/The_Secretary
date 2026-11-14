@@ -1473,6 +1473,42 @@ body.is-electron-mac:not(.is-fullscreen) #screen-connect .landing-drag-strip {
   -webkit-app-region: drag;
 }
 
+/* ── PWA Window Controls Overlay (Chrome / Edge desktop) ── */
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header {
+  min-height: env(titlebar-area-height, var(--win-titlebar-h, 40px)) !important;
+  padding-left: max(0.9rem, env(titlebar-area-x, 0px)) !important;
+  padding-right: max(0.9rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))) !important;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row button,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row a,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row input,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row select,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row [role="button"],
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header button,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header a,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header input,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header select {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #screen-connect .landing-drag-strip {
+  display: block;
+  position: fixed;
+  top: env(titlebar-area-y, 0px);
+  left: env(titlebar-area-x, 0px);
+  width: env(titlebar-area-width, 100%);
+  height: env(titlebar-area-height, var(--win-titlebar-h, 40px));
+  z-index: 1;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
 body.is-fullscreen .topbar-main-row,
 body.is-fullscreen .overlay-header,
 body.is-fullscreen .daily-review-header,

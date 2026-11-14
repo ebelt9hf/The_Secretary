@@ -7,6 +7,12 @@
 
   let deferredPrompt = null;
   let isRegistered = false;
+  let wcoListenerBound = false;
+
+  const THEME_COLORS = {
+    light: '#1e1b4b',
+    dark: '#090e18'
+  };
 
   const PwaManager = {
     get isElectron() {
@@ -21,13 +27,21 @@
       if (typeof window === 'undefined') return false;
       const displayModeStandalone = !!(
         window.matchMedia &&
-        window.matchMedia('(display-mode: standalone)').matches
+        (
+          window.matchMedia('(display-mode: standalone)').matches ||
+          window.matchMedia('(display-mode: window-controls-overlay)').matches
+        )
       );
       const navigatorStandalone = !!(
         typeof navigator !== 'undefined' &&
         navigator.standalone === true
       );
       return displayModeStandalone || navigatorStandalone;
+    },
+
+    get isWindowControlsOverlay() {
+      if (this.isElectron || typeof navigator === 'undefined') return false;
+      return !!(navigator.windowControlsOverlay && navigator.windowControlsOverlay.visible);
     },
 
     get isIOS() {
@@ -58,13 +72,59 @@
       return !!deferredPrompt || this.isIOS;
     },
 
+    syncWindowControlsOverlay() {
+      if (typeof document === 'undefined') return false;
+      const active = this.isWindowControlsOverlay;
+      document.documentElement?.classList.toggle('is-pwa-wco', active);
+      document.body?.classList.toggle('is-pwa-wco', active);
+      return active;
+    },
+
+    syncThemeColor(resolvedTheme) {
+      if (typeof document === 'undefined') return null;
+      let resolved = resolvedTheme;
+      if (resolved !== 'dark' && resolved !== 'light') {
+        const attr = document.documentElement?.getAttribute('data-theme');
+        if (attr === 'dark' || attr === 'light') {
+          resolved = attr;
+        } else if (typeof window !== 'undefined' && window.matchMedia) {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } else {
+          resolved = 'light';
+        }
+      }
+      const color = resolved === 'dark' ? THEME_COLORS.dark : THEME_COLORS.light;
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeMeta) {
+        themeMeta.setAttribute('content', color);
+      }
+      return color;
+    },
+
     init() {
       if (typeof window === 'undefined') return;
 
-      // Never activate PWA install prompts inside native Electron desktop builds
+      // Never activate PWA install prompts or WCO inside native Electron desktop builds
       if (this.isElectron) {
+        this.syncWindowControlsOverlay();
         this.updateUI();
         return;
+      }
+
+      this.syncWindowControlsOverlay();
+      this.syncThemeColor();
+
+      if (
+        !wcoListenerBound &&
+        typeof navigator !== 'undefined' &&
+        navigator.windowControlsOverlay &&
+        typeof navigator.windowControlsOverlay.addEventListener === 'function'
+      ) {
+        wcoListenerBound = true;
+        navigator.windowControlsOverlay.addEventListener('geometrychange', () => {
+          this.syncWindowControlsOverlay();
+          this.updateUI();
+        });
       }
 
       // If already installed and launched in standalone mode, hide buttons

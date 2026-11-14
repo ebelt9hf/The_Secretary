@@ -183,4 +183,73 @@ describe('Progressive Web App (PWA) Implementation (tests/unit/app-pwa.test.js)'
     // sw.js must handle 404 responses for app shell and fall back to cached app.html
     expect(swContent).toMatch(/response\.status === 404[\s\S]*app\.html/);
   });
+
+  it('configures display_override with window-controls-overlay and standalone fallback in manifest.webmanifest', () => {
+    const manifestPath = path.resolve(__dirname, '../../manifest.webmanifest');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+
+    expect(manifest.display_override).toEqual(['window-controls-overlay', 'standalone']);
+    expect(manifest.display).toBe('standalone');
+  });
+
+  it('toggles is-pwa-wco class based on navigator.windowControlsOverlay.visible in browser and disables in Electron', () => {
+    const originalWco = navigator.windowControlsOverlay;
+    try {
+      Object.defineProperty(navigator, 'windowControlsOverlay', {
+        configurable: true,
+        value: { visible: true, addEventListener: vi.fn() }
+      });
+
+      window.AppBridge.isElectron = false;
+      expect(window.PwaManager.syncWindowControlsOverlay()).toBe(true);
+      expect(document.documentElement.classList.contains('is-pwa-wco')).toBe(true);
+      expect(document.body.classList.contains('is-pwa-wco')).toBe(true);
+
+      // Inside Electron, WCO class must never be active even if navigator property exists
+      window.AppBridge.isElectron = true;
+      expect(window.PwaManager.syncWindowControlsOverlay()).toBe(false);
+      expect(document.documentElement.classList.contains('is-pwa-wco')).toBe(false);
+      expect(document.body.classList.contains('is-pwa-wco')).toBe(false);
+    } finally {
+      Object.defineProperty(navigator, 'windowControlsOverlay', {
+        configurable: true,
+        value: originalWco
+      });
+      document.documentElement.classList.remove('is-pwa-wco');
+      document.body.classList.remove('is-pwa-wco');
+    }
+  });
+
+  it('treats window-controls-overlay display-mode as standalone so install buttons remain hidden', () => {
+    const originalMatchMedia = window.matchMedia;
+    try {
+      window.AppBridge.isElectron = false;
+      window.matchMedia = vi.fn((query) => ({
+        matches: query === '(display-mode: window-controls-overlay)',
+        media: query
+      }));
+
+      expect(window.PwaManager.isStandalone).toBe(true);
+      expect(window.PwaManager.isInstallable()).toBe(false);
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
+  it('syncs meta[name="theme-color"] to dark (#090e18) and light (#1e1b4b) topbar colors as fallback', () => {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    meta.setAttribute('content', '#1e1b4b');
+    document.head.appendChild(meta);
+
+    try {
+      expect(window.PwaManager.syncThemeColor('dark')).toBe('#090e18');
+      expect(meta.getAttribute('content')).toBe('#090e18');
+
+      expect(window.PwaManager.syncThemeColor('light')).toBe('#1e1b4b');
+      expect(meta.getAttribute('content')).toBe('#1e1b4b');
+    } finally {
+      meta.remove();
+    }
+  });
 });
