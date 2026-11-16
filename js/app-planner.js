@@ -1756,8 +1756,10 @@ async function loadPlanner() {
 }
 
 // Save planner data to disk
+let _lastPlannerSelfSavedAt = 0;
 async function savePlanner() {
   try {
+    _lastPlannerSelfSavedAt = Date.now();
     const result = normalizePlannerEventsStrict(plannerEvents);
     plannerEvents = result.events;
     if (typeof window !== 'undefined') {
@@ -12397,9 +12399,15 @@ async function checkPlannerRefresh() {
   _isPlannerRefreshing = true;
 
   try {
-    if (isPlannerActive && typeof StorageAPI !== 'undefined' && typeof StorageAPI.hasPlanner === 'function' && await StorageAPI.hasPlanner()) {
+    const isPlannerSyncInFlight = typeof StorageAPI !== 'undefined' && (
+      StorageAPI._syncQueue?.has('doc:planner:events') || StorageAPI._isProcessingSyncQueue
+    );
+    if (isPlannerActive && !isPlannerSyncInFlight && (now - _lastPlannerSelfSavedAt >= 5000) && typeof StorageAPI !== 'undefined' && typeof StorageAPI.hasPlanner === 'function' && await StorageAPI.hasPlanner()) {
       const data = await StorageAPI.readPlanner();
-      const newEvents = (data && Array.isArray(data.events)) ? data.events : [];
+      const rawEvents = (data && Array.isArray(data.events)) ? data.events : [];
+      const newEvents = (typeof normalizePlannerEventsStrict === 'function')
+        ? normalizePlannerEventsStrict(rawEvents).events
+        : rawEvents;
       
       const currentEvents = plannerEvents || [];
       if (currentEvents.length !== newEvents.length || JSON.stringify(currentEvents) !== JSON.stringify(newEvents)) {

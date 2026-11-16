@@ -447,9 +447,14 @@ ipcMain.handle('fs-write-file', async (event, relPath, content) => {
     await fs.promises.rename(tempTarget, target);
     return true;
   } catch (atomicErr) {
+    console.error('[fs-write-file] Atomic write/rename failed:', relPath, atomicErr);
     try {
       await fs.promises.unlink(tempTarget);
-    } catch (cleanErr) {}
+    } catch (cleanErr) {
+      if (cleanErr && cleanErr.code !== 'ENOENT') {
+        console.warn('[fs-write-file] Failed to clean up temp file:', tempTarget, cleanErr);
+      }
+    }
     // Never fall back to direct in-place overwrite when atomic rename fails, as overwriting a locked
     // or troubled target risks zero-byte truncation and corruption. Propagate the error so the
     // storage layer can preserve the work by creating an emergency recovery snapshot in .history/.

@@ -537,7 +537,14 @@ async function refreshOpenNoteIfChanged(reason = 'focus') {
   const selfSavedAt = (typeof _lastNoteSelfSavedAt !== 'undefined' ? _lastNoteSelfSavedAt : 0) ||
                       (typeof window !== 'undefined' && window._lastNoteSelfSavedAt ? window._lastNoteSelfSavedAt : 0) ||
                       (typeof globalThis !== 'undefined' && globalThis._lastNoteSelfSavedAt ? globalThis._lastNoteSelfSavedAt : 0);
-  if (now - selfSavedAt < 3000) return;
+  if (now - selfSavedAt < 8000) return;
+
+  const cleanNoteId = currentNote.id || String(currentNote.path || '').replace(/^notes\//, '').replace(/\.html$/, '');
+  if ((typeof isSaveInProgress === 'function' && isSaveInProgress()) ||
+      (typeof _activeSavePromise !== 'undefined' && _activeSavePromise) ||
+      (typeof StorageAPI !== 'undefined' && cleanNoteId && StorageAPI._syncQueue?.has(cleanNoteId))) {
+    return;
+  }
 
   const overlayVisible = document.getElementById('note-edit-overlay')?.style.display !== 'none';
   const dailyReviewStepOpen = typeof DailyReviewController !== 'undefined'

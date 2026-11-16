@@ -909,7 +909,10 @@ const StorageAPI = {
               continue;
             }
 
+            let itemTimer = null;
             try {
+              await Promise.race([
+                (async () => {
               if (item.action === 'save') {
                 if (item.isDoc) {
                   if (this.getStorageEngine() !== 'firebase') {
@@ -985,6 +988,12 @@ const StorageAPI = {
                   }
                 }
               }
+                })(),
+                new Promise((_, reject) => {
+                  itemTimer = setTimeout(() => reject(new Error(`Timeout syncing item ${key}`)), 25000);
+                })
+              ]);
+              if (itemTimer) { clearTimeout(itemTimer); itemTimer = null; }
 
               // Only delete from queue if not superseded by a newer autosave/delete while in-flight
               if (this._syncQueue.get(key) === item) {
@@ -992,6 +1001,7 @@ const StorageAPI = {
               }
               processedCount++;
             } catch (err) {
+              if (itemTimer) { clearTimeout(itemTimer); itemTimer = null; }
               if (item.superseded || err?.name === 'AbortError' || item.abortController?.signal?.aborted) {
                 // Safely discard superseded item without treating as failure
                 if (this._syncQueue.get(key) === item) {
@@ -1032,6 +1042,7 @@ const StorageAPI = {
                   this._syncQueue.delete(key);
                 }
               } else {
+                console.warn(`[StorageAPI] Sync queue write failed for ${key} (attempt ${item.retries}/3):`, err);
                 this._scheduleSyncRetry();
               }
             }

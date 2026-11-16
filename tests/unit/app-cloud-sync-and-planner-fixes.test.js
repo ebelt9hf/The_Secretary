@@ -260,4 +260,50 @@ describe('Cloud Sync, Planner Note Resolution, and UI Fixes', () => {
     expect(plannerCss).toContain('.planner-unplanned-slot {\n  position: absolute;\n  left: 0;\n  right: 0;\n  pointer-events: none !important;');
     expect(plannerCss).toContain('.planner-off-hours {\n  position: absolute;\n  left: 0;\n  right: 0;\n  pointer-events: none !important;');
   });
+
+  /**
+   * 1. Protected Behavior: `checkPlannerRefresh()` normalizes disk events before comparing against in-memory
+   *    `plannerEvents` and skips disk polling while a planner save/sync is in flight.
+   * 2. Regression Target: False-positive "Planner file change detected on disk. Reloading..." loops every 5s
+   *    on single-user machines when `normalizePlannerEventsStrict` adds `noteId: ''` / `linkedNoteIds: []` in memory.
+   * 3. Coverage Overlap / Redundancy: None; existing Bug 1 test only checks Firebase polling when `rootHandle` is null.
+   * 4. Production Code Footprint: None; exercises production `checkPlannerRefresh()`.
+   */
+  it('checkPlannerRefresh does not falsely reload when disk events only differ by default normalization or sync is in flight', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    let readCount = 0;
+
+    globalThis.rootHandle = { name: 'vault' };
+    globalThis.activeTab = 'planner';
+    globalThis._lastPlannerFileCheckedAt = 0;
+    globalThis._isPlannerRefreshing = false;
+
+    const rawDiskEvent = { id: 'ev-norm-1', title: 'Focus Block', type: 'work', date: '2026-11-16', startTime: '09:00', endTime: '10:00' };
+    globalThis.plannerEvents = [{ ...rawDiskEvent, noteId: '', linkedNoteIds: [] }];
+
+    globalThis.StorageAPI = {
+      getStorageEngine: () => 'filesystem',
+      _isProcessingSyncQueue: false,
+      _syncQueue: new Map(),
+      hasPlanner: async () => true,
+      readPlanner: async () => {
+        readCount += 1;
+        return { events: [rawDiskEvent] };
+      },
+      hasPlannerProposals: async () => false,
+      readPlannerProposals: async () => null
+    };
+
+    await globalThis.checkPlannerRefresh();
+    expect(readCount).toBe(1);
+    expect(logSpy).not.toHaveBeenCalledWith('Planner file change detected on disk. Reloading...');
+
+    // Also verify polling is skipped when sync queue is actively flushing planner
+    globalThis._lastPlannerFileCheckedAt = 0;
+    globalThis.StorageAPI._isProcessingSyncQueue = true;
+    await globalThis.checkPlannerRefresh();
+    expect(readCount).toBe(1);
+
+    logSpy.mockRestore();
+  });
 });

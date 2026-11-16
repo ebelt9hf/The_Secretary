@@ -428,49 +428,56 @@ async function _writeFileDirect(pathStr, content, options = {}) {
   const name  = parts.pop();
   if (!name) throw new Error(`Invalid target filename in path: ${pathStr}`);
   const root  = _getRootHandle();
-  const dir   = parts.length ? await getOrCreateDirHandle(parts.join('/')) : root;
-  if (!dir || typeof dir.getFileHandle !== 'function') {
-    const err = new Error(`No root folder handle loaded or FileSystemDirectoryHandle not available for path: ${pathStr}`);
-    err.name = 'NotFoundError';
-    throw err;
-  }
-  const fh    = await dir.getFileHandle(name, { create: true });
-  const w     = await fh.createWritable();
+  let w = null;
+  let streamTimer = null;
   try {
-    if (options?.signal?.aborted) {
-      const abortErr = new Error('The write operation was aborted');
-      abortErr.name = 'AbortError';
-      throw abortErr;
-    }
-    let streamTimer = null;
-    try {
-      await Promise.race([
-        (async () => {
-          if (typeof content === 'string' && content.startsWith('data:image/')) {
-            const blob = _dataUrlToBlob(content);
-            await w.write(blob);
-          } else {
-            await w.write(content);
-          }
-          if (options?.signal?.aborted) {
-            const abortErr = new Error('The write operation was aborted');
-            abortErr.name = 'AbortError';
-            throw abortErr;
-          }
-          await w.close();
-        })(),
-        new Promise((_, reject) => {
-          streamTimer = setTimeout(() => reject(new Error(`Timeout writing stream to ${pathStr}`)), 30000);
-        })
-      ]);
-    } finally {
-      if (streamTimer) clearTimeout(streamTimer);
-    }
+    await Promise.race([
+      (async () => {
+        const dir = parts.length ? await getOrCreateDirHandle(parts.join('/')) : root;
+        if (!dir || typeof dir.getFileHandle !== 'function') {
+          const err = new Error(`No root folder handle loaded or FileSystemDirectoryHandle not available for path: ${pathStr}`);
+          err.name = 'NotFoundError';
+          throw err;
+        }
+        const fh = await dir.getFileHandle(name, { create: true });
+        w = await fh.createWritable();
+        if (options?.signal?.aborted) {
+          const abortErr = new Error('The write operation was aborted');
+          abortErr.name = 'AbortError';
+          throw abortErr;
+        }
+        if (typeof content === 'string' && content.startsWith('data:image/')) {
+          const blob = _dataUrlToBlob(content);
+          await w.write(blob);
+        } else {
+          await w.write(content);
+        }
+        if (options?.signal?.aborted) {
+          const abortErr = new Error('The write operation was aborted');
+          abortErr.name = 'AbortError';
+          throw abortErr;
+        }
+        await w.close();
+      })(),
+      new Promise((_, reject) => {
+        streamTimer = setTimeout(() => reject(new Error(`Timeout writing stream to ${pathStr}`)), 20000);
+      })
+    ]);
   } catch (err) {
+    if (err?.name !== 'AbortError' && !err?.message?.includes('No root folder handle loaded')) {
+      console.error(`[app-fs] Failed to write ${pathStr}:`, err);
+    }
     if (w && typeof w.abort === 'function') {
-      await w.abort().catch(() => {});
+      await Promise.race([
+        w.abort().catch((abortErr) => {
+          console.warn(`[app-fs] Failed to abort stream for ${pathStr}:`, abortErr);
+        }),
+        new Promise(resolve => setTimeout(resolve, 2000))
+      ]);
     }
     throw err;
+  } finally {
+    if (streamTimer) clearTimeout(streamTimer);
   }
 }
 

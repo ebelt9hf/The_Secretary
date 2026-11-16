@@ -952,6 +952,10 @@ async function autoSaveNote(options = {}) {
     return await _activeSavePromise;
   } catch (err) {
     console.warn('[autoSaveNote] Save bounded timeout or error:', err);
+    if (!options?.silent && typeof setSaveIndicator === 'function') {
+      const errorInfo = typeof classifySaveError === 'function' ? classifySaveError(err) : { type: 'unknown', message: err?.message || 'Save timeout' };
+      setSaveIndicator('error', { errorInfo, retryCount: _noteSaveRetryCount });
+    }
     return false;
   } finally {
     _activeSavePromise = null;

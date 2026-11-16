@@ -450,5 +450,57 @@ describe('Saving, Synchronization & Progress Resilience Architecture (Track A)',
       nClose2.close();
       expect(document.querySelector('.dialog-overlay')).toBeNull();
     });
+
+    /**
+     * 1. Protected Behavior: StorageAPI._processSyncQueue enforces a bounded per-item timeout so a single
+     *    stalled write does not wedge _isProcessingSyncQueue forever or block subsequent note saves.
+     * 2. Regression Target: Permanent session-wide "Timeout processing sync queue" failure after one hung write.
+     * 3. Coverage Overlap / Redundancy: None; existing tests only verify finalizeSaves and modal watchdogs.
+     * 4. Production Code Footprint: None; exercises production StorageAPI._processSyncQueue().
+     */
+    it('releases _isProcessingSyncQueue via per-item timeout when a single queued write hangs', async () => {
+      vi.useFakeTimers();
+      try {
+        StorageAPI.clearSyncQueue();
+        vi.spyOn(StorageAPI, 'getStorageEngine').mockReturnValue('filesystem');
+        vi.spyOn(StorageAPI, 'saveSnapshot').mockResolvedValue(true);
+        const origWriteFile = globalThis.writeFile;
+        let callCount = 0;
+        globalThis.writeFile = vi.fn(() => {
+          callCount += 1;
+          if (callCount === 1) return new Promise(() => {}); // Hung first write
+          return Promise.resolve(true);
+        });
+
+        try {
+          StorageAPI._enqueueSync({
+            id: 'hung-note',
+            path: 'notes/hung-note.html',
+            action: 'save',
+            content: '<p>hung</p>',
+            createdAt: Date.now()
+          });
+          StorageAPI._enqueueSync({
+            id: 'healthy-note',
+            path: 'notes/healthy-note.html',
+            action: 'save',
+            content: '<p>healthy</p>',
+            createdAt: Date.now()
+          });
+
+          const flushPromise = StorageAPI._processSyncQueue();
+          await vi.advanceTimersByTimeAsync(26000);
+          await flushPromise;
+
+          expect(StorageAPI._isProcessingSyncQueue).toBe(false);
+          expect(StorageAPI._syncQueue.has('healthy-note')).toBe(false);
+        } finally {
+          globalThis.writeFile = origWriteFile;
+          StorageAPI.clearSyncQueue();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
