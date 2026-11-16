@@ -460,7 +460,7 @@ async function _writeFileDirect(pathStr, content, options = {}) {
           await w.close();
         })(),
         new Promise((_, reject) => {
-          streamTimer = setTimeout(() => reject(new Error(`Timeout writing stream to ${pathStr}`)), 10000);
+          streamTimer = setTimeout(() => reject(new Error(`Timeout writing stream to ${pathStr}`)), 30000);
         })
       ]);
     } finally {

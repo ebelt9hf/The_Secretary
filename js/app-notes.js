@@ -1179,7 +1179,9 @@ async function _flushManifestFilesOnce() {
     }
   })();
 
-  await Promise.all([writeManifestPromise, writeManifestJSPromise, writeBufferPromise]);
+  await Promise.all([writeManifestPromise, writeBufferPromise]);
+  // Legacy file:// manifest.js is non-critical; never let slow/locked manifest.js streams block note saving.
+  void writeManifestJSPromise;
   broadcastSync({ type: 'MANIFEST_UPDATED' });
 }
 

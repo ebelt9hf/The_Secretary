@@ -943,7 +943,7 @@ async function autoSaveNote(options = {}) {
   _activeSavePromise = Promise.race([
     _executeAutoSaveNote(options),
     new Promise((_, reject) => {
-      saveTimer = setTimeout(() => reject(new Error('autoSaveNote timeout')), 10000);
+      saveTimer = setTimeout(() => reject(new Error('autoSaveNote timeout')), 45000);
     })
   ]).finally(() => {
     if (saveTimer) clearTimeout(saveTimer);

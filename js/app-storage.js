@@ -1063,7 +1063,7 @@ const StorageAPI = {
       await Promise.race([
         this._processSyncQueue(),
         new Promise((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('Timeout processing sync queue')), 10000);
+          timeoutId = setTimeout(() => reject(new Error('Timeout processing sync queue')), 45000);
         })
       ]);
       if (syncItem.superseded) {

@@ -536,4 +536,30 @@ describe('Planner Note Opening & Dual-Backend Manifest Indexing Pipeline', () =>
     const recovered = await StorageAPI.readNotesManifest();
     expect(recovered.map((n) => n.id)).toEqual(['note-disk-1', 'note-tier1-only']);
   });
+
+  /**
+   * 1. Protected Behavior: `saveManifest({ force: true })` resolves as soon as `writeNotesManifest` and
+   *    `writeMetadataBuffer` complete, even if legacy `writeNotesManifestJS` (`notes/manifest.js`) stalls or hangs.
+   * 2. Regression Target: A slow or timing-out `notes/manifest.js` stream blocking `saveManifest()` and causing
+   *    `autoSaveNote()` to hit its bounded timeout and fail note saves.
+   * 3. Coverage Overlap / Redundancy: None; existing parallel flush test mocks `writeNotesManifestJS` as instant.
+   * 4. Production Code Footprint: None; exercises production `saveManifest()`.
+   */
+  it('does not block saveManifest when legacy notes/manifest.js write stalls', async () => {
+    vi.spyOn(StorageAPI, 'writeNotesManifest').mockResolvedValue(true);
+    vi.spyOn(StorageAPI, 'writeMetadataBuffer').mockResolvedValue(true);
+    const jsSpy = vi.spyOn(StorageAPI, 'writeNotesManifestJS').mockImplementation(() => new Promise(() => {}));
+
+    globalThis.manifest = [
+      { id: 'note-nonblock-1', path: 'notes/note-nonblock-1.html', title: 'Non-blocking', date: '2026-11-16' }
+    ];
+
+    const result = await Promise.race([
+      saveManifest({ force: true }).then(() => 'resolved'),
+      new Promise((resolve) => setTimeout(() => resolve('timed-out'), 200))
+    ]);
+
+    expect(jsSpy).toHaveBeenCalledTimes(1);
+    expect(result).toBe('resolved');
+  });
 });
