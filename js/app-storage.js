@@ -1007,6 +1007,7 @@ const StorageAPI = {
                 if (this._syncQueue.get(key) === item) {
                   this._syncQueue.delete(key);
                 }
+                processedCount++;
                 continue;
               }
 
