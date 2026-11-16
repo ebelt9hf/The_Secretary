@@ -1,6 +1,6 @@
 {
   "name": "secretary",
-  "version": "4.0.92",
+  "version": "4.0.93",
   "description": "Private local-first personal note manager and task organizer",
   "main": "electron/main.js",
   "type": "module",
@@ -37,14 +37,14 @@
   "author": "Etienne Beltzung <etienne.beltzung@gmail.com>",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "electron": "^42.11.16",
+    "concurrently": "^10.0.7",
+    "electron": "^42.11.18",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
-    "happy-dom": "^20.11.12",
+    "happy-dom": "^21.0.4",
     "vite": "^8.3.8",
-    "vitest": "^4.1.11",
-    "wait-on": "^7.2.0"
+    "vitest": "^4.1.12",
+    "wait-on": "^9.5.1"
   },
   "build": {
     "appId": "com.secretary.app",
