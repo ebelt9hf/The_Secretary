@@ -7386,20 +7386,6 @@ function openPlanEventModal(prefill = {}) {
         await StorageAPI._persistNoteTier1(noteId, notePath, fullHTML, note);
       }
 
-      const persistPromise = Promise.all([
-        StorageAPI.writeNoteContent(notePath, fullHTML),
-        saveManifest({ force: true }),
-        rebuildIndexHTML(),
-        mainEv ? savePlanner() : Promise.resolve()
-      ]).then(() => {
-        renderFilterChips();
-        if (mainEv) renderPlanner();
-      }).catch(err => {
-        console.error('Failed to persist planner modal note:', err);
-        toast(t('planner.createNoteFailed', { message: err.message }), true);
-      });
-      void persistPromise;
-
       upsertManifest(note);
 
       event.noteId = noteId;
@@ -7408,6 +7394,15 @@ function openPlanEventModal(prefill = {}) {
       event.topic_tags = [...topicTags];
       event.tags = [...new Set([...groupTags, ...majorTags, ...topicTags])];
       event.linkedNoteIds = normalizePlannerLinkedNoteIds([noteId, ...(event.linkedNoteIds || [])], noteId);
+      const liveEv = (isEdit && Array.isArray(plannerEvents)) ? plannerEvents.find(e => e && e.id === event.id) : null;
+      if (liveEv && liveEv !== event) {
+        liveEv.noteId = event.noteId;
+        liveEv.group_tags = [...event.group_tags];
+        liveEv.major_topic_tags = [...event.major_topic_tags];
+        liveEv.topic_tags = [...event.topic_tags];
+        liveEv.tags = [...event.tags];
+        liveEv.linkedNoteIds = [...event.linkedNoteIds];
+      }
       if (mainEv) {
         mainEv.noteId = noteId;
         mainEv.group_tags = [...groupTags];
@@ -7419,6 +7414,30 @@ function openPlanEventModal(prefill = {}) {
       if (hiddenInput) hiddenInput.value = noteId;
       _updatePlannerModalNoteActionButton(noteId);
       window.populatePlannerNoteSelector(noteId);
+
+      const shouldSavePlanner = Boolean(mainEv || liveEv);
+      if (shouldSavePlanner) {
+        renderPlanner();
+        if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+      }
+      renderFilterChips();
+
+      const persistPromise = Promise.all([
+        StorageAPI.writeNoteContent(notePath, fullHTML),
+        saveManifest({ force: true }),
+        rebuildIndexHTML(),
+        shouldSavePlanner ? savePlanner() : Promise.resolve()
+      ]).then(() => {
+        renderFilterChips();
+        if (shouldSavePlanner) {
+          renderPlanner();
+          if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+        }
+      }).catch(err => {
+        console.error('Failed to persist planner modal note:', err);
+        toast(t('planner.createNoteFailed', { message: err.message }), true);
+      });
+      void persistPromise;
 
       if (typeof openNoteOverlay === 'function') {
         openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
@@ -12010,24 +12029,7 @@ async function openNoteForEvent(event) {
           await StorageAPI._persistNoteTier1(noteId, notePath, fullHTML, note);
         }
 
-        const persistPromise = Promise.all([
-          StorageAPI.writeNoteContent(notePath, fullHTML),
-          saveTodosManifest(),
-          saveManifest({ force: true }),
-          rebuildIndexHTML(),
-          savePlanner()
-        ]).then(() => {
-          renderPlanner();
-          renderFilterChips();
-          if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
-          if (typeof broadcastSync === 'function') {
-            broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString(), isInitialCreate: true });
-          }
-        }).catch(e => {
-          console.error('Failed to persist new note for todo bloc:', e);
-          toast(t('planner.createNoteFailed', { message: e.message }) || ('Failed to create note: ' + e.message), true);
-        });
-        void persistPromise;
+        const writeContentPromise = StorageAPI.writeNoteContent(notePath, fullHTML);
 
         upsertManifest(note);
 
@@ -12052,6 +12054,29 @@ async function openNoteForEvent(event) {
           if (!Array.isArray(todo.linkedNoteIds)) todo.linkedNoteIds = [];
           if (!todo.linkedNoteIds.includes(noteId)) todo.linkedNoteIds.push(noteId);
         }
+
+        renderPlanner();
+        renderFilterChips();
+        if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+
+        const persistPromise = Promise.all([
+          writeContentPromise,
+          saveTodosManifest(),
+          saveManifest({ force: true }),
+          rebuildIndexHTML(),
+          savePlanner()
+        ]).then(() => {
+          renderPlanner();
+          renderFilterChips();
+          if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+          if (typeof broadcastSync === 'function') {
+            broadcastSync({ type: 'NOTE_SAVED', noteId, path: notePath, modified: new Date().toISOString(), isInitialCreate: true });
+          }
+        }).catch(e => {
+          console.error('Failed to persist new note for todo bloc:', e);
+          toast(t('planner.createNoteFailed', { message: e.message }) || ('Failed to create note: ' + e.message), true);
+        });
+        void persistPromise;
 
         if (typeof openNoteOverlay === 'function') {
           openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });
@@ -12133,19 +12158,7 @@ async function openNoteForEvent(event) {
       await StorageAPI._persistNoteTier1(noteId, notePath, fullHTML, note);
     }
 
-    const persistPromise = Promise.all([
-      StorageAPI.writeNoteContent(notePath, fullHTML),
-      savePlanner(),
-      saveManifest({ force: true }),
-      rebuildIndexHTML()
-    ]).then(() => {
-      renderPlanner();
-      renderFilterChips();
-    }).catch(err => {
-      console.error('Failed to persist note on demand:', err);
-      toast('Failed to create note: ' + err.message, true);
-    });
-    void persistPromise;
+    const writeContentPromise = StorageAPI.writeNoteContent(notePath, fullHTML);
 
     upsertManifest(note);
 
@@ -12169,6 +12182,25 @@ async function openNoteForEvent(event) {
         }
       });
     }
+
+    renderPlanner();
+    renderFilterChips();
+    if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+
+    const persistPromise = Promise.all([
+      writeContentPromise,
+      savePlanner(),
+      saveManifest({ force: true }),
+      rebuildIndexHTML()
+    ]).then(() => {
+      renderPlanner();
+      renderFilterChips();
+      if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+    }).catch(err => {
+      console.error('Failed to persist note on demand:', err);
+      toast('Failed to create note: ' + err.message, true);
+    });
+    void persistPromise;
 
     if (typeof openNoteOverlay === 'function') {
       openNoteOverlay(notePath, null, null, false, null, { collapseMetadata: true, fromBloc: true, sourceEvent: event });

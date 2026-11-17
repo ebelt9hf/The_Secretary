@@ -562,4 +562,65 @@ describe('Planner Note Opening & Dual-Backend Manifest Indexing Pipeline', () =>
     expect(jsSpy).toHaveBeenCalledTimes(1);
     expect(result).toBe('resolved');
   });
+
+  /**
+   * 1. Protected Behavior: `openNoteForEvent()` links the newly generated note to `event` and `manifest` BEFORE
+   *    calling `savePlanner()` and `saveManifest()`, and immediately refreshes both the calendar (`renderPlanner`)
+   *    and inspector (`renderPlannerInspector`) so `getPlannerEventNoteActionLabel(event)` transitions to Open Note.
+   * 2. Regression Target: Calling `savePlanner()` and `saveManifest()` before `upsertManifest(note)` and
+   *    `event.noteId = noteId`, which persisted the planner without the new note link and left the calendar
+   *    and inspector showing "Generate new note" after closing the note editor.
+   * 3. Coverage Overlap / Redundancy: None; first unit test covering `openNoteForEvent()` persistence ordering and UI refresh.
+   * 4. Production Code Footprint: None; exercises production `openNoteForEvent()` and `getPlannerEventNoteActionLabel()`.
+   */
+  it('links newly generated note on event and manifest before savePlanner and refreshes planner and inspector', async () => {
+    const event = {
+      id: 'evt-gen-1',
+      type: 'work',
+      title: 'Architecture Deep Dive',
+      date: '2026-11-17',
+      startTime: '10:00',
+      endTime: '11:00',
+      group_tags: ['Engineering'],
+      major_topic_tags: [],
+      topic_tags: []
+    };
+    globalThis.plannerEvents = [event];
+
+    let noteIdSeenAtSavePlanner = null;
+    let manifestLenSeenAtWriteManifest = 0;
+
+    vi.spyOn(StorageAPI, 'writeNoteContent').mockResolvedValue(true);
+    vi.spyOn(StorageAPI, 'writeNotesManifest').mockImplementation(async (items) => {
+      manifestLenSeenAtWriteManifest = Array.isArray(items) ? items.length : 0;
+      return true;
+    });
+    vi.spyOn(StorageAPI, 'writeMetadataBuffer').mockResolvedValue(true);
+    vi.spyOn(StorageAPI, 'writeNotesManifestJS').mockResolvedValue(true);
+
+    const savePlannerSpy = vi.fn().mockImplementation(async () => {
+      noteIdSeenAtSavePlanner = event.noteId || null;
+      return true;
+    });
+    const renderPlannerSpy = vi.fn();
+    const renderPlannerInspectorSpy = vi.fn();
+    const openNoteOverlaySpy = vi.fn();
+
+    globalThis.savePlanner = savePlannerSpy;
+    globalThis.renderPlanner = renderPlannerSpy;
+    globalThis.renderPlannerInspector = renderPlannerInspectorSpy;
+    globalThis.openNoteOverlay = openNoteOverlaySpy;
+
+    await openNoteForEvent(event);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(event.noteId).toBeTruthy();
+    expect(noteIdSeenAtSavePlanner).toBe(event.noteId);
+    expect(manifestLenSeenAtWriteManifest).toBe(1);
+    expect(getNoteById(event.noteId)?.title).toBe('Architecture Deep Dive');
+    expect(getPlannerEventNoteActionLabel(event)).toBe(t('planner.openNote'));
+    expect(renderPlannerSpy).toHaveBeenCalled();
+    expect(renderPlannerInspectorSpy).toHaveBeenCalled();
+    expect(openNoteOverlaySpy).toHaveBeenCalledTimes(1);
+  });
 });

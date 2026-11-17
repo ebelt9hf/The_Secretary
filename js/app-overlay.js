@@ -3653,10 +3653,17 @@ async function closeNoteOverlay(forceCloseAll = false) {
         if (typeof renderBoard === 'function') {
           renderBoard();
         }
+        if (activeTab === 'planner') {
+          if (typeof renderPlanner === 'function') renderPlanner();
+          if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+        }
       }
     } else {
       if (activeTab === 'notes' || activeTab === 'todos') {
         renderBoard();
+      } else if (activeTab === 'planner') {
+        if (typeof renderPlanner === 'function') renderPlanner();
+        if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
       } else if (activeTab === 'retro' && typeof renderRetroPanel === 'function') {
         renderRetroPanel();
       }
