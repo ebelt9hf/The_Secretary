@@ -1838,7 +1838,8 @@ async function removeLabelAcrossNotes(type, label) {
 
 /** Parse a note's HTML to extract editable fields. */
 function parseNoteHTML(html) {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const safeHtml = typeof html === 'string' ? html : String(html || '');
+  const doc = new DOMParser().parseFromString(safeHtml, 'text/html');
   const getMeta = name => {
     const c = doc.querySelector(`meta[name="${name}"]`)?.getAttribute('content') || '';
     return c ? decodeTagListFromStorage(c) : [];
@@ -1864,6 +1865,9 @@ function parseNoteHTML(html) {
   return {
     id: doc.querySelector('meta[name="note-id"]')?.getAttribute('content') || '',
     title,
+    date: doc.querySelector('meta[name="date"]')?.getAttribute('content')?.trim()
+      || doc.querySelector('header .date, header .meta .date, .meta .date')?.textContent?.trim()
+      || '',
     group_tags: getMeta('group-tags'),
     major_topic_tags: getMeta('major-topic-tags'),
     topic_tags: getMeta('topic-tags'),
@@ -2242,54 +2246,595 @@ ${cards(getTodosByPriority('Done'))}
   await StorageAPI.writeTodosIndex(html);
 }
 
+const RECOVERED_DUPLICATE_WINDOW_MS = 30 * 60 * 1000;
+let _stagedRecoveredNotes = [];
+
+function _normalizeRecoveredTitle(title) {
+  return String(title || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function _extractRecoveredDate(entry) {
+  const explicit = String(entry?.date || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(explicit)) return explicit.slice(0, 10);
+  const ts = _extractRecoveredNoteTimestamp(entry);
+  if (ts !== null) {
+    return new Date(ts).toISOString().slice(0, 10);
+  }
+  return explicit;
+}
+
+function _extractRecoveredNoteTimestamp(entry) {
+  if (!entry) return null;
+  if (typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt)) {
+    return entry.updatedAt;
+  }
+  const mod = String(entry.modified || '').trim();
+  if (mod) {
+    const parsed = Date.parse(mod);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  const idStr = String(entry.id || entry.path || '');
+  const match = idStr.match(/note-(\d{12,14})/);
+  if (match) {
+    const num = Number(match[1]);
+    if (Number.isFinite(num)) return num;
+  }
+  return null;
+}
+
+function findRecoveredNoteDuplicate(candidateEntry, existingList = []) {
+  const normTitle = _normalizeRecoveredTitle(candidateEntry?.title);
+  if (!normTitle) return null;
+  const candDate = _extractRecoveredDate(candidateEntry);
+  if (!candDate) return null;
+  const candTs = _extractRecoveredNoteTimestamp(candidateEntry);
+
+  for (const existing of (existingList || [])) {
+    if (!existing) continue;
+    if (candidateEntry.id && existing.id && candidateEntry.id === existing.id) continue;
+    if (candidateEntry.path && existing.path && candidateEntry.path === existing.path) continue;
+    const existTitle = _normalizeRecoveredTitle(existing.title);
+    if (!existTitle || existTitle !== normTitle) continue;
+    const existDate = _extractRecoveredDate(existing);
+    if (!existDate || existDate !== candDate) continue;
+
+    const existTs = _extractRecoveredNoteTimestamp(existing);
+    if (candTs !== null && existTs !== null) {
+      const diffMs = Math.abs(candTs - existTs);
+      if (diffMs > RECOVERED_DUPLICATE_WINDOW_MS) continue;
+      return {
+        id: existing.id || '',
+        path: existing.path || '',
+        title: existing.title || '',
+        date: existDate,
+        timeDiffMinutes: Math.round(diffMs / 60000)
+      };
+    }
+
+    return {
+      id: existing.id || '',
+      path: existing.path || '',
+      title: existing.title || '',
+      date: existDate,
+      timeDiffMinutes: null
+    };
+  }
+  return null;
+}
+
+function _buildRecoveredManifestEntry(raw, fallbackPath = '') {
+  const id = String(raw?.id || '').trim() || (typeof generateNoteId === 'function' ? generateNoteId() : ('note-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)));
+  const path = String(raw?.path || fallbackPath || '').trim() || (typeof getCanonicalNotePath === 'function' ? getCanonicalNotePath(id) : `notes/${id}.html`);
+  const title = String(raw?.title || '').trim() || path.split('/').pop().replace(/\.html$/, '') || (typeof t === 'function' ? t('common.untitledNote') : 'Untitled Note');
+  return {
+    id,
+    title,
+    path,
+    group_tags: Array.isArray(raw?.group_tags) ? [...raw.group_tags] : [],
+    major_topic_tags: Array.isArray(raw?.major_topic_tags) ? [...raw.major_topic_tags] : [],
+    topic_tags: Array.isArray(raw?.topic_tags) ? [...raw.topic_tags] : [],
+    extra_tags: Array.isArray(raw?.extra_tags) ? [...raw.extra_tags] : [],
+    workstream: raw?.workstream || '',
+    workstreams: Array.isArray(raw?.workstreams) ? [...raw.workstreams] : (raw?.workstream ? [raw.workstream] : []),
+    date: String(raw?.date || '').trim(),
+    modified: raw?.modified || '',
+    updatedAt: typeof raw?.updatedAt === 'number' ? raw.updatedAt : undefined,
+    summary: raw?.summary || '',
+  };
+}
+
 async function rebuildAll() {
   try {
-    // 1. Find all .html files under notes/
-    const htmlFiles = await StorageAPI.listNoteFiles();
+    const engine = (typeof StorageAPI !== 'undefined' && typeof StorageAPI.getStorageEngine === 'function')
+      ? StorageAPI.getStorageEngine()
+      : 'filesystem';
+    const hasLocalFS = Boolean(
+      (typeof window !== 'undefined' && window.AppBridge?.fs?.hasNativeFS?.()) ||
+      (typeof rootHandle !== 'undefined' && rootHandle)
+    );
 
-    // 2. Remove manifest entries for missing files
-    const before = manifest.length;
-    manifest = manifest.filter(m => htmlFiles.includes(m.path));
-    const removed = before - manifest.length;
+    const recoveredNotes = [];
+    const seenRecoveredKeys = new Set();
+    let removed = 0;
 
-    // 3. Add manifest entries for orphan files
-    let added = 0;
-    for (const path of htmlFiles) {
-      if (!manifest.some(m => m.path === path)) {
+    const isRegistered = (id, path) => {
+      return manifest.some(m => (id && m.id === id) || (path && m.path === path));
+    };
+
+    const stageRecovered = (rawEntry, source, rawHtml = '') => {
+      const entry = _buildRecoveredManifestEntry(rawEntry);
+      if (isRegistered(entry.id, entry.path)) return false;
+      const dedupKey = entry.id || entry.path;
+      if (seenRecoveredKeys.has(dedupKey)) return false;
+      seenRecoveredKeys.add(dedupKey);
+
+      const duplicateOf = findRecoveredNoteDuplicate(entry, [
+        ...manifest,
+        ...recoveredNotes.map(r => r.note)
+      ]);
+
+      recoveredNotes.push({
+        note: entry,
+        source,
+        rawHtml: String(rawHtml || ''),
+        duplicateOf,
+        finalized: false
+      });
+      return true;
+    };
+
+    // 1. Local filesystem scan (when local FS is active and not in firebase-only mode)
+    if (engine !== 'firebase' && hasLocalFS && typeof StorageAPI?.listNoteFiles === 'function') {
+      const htmlFiles = await StorageAPI.listNoteFiles();
+      const safeHtmlFiles = Array.isArray(htmlFiles) ? htmlFiles.filter(p => typeof p === 'string' && p.endsWith('.html')) : [];
+      const before = manifest.length;
+      manifest = manifest.filter(m => m && safeHtmlFiles.includes(m.path));
+      removed = before - manifest.length;
+      if (removed > 0 && typeof syncMetadataIndexes === 'function') {
+        syncMetadataIndexes();
+      }
+
+      for (const path of safeHtmlFiles) {
+        if (manifest.some(m => m && m.path === path)) continue;
         try {
           const html = await StorageAPI.readNoteContent(path);
-          if (!html.trim()) continue; // Ignore completely empty files
+          if (typeof html !== 'string' || !html.trim()) continue;
           const meta = parseNoteHTML(html);
-          if (!meta.mainHTML.trim()) continue; // Ignore files with no <main> content (nav/index files)
-          manifest.push({
-            id: meta.id || '',
-            title: meta.title || path.split('/').pop().replace(/\.html$/, ''),
-            path,
-            group_tags: meta.group_tags || [],
-            major_topic_tags: meta.major_topic_tags || [],
-            topic_tags: meta.topic_tags || [],
-            extra_tags: meta.extra_tags || [],
-            date: '',
-            modified: new Date().toISOString(),
-          });
-          added++;
+          if (!meta || !String(meta.mainHTML || '').trim()) continue;
+          stageRecovered({ ...meta, path }, 'local', html);
         } catch (e) {
           console.warn('Failed to parse orphan note', path, e);
         }
       }
     }
 
-    await saveManifest({ force: true });
-    await rebuildIndexHTML();
-    // 4. Refresh the UI to reflect manifest changes
-    renderFilterChips();
-    renderBoard();
+    // 2. Firebase cloud vault scan
+    if (engine === 'firebase' && typeof FirebaseSyncService !== 'undefined' && FirebaseSyncService.state?.isUnlocked && typeof FirebaseSyncService.getAllNotes === 'function') {
+      try {
+        const remoteNotes = await FirebaseSyncService.getAllNotes();
+        for (const rec of (remoteNotes || [])) {
+          if (!rec || rec.deleted || rec.meta?.deleted) continue;
+          const id = String(rec.id || '').trim();
+          const path = String(rec.path || '').trim() || (id && typeof getCanonicalNotePath === 'function' ? getCanonicalNotePath(id) : '');
+          if (isRegistered(id, path)) continue;
+          const html = String(rec.contentHtml || rec.html || '').trim();
+          const meta = html ? parseNoteHTML(html) : {};
+          if (!html && !rec.title) continue;
+          if (html && !String(meta.mainHTML || '').trim() && !rec.title) continue;
+          stageRecovered({
+            id: id || meta.id,
+            path,
+            title: rec.title || meta.title,
+            date: rec.date || meta.date || '',
+            group_tags: rec.group_tags || meta.group_tags || [],
+            major_topic_tags: rec.major_topic_tags || meta.major_topic_tags || [],
+            topic_tags: rec.topic_tags || meta.topic_tags || [],
+            extra_tags: rec.extra_tags || meta.extra_tags || [],
+            workstream: rec.workstream || meta.workstream || '',
+            workstreams: rec.workstreams || meta.workstreams || [],
+            modified: rec.modified || (rec.updatedAt ? new Date(rec.updatedAt).toISOString() : ''),
+            updatedAt: rec.updatedAt,
+            summary: rec.summary || meta.summary || '',
+          }, 'firebase', html);
+        }
+      } catch (e) {
+        console.warn('Firebase orphan note scan warning:', e);
+      }
+    }
 
-    const parts = ['✅ Rebuilt'];
-    if (added) parts.push(`+${added} orphan${added > 1 ? 's' : ''}`);
-    if (removed) parts.push(`−${removed} missing`);
-    toast(parts.join(' · '));
-  } catch (e) { toast(t('common.rebuildError', { message: e.message }), true); }
+    // 3. IndexedDB (VaultIDBStorage) scan
+    if (typeof VaultIDBStorage !== 'undefined' && typeof VaultIDBStorage.getAllNotes === 'function') {
+      try {
+        const idbNotes = await VaultIDBStorage.getAllNotes();
+        for (const rec of (idbNotes || [])) {
+          if (!rec || rec.deleted || rec.meta?.deleted) continue;
+          let resolved = rec;
+          if ((rec.ciphertext || rec.meta?.ciphertext) && typeof FirebaseSyncService !== 'undefined' && FirebaseSyncService.state?.isUnlocked && typeof FirebaseSyncService.getNote === 'function') {
+            try {
+              const dec = await FirebaseSyncService.getNote(rec.id);
+              if (dec) resolved = dec;
+            } catch (_) { /* ignore undecryptable record */ }
+          }
+          if (resolved.ciphertext || resolved.meta?.ciphertext) continue;
+          const id = String(resolved.id || '').trim();
+          const path = String(resolved.path || '').trim() || (id && typeof getCanonicalNotePath === 'function' ? getCanonicalNotePath(id) : '');
+          if (isRegistered(id, path)) continue;
+          const html = String(resolved.contentHtml || resolved.html || '').trim();
+          const meta = html ? parseNoteHTML(html) : {};
+          if (!html && !resolved.title) continue;
+          if (html && !String(meta.mainHTML || '').trim() && !resolved.title) continue;
+          stageRecovered({
+            id: id || meta.id,
+            path,
+            title: resolved.title || meta.title,
+            date: resolved.date || meta.date || '',
+            group_tags: resolved.group_tags || meta.group_tags || [],
+            major_topic_tags: resolved.major_topic_tags || meta.major_topic_tags || [],
+            topic_tags: resolved.topic_tags || meta.topic_tags || [],
+            extra_tags: resolved.extra_tags || meta.extra_tags || [],
+            workstream: resolved.workstream || meta.workstream || '',
+            workstreams: resolved.workstreams || meta.workstreams || [],
+            modified: resolved.modified || (resolved.updatedAt ? new Date(resolved.updatedAt).toISOString() : ''),
+            updatedAt: resolved.updatedAt,
+            summary: resolved.summary || meta.summary || '',
+          }, 'indexeddb', html);
+        }
+      } catch (e) {
+        console.warn('IndexedDB orphan note scan warning:', e);
+      }
+    }
+
+    // 4. In-memory cache scan (StorageAPI._noteCache)
+    if (typeof StorageAPI !== 'undefined' && StorageAPI._noteCache instanceof Map) {
+      for (const [path, html] of StorageAPI._noteCache.entries()) {
+        if (!path || !String(path).startsWith('notes/') || !String(path).endsWith('.html')) continue;
+        if (typeof html !== 'string' || !html.trim()) continue;
+        if (isRegistered('', path)) continue;
+        try {
+          const meta = parseNoteHTML(html);
+          if (!meta || !String(meta.mainHTML || '').trim()) continue;
+          if (isRegistered(meta.id, path)) continue;
+          stageRecovered({ ...meta, path }, 'memory', html);
+        } catch (e) {
+          console.warn('Failed to parse in-memory cached note', path, e);
+        }
+      }
+    }
+
+    _stagedRecoveredNotes = recoveredNotes;
+
+    if (removed > 0) {
+      await saveManifest({ force: true });
+      await rebuildIndexHTML();
+      if (typeof renderFilterChips === 'function') renderFilterChips();
+      if (typeof renderBoard === 'function') renderBoard();
+    }
+
+    if (recoveredNotes.length > 0) {
+      toast(t('recovery.foundToast', { count: recoveredNotes.length }) || `Found ${recoveredNotes.length} unregistered note(s) ready for review`);
+      if (typeof openRecoveredNotesModal === 'function') {
+        openRecoveredNotesModal(recoveredNotes);
+      }
+    } else if (removed > 0) {
+      const details = `-${removed}`;
+      toast(t('recovery.rebuiltSummary', { details }) || `Rebuilt: ${details}`);
+    } else {
+      toast(t('recovery.rebuiltNoChanges') || 'Index is up to date');
+    }
+
+    return recoveredNotes;
+  } catch (e) {
+    toast(t('common.rebuildError', { message: e.message }), true);
+    return [];
+  }
+}
+
+function _getRecoveredSourceLabel(source) {
+  switch (source) {
+    case 'firebase': return (typeof t === 'function' ? t('recovery.sourceFirebase') : '') || 'Firebase Cloud';
+    case 'indexeddb': return (typeof t === 'function' ? t('recovery.sourceIndexeddb') : '') || 'Browser Cache (IndexedDB)';
+    case 'memory': return (typeof t === 'function' ? t('recovery.sourceMemory') : '') || 'Memory';
+    default: return (typeof t === 'function' ? t('recovery.sourceLocal') : '') || 'Local';
+  }
+}
+
+function _ensureRecoveredNotesModalElement() {
+  let modal = document.getElementById('recovered-notes-modal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'recovered-notes-modal';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:680px;width:94%;max-height:85vh;display:flex;flex-direction:column;">
+      <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <h3 id="recovered-notes-modal-title" style="margin:0;"></h3>
+        <button type="button" class="btn-icon" id="recovered-notes-close-x" onclick="closeModal('recovered-notes-modal')" title="">&#10005;</button>
+      </div>
+      <p id="recovered-notes-modal-desc" style="margin:6px 0 12px;font-size:0.85rem;color:var(--text-muted);"></p>
+      <div id="recovered-notes-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;padding-right:2px;"></div>
+      <div class="modal-actions" style="margin-top:14px;display:flex;justify-content:space-between;gap:8px;">
+        <button type="button" class="btn primary" id="recovered-notes-merge-all-btn" onclick="finalizeAllNonDuplicateRecoveredNotes()" title=""></button>
+        <button type="button" class="btn" id="recovered-notes-close-btn" onclick="closeModal('recovered-notes-modal')" title=""></button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function _findStagedRecoveredItem(noteIdOrPath) {
+  return _stagedRecoveredNotes.find(item => item && item.note && (item.note.id === noteIdOrPath || item.note.path === noteIdOrPath)) || null;
+}
+
+function previewRecoveredNoteReadOnly(notePath) {
+  if (!notePath || typeof openNoteOverlay !== 'function') return;
+  const staged = _findStagedRecoveredItem(notePath);
+  const previewOpts = {
+    viewMode: true,
+    sameWindow: true,
+    previewOnly: true,
+    ...(staged && staged.rawHtml ? { previewHtml: staged.rawHtml } : {})
+  };
+  return Promise.resolve(openNoteOverlay(notePath, null, null, false, null, previewOpts)).then(() => {
+    const overlay = document.getElementById('note-edit-overlay');
+    if (overlay) overlay.style.zIndex = '10001';
+  });
+}
+
+async function finalizeRecoveredNote(noteId, options = {}) {
+  const { save = true, silent = false, rowId = '' } = options;
+  const staged = _findStagedRecoveredItem(noteId);
+  const note = staged?.note
+    || (typeof getNoteById === 'function' ? getNoteById(noteId) : null)
+    || (typeof manifest !== 'undefined' && Array.isArray(manifest) ? manifest.find(n => n && n.id === noteId) : null);
+  if (!note) return null;
+
+  if (staged && !staged.finalized) {
+    if (!note.modified) {
+      note.modified = new Date().toISOString();
+    }
+    if (staged.rawHtml && (staged.source === 'indexeddb' || staged.source === 'memory' || staged.source === 'firebase')) {
+      if (typeof StorageAPI !== 'undefined') {
+        if (StorageAPI._noteCache instanceof Map) {
+          StorageAPI._noteCache.set(note.path, staged.rawHtml);
+        }
+        if ((staged.source === 'indexeddb' || staged.source === 'memory') && typeof StorageAPI.writeNoteContent === 'function') {
+          await StorageAPI.writeNoteContent(note.path, staged.rawHtml);
+        }
+      }
+    }
+    if (typeof upsertManifest === 'function') {
+      upsertManifest(note);
+    } else if (typeof manifest !== 'undefined' && Array.isArray(manifest) && !manifest.some(m => m && m.id === note.id)) {
+      manifest.push(note);
+    }
+    staged.finalized = true;
+  }
+
+  if (save) {
+    if (typeof saveManifest === 'function') await saveManifest({ force: true });
+    if (typeof rebuildIndexHTML === 'function') await rebuildIndexHTML();
+    if (typeof renderFilterChips === 'function') renderFilterChips();
+    if (typeof renderBoard === 'function') renderBoard();
+  }
+
+  const resolvedRowId = rowId || (staged ? `recovered-note-row-${_stagedRecoveredNotes.indexOf(staged)}` : '');
+  const rowEl = resolvedRowId ? document.getElementById(resolvedRowId) : null;
+  if (rowEl) {
+    const badgeEl = rowEl.querySelector('.recovered-note-status');
+    if (badgeEl && badgeEl.style.display === 'none') {
+      badgeEl.textContent = t('recovery.mergedBadge') || 'Merged';
+      badgeEl.style.display = 'inline-block';
+    }
+    const mergeBtn = rowEl.querySelector('.recovered-note-merge-btn');
+    if (mergeBtn) mergeBtn.disabled = true;
+  }
+
+  if (!silent) {
+    toast(t('recovery.mergedToast', { title: note.title || '' }) || `Recovered note "${note.title || ''}" merged into index`);
+  }
+
+  return (typeof getNoteById === 'function' ? getNoteById(note.id) : null) || note;
+}
+
+async function finalizeAllNonDuplicateRecoveredNotes() {
+  let count = 0;
+  for (let i = 0; i < _stagedRecoveredNotes.length; i++) {
+    const item = _stagedRecoveredNotes[i];
+    if (!item || item.finalized || item.duplicateOf) continue;
+    await finalizeRecoveredNote(item.note.id, { save: false, silent: true, rowId: `recovered-note-row-${i}` });
+    count++;
+  }
+  if (count > 0) {
+    if (typeof saveManifest === 'function') await saveManifest({ force: true });
+    if (typeof rebuildIndexHTML === 'function') await rebuildIndexHTML();
+    if (typeof renderFilterChips === 'function') renderFilterChips();
+    if (typeof renderBoard === 'function') renderBoard();
+    toast(t('recovery.mergedAllToast', { count }) || `Merged ${count} recovered note(s) into index`);
+  }
+  return count;
+}
+
+async function assignRecoveredNoteToBloc(noteId, selectId, rowId) {
+  const selectEl = document.getElementById(selectId);
+  const eventId = selectEl ? String(selectEl.value || '').trim() : '';
+  if (!eventId) {
+    toast(t('recovery.selectBlocFirst') || 'Please select a calendar bloc first', true);
+    return false;
+  }
+
+  const events = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) ? plannerEvents : [];
+  const event = events.find(e => e && e.id === eventId);
+  if (!event) return false;
+
+  const note = await finalizeRecoveredNote(noteId, { save: false, silent: true, rowId });
+  if (!note) return false;
+
+  event.noteId = note.id;
+  if (typeof normalizePlannerLinkedNoteIds === 'function') {
+    event.linkedNoteIds = normalizePlannerLinkedNoteIds([note.id, ...(event.linkedNoteIds || [])], note.id);
+  } else {
+    const existing = Array.isArray(event.linkedNoteIds) ? event.linkedNoteIds : [];
+    event.linkedNoteIds = [note.id, ...existing.filter(id => id !== note.id)];
+  }
+
+  if (event.type === 'call' || event.type === 'sync') {
+    events.forEach(pe => {
+      if (pe && pe.type === 'prep' && pe.prepForEventId === event.id) {
+        pe.noteId = note.id;
+        if (typeof normalizePlannerLinkedNoteIds === 'function') {
+          pe.linkedNoteIds = normalizePlannerLinkedNoteIds([note.id, ...(pe.linkedNoteIds || [])], note.id);
+        } else {
+          const peExisting = Array.isArray(pe.linkedNoteIds) ? pe.linkedNoteIds : [];
+          pe.linkedNoteIds = [note.id, ...peExisting.filter(id => id !== note.id)];
+        }
+      }
+    });
+  }
+
+  if (event.workstream && !note.workstream) {
+    note.workstream = event.workstream;
+    if (Array.isArray(event.workstreams) && event.workstreams.length) {
+      note.workstreams = [...event.workstreams];
+    }
+  }
+
+  if (typeof syncTagsBetweenBlocAndNote === 'function') {
+    await syncTagsBetweenBlocAndNote(event, note);
+  }
+  if (typeof upsertManifest === 'function') upsertManifest(note);
+  if (typeof saveManifest === 'function') await saveManifest({ force: true });
+  if (typeof rebuildIndexHTML === 'function') await rebuildIndexHTML();
+  if (typeof savePlanner === 'function') await savePlanner();
+  if (typeof renderPlanner === 'function') renderPlanner();
+  if (typeof renderPlannerInspector === 'function') renderPlannerInspector();
+  if (typeof renderBoard === 'function') renderBoard();
+  if (typeof renderFilterChips === 'function') renderFilterChips();
+
+  const rowEl = rowId ? document.getElementById(rowId) : null;
+  if (rowEl) {
+    const badgeEl = rowEl.querySelector('.recovered-note-status');
+    if (badgeEl) {
+      badgeEl.textContent = t('recovery.assignedBadge') || 'Linked';
+      badgeEl.style.display = 'inline-block';
+    }
+  }
+
+  toast(t('recovery.assignedToast', { title: event.title || '' }) || `Note linked to "${event.title || ''}" and tags synced`);
+  return true;
+}
+
+function openRecoveredNotesModal(recoveredNotes = []) {
+  if (!Array.isArray(recoveredNotes) || recoveredNotes.length === 0) return;
+  _stagedRecoveredNotes = recoveredNotes;
+  const modal = _ensureRecoveredNotesModalElement();
+  const titleEl = document.getElementById('recovered-notes-modal-title');
+  const descEl = document.getElementById('recovered-notes-modal-desc');
+  const closeX = document.getElementById('recovered-notes-close-x');
+  const mergeAllBtn = document.getElementById('recovered-notes-merge-all-btn');
+  const closeBtn = document.getElementById('recovered-notes-close-btn');
+  const listEl = document.getElementById('recovered-notes-list');
+
+  if (titleEl) titleEl.textContent = t('recovery.modalTitle') || 'Recovered Notes';
+  if (descEl) descEl.textContent = t('recovery.modalDesc') || 'The following saved notes were not registered in the index and have been recovered.';
+  if (closeX) closeX.title = t('recovery.closeBtnTooltip') || 'Close recovered notes dialog';
+  if (mergeAllBtn) {
+    mergeAllBtn.textContent = t('recovery.mergeAllBtn') || 'Merge Non-Duplicates';
+    mergeAllBtn.title = t('recovery.mergeAllBtnTooltip') || 'Register all non-duplicate recovered notes into your index';
+  }
+  if (closeBtn) {
+    closeBtn.textContent = t('recovery.closeBtn') || 'Close';
+    closeBtn.title = t('recovery.closeBtnTooltip') || 'Close recovered notes dialog';
+  }
+
+  const events = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) ? plannerEvents : [];
+  const assignableEvents = events
+    .filter(e => e && e.id && e.type !== 'ooo' && e.type !== 'personal' && e.type !== 'custom')
+    .slice()
+    .sort((a, b) => `${b.date || ''} ${b.startTime || ''}`.localeCompare(`${a.date || ''} ${a.startTime || ''}`));
+
+  const placeholderLabel = t('recovery.selectBlocPlaceholder') || 'Select a calendar bloc...';
+  const noBlocsLabel = t('recovery.noBlocsAvailable') || 'No calendar blocs available';
+  const selectTooltip = t('recovery.selectBlocTooltip') || 'Choose a calendar bloc to link this note to';
+  const openTooltip = t('recovery.openReadOnlyTooltip') || 'Open note in read-only view';
+  const assignLabel = t('recovery.assignBtn') || 'Assign';
+  const assignTooltip = t('recovery.assignBtnTooltip') || 'Link this note to the selected bloc and inherit its tags';
+  const mergeLabel = t('recovery.mergeBtn') || 'Merge';
+  const mergeTooltip = t('recovery.mergeBtnTooltip') || 'Register this recovered note into your index';
+  const dupBadgeLabel = t('recovery.duplicateBadge') || 'Possible duplicate';
+
+  const optionsHtml = assignableEvents.length > 0
+    ? `<option value="">${escH(placeholderLabel)}</option>` + assignableEvents.map(ev => {
+      const label = [ev.date, ev.startTime, ev.title].filter(Boolean).join(' · ');
+      return `<option value="${escA(ev.id)}">${escH(label)}</option>`;
+    }).join('')
+    : `<option value="">${escH(noBlocsLabel)}</option>`;
+
+  if (listEl) {
+    listEl.innerHTML = recoveredNotes.map((item, idx) => {
+      const note = item?.note || item;
+      const sourceLabel = _getRecoveredSourceLabel(item?.source || 'local');
+      const selectId = `recovered-bloc-select-${idx}`;
+      const rowId = `recovered-note-row-${idx}`;
+      const dateHtml = note.date ? `<span style="font-size:0.75rem;color:var(--text-muted);">${escH(note.date)}</span>` : '';
+      const dupTip = item?.duplicateOf
+        ? (t('recovery.duplicateTooltip', { date: item.duplicateOf.date || '' }) || `A note with the same title on ${item.duplicateOf.date || ''} already exists in your index`)
+        : '';
+      const dupHtml = item?.duplicateOf
+        ? `<span class="recovered-note-duplicate-badge" title="${escA(dupTip)}" style="font-size:0.72rem;padding:2px 6px;border-radius:999px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">${escH(dupBadgeLabel)}</span>`
+        : '';
+      return `
+        <div id="${escA(rowId)}" class="recovered-note-row" style="border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--card-bg);">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn-link recovered-note-preview-btn" onclick="previewRecoveredNoteReadOnly(${jq(note.path)})" title="${escA(openTooltip)}" style="background:none;border:none;padding:0;text-align:left;font-weight:600;font-size:0.9rem;color:var(--accent);cursor:pointer;text-decoration:underline;">
+              ${escH(note.title || note.path)}
+            </button>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              ${dateHtml}
+              <span class="recovered-note-source-badge" style="font-size:0.72rem;padding:2px 6px;border-radius:999px;background:var(--card-bg-alt);border:1px solid var(--card-border);color:var(--text-muted);">${escH(sourceLabel)}</span>
+              ${dupHtml}
+              <span class="recovered-note-status" style="display:none;font-size:0.72rem;padding:2px 6px;border-radius:999px;background:var(--accent);color:#fff;"></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <select id="${escA(selectId)}" name="${escA(selectId)}" class="field-input" title="${escA(selectTooltip)}" style="flex:1;min-width:0;" ${assignableEvents.length === 0 ? 'disabled' : ''}>
+              ${optionsHtml}
+            </select>
+            <button type="button" class="btn primary" onclick="assignRecoveredNoteToBloc(${jq(note.id)}, ${jq(selectId)}, ${jq(rowId)})" title="${escA(assignTooltip)}" ${assignableEvents.length === 0 ? 'disabled' : ''}>
+              ${escH(assignLabel)}
+            </button>
+            <button type="button" class="btn recovered-note-merge-btn" onclick="finalizeRecoveredNote(${jq(note.id)}, { rowId: ${jq(rowId)} })" title="${escA(mergeTooltip)}">
+              ${escH(mergeLabel)}
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (typeof openModal === 'function') {
+    openModal('recovered-notes-modal');
+  } else {
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.openRecoveredNotesModal = openRecoveredNotesModal;
+  window.previewRecoveredNoteReadOnly = previewRecoveredNoteReadOnly;
+  window.assignRecoveredNoteToBloc = assignRecoveredNoteToBloc;
+  window.finalizeRecoveredNote = finalizeRecoveredNote;
+  window.finalizeAllNonDuplicateRecoveredNotes = finalizeAllNonDuplicateRecoveredNotes;
+  window.findRecoveredNoteDuplicate = findRecoveredNoteDuplicate;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis.openRecoveredNotesModal = openRecoveredNotesModal;
+  globalThis.previewRecoveredNoteReadOnly = previewRecoveredNoteReadOnly;
+  globalThis.assignRecoveredNoteToBloc = assignRecoveredNoteToBloc;
+  globalThis.finalizeRecoveredNote = finalizeRecoveredNote;
+  globalThis.finalizeAllNonDuplicateRecoveredNotes = finalizeAllNonDuplicateRecoveredNotes;
+  globalThis.findRecoveredNoteDuplicate = findRecoveredNoteDuplicate;
 }
 // LEGACY — replaced by loadTodosManifest / saveTodosManifest
 async function loadTodosOrder() { return { High: [], Medium: [], Low: [], Done: [] }; }

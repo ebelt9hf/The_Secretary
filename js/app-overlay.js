@@ -1376,7 +1376,7 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
   dismissReloadBanner(); // always hide the "updated in another window" banner on fresh open
   if (path) {
     try {
-      let html = (StorageAPI && StorageAPI.getNoteFromCache(path)) || await StorageAPI.readNoteContent(path);
+      let html = options?.previewHtml || (StorageAPI && StorageAPI.getNoteFromCache(path)) || await StorageAPI.readNoteContent(path);
       const meta = (typeof getMetaByPath === 'function' ? getMetaByPath(path) : null)
         || (typeof getMetaById === 'function' ? getMetaById(path) : null)
         || (manifest && manifest.find(m => m.path === path || m.id === path))
@@ -1409,7 +1409,7 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
         extra_tags: (parsed.extra_tags && parsed.extra_tags.length) ? parsed.extra_tags : (meta.extra_tags || []),
         summary: parsed.summary || meta.summary || ''
       };
-      if (typeof upsertManifest === 'function' && currentNote.path) {
+      if (!options?.previewOnly && typeof upsertManifest === 'function' && currentNote.path) {
         const curMan = (typeof manifest !== 'undefined' && Array.isArray(manifest)) ? manifest : [];
         if (!curMan.some(m => m && m.path === currentNote.path)) {
           upsertManifest(currentNote);
