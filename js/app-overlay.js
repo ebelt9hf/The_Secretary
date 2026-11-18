@@ -3675,6 +3675,17 @@ async function closeNoteOverlay(forceCloseAll = false) {
     setSaveIndicator('');
     _noteCloseInProgress = false;
   }
+  if (typeof window !== 'undefined' && window._restoreRecoveredNotesModalOnClose) {
+    window._restoreRecoveredNotesModalOnClose = false;
+    const recModal = document.getElementById('recovered-notes-modal');
+    if (recModal) {
+      if (typeof openModal === 'function') openModal('recovered-notes-modal');
+      else {
+        recModal.style.display = 'flex';
+        recModal.classList.add('active');
+      }
+    }
+  }
   if (window.syncFloatingChatContext) window.syncFloatingChatContext();
 }
 

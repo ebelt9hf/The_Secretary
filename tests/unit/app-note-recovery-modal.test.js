@@ -300,20 +300,27 @@ describe('Orphan Note Recovery (Local, Firebase, IndexedDB, Memory), Duplicate D
   });
 
   /**
-   * 1. Protected Behavior: `previewRecoveredNoteReadOnly()` opens the staged note in read-only mode
-   *    (`viewMode: true, sameWindow: true, previewOnly: true, previewHtml`) above `#recovered-notes-modal`.
-   * 2. Regression Target: Clicking a recovered note opening in edit mode, auto-merging into `manifest`, or rendering underneath the modal.
-   * 3. Coverage Overlap / Redundancy: None; tests read-only preview from the recovery modal.
+   * 1. Protected Behavior: `previewRecoveredNoteReadOnly()` hides `#recovered-notes-modal`, sets
+   *    `_restoreRecoveredNotesModalOnClose = true`, and opens the staged note in read-only mode
+   *    (`viewMode: true, sameWindow: true, previewOnly: true, previewHtml`) without auto-merging it.
+   * 2. Regression Target: Note editor rendering underneath `#recovered-notes-modal` due to `.modal-overlay`
+   *    stacking context, or previewing auto-merging the note into `manifest`.
+   * 3. Coverage Overlap / Redundancy: None; tests read-only preview and modal hide/restore handoff.
    * 4. Production Code Footprint: None; exercises `previewRecoveredNoteReadOnly()`.
    */
-  it('opens staged recovered note in read-only view without auto-merging it', async () => {
+  it('hides recovery modal when previewing staged note read-only and does not auto-merge', async () => {
     const html = '<!DOCTYPE html><html><head><title>Preview Only</title><meta name="note-id" content="note-prev-1"></head><body><main><p>Preview body</p></main></body></html>';
     StorageAPI._noteCache.set('notes/note-prev-1.html', html);
     vi.spyOn(VaultIDBStorage, 'getAllNotes').mockResolvedValue([]);
 
     await rebuildAll();
+    const recModal = document.getElementById('recovered-notes-modal');
+    expect(recModal.classList.contains('active')).toBe(true);
+
     await previewRecoveredNoteReadOnly('notes/note-prev-1.html');
 
+    expect(recModal.classList.contains('active')).toBe(false);
+    expect(window._restoreRecoveredNotesModalOnClose).toBe(true);
     expect(globalThis.openNoteOverlay).toHaveBeenCalledWith(
       'notes/note-prev-1.html',
       null,
@@ -322,24 +329,33 @@ describe('Orphan Note Recovery (Local, Firebase, IndexedDB, Memory), Duplicate D
       null,
       { viewMode: true, sameWindow: true, previewOnly: true, previewHtml: html }
     );
-    expect(document.getElementById('note-edit-overlay').style.zIndex).toBe('10001');
     expect(getNoteById('note-prev-1')).toBeNull();
   });
 
   /**
-   * 1. Protected Behavior: `assignRecoveredNoteToBloc()` finalizes the staged note into `manifest`, links it to
-   *    the selected bloc (and linked prep blocs), copies the bloc's tags and workstream onto the note, and persists.
-   * 2. Regression Target: Assigning a staged note to a bloc failing to finalize it, transfer tags/workstream, or save planner.
-   * 3. Coverage Overlap / Redundancy: None; tests bloc assignment & tag inheritance from the recovery modal.
-   * 4. Production Code Footprint: None; exercises `openRecoveredNotesModal()` and `assignRecoveredNoteToBloc()`.
+   * 1. Protected Behavior: `openRecoveredBlocPickerModal()` displays each bloc's date comparison (`Same date` vs
+   *    `Different date` relative to the note date) and linked-note status (`Already linked: ...` vs `No note linked`),
+   *    and `assignRecoveredNoteToBlocById()` finalizes the staged note, links it to the bloc, and inherits tags/workstream.
+   * 2. Regression Target: Assigning a note to a bloc without visibility into date mismatch or existing linked notes,
+   *    or failing to finalize the note, transfer tags/workstream, and close the picker modal.
+   * 3. Coverage Overlap / Redundancy: None; tests the dedicated bloc picker modal and assignment flow.
+   * 4. Production Code Footprint: None; exercises `openRecoveredBlocPickerModal()` and `assignRecoveredNoteToBlocById()`.
    */
-  it('finalizes staged note when assigned to a calendar bloc and inherits bloc tags and workstream', async () => {
+  it('shows date match and existing linked note status in bloc picker modal and assigns selected bloc', async () => {
+    const existingLinkedNote = {
+      id: 'note-existing-linked',
+      path: 'notes/note-existing-linked.html',
+      title: 'Existing Linked Note',
+      date: '2026-11-17'
+    };
+    upsertManifest(existingLinkedNote);
+
     const rawNoteHtml = '<!DOCTYPE html><html><head><title>Recovered Sync Note</title><meta name="note-id" content="note-rec-1"><meta name="date" content="2026-11-17"></head><body><main><p>Notes</p></main></body></html>';
     vi.spyOn(VaultIDBStorage, 'getAllNotes').mockResolvedValue([
       { id: 'note-rec-1', path: 'notes/note-rec-1.html', title: 'Recovered Sync Note', date: '2026-11-17', contentHtml: rawNoteHtml }
     ]);
 
-    const bloc = {
+    const sameDateUnlinkedBloc = {
       id: 'evt-bloc-1',
       type: 'sync',
       title: 'Weekly Sync',
@@ -351,6 +367,15 @@ describe('Orphan Note Recovery (Local, Firebase, IndexedDB, Memory), Duplicate D
       topic_tags: ['Sync'],
       workstream: 'Core'
     };
+    const diffDateLinkedBloc = {
+      id: 'evt-bloc-2',
+      type: 'call',
+      title: 'Client Call',
+      date: '2026-11-16',
+      startTime: '09:00',
+      endTime: '10:00',
+      noteId: 'note-existing-linked'
+    };
     const prepBloc = {
       id: 'evt-prep-1',
       type: 'prep',
@@ -360,7 +385,7 @@ describe('Orphan Note Recovery (Local, Firebase, IndexedDB, Memory), Duplicate D
       startTime: '13:30',
       endTime: '14:00'
     };
-    globalThis.plannerEvents = [bloc, prepBloc];
+    globalThis.plannerEvents = [diffDateLinkedBloc, sameDateUnlinkedBloc, prepBloc];
 
     vi.spyOn(StorageAPI, 'writeNoteContent').mockResolvedValue(true);
     vi.spyOn(StorageAPI, 'writeNotesManifest').mockResolvedValue(true);
@@ -370,13 +395,27 @@ describe('Orphan Note Recovery (Local, Firebase, IndexedDB, Memory), Duplicate D
     await rebuildAll();
     expect(getNoteById('note-rec-1')).toBeNull();
 
-    const selectEl = document.getElementById('recovered-bloc-select-0');
-    expect(selectEl).not.toBeNull();
-    selectEl.value = 'evt-bloc-1';
+    openRecoveredBlocPickerModal('note-rec-1', 'recovered-note-row-0');
 
-    const ok = await assignRecoveredNoteToBloc('note-rec-1', 'recovered-bloc-select-0', 'recovered-note-row-0');
+    const pickerModal = document.getElementById('recovered-bloc-picker-modal');
+    expect(pickerModal).not.toBeNull();
+    expect(pickerModal.classList.contains('active')).toBe(true);
+
+    const rows = Array.from(pickerModal.querySelectorAll('.recovered-bloc-picker-row'));
+    expect(rows).toHaveLength(3);
+    // Same-date blocs are sorted before different-date blocs
+    expect(rows[0].querySelector('.bloc-picker-date-badge').classList.contains('same-date')).toBe(true);
+    expect(rows[0].querySelector('.bloc-picker-linked-badge').classList.contains('no-linked')).toBe(true);
+
+    const clientRow = rows.find((r) => r.dataset.eventId === 'evt-bloc-2');
+    expect(clientRow.querySelector('.bloc-picker-date-badge').classList.contains('diff-date')).toBe(true);
+    expect(clientRow.querySelector('.bloc-picker-linked-badge').classList.contains('has-linked')).toBe(true);
+    expect(clientRow.querySelector('.bloc-picker-linked-badge').textContent).toContain('Existing Linked Note');
+
+    const ok = await assignRecoveredNoteToBlocById('note-rec-1', 'evt-bloc-1', 'recovered-note-row-0');
     expect(ok).toBe(true);
-    expect(bloc.noteId).toBe('note-rec-1');
+    expect(pickerModal.classList.contains('active')).toBe(false);
+    expect(sameDateUnlinkedBloc.noteId).toBe('note-rec-1');
     expect(prepBloc.noteId).toBe('note-rec-1');
 
     const updatedNote = getNoteById('note-rec-1');
@@ -390,6 +429,6 @@ describe('Orphan Note Recovery (Local, Firebase, IndexedDB, Memory), Duplicate D
     expect(globalThis.renderPlannerInspector).toHaveBeenCalled();
 
     const statusBadge = document.querySelector('#recovered-note-row-0 .recovered-note-status');
-    expect(statusBadge.style.display).toBe('inline-block');
+    expect(statusBadge.style.display).toBe('inline-flex');
   });
 });

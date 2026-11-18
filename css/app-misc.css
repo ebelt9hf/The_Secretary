@@ -1627,6 +1627,9 @@ body.note-window-standalone #overlay-new-window-btn {
 #todo-matrix-picker-overlay {
   z-index: 10010 !important;
 }
+#recovered-bloc-picker-modal {
+  z-index: 10005 !important;
+}
 #ai-chat-floating-panel,
 #ai-inspector-modal {
   z-index: 11000 !important;
@@ -2024,6 +2027,259 @@ body.focused-note-mode #screen-connect p.connect-note-hint {
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* ── Note Recovery & Bloc Picker Modals ── */
+.recovery-modal-box {
+  max-width: 680px;
+  width: 94%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.recovery-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--card-border);
+}
+.recovery-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.recovery-modal-title-wrap h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.recovery-modal-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--highlight-bg);
+  color: var(--highlight-text);
+  border: 1px solid var(--highlight-border);
+}
+.recovery-modal-close-x {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.recovery-modal-close-x:hover {
+  background: var(--card-bg-alt);
+  color: var(--text);
+}
+.recovery-modal-desc {
+  margin: 10px 0 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.recovery-modal-list {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+.recovered-note-row,
+.recovered-bloc-picker-row {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  background: var(--card-bg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.recovered-note-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.recovered-note-row:hover,
+.recovered-bloc-picker-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--card-border));
+  box-shadow: var(--shadow-sm);
+}
+.recovered-note-row.is-finalized {
+  background: color-mix(in srgb, var(--success) 5%, var(--card-bg));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--card-border));
+}
+.recovered-note-row-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.recovered-note-preview-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.recovered-note-preview-btn:hover {
+  color: var(--accent-hover);
+  border-bottom-color: var(--accent-hover);
+}
+.recovered-note-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.recovered-note-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.recovered-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg-alt);
+  color: var(--text-muted);
+}
+.recovered-note-duplicate-badge {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border-color: var(--color-medium-border);
+}
+.recovered-note-status {
+  background: color-mix(in srgb, var(--success) 14%, var(--card-bg));
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  font-weight: 600;
+}
+.recovered-note-dup-hint {
+  font-size: 0.76rem;
+  color: var(--color-medium-text);
+}
+.recovered-note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.recovery-modal-actions {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bloc-picker-note-banner {
+  margin: 10px 0;
+  padding: 8px 11px;
+  border-radius: 8px;
+  background: var(--card-bg-alt);
+  border: 1px solid var(--card-border);
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bloc-picker-note-banner strong {
+  color: var(--text);
+}
+.bloc-picker-search {
+  width: 100%;
+  margin-bottom: 10px;
+}
+.recovered-bloc-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.recovered-bloc-picker-row.is-same-date {
+  border-left: 3px solid var(--success);
+}
+.bloc-picker-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.bloc-picker-row-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.bloc-picker-row-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bloc-picker-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bloc-picker-date-badge.same-date {
+  background: color-mix(in srgb, var(--success) 14%, var(--card-bg));
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+.bloc-picker-date-badge.diff-date {
+  background: var(--color-medium-bg);
+  color: var(--color-medium-text);
+  border-color: var(--color-medium-border);
+}
+.bloc-picker-linked-badge.has-linked {
+  background: var(--color-high-bg);
+  color: var(--color-high-text);
+  border-color: var(--color-high-border);
+}
+.bloc-picker-linked-badge.no-linked {
+  background: var(--card-bg-alt);
+  color: var(--text-muted);
+  border-color: var(--card-border);
+}
+
 
 
 

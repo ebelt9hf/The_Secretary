@@ -2545,19 +2545,31 @@ function _ensureRecoveredNotesModalElement() {
   modal.className = 'modal-overlay';
   modal.id = 'recovered-notes-modal';
   modal.innerHTML = `
-    <div class="modal" style="max-width:680px;width:94%;max-height:85vh;display:flex;flex-direction:column;">
-      <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <h3 id="recovered-notes-modal-title" style="margin:0;"></h3>
-        <button type="button" class="btn-icon" id="recovered-notes-close-x" onclick="closeModal('recovered-notes-modal')" title="">&#10005;</button>
+    <div class="modal recovery-modal-box">
+      <div class="recovery-modal-header">
+        <div class="recovery-modal-title-wrap">
+          <h3 id="recovered-notes-modal-title"></h3>
+          <span id="recovered-notes-modal-count" class="recovery-modal-count"></span>
+        </div>
+        <button type="button" class="recovery-modal-close-x" id="recovered-notes-close-x" onclick="closeModal('recovered-notes-modal')" title="">&#10005;</button>
       </div>
-      <p id="recovered-notes-modal-desc" style="margin:6px 0 12px;font-size:0.85rem;color:var(--text-muted);"></p>
-      <div id="recovered-notes-list" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;padding-right:2px;"></div>
-      <div class="modal-actions" style="margin-top:14px;display:flex;justify-content:space-between;gap:8px;">
-        <button type="button" class="btn primary" id="recovered-notes-merge-all-btn" onclick="finalizeAllNonDuplicateRecoveredNotes()" title=""></button>
+      <p id="recovered-notes-modal-desc" class="recovery-modal-desc"></p>
+      <div id="recovered-notes-list" class="recovery-modal-list"></div>
+      <div class="recovery-modal-actions">
+        <button type="button" class="btn btn-primary" id="recovered-notes-merge-all-btn" onclick="finalizeAllNonDuplicateRecoveredNotes()" title=""></button>
         <button type="button" class="btn" id="recovered-notes-close-btn" onclick="closeModal('recovered-notes-modal')" title=""></button>
       </div>
     </div>
   `;
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      if (typeof closeModal === 'function') closeModal('recovered-notes-modal');
+      else {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+      }
+    }
+  });
   document.body.appendChild(modal);
   return modal;
 }
@@ -2568,6 +2580,15 @@ function _findStagedRecoveredItem(noteIdOrPath) {
 
 function previewRecoveredNoteReadOnly(notePath) {
   if (!notePath || typeof openNoteOverlay !== 'function') return;
+  const recModal = document.getElementById('recovered-notes-modal');
+  if (recModal && (recModal.classList.contains('active') || recModal.style.display !== 'none')) {
+    if (typeof window !== 'undefined') window._restoreRecoveredNotesModalOnClose = true;
+    if (typeof closeModal === 'function') closeModal('recovered-notes-modal');
+    else {
+      recModal.style.display = 'none';
+      recModal.classList.remove('active');
+    }
+  }
   const staged = _findStagedRecoveredItem(notePath);
   const previewOpts = {
     viewMode: true,
@@ -2575,10 +2596,7 @@ function previewRecoveredNoteReadOnly(notePath) {
     previewOnly: true,
     ...(staged && staged.rawHtml ? { previewHtml: staged.rawHtml } : {})
   };
-  return Promise.resolve(openNoteOverlay(notePath, null, null, false, null, previewOpts)).then(() => {
-    const overlay = document.getElementById('note-edit-overlay');
-    if (overlay) overlay.style.zIndex = '10001';
-  });
+  return Promise.resolve(openNoteOverlay(notePath, null, null, false, null, previewOpts));
 }
 
 async function finalizeRecoveredNote(noteId, options = {}) {
@@ -2621,13 +2639,19 @@ async function finalizeRecoveredNote(noteId, options = {}) {
   const resolvedRowId = rowId || (staged ? `recovered-note-row-${_stagedRecoveredNotes.indexOf(staged)}` : '');
   const rowEl = resolvedRowId ? document.getElementById(resolvedRowId) : null;
   if (rowEl) {
+    rowEl.classList.add('is-finalized');
     const badgeEl = rowEl.querySelector('.recovered-note-status');
     if (badgeEl && badgeEl.style.display === 'none') {
-      badgeEl.textContent = t('recovery.mergedBadge') || 'Merged';
-      badgeEl.style.display = 'inline-block';
+      badgeEl.textContent = t('recovery.mergedBadge') || 'Restored';
+      badgeEl.style.display = 'inline-flex';
     }
     const mergeBtn = rowEl.querySelector('.recovered-note-merge-btn');
     if (mergeBtn) mergeBtn.disabled = true;
+  }
+  const mergeAllBtn = document.getElementById('recovered-notes-merge-all-btn');
+  if (mergeAllBtn) {
+    const hasRemainingNonDup = _stagedRecoveredNotes.some(item => item && !item.finalized && !item.duplicateOf);
+    mergeAllBtn.disabled = !hasRemainingNonDup;
   }
 
   if (!silent) {
@@ -2655,9 +2679,163 @@ async function finalizeAllNonDuplicateRecoveredNotes() {
   return count;
 }
 
-async function assignRecoveredNoteToBloc(noteId, selectId, rowId) {
-  const selectEl = document.getElementById(selectId);
-  const eventId = selectEl ? String(selectEl.value || '').trim() : '';
+function _ensureRecoveredBlocPickerModalElement() {
+  let modal = document.getElementById('recovered-bloc-picker-modal');
+  if (modal) return modal;
+  modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'recovered-bloc-picker-modal';
+  modal.innerHTML = `
+    <div class="modal recovery-modal-box">
+      <div class="recovery-modal-header">
+        <h3 id="recovered-bloc-picker-title" style="margin:0;font-size:1.05rem;"></h3>
+        <button type="button" class="recovery-modal-close-x" id="recovered-bloc-picker-close-x" onclick="closeModal('recovered-bloc-picker-modal')" title="">&#10005;</button>
+      </div>
+      <div id="recovered-bloc-picker-meta" class="bloc-picker-note-banner"></div>
+      <input type="text" id="recovered-bloc-picker-search" name="recovered-bloc-picker-search" class="field-input bloc-picker-search" placeholder="" title="" />
+      <div id="recovered-bloc-picker-list" class="recovery-modal-list"></div>
+      <div class="recovery-modal-actions" style="justify-content:flex-end;">
+        <button type="button" class="btn" id="recovered-bloc-picker-close-btn" onclick="closeModal('recovered-bloc-picker-modal')" title=""></button>
+      </div>
+    </div>
+  `;
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      if (typeof closeModal === 'function') closeModal('recovered-bloc-picker-modal');
+      else {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+      }
+    }
+  });
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function openRecoveredBlocPickerModal(noteId, rowId = '') {
+  const staged = _findStagedRecoveredItem(noteId);
+  const note = staged?.note
+    || (typeof getNoteById === 'function' ? getNoteById(noteId) : null)
+    || (typeof manifest !== 'undefined' && Array.isArray(manifest) ? manifest.find(n => n && n.id === noteId) : null);
+  if (!note) return;
+
+  const modal = _ensureRecoveredBlocPickerModalElement();
+  const titleEl = document.getElementById('recovered-bloc-picker-title');
+  const metaEl = document.getElementById('recovered-bloc-picker-meta');
+  const closeX = document.getElementById('recovered-bloc-picker-close-x');
+  const closeBtn = document.getElementById('recovered-bloc-picker-close-btn');
+  const searchEl = document.getElementById('recovered-bloc-picker-search');
+  const listEl = document.getElementById('recovered-bloc-picker-list');
+
+  if (titleEl) titleEl.textContent = t('recovery.blocPickerTitle') || 'Select Calendar Bloc';
+  const noteDate = _extractRecoveredDate(note) || '—';
+  if (metaEl) {
+    const dateText = t('recovery.blocPickerNoteDate', { date: noteDate }) || `Note date: ${noteDate}`;
+    metaEl.innerHTML = `<strong>${escH(note.title || note.path)}</strong><span class="recovered-note-date">${escH(dateText)}</span>`;
+  }
+  if (closeX) closeX.title = t('recovery.closeBtnTooltip') || 'Close dialog';
+  if (closeBtn) {
+    closeBtn.textContent = t('recovery.closeBtn') || 'Close';
+    closeBtn.title = t('recovery.closeBtnTooltip') || 'Close dialog';
+  }
+  if (searchEl) {
+    searchEl.value = '';
+    searchEl.placeholder = t('recovery.blocPickerSearchPlaceholder') || 'Filter blocs by title or date...';
+    searchEl.title = t('recovery.blocPickerSearchTooltip') || 'Filter calendar blocs by title or date';
+  }
+
+  const events = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) ? plannerEvents : [];
+  const rawNoteDate = _extractRecoveredDate(note);
+  const assignableEvents = events
+    .filter(e => e && e.id && e.type !== 'ooo' && e.type !== 'personal' && e.type !== 'custom')
+    .slice()
+    .sort((a, b) => {
+      const aSame = rawNoteDate && a.date === rawNoteDate ? 1 : 0;
+      const bSame = rawNoteDate && b.date === rawNoteDate ? 1 : 0;
+      if (aSame !== bSame) return bSame - aSame;
+      return `${b.date || ''} ${b.startTime || ''}`.localeCompare(`${a.date || ''} ${a.startTime || ''}`);
+    });
+
+  const sameDateLabel = t('recovery.sameDateBadge') || 'Same date';
+  const diffDateLabel = t('recovery.differentDateBadge') || 'Different date';
+  const noLinkedLabel = t('recovery.noLinkedNote') || 'No note linked';
+  const assignLabel = t('recovery.assignBtn') || 'Assign';
+  const assignTooltip = t('recovery.assignBtnTooltip') || 'Link this note to the selected bloc and inherit its tags';
+  const noBlocsLabel = t('recovery.noBlocsAvailable') || 'No calendar blocs available';
+
+  const renderList = (query = '') => {
+    if (!listEl) return;
+    const q = String(query || '').trim().toLowerCase();
+    const filtered = q
+      ? assignableEvents.filter(ev => `${ev.title || ''} ${ev.date || ''} ${ev.type || ''}`.toLowerCase().includes(q))
+      : assignableEvents;
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.85rem;">${escH(noBlocsLabel)}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = filtered.map(ev => {
+      const isSameDate = Boolean(rawNoteDate && ev.date && ev.date === rawNoteDate);
+      const dateBadgeHtml = rawNoteDate && ev.date
+        ? `<span class="recovered-pill bloc-picker-date-badge ${isSameDate ? 'same-date' : 'diff-date'}">${escH(isSameDate ? sameDateLabel : diffDateLabel)}</span>`
+        : '';
+
+      const effectiveLinkedId = (typeof getPlannerEventEffectiveNoteId === 'function')
+        ? getPlannerEventEffectiveNoteId(ev)
+        : (ev.noteId || (Array.isArray(ev.linkedNoteIds) && ev.linkedNoteIds[0]) || '');
+      const linkedNoteObj = effectiveLinkedId
+        ? ((typeof getNoteById === 'function' ? getNoteById(effectiveLinkedId) : null)
+          || (typeof manifest !== 'undefined' && Array.isArray(manifest) ? manifest.find(n => n && n.id === effectiveLinkedId) : null))
+        : null;
+      const hasLinked = Boolean(effectiveLinkedId);
+      const linkedText = hasLinked
+        ? (t('recovery.alreadyLinkedNote', { title: linkedNoteObj?.title || effectiveLinkedId }) || `Already linked: ${linkedNoteObj?.title || effectiveLinkedId}`)
+        : noLinkedLabel;
+      const linkedBadgeHtml = `<span class="recovered-pill bloc-picker-linked-badge ${hasLinked ? 'has-linked' : 'no-linked'}">${escH(linkedText)}</span>`;
+
+      const typeLabel = ev.type ? ((typeof t === 'function' ? t(`planner.${ev.type}`) : '') || ev.type) : '';
+      const typeBadgeHtml = typeLabel ? `<span class="recovered-pill">${escH(typeLabel)}</span>` : '';
+
+      const timeRange = [ev.startTime, ev.endTime].filter(Boolean).join('–');
+      return `
+        <div class="recovered-bloc-picker-row${isSameDate ? ' is-same-date' : ''}" data-event-id="${escA(ev.id)}">
+          <div class="bloc-picker-row-info">
+            <div class="bloc-picker-row-title-line">
+              ${typeBadgeHtml}
+              <span class="bloc-picker-row-title">${escH(ev.title || ev.type || '')}</span>
+            </div>
+            <div class="bloc-picker-row-meta">
+              <span>${escH(ev.date || '—')}${timeRange ? ' · ' + escH(timeRange) : ''}</span>
+              ${dateBadgeHtml}
+              ${linkedBadgeHtml}
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary recovered-bloc-picker-select-btn" onclick="assignRecoveredNoteToBlocById(${jq(note.id)}, ${jq(ev.id)}, ${jq(rowId)})" title="${escA(assignTooltip)}">
+            ${escH(assignLabel)}
+          </button>
+        </div>
+      `;
+    }).join('');
+  };
+
+  if (searchEl) {
+    searchEl.oninput = () => renderList(searchEl.value);
+  }
+  renderList('');
+
+  if (typeof openModal === 'function') {
+    openModal('recovered-bloc-picker-modal');
+  } else {
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+  }
+  if (searchEl && typeof searchEl.focus === 'function') {
+    setTimeout(() => searchEl.focus(), 20);
+  }
+}
+
+async function assignRecoveredNoteToBlocById(noteId, eventId, rowId = '') {
   if (!eventId) {
     toast(t('recovery.selectBlocFirst') || 'Please select a calendar bloc first', true);
     return false;
@@ -2711,12 +2889,22 @@ async function assignRecoveredNoteToBloc(noteId, selectId, rowId) {
   if (typeof renderBoard === 'function') renderBoard();
   if (typeof renderFilterChips === 'function') renderFilterChips();
 
+  const pickerModal = document.getElementById('recovered-bloc-picker-modal');
+  if (pickerModal) {
+    if (typeof closeModal === 'function') closeModal('recovered-bloc-picker-modal');
+    else {
+      pickerModal.style.display = 'none';
+      pickerModal.classList.remove('active');
+    }
+  }
+
   const rowEl = rowId ? document.getElementById(rowId) : null;
   if (rowEl) {
+    rowEl.classList.add('is-finalized');
     const badgeEl = rowEl.querySelector('.recovered-note-status');
     if (badgeEl) {
-      badgeEl.textContent = t('recovery.assignedBadge') || 'Linked';
-      badgeEl.style.display = 'inline-block';
+      badgeEl.textContent = `${t('recovery.assignedBadge') || 'Linked'}: ${event.title || ''}`;
+      badgeEl.style.display = 'inline-flex';
     }
   }
 
@@ -2724,11 +2912,18 @@ async function assignRecoveredNoteToBloc(noteId, selectId, rowId) {
   return true;
 }
 
+async function assignRecoveredNoteToBloc(noteId, selectId, rowId) {
+  const selectEl = document.getElementById(selectId);
+  const eventId = selectEl ? String(selectEl.value || '').trim() : '';
+  return assignRecoveredNoteToBlocById(noteId, eventId, rowId);
+}
+
 function openRecoveredNotesModal(recoveredNotes = []) {
   if (!Array.isArray(recoveredNotes) || recoveredNotes.length === 0) return;
   _stagedRecoveredNotes = recoveredNotes;
   const modal = _ensureRecoveredNotesModalElement();
   const titleEl = document.getElementById('recovered-notes-modal-title');
+  const countEl = document.getElementById('recovered-notes-modal-count');
   const descEl = document.getElementById('recovered-notes-modal-desc');
   const closeX = document.getElementById('recovered-notes-close-x');
   const mergeAllBtn = document.getElementById('recovered-notes-merge-all-btn');
@@ -2736,11 +2931,13 @@ function openRecoveredNotesModal(recoveredNotes = []) {
   const listEl = document.getElementById('recovered-notes-list');
 
   if (titleEl) titleEl.textContent = t('recovery.modalTitle') || 'Recovered Notes';
+  if (countEl) countEl.textContent = String(recoveredNotes.length);
   if (descEl) descEl.textContent = t('recovery.modalDesc') || 'The following saved notes were not registered in the index and have been recovered.';
   if (closeX) closeX.title = t('recovery.closeBtnTooltip') || 'Close recovered notes dialog';
   if (mergeAllBtn) {
-    mergeAllBtn.textContent = t('recovery.mergeAllBtn') || 'Merge Non-Duplicates';
-    mergeAllBtn.title = t('recovery.mergeAllBtnTooltip') || 'Register all non-duplicate recovered notes into your index';
+    mergeAllBtn.textContent = t('recovery.mergeAllBtn') || 'Restore Non-Duplicates';
+    mergeAllBtn.title = t('recovery.mergeAllBtnTooltip') || 'Restore all non-duplicate recovered notes into your Notes index';
+    mergeAllBtn.disabled = !recoveredNotes.some(item => item && !item.finalized && !item.duplicateOf);
   }
   if (closeBtn) {
     closeBtn.textContent = t('recovery.closeBtn') || 'Close';
@@ -2748,60 +2945,47 @@ function openRecoveredNotesModal(recoveredNotes = []) {
   }
 
   const events = (typeof plannerEvents !== 'undefined' && Array.isArray(plannerEvents)) ? plannerEvents : [];
-  const assignableEvents = events
-    .filter(e => e && e.id && e.type !== 'ooo' && e.type !== 'personal' && e.type !== 'custom')
-    .slice()
-    .sort((a, b) => `${b.date || ''} ${b.startTime || ''}`.localeCompare(`${a.date || ''} ${a.startTime || ''}`));
+  const hasAssignableBlocs = events.some(e => e && e.id && e.type !== 'ooo' && e.type !== 'personal' && e.type !== 'custom');
 
-  const placeholderLabel = t('recovery.selectBlocPlaceholder') || 'Select a calendar bloc...';
-  const noBlocsLabel = t('recovery.noBlocsAvailable') || 'No calendar blocs available';
-  const selectTooltip = t('recovery.selectBlocTooltip') || 'Choose a calendar bloc to link this note to';
   const openTooltip = t('recovery.openReadOnlyTooltip') || 'Open note in read-only view';
-  const assignLabel = t('recovery.assignBtn') || 'Assign';
-  const assignTooltip = t('recovery.assignBtnTooltip') || 'Link this note to the selected bloc and inherit its tags';
-  const mergeLabel = t('recovery.mergeBtn') || 'Merge';
-  const mergeTooltip = t('recovery.mergeBtnTooltip') || 'Register this recovered note into your index';
+  const linkBlocLabel = t('recovery.linkBlocBtn') || 'Link to Bloc…';
+  const linkBlocTooltip = t('recovery.assignBtnTooltip') || 'Link this note to a calendar bloc and inherit its tags';
+  const mergeLabel = t('recovery.mergeBtn') || 'Restore';
+  const mergeTooltip = t('recovery.mergeBtnTooltip') || 'Restore this recovered note into your Notes index';
   const dupBadgeLabel = t('recovery.duplicateBadge') || 'Possible duplicate';
-
-  const optionsHtml = assignableEvents.length > 0
-    ? `<option value="">${escH(placeholderLabel)}</option>` + assignableEvents.map(ev => {
-      const label = [ev.date, ev.startTime, ev.title].filter(Boolean).join(' · ');
-      return `<option value="${escA(ev.id)}">${escH(label)}</option>`;
-    }).join('')
-    : `<option value="">${escH(noBlocsLabel)}</option>`;
 
   if (listEl) {
     listEl.innerHTML = recoveredNotes.map((item, idx) => {
       const note = item?.note || item;
       const sourceLabel = _getRecoveredSourceLabel(item?.source || 'local');
-      const selectId = `recovered-bloc-select-${idx}`;
       const rowId = `recovered-note-row-${idx}`;
-      const dateHtml = note.date ? `<span style="font-size:0.75rem;color:var(--text-muted);">${escH(note.date)}</span>` : '';
+      const dateHtml = note.date ? `<span class="recovered-note-date">${escH(note.date)}</span>` : '';
       const dupTip = item?.duplicateOf
         ? (t('recovery.duplicateTooltip', { date: item.duplicateOf.date || '' }) || `A note with the same title on ${item.duplicateOf.date || ''} already exists in your index`)
         : '';
       const dupHtml = item?.duplicateOf
-        ? `<span class="recovered-note-duplicate-badge" title="${escA(dupTip)}" style="font-size:0.72rem;padding:2px 6px;border-radius:999px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;">${escH(dupBadgeLabel)}</span>`
+        ? `<span class="recovered-pill recovered-note-duplicate-badge" title="${escA(dupTip)}">${escH(dupBadgeLabel)}</span>`
+        : '';
+      const dupHintHtml = item?.duplicateOf
+        ? `<div class="recovered-note-dup-hint">${escH(dupTip)}</div>`
         : '';
       return `
-        <div id="${escA(rowId)}" class="recovered-note-row" style="border:1px solid var(--card-border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--card-bg);">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <button type="button" class="btn-link recovered-note-preview-btn" onclick="previewRecoveredNoteReadOnly(${jq(note.path)})" title="${escA(openTooltip)}" style="background:none;border:none;padding:0;text-align:left;font-weight:600;font-size:0.9rem;color:var(--accent);cursor:pointer;text-decoration:underline;">
+        <div id="${escA(rowId)}" class="recovered-note-row">
+          <div class="recovered-note-row-top">
+            <button type="button" class="recovered-note-preview-btn" onclick="previewRecoveredNoteReadOnly(${jq(note.path)})" title="${escA(openTooltip)}">
               ${escH(note.title || note.path)}
             </button>
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div class="recovered-note-badges">
               ${dateHtml}
-              <span class="recovered-note-source-badge" style="font-size:0.72rem;padding:2px 6px;border-radius:999px;background:var(--card-bg-alt);border:1px solid var(--card-border);color:var(--text-muted);">${escH(sourceLabel)}</span>
+              <span class="recovered-pill recovered-note-source-badge">${escH(sourceLabel)}</span>
               ${dupHtml}
-              <span class="recovered-note-status" style="display:none;font-size:0.72rem;padding:2px 6px;border-radius:999px;background:var(--accent);color:#fff;"></span>
+              <span class="recovered-pill recovered-note-status" style="display:none;"></span>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <select id="${escA(selectId)}" name="${escA(selectId)}" class="field-input" title="${escA(selectTooltip)}" style="flex:1;min-width:0;" ${assignableEvents.length === 0 ? 'disabled' : ''}>
-              ${optionsHtml}
-            </select>
-            <button type="button" class="btn primary" onclick="assignRecoveredNoteToBloc(${jq(note.id)}, ${jq(selectId)}, ${jq(rowId)})" title="${escA(assignTooltip)}" ${assignableEvents.length === 0 ? 'disabled' : ''}>
-              ${escH(assignLabel)}
+          ${dupHintHtml}
+          <div class="recovered-note-actions">
+            <button type="button" class="btn btn-primary recovered-note-link-bloc-btn" onclick="openRecoveredBlocPickerModal(${jq(note.id)}, ${jq(rowId)})" title="${escA(linkBlocTooltip)}" ${hasAssignableBlocs ? '' : 'disabled'}>
+              ${escH(linkBlocLabel)}
             </button>
             <button type="button" class="btn recovered-note-merge-btn" onclick="finalizeRecoveredNote(${jq(note.id)}, { rowId: ${jq(rowId)} })" title="${escA(mergeTooltip)}">
               ${escH(mergeLabel)}
@@ -2822,16 +3006,20 @@ function openRecoveredNotesModal(recoveredNotes = []) {
 
 if (typeof window !== 'undefined') {
   window.openRecoveredNotesModal = openRecoveredNotesModal;
+  window.openRecoveredBlocPickerModal = openRecoveredBlocPickerModal;
   window.previewRecoveredNoteReadOnly = previewRecoveredNoteReadOnly;
   window.assignRecoveredNoteToBloc = assignRecoveredNoteToBloc;
+  window.assignRecoveredNoteToBlocById = assignRecoveredNoteToBlocById;
   window.finalizeRecoveredNote = finalizeRecoveredNote;
   window.finalizeAllNonDuplicateRecoveredNotes = finalizeAllNonDuplicateRecoveredNotes;
   window.findRecoveredNoteDuplicate = findRecoveredNoteDuplicate;
 }
 if (typeof globalThis !== 'undefined') {
   globalThis.openRecoveredNotesModal = openRecoveredNotesModal;
+  globalThis.openRecoveredBlocPickerModal = openRecoveredBlocPickerModal;
   globalThis.previewRecoveredNoteReadOnly = previewRecoveredNoteReadOnly;
   globalThis.assignRecoveredNoteToBloc = assignRecoveredNoteToBloc;
+  globalThis.assignRecoveredNoteToBlocById = assignRecoveredNoteToBlocById;
   globalThis.finalizeRecoveredNote = finalizeRecoveredNote;
   globalThis.finalizeAllNonDuplicateRecoveredNotes = finalizeAllNonDuplicateRecoveredNotes;
   globalThis.findRecoveredNoteDuplicate = findRecoveredNoteDuplicate;
