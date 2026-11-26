@@ -1185,6 +1185,7 @@ const OmnibarController = {
     this.renderLivePreview();
 
     setTimeout(() => {
+      if (typeof document === 'undefined' || !this.segmentedState?.active) return;
       this.focusSection(1);
     }, 40);
   },
