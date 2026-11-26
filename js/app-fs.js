@@ -543,15 +543,62 @@ const IDB_STORE = 'handles';
 const IDB_KEY   = 'last-folder';
 
 // ═══ IDB ═══
+const IDB_OPEN_TIMEOUT_MS = 4000;
+const IDB_TX_TIMEOUT_MS = 4000;
+
+function _runIdbTransaction(db, mode, exec) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, val) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { db.close(); } catch (_) {}
+      fn(val);
+    };
+    const timer = setTimeout(() => {
+      finish(reject, new Error('Timed out during IndexedDB transaction'));
+    }, IDB_TX_TIMEOUT_MS);
+    try {
+      const tx = db.transaction(IDB_STORE, mode);
+      exec(tx, finish, resolve, reject);
+    } catch (e) {
+      finish(reject, e);
+    }
+  });
+}
+
 function openIDB() {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       return reject(new Error('IndexedDB is not supported in this environment'));
     }
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror   = e => reject(e.target.error || new Error('Failed to open IndexedDB'));
+    let settled = false;
+    const finish = (fn, val) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(val);
+    };
+    const timer = setTimeout(() => {
+      finish(reject, new Error('Timed out opening IndexedDB'));
+    }, IDB_OPEN_TIMEOUT_MS);
+    try {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(IDB_STORE);
+      req.onsuccess = e => {
+        const db = e.target.result;
+        if (settled) {
+          try { db.close(); } catch (_) {}
+          return;
+        }
+        finish(resolve, db);
+      };
+      req.onerror   = e => finish(reject, e.target.error || new Error('Failed to open IndexedDB'));
+      req.onblocked = () => finish(reject, new Error('IndexedDB open blocked'));
+    } catch (e) {
+      finish(reject, e);
+    }
   });
 }
 
@@ -559,12 +606,11 @@ async function saveHandleIDB(handle) {
   if (typeof indexedDB === 'undefined') return;
   try {
     const db = await openIDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
+    return await _runIdbTransaction(db, 'readwrite', (tx, finish, resolve, reject) => {
       tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror    = e => { db.close(); reject(e.target.error); };
-      tx.onabort    = e => { db.close(); reject(e.target.error); };
+      tx.oncomplete = () => finish(resolve);
+      tx.onerror    = e => finish(reject, e.target.error);
+      tx.onabort    = e => finish(reject, e.target.error);
     });
   } catch (e) {
     console.warn('saveHandleIDB failed', e);
@@ -575,12 +621,11 @@ async function loadHandleIDB() {
   if (typeof indexedDB === 'undefined') return null;
   try {
     const db = await openIDB();
-    return new Promise((resolve, reject) => {
-      const tx  = db.transaction(IDB_STORE, 'readonly');
+    return await _runIdbTransaction(db, 'readonly', (tx, finish, resolve, reject) => {
       const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
-      req.onsuccess = e => { db.close(); resolve(e.target.result || null); };
-      req.onerror   = e => { db.close(); reject(e.target.error); };
-      tx.onabort    = e => { db.close(); reject(e.target.error); };
+      req.onsuccess = e => finish(resolve, e.target.result || null);
+      req.onerror   = e => finish(reject, e.target.error);
+      tx.onabort    = e => finish(reject, e.target.error);
     });
   } catch (e) {
     console.warn('loadHandleIDB failed', e);

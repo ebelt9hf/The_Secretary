@@ -127,8 +127,9 @@
         });
       }
 
-      // If already installed and launched in standalone mode, hide buttons
+      // If already installed and launched in standalone mode, still keep service worker registered/updated while hiding install buttons
       if (this.isStandalone) {
+        this.registerServiceWorker();
         this.updateUI();
         return;
       }

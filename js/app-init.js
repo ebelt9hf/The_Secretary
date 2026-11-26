@@ -5492,129 +5492,156 @@ function queueBackgroundHydration(isNewWorkspaceFolder = false) {
   }, 0);
 }
 
+function _withStartupTimeout(promise, ms, fallbackValue) {
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(fallbackValue), ms);
+    })
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 /** On page load: check IDB for a saved handle and surface the Resume button. */
 async function checkSavedFolder() {
-  if (window.initTranslationsPromise) {
-    await window.initTranslationsPromise;
-  }
-  if (typeof applyLocalizedUI === 'function') {
-    applyLocalizedUI();
-  }
-  if (window.AppBridge?.fs && typeof window.AppBridge.fs.getWorkspacePath === 'function') {
-    try {
-      const ws = await window.AppBridge.fs.getWorkspacePath();
-      if (ws) {
-        await mountFolder(ws);
-        return;
-      }
-    } catch (e) {
-      console.warn('Failed getting workspace path', e);
+  try {
+    if (window.initTranslationsPromise) {
+      await _withStartupTimeout(window.initTranslationsPromise, 4000, null);
     }
-  }
-  if (settings && settings.storageEngine === 'firebase') {
-    await mountFolder({ name: 'Firebase Cloud Vault' });
-    return;
-  }
-  // If opened as a popup or new tab from an active Secretary window, inherit the folder handle
-  if (window.opener && !window.opener.closed) {
-    try {
-      if (window.opener.rootHandle) {
-        if (window.opener.settings && typeof settings === 'object') {
-          if (typeof deepMerge === 'function') {
-            deepMerge(settings, window.opener.settings);
-          } else {
-            Object.assign(settings, window.opener.settings);
-          }
+    if (typeof applyLocalizedUI === 'function') {
+      try { applyLocalizedUI(); } catch (e) { console.warn('applyLocalizedUI failed on startup', e); }
+    }
+    if (window.AppBridge?.fs && typeof window.AppBridge.fs.getWorkspacePath === 'function') {
+      try {
+        const ws = await _withStartupTimeout(window.AppBridge.fs.getWorkspacePath(), 4000, null);
+        if (ws) {
+          await mountFolder(ws);
+          return;
         }
-        await mountFolder(window.opener.rootHandle);
-        return;
+      } catch (e) {
+        console.warn('Failed getting workspace path', e);
       }
-    } catch (e) {
-      console.warn('Failed accessing opener rootHandle', e);
     }
-  }
-
-  let handle = null;
-  try {
-    handle = await loadHandleIDB();
-  } catch (e) {
-    setLandingBusy(false);
-    return;
-  }
-  if (!handle) {
-    setLandingBusy(false);
-    return;
-  }
-
-  rememberedFolderHandle = handle;
-  settings.folder.last = handle.name;
-  saveLocalSettings();
-
-  // Try to auto-mount if permission already survived the refresh or if running in Electron / focused note mode.
-  try {
-    const isElectronEnv = !!(window.AppBridge?.isElectron);
-    let perm = 'prompt';
-    if (typeof handle.queryPermission === 'function') perm = await handle.queryPermission({ mode: 'readwrite' });
-    const isCompanion = document.body.classList.contains('secretary-window-standalone') ||
-                        document.body.classList.contains('chat-window-mode') ||
-                        (location.hash && location.hash.includes('chat-window=true'));
-    const isVirtual = Boolean(handle?.isVirtual || handle?.isDemo || handle?.name === 'Demo Workspace (Sandbox)');
-    if (perm === 'granted' || isElectronEnv || isVirtual || ((_isFocusedMode || isCompanion) && perm === 'granted')) {
-      updateStartupProgress(3, (typeof t === 'function' ? t('landing.loadingFolder') : null) || 'Loading folder…');
-      await saveHandleIDB(handle);
-      await mountFolder(handle);
+    if (settings && settings.storageEngine === 'firebase') {
+      await mountFolder({ name: 'Firebase Cloud Vault' });
       return;
     }
-  } catch (e) {
-    console.warn('Auto-resume failed', e);
-  }
-
-  setLandingBusy(false);
-  // fallback: show resume button — permission will be requested on click (requires gesture)
-  const resumeWrap = document.getElementById('landing-resume-wrap');
-  if (resumeWrap) resumeWrap.style.display = '';
-  const btn = document.getElementById('btn-resume-folder');
-  const btnLabel = document.getElementById('btn-resume-folder-label');
-  if (btnLabel) btnLabel.textContent = t('landing.resumeAction') || t('landing.resume');
-  const btnName = document.getElementById('btn-resume-folder-name');
-  if (btnName) btnName.textContent = handle.name;
-  if (btn) btn.title = t('landing.resumeTitle');
-  const divider = document.getElementById('landing-divider');
-  if (divider) divider.style.display = '';
-  const btnOpen = document.getElementById('btn-open-folder');
-  if (btnOpen) {
-    btnOpen.classList.remove('landing-btn-open-hero');
-    const openText = document.getElementById('btn-open-folder-text');
-    if (openText) openText.textContent = t('landing.openDifferent') || t('landing.open');
-  }
-
-  btn.onclick = async () => {
-    try {
-      let perm = 'prompt';
-      if (typeof handle.requestPermission === 'function') {
-        perm = await handle.requestPermission({ mode: 'readwrite' });
+    // If opened as a popup or new tab from an active Secretary window, inherit the folder handle
+    if (window.opener && !window.opener.closed) {
+      try {
+        if (window.opener.rootHandle) {
+          if (window.opener.settings && typeof settings === 'object') {
+            if (typeof deepMerge === 'function') {
+              deepMerge(settings, window.opener.settings);
+            } else {
+              Object.assign(settings, window.opener.settings);
+            }
+          }
+          await mountFolder(window.opener.rootHandle);
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed accessing opener rootHandle', e);
       }
-      if (perm === 'granted') {
+    }
+
+    let handle = null;
+    try {
+      handle = await _withStartupTimeout(loadHandleIDB(), 5000, null);
+    } catch (e) {
+      setLandingBusy(false);
+      return;
+    }
+    if (!handle) {
+      setLandingBusy(false);
+      return;
+    }
+
+    rememberedFolderHandle = handle;
+    if (typeof settings === 'object' && settings) {
+      if (!settings.folder) settings.folder = {};
+      settings.folder.last = handle.name;
+      saveLocalSettings();
+    }
+
+    // Try to auto-mount if permission already survived the refresh or if running in Electron / focused note mode.
+    try {
+      const isElectronEnv = !!(window.AppBridge?.isElectron);
+      let perm = 'prompt';
+      if (typeof handle.queryPermission === 'function') {
+        perm = await _withStartupTimeout(handle.queryPermission({ mode: 'readwrite' }), 3000, 'prompt');
+      }
+      const isCompanion = document.body.classList.contains('secretary-window-standalone') ||
+                          document.body.classList.contains('chat-window-mode') ||
+                          (location.hash && location.hash.includes('chat-window=true'));
+      const isVirtual = Boolean(handle?.isVirtual || handle?.isDemo || handle?.name === 'Demo Workspace (Sandbox)');
+      if (perm === 'granted' || isElectronEnv || isVirtual || ((_isFocusedMode || isCompanion) && perm === 'granted')) {
         updateStartupProgress(3, (typeof t === 'function' ? t('landing.loadingFolder') : null) || 'Loading folder…');
-        await saveHandleIDB(handle);
+        await _withStartupTimeout(saveHandleIDB(handle), 3000, null);
         await mountFolder(handle);
         return;
       }
     } catch (e) {
-      if (e.name !== 'AbortError') console.warn('Resume permission request failed', e);
+      console.warn('Auto-resume failed', e);
     }
 
-    try {
-      const pickedHandle = await showSecretaryFolderPicker(handle);
-      await saveHandleIDB(pickedHandle);
-      rememberedFolderHandle = pickedHandle;
-      settings.folder.last = pickedHandle.name;
-      saveLocalSettings();
-      await mountFolder(pickedHandle);
-    } catch (e) {
-      if (e.name !== 'AbortError') toast(t('common.couldNotResume', { message: e.message }), true);
+    setLandingBusy(false);
+    // fallback: show resume button — permission will be requested on click (requires gesture)
+    const resumeWrap = document.getElementById('landing-resume-wrap');
+    if (resumeWrap) resumeWrap.style.display = '';
+    const btn = document.getElementById('btn-resume-folder');
+    const btnLabel = document.getElementById('btn-resume-folder-label');
+    if (btnLabel) btnLabel.textContent = t('landing.resumeAction') || t('landing.resume');
+    const btnName = document.getElementById('btn-resume-folder-name');
+    if (btnName) btnName.textContent = handle.name;
+    if (btn) btn.title = t('landing.resumeTitle');
+    const divider = document.getElementById('landing-divider');
+    if (divider) divider.style.display = '';
+    const btnOpen = document.getElementById('btn-open-folder');
+    if (btnOpen) {
+      btnOpen.classList.remove('landing-btn-open-hero');
+      const openText = document.getElementById('btn-open-folder-text');
+      if (openText) openText.textContent = t('landing.openDifferent') || t('landing.open');
     }
-  };
+
+    if (btn) {
+      btn.onclick = async () => {
+        try {
+          let perm = 'prompt';
+          if (typeof handle.requestPermission === 'function') {
+            perm = await handle.requestPermission({ mode: 'readwrite' });
+          }
+          if (perm === 'granted') {
+            updateStartupProgress(3, (typeof t === 'function' ? t('landing.loadingFolder') : null) || 'Loading folder…');
+            await saveHandleIDB(handle);
+            await mountFolder(handle);
+            return;
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') console.warn('Resume permission request failed', e);
+        }
+
+        try {
+          const pickedHandle = await showSecretaryFolderPicker(handle);
+          await saveHandleIDB(pickedHandle);
+          rememberedFolderHandle = pickedHandle;
+          if (typeof settings === 'object' && settings) {
+            if (!settings.folder) settings.folder = {};
+            settings.folder.last = pickedHandle.name;
+            saveLocalSettings();
+          }
+          await mountFolder(pickedHandle);
+        } catch (e) {
+          if (e.name !== 'AbortError') toast(t('common.couldNotResume', { message: e.message }), true);
+        }
+      };
+    }
+  } catch (e) {
+    console.warn('checkSavedFolder failed:', e);
+    setLandingBusy(false);
+  }
 }
 
 document.addEventListener('click', async e => {

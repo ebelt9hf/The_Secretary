@@ -1,7 +1,7 @@
 // ── Secretary: Progressive Web App Service Worker ──
 // Provides installability criteria, background caching of shell assets, and transparent network bypass for E2EE cloud sync & AI APIs.
 
-const CACHE_NAME = 'secretary-pwa-v4.0.97';
+const CACHE_NAME = 'secretary-pwa-v4.0.98';
 
 const PRECACHE_ASSETS = [
   './',
@@ -134,9 +134,13 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           return caches.match(request).then((cached) => {
             if (cached) return cached;
-            if (url.pathname.endsWith('/app.html') || url.pathname.endsWith('/index.html')) {
-              return caches.match('./app.html').then((appCached) => appCached || caches.match('./'));
-            }
+            return caches.match(request, { ignoreSearch: true }).then((ignoredSearchCached) => {
+              if (ignoredSearchCached) return ignoredSearchCached;
+              if (url.pathname.endsWith('/app.html') || url.pathname.endsWith('/index.html')) {
+                return caches.match('./app.html').then((appCached) => appCached || caches.match('./') || Response.error());
+              }
+              return Response.error();
+            });
           });
         })
     );
