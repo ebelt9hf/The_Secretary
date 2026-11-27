@@ -1221,6 +1221,7 @@ window.attachRetroDailyReviewNoteChangeListener = attachRetroDailyReviewNoteChan
 // Bind hover and periodic state checker
 (function initRetroFlashEvents() {
   function setup() {
+    if (typeof document === 'undefined') return;
     const wrapper = document.getElementById('tab-retro-wrapper');
     const hoverCard = document.getElementById('retro-hover-card');
     const tabBtn = document.getElementById('tab-retro');
@@ -1247,6 +1248,7 @@ window.attachRetroDailyReviewNoteChangeListener = attachRetroDailyReviewNoteChan
     window.updateRetroFlashAndHoverState();
   }
 
+  if (typeof document === 'undefined') return;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', setup);
   } else {
@@ -1255,6 +1257,7 @@ window.attachRetroDailyReviewNoteChangeListener = attachRetroDailyReviewNoteChan
 
   // Check state periodically (every 30 seconds)
   setInterval(() => {
+    if (typeof document === 'undefined') return;
     try { window.updateRetroFlashAndHoverState(); } catch(_e) {}
   }, 30000);
 })();
