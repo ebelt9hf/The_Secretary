@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { loadScriptsIntoGlobal } from '../helpers/load-globals.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -57,5 +58,38 @@ describe('Version Management and Main Branch Parity', () => {
     expect(pkg.scripts['check:version']).toBeDefined();
     expect(pkg.scripts['bump:patch']).toBeDefined();
     expect(pkg.scripts['test']).toContain('npm run check:version');
+  });
+
+  it('includes an About section in settings and populates version in switchPrefsTab', () => {
+    const appHtml = fs.readFileSync(path.join(ROOT, 'app.html'), 'utf8');
+    expect(appHtml).toContain('id="prefs-sec-about"');
+    expect(appHtml).toContain('id="prefs-about-version"');
+
+    document.body.innerHTML = `
+      <span id="connect-version-hint" data-version="4.0.101">Version 4.0.101</span>
+      <button class="prefs-tab-btn" data-tab="general"></button>
+      <button class="prefs-tab-btn" data-tab="system"></button>
+      <div id="prefs-sec-about" style="display:none">
+        <span id="prefs-about-version"></span>
+      </div>
+    `;
+    globalThis.t = globalThis.t || ((k) => k);
+    globalThis.normalizeLanguageCode = globalThis.normalizeLanguageCode || ((c) => c || 'en');
+    loadScriptsIntoGlobal([
+      'js/translations.js',
+      'js/app-i18n.js',
+      'js/app-utils.js',
+      'js/app-fs.js',
+      'js/app-state.js',
+      'js/app-bridge.js',
+      'js/app-init.js'
+    ]);
+
+    window.switchPrefsTab('system');
+    expect(document.getElementById('prefs-sec-about').style.display).toBe('block');
+    expect(document.getElementById('prefs-about-version').textContent).toBe('4.0.101');
+
+    window.switchPrefsTab('general');
+    expect(document.getElementById('prefs-sec-about').style.display).toBe('none');
   });
 });

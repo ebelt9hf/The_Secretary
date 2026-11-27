@@ -59,20 +59,20 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#1e1b4b">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="css/app-base.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-board.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-focus.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-todos.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-editor.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-misc.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-planner.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-collab.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.101">
-<link rel="stylesheet" href="css/app-chat.css?v=4.0.101">
-<link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.101" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.101"></noscript>
+<link rel="stylesheet" href="css/app-base.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-board.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-focus.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-todos.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-editor.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-misc.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-planner.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-collab.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-omnibar.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-dailyreview.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-tutorial.css?v=4.0.102">
+<link rel="stylesheet" href="css/app-chat.css?v=4.0.102">
+<link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.102" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="css/vendor/katex.min.css?v=4.0.102"></noscript>
 <script>
   (function() {
     try {
@@ -270,7 +270,7 @@
       </div>
 
       <div class="landing-kbd-hint">
-        <span id="connect-version-hint" data-version="4.0.101">Version 4.0.101</span>
+        <span id="connect-version-hint" data-version="4.0.102">Version 4.0.102</span>
       </div>
     </div>
 
@@ -1165,6 +1165,14 @@
         </div>
       </div>
 
+      <div class="prefs-section" id="prefs-sec-about">
+        <h3 data-i18n="prefs.aboutTitle">About</h3>
+        <div class="prefs-row">
+          <span class="prefs-label" id="prefs-about-version-label" data-i18n="prefs.versionLabel">Application Version</span>
+          <span id="prefs-about-version" style="font-family:var(--font-mono, monospace); font-weight:600; color:var(--text);"></span>
+        </div>
+      </div>
+
       <div class="prefs-section" id="prefs-sec-folder">
         <h3 data-i18n="prefs.folder">Folder</h3>
         <div class="prefs-row">
@@ -1734,12 +1742,12 @@
 <div class="toast" id="toast"></div>
 
 <!-- Vendor Markdown & LaTeX libraries -->
-<script src="js/vendor/katex.min.js?v=4.0.101"></script>
-<script src="js/vendor/katex-auto-render.min.js?v=4.0.101"></script>
-<script src="js/vendor/dompurify.min.js?v=4.0.101"></script>
-<script src="js/vendor/marked.min.js?v=4.0.101"></script>
-<script src="js/vendor/turndown.js?v=4.0.101"></script>
-<script src="js/vendor/turndown-plugin-gfm.js?v=4.0.101"></script>
+<script src="js/vendor/katex.min.js?v=4.0.102"></script>
+<script src="js/vendor/katex-auto-render.min.js?v=4.0.102"></script>
+<script src="js/vendor/dompurify.min.js?v=4.0.102"></script>
+<script src="js/vendor/marked.min.js?v=4.0.102"></script>
+<script src="js/vendor/turndown.js?v=4.0.102"></script>
+<script src="js/vendor/turndown-plugin-gfm.js?v=4.0.102"></script>
 <script>
   // Ensure marked options are securely set
   try {
@@ -1787,42 +1795,42 @@
   } catch (e) { console.warn('Could not add turndown math rules', e); }
 </script>
 
-<script src="js/app-state.js?v=4.0.101"></script>
-<script src="js/app-utils.js?v=4.0.101"></script>
-<script src="js/app-icons.js?v=4.0.101"></script>
-<script src="js/app-popover-manager.js?v=4.0.101"></script>
-<script src="js/translations.js?v=4.0.101"></script>
-<script src="js/app-i18n.js?v=4.0.101"></script>
-<script src="js/app-bridge.js?v=4.0.101"></script>
-<script src="js/app-pwa.js?v=4.0.101"></script>
-<script src="js/app-fs.js?v=4.0.101"></script>
-<script src="js/firebase-bundle.js?v=4.0.101"></script>
-<script src="js/firebase-config.js?v=4.0.101"></script>
-<script src="js/app-crypto.js?v=4.0.101"></script>
-<script src="js/app-image-optimizer.js?v=4.0.101"></script>
-<script src="js/app-idb.js?v=4.0.101"></script>
-<script src="js/app-firebase-sync.js?v=4.0.101"></script>
-<script src="js/app-sync-pipeline.js?v=4.0.101"></script>
-<script src="js/app-storage.js?v=4.0.101"></script>
-<script src="js/storage-migration.js?v=4.0.101"></script>
-<script src="js/app-stash-service.js?v=4.0.101"></script>
-<script src="js/app-omnibar.js?v=4.0.101"></script>
-<script src="js/app-topic-memory.js?v=4.0.101"></script>
-<script src="js/app-prompts.js?v=4.0.101"></script>
-<script src="js/app-llm.js?v=4.0.101"></script>
-<script src="js/app-dailyreview.js?v=4.0.101"></script>
-<script src="js/app-notes.js?v=4.0.101"></script>
-<script src="js/app-todos-board.js?v=4.0.101"></script>
-<script src="js/app-board.js?v=4.0.101"></script>
-<script src="js/app-focus.js?v=4.0.101"></script>
-<script src="js/app-overlay.js?v=4.0.101"></script>
-<script src="js/app-calendar-sync.js?v=4.0.101"></script>
-<script src="js/app-planner.js?v=4.0.101"></script>
-<script src="js/app-collab.js?v=4.0.101"></script>
-<script src="js/app-retro.js?v=4.0.101"></script>
-<script src="js/app-tutorial.js?v=4.0.101"></script>
-<script src="js/app-graph-view.js?v=4.0.101"></script>
-<script src="js/app-chat.js?v=4.0.101"></script>
-<script src="js/app-init.js?v=4.0.101"></script>
+<script src="js/app-state.js?v=4.0.102"></script>
+<script src="js/app-utils.js?v=4.0.102"></script>
+<script src="js/app-icons.js?v=4.0.102"></script>
+<script src="js/app-popover-manager.js?v=4.0.102"></script>
+<script src="js/translations.js?v=4.0.102"></script>
+<script src="js/app-i18n.js?v=4.0.102"></script>
+<script src="js/app-bridge.js?v=4.0.102"></script>
+<script src="js/app-pwa.js?v=4.0.102"></script>
+<script src="js/app-fs.js?v=4.0.102"></script>
+<script src="js/firebase-bundle.js?v=4.0.102"></script>
+<script src="js/firebase-config.js?v=4.0.102"></script>
+<script src="js/app-crypto.js?v=4.0.102"></script>
+<script src="js/app-image-optimizer.js?v=4.0.102"></script>
+<script src="js/app-idb.js?v=4.0.102"></script>
+<script src="js/app-firebase-sync.js?v=4.0.102"></script>
+<script src="js/app-sync-pipeline.js?v=4.0.102"></script>
+<script src="js/app-storage.js?v=4.0.102"></script>
+<script src="js/storage-migration.js?v=4.0.102"></script>
+<script src="js/app-stash-service.js?v=4.0.102"></script>
+<script src="js/app-omnibar.js?v=4.0.102"></script>
+<script src="js/app-topic-memory.js?v=4.0.102"></script>
+<script src="js/app-prompts.js?v=4.0.102"></script>
+<script src="js/app-llm.js?v=4.0.102"></script>
+<script src="js/app-dailyreview.js?v=4.0.102"></script>
+<script src="js/app-notes.js?v=4.0.102"></script>
+<script src="js/app-todos-board.js?v=4.0.102"></script>
+<script src="js/app-board.js?v=4.0.102"></script>
+<script src="js/app-focus.js?v=4.0.102"></script>
+<script src="js/app-overlay.js?v=4.0.102"></script>
+<script src="js/app-calendar-sync.js?v=4.0.102"></script>
+<script src="js/app-planner.js?v=4.0.102"></script>
+<script src="js/app-collab.js?v=4.0.102"></script>
+<script src="js/app-retro.js?v=4.0.102"></script>
+<script src="js/app-tutorial.js?v=4.0.102"></script>
+<script src="js/app-graph-view.js?v=4.0.102"></script>
+<script src="js/app-chat.js?v=4.0.102"></script>
+<script src="js/app-init.js?v=4.0.102"></script>
 </body>
 </html>

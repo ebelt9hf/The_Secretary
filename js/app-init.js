@@ -788,8 +788,13 @@ function switchPrefsTab(tabId) {
     schedule: ['prefs-sec-schedule'],
     ai: ['prefs-sec-ai'],
     sync: ['prefs-sec-sync', 'prefs-sec-user-info'],
-    system: ['prefs-sec-folder', 'prefs-sec-maintenance', 'prefs-sec-help']
+    system: ['prefs-sec-folder', 'prefs-sec-maintenance', 'prefs-sec-help', 'prefs-sec-about']
   };
+  const aboutVerEl = document.getElementById('prefs-about-version');
+  if (aboutVerEl) {
+    const ver = document.getElementById('connect-version-hint')?.getAttribute('data-version');
+    if (ver) aboutVerEl.textContent = ver;
+  }
   Object.entries(sections).forEach(([tId, secIds]) => {
     const isCurrent = (tId === tabId);
     secIds.forEach(id => {
