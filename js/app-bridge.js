@@ -585,8 +585,8 @@
           } else if (path) {
             url.hash = `path=${encodeURIComponent(path)}`;
           }
-          global.open(url.toString(), '_blank');
-          return true;
+          const openedWin = global.open(url.toString(), '_blank');
+          return openedWin !== null;
         } catch (e) {
           console.warn('AppBridge.noteWindow.open failed', e);
           return false;

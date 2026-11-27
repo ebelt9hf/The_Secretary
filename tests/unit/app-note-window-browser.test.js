@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { loadScriptsIntoGlobal } from '../helpers/load-globals.js';
 import fs from 'fs';
 import path from 'path';
@@ -44,6 +44,10 @@ describe('Note Window in Browser Environment', () => {
         </div>
       </div>
     `;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('AppBridge.noteWindow.open preserves window.opener in browser mode (no "noopener")', () => {
@@ -137,16 +141,21 @@ describe('Note Window in Browser Environment', () => {
       window.rootHandle = h;
     });
 
+    const origOpenNoteOverlay = globalThis.openNoteOverlay;
     globalThis.openNoteOverlay = vi.fn().mockImplementation(async (path) => {
       window.currentNote = window.opener.currentNote;
     });
 
-    await window.applyHashState();
+    try {
+      await window.applyHashState();
 
-    expect(window.mountFolder).toHaveBeenCalledWith(mockRootHandle);
-    expect(window.rootHandle).toBe(mockRootHandle);
-    expect(globalThis.openNoteOverlay).toHaveBeenCalledWith('notes/demo-42.html', null, null, false, null, { sameWindow: true });
-    expect(window.currentNote.title).toBe('Demo Note 42');
+      expect(window.mountFolder).toHaveBeenCalledWith(mockRootHandle);
+      expect(window.rootHandle).toBe(mockRootHandle);
+      expect(globalThis.openNoteOverlay).toHaveBeenCalledWith('notes/demo-42.html', null, null, false, null, { sameWindow: true });
+      expect(window.currentNote.title).toBe('Demo Note 42');
+    } finally {
+      globalThis.openNoteOverlay = origOpenNoteOverlay;
+    }
   });
 
   it('note-window.html template does not hardcode is-electron on body', () => {
@@ -228,6 +237,7 @@ describe('Note Window in Browser Environment', () => {
     globalThis.manifest = [{ id: 'note-close-1', path: 'notes/note-close-1.html', title: 'Original Title' }];
     globalThis.hasUnsavedNoteOverlayChanges = vi.fn().mockReturnValue(true);
 
+    const origRenderInspectorPanel = globalThis.renderInspectorPanel;
     const inspectorSpy = vi.fn().mockImplementation(async () => {
       // Simulate heavy or hung inspector backlink scan if called during close
       await new Promise(() => {});
@@ -249,12 +259,16 @@ describe('Note Window in Browser Environment', () => {
     globalThis.renderInspectorPanel = inspectorSpy;
     globalThis.hasUnsavedNoteOverlayChanges = vi.fn().mockReturnValue(true);
 
-    await globalThis.closeNoteOverlay(true);
+    try {
+      await globalThis.closeNoteOverlay(true);
 
-    expect(inspectorSpy).not.toHaveBeenCalled();
-    expect(document.getElementById('note-close-progress-overlay')).toBeNull();
-    expect(document.getElementById('note-edit-overlay').style.display).toBe('none');
-    expect(globalThis._noteCloseInProgress).toBe(false);
+      expect(inspectorSpy).not.toHaveBeenCalled();
+      expect(document.getElementById('note-close-progress-overlay')).toBeNull();
+      expect(document.getElementById('note-edit-overlay').style.display).toBe('none');
+      expect(globalThis._noteCloseInProgress).toBe(false);
+    } finally {
+      globalThis.renderInspectorPanel = origRenderInspectorPanel;
+    }
   });
 
   it('applyHashState with #tab=notes&note=<id> in main app window does not set _isFocusedMode or focused-note-mode', async () => {
@@ -270,14 +284,19 @@ describe('Note Window in Browser Environment', () => {
     globalThis.activeTab = 'notes';
     globalThis.manifest = [{ id: 'note-in-app', path: 'notes/note-in-app.html', title: 'In App Note' }];
     globalThis.switchTab = vi.fn().mockResolvedValue(undefined);
+    const origOpenNoteOverlay = globalThis.openNoteOverlay;
     globalThis.openNoteOverlay = vi.fn().mockResolvedValue(undefined);
 
-    window.location.hash = '#tab=notes&note=note-in-app';
-    await window.applyHashState();
+    try {
+      window.location.hash = '#tab=notes&note=note-in-app';
+      await window.applyHashState();
 
-    expect(globalThis._isFocusedMode).toBe(false);
-    expect(document.body.classList.contains('focused-note-mode')).toBe(false);
-    expect(globalThis.openNoteOverlay).toHaveBeenCalledWith('notes/note-in-app.html', null, null, false, null, { sameWindow: true });
+      expect(globalThis._isFocusedMode).toBe(false);
+      expect(document.body.classList.contains('focused-note-mode')).toBe(false);
+      expect(globalThis.openNoteOverlay).toHaveBeenCalledWith('notes/note-in-app.html', null, null, false, null, { sameWindow: true });
+    } finally {
+      globalThis.openNoteOverlay = origOpenNoteOverlay;
+    }
   });
 
   it('saveManifest({ force: true }) settles pending waiters even if an in-flight manifest flush rejects', async () => {
@@ -307,5 +326,126 @@ describe('Note Window in Browser Environment', () => {
     const [firstResult] = await Promise.all([firstSave, secondSave]);
     expect(firstResult).toBe('first-rejected');
     expect(callCount).toBe(2);
+  });
+
+  it('openNoteOverlay opens in a separate window by default in installed PWA web app mode', async () => {
+    window.AppBridge.isElectron = false;
+    globalThis._isFocusedMode = false;
+    globalThis.activeTab = 'notes';
+    window.location.hash = '#tab=notes';
+    globalThis.manifest = [{ id: 'note-web-1', path: 'notes/note-web-1.html', title: 'Web Note 1' }];
+
+    const origMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((q) => ({
+      matches: q === '(display-mode: window-controls-overlay)' || q === '(display-mode: standalone)',
+      media: q
+    }));
+    const openSpy = vi.fn().mockReturnValue({ closed: false });
+    window.open = openSpy;
+    const bridgeOpenSpy = vi.spyOn(window.AppBridge.noteWindow, 'open');
+
+    try {
+      await globalThis.openNoteOverlay('notes/note-web-1.html');
+
+      expect(bridgeOpenSpy).toHaveBeenCalledWith('note-web-1', 'notes/note-web-1.html');
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(openSpy.mock.calls[0][0]).toContain('#note=note-web-1');
+      expect(document.getElementById('note-edit-overlay').style.display).toBe('none');
+    } finally {
+      window.matchMedia = origMatchMedia;
+    }
+  });
+
+  it('openNoteOverlay opens within the browser window in a regular browser tab unless openInNewWindow is set', async () => {
+    window.AppBridge.isElectron = false;
+    globalThis._isFocusedMode = false;
+    globalThis.activeTab = 'notes';
+    window.location.hash = '#tab=notes';
+    globalThis.manifest = [{ id: 'note-tab-1', path: 'notes/note-tab-1.html', title: 'Tab Note 1' }];
+    globalThis.StorageAPI = {
+      getNoteFromCache: vi.fn().mockReturnValue(null),
+      readNoteContent: vi.fn().mockResolvedValue('<!DOCTYPE html><html><body><main><p>In-tab</p></main></body></html>')
+    };
+
+    const origMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    const openSpy = vi.fn().mockReturnValue({ closed: false });
+    window.open = openSpy;
+    const bridgeOpenSpy = vi.spyOn(window.AppBridge.noteWindow, 'open');
+
+    try {
+      await globalThis.openNoteOverlay('notes/note-tab-1.html');
+      expect(bridgeOpenSpy).not.toHaveBeenCalled();
+
+      await globalThis.openNoteOverlay('notes/note-tab-1.html', null, null, false, null, { openInNewWindow: true });
+      expect(bridgeOpenSpy).toHaveBeenCalledWith('note-tab-1', 'notes/note-tab-1.html');
+      expect(openSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.matchMedia = origMatchMedia;
+    }
+  });
+
+  it('openNoteOverlay does not open a separate window when viewing a note (viewMode/previewOnly) or in daily review even in web app/Electron mode', async () => {
+    window.AppBridge.isElectron = true;
+    globalThis._isFocusedMode = false;
+    globalThis.activeTab = 'notes';
+    window.location.hash = '#tab=notes';
+    globalThis.manifest = [{ id: 'note-view-1', path: 'notes/note-view-1.html', title: 'View Note 1' }];
+    globalThis.StorageAPI = {
+      getNoteFromCache: vi.fn().mockReturnValue(null),
+      readNoteContent: vi.fn().mockResolvedValue('<!DOCTYPE html><html><body><main><p>Viewed</p></main></body></html>')
+    };
+
+    const bridgeOpenSpy = vi.spyOn(window.AppBridge.noteWindow, 'open');
+
+    await globalThis.openNoteOverlay('notes/note-view-1.html', null, null, false, null, { viewMode: true });
+    expect(bridgeOpenSpy).not.toHaveBeenCalled();
+
+    await globalThis.openNoteOverlay('notes/note-view-1.html', null, null, false, null, { previewOnly: true });
+    expect(bridgeOpenSpy).not.toHaveBeenCalled();
+
+    globalThis.activeTab = 'daily-review';
+    await globalThis.openNoteOverlay('notes/note-view-1.html');
+    expect(bridgeOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('openNoteOverlay falls back to in-page overlay when popup is blocked in PWA web app mode', async () => {
+    window.AppBridge.isElectron = false;
+    globalThis._isFocusedMode = false;
+    globalThis.activeTab = 'notes';
+    window.location.hash = '#tab=notes';
+    globalThis.manifest = [{ id: 'note-fallback-1', path: 'notes/note-fallback-1.html', title: 'Fallback Note' }];
+    globalThis.StorageAPI = {
+      getNoteFromCache: vi.fn().mockReturnValue(null),
+      readNoteContent: vi.fn().mockResolvedValue('<!DOCTYPE html><html><body><main><p>Fallback</p></main></body></html>')
+    };
+
+    const origMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+    window.open = vi.fn().mockReturnValue(null);
+
+    try {
+      await globalThis.openNoteOverlay('notes/note-fallback-1.html');
+      expect(globalThis.StorageAPI.readNoteContent).toHaveBeenCalledWith('notes/note-fallback-1.html');
+      expect(document.getElementById('note-edit-overlay').style.display).toBe('flex');
+    } finally {
+      window.matchMedia = origMatchMedia;
+    }
+  });
+
+  it('AppBridge.noteWindow.open returns false when popup is blocked (window.open returns null)', () => {
+    window.open = vi.fn().mockReturnValue(null);
+    window.location.href = 'http://localhost:5173/app.html#tab=notes';
+
+    const result = window.AppBridge.noteWindow.open('blocked-note', 'notes/blocked.html');
+    expect(result).toBe(false);
+  });
+
+  it('css/app-misc.css applies WCO titlebar padding and no-drag rules to #note-edit-overlay .overlay-header', () => {
+    const cssPath = path.resolve(process.cwd(), 'css/app-misc.css');
+    const css = fs.readFileSync(cssPath, 'utf8');
+
+    expect(css).toContain('html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header');
+    expect(css).toContain('html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header button');
   });
 });

@@ -1475,11 +1475,12 @@ body.is-electron-mac:not(.is-fullscreen) #screen-connect .landing-drag-strip {
 
 /* ── PWA Window Controls Overlay (Chrome / Edge desktop) ── */
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header,
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header,
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header {
   min-height: env(titlebar-area-height, var(--win-titlebar-h, 40px)) !important;
   padding-left: max(0.9rem, env(titlebar-area-x, 0px)) !important;
-  padding-right: max(0.9rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))) !important;
+  padding-right: max(0.9rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.5rem)) !important;
   -webkit-app-region: drag;
   app-region: drag;
 }
@@ -1489,6 +1490,20 @@ html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row a,
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row input,
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row select,
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .topbar-main-row [role="button"],
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header button,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header a,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header input,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header select,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header [onclick],
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header [role="button"],
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header .topbar-title-wrap,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) #note-edit-overlay .overlay-header .overlay-header-actions,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header button,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header a,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header input,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header select,
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header [onclick],
+html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) body.focused-note-mode .overlay-header [role="button"],
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header button,
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header a,
 html.is-pwa-wco:not(.is-electron):not(.is-fullscreen) .daily-review-header input,

@@ -1310,7 +1310,17 @@ async function openNoteOverlay(path, prefillGroup, prefillMajor, isPop = false, 
 async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = false, prefillTopic = null, options = {}) {
   const isDedicatedNoteWindow = (typeof isFocusedNoteWindow === 'function' ? isFocusedNoteWindow() : (typeof _isFocusedMode !== 'undefined' && _isFocusedMode)) || (location.hash && !location.hash.includes('tab=') && (location.hash.includes('note=') || location.hash.includes('path=') || location.hash.includes('preloaded=true')));
   const isInDailyReview = (typeof activeTab !== 'undefined' && activeTab === 'daily-review') || !!options?.embeddedInDailyReview;
-  if (window.AppBridge?.isElectron && window.AppBridge?.noteWindow && (!isDedicatedNoteWindow || options?.openInNewWindow) && !options?.sameWindow && !isInDailyReview) {
+  const isViewOnly = (!!options?.viewMode || !!options?.previewOnly) && !options?.openInNewWindow;
+  const isStandaloneApp = !!(
+    window.AppBridge?.isElectron ||
+    window.PwaManager?.isStandalone ||
+    (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: window-controls-overlay)').matches
+    )) ||
+    (typeof navigator !== 'undefined' && navigator.standalone === true)
+  );
+  if (window.AppBridge?.noteWindow && (isStandaloneApp || options?.openInNewWindow) && (!isDedicatedNoteWindow || options?.openInNewWindow) && !options?.sameWindow && !isInDailyReview && !isViewOnly) {
     let meta = null;
     if (path) {
       meta = (typeof getMetaByPath === 'function' ? getMetaByPath(path) : null)
@@ -1320,15 +1330,15 @@ async function _doOpenNoteOverlay(path, prefillGroup, prefillMajor, isPop = fals
     const normP = path ? String(path).replace(/\\/g, '/') : '';
     const resolvedNoteId = meta?.id || (normP && !normP.includes('/') ? normP : null);
     if (resolvedNoteId || path) {
-      window.AppBridge.noteWindow.open(resolvedNoteId, normP || path);
-      return;
+      const opened = window.AppBridge.noteWindow.open(resolvedNoteId, normP || path);
+      if (opened !== false) return;
     } else {
       currentNote = { path: null, originalHTML: null, id: generateNoteId(), title: typeof t === 'function' ? t('common.untitledNote') : 'Untitled Note', date: new Date().toISOString().slice(0,10),
       group_tags: prefillGroup ? [prefillGroup] : [], major_topic_tags: prefillMajor ? [prefillMajor] : [], topic_tags: prefillTopic ? [prefillTopic] : [], extra_tags: [], mainHTML: getDefaultNoteTemplateHTML(), summary: '' };
       const savedOk = await autoSaveNote({ silent: true, isFinal: true });
       if (savedOk && currentNote?.id && currentNote?.path) {
-        window.AppBridge.noteWindow.open(currentNote.id, currentNote.path.replace(/\\/g, '/'));
-        return;
+        const opened = window.AppBridge.noteWindow.open(currentNote.id, currentNote.path.replace(/\\/g, '/'));
+        if (opened !== false) return;
       }
     }
   }
